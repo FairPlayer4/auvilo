@@ -23,6 +23,9 @@ class AlarmReceiver : BroadcastReceiver() {
         if (intent.getBooleanExtra(AlarmScheduler.EXTRA_FROM_PLAN, false)) {
             AlarmScheduler.scheduleNextPlanSlot(context)
         }
+        if (intent.hasExtra(AlarmScheduler.EXTRA_QUICK_INDEX)) {
+            AlarmScheduler.onQuickAlarmFired(context, intent.getIntExtra(AlarmScheduler.EXTRA_QUICK_INDEX, 0), plannedAt)
+        }
 
         if (mode == AlarmMode.SILENT) {
             Notifications.showSilent(context, label)
@@ -31,7 +34,8 @@ class AlarmReceiver : BroadcastReceiver() {
         }
 
         if (intent.getBooleanExtra(AlarmScheduler.EXTRA_HOME_CHECK, false)) {
-            HomeLocation.checkAtHome(context, goAsync())
+            val pending = goAsync()
+            HomeLocation.checkAtHome(context) { pending.finish() }
         }
     }
 }

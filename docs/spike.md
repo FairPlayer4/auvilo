@@ -71,11 +71,12 @@ Bauen: `cd spike && gradlew assembleDebug` → `app/build/outputs/apk/debug/app-
 
 | Datei | Aufgabe |
 |---|---|
-| `MainActivity.kt` | Steuerzentrale: Berechtigungen prüfen/erteilen, Testplan starten/stoppen, Sofort-Tests, Zuhause setzen, Protokoll anzeigen |
-| `TestPlan.kt` | Feste Testzeiten **02:00, 08:00, 13:00, 19:00, 20:30**; Modus nach Uhrzeit: 7–21 Uhr sichtbar, 18–21 Uhr laut, sonst still |
+| `MainActivity.kt` | Steuerzentrale: Berechtigungen prüfen/erteilen, Schnelltest und Mehrtagestest starten/stoppen, Sofort-Tests, Zuhause setzen/prüfen, Protokoll anzeigen |
+| `SpikeApp.kt` | Protokolliert jeden Prozessstart (zeigt, wann das System die App beendet hatte) |
+| `TestPlan.kt` | Schnelltest: 60 min, alle 5 min. Mehrtagestest: feste Zeiten **02:00, 08:00, 13:00, 19:00, 20:30**; Modus nach Uhrzeit: 7–21 Uhr sichtbar, 18–21 Uhr laut, sonst still |
 | `AlarmScheduler.kt` | Plant Alarme mit `setAlarmClock()` (Kette: jeder Plan-Alarm plant den nächsten); erkennt Alarme, die nie ausgelöst haben ("VERPASST") |
 | `AlarmReceiver.kt` | Wird vom System geweckt: misst die **Verspätung**, protokolliert den Energiespar-Zustand, startet den Alarm |
-| `AlarmService.kt` | Foreground-Service: Vollbild-Benachrichtigung, **eigenes Vibrationsmuster** in Schleife, Alarmton im Modus laut; Ende durch *Bestätigen*, *+5 min* oder nach 5 min ohne Reaktion |
+| `AlarmService.kt` | Foreground-Service: Vollbild-Benachrichtigung, **eigenes Vibrationsmuster** in Schleife, Alarmton im Modus laut; Ende durch *Bestätigen*, *+5 min* oder nach 3 min ohne Reaktion |
 | `AlarmActivity.kt` | Vollbild über dem Sperrbildschirm mit *Bestätigen* / *+5 min* |
 | `HomeLocation.kt`, `GeofenceReceiver.kt` | Geofence "zuhause" (150 m) mit Ankunft/Verlassen; um 19:00 Prüfung "bin ich zuhause?" |
 | `BootReceiver.kt` | Nach Neustart: Alarm und Geofence neu registrieren, verpasste Alarme melden |
@@ -90,7 +91,36 @@ bleibt im App-Speicher (Koordinaten "zuhause" + Protokolleinträge mit Distanz).
 - In der App zu erteilen: Benachrichtigungen, Vollbild, Akku "nicht optimieren",
   Standort genau + "immer erlauben".
 
-### Ablauf auf dem Handy
+## 5. Schnelltest: eine Stunde
+
+Ziel: In einer Stunde genug Daten, um mit der Implementierung zu starten. Die echten
+Samsung-Effekte über mehrere Tage (Schlafende Apps, Standby-Buckets) liefert danach der
+Mehrtagestest. Doze und Akkumanagement **simulieren** wir per adb, statt Stunden zu warten.
+
+Die App erzeugt im Schnelltest **alle 5 min einen Alarm** (12 Stück), mit wechselnder
+Stufe: sichtbar → laut → still, jeweils mit Zuhause-Prüfung (Distanz im Protokoll).
+Ein Alarm ohne Reaktion endet nach 3 min.
+
+| Zeit | Wer | Was | Prüft |
+|---|---|---|---|
+| Vorher (~10 min, USB) | beide | Installieren, Berechtigungen, *Zuhause setzen*, 3 Sofort-Tests (still/sichtbar/laut) mit **gesperrtem, lautlosem** Handy | Vollbild, Vibrationsmuster, Alarmton trotz lautlos |
+| 0 | du | *Schnelltest Start*, Handy sperren, liegen lassen | |
+| 0–15 (USB) | ich (adb) | Akku "abgesteckt" simulieren, **Deep Doze erzwingen**; danach App in Bucket **restricted** | Alarme in Doze/restricted pünktlich? |
+| 15–35 (ohne USB) | du | **Mind. 300 m weg** von zuhause, ~10 min draußen, zurück. Handy gesperrt in der Tasche. Einen Alarm bestätigen, einen ignorieren | Geofence verlassen/ankommen + Verzögerung, Alarm in der Tasche |
+| 35–45 | du | Handy **neu starten**, einmal entsperren, App **nicht** öffnen | Alarme nach Neustart |
+| 45–60 (USB) | ich (adb) | App-Prozess beenden (wie System), am Ende **Stopp erzwingen** (wie Samsung-Tiefschlaf) | Neustart des Prozesses, Erkennung verpasster Alarme |
+| 60 | ich | Protokoll auslesen, Simulationen zurücksetzen, Mehrtagestest starten | |
+
+adb-Befehle (alle umkehrbar, am Ende zurückgesetzt):
+- `dumpsys battery unplug` / `reset` – Laden ausblenden, sonst gibt es kein Doze
+- `dumpsys deviceidle force-idle` / `unforce` – Deep Doze sofort
+- `am set-standby-bucket com.avlreminder.spike restricted` / `active`
+- `am kill com.avlreminder.spike` – Prozess beenden wie bei Speichermangel
+- `am force-stop com.avlreminder.spike` – löscht alle Alarme der App (schlimmster Fall)
+
+Ergebnis danach: Was in der Stunde geklärt ist und was erst der Mehrtagestest zeigt.
+
+### Ablauf auf dem Handy (Mehrtagestest)
 1. Installieren: `adb install app-debug.apk`
 2. App öffnen, alle Berechtigungen auf ✅ bringen.
 3. Zuhause: Zuhause → *Aktuellen Standort als Zuhause setzen*.

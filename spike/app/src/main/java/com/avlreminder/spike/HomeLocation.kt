@@ -3,7 +3,6 @@ package com.avlreminder.spike
 import android.Manifest
 import android.annotation.SuppressLint
 import android.app.PendingIntent
-import android.content.BroadcastReceiver
 import android.content.Context
 import android.content.Intent
 import android.content.pm.PackageManager
@@ -90,11 +89,11 @@ object HomeLocation {
 
     /** The 19:00 rule: at home now → reminder, otherwise the day's training is skipped. */
     @SuppressLint("MissingPermission")
-    fun checkAtHome(context: Context, pending: BroadcastReceiver.PendingResult) {
+    fun checkAtHome(context: Context, onDone: () -> Unit) {
         val home = home(context)
         if (home == null || !hasBackgroundLocation(context)) {
             SpikeLog.log(context, "Zuhause-Prüfung übersprungen (Zuhause gesetzt=${home != null}, Hintergrund-Standort=${hasBackgroundLocation(context)})")
-            pending.finish()
+            onDone()
             return
         }
         LocationServices.getFusedLocationProviderClient(context)
@@ -113,7 +112,7 @@ object HomeLocation {
                             "Geofence-Status ${lastGeofenceState(context)})",
                     )
                 }
-                pending.finish()
+                onDone()
             }
     }
 

@@ -21,6 +21,18 @@ enum class AlarmMode(val label: String) {
 
 data class Slot(val time: LocalTime, val label: String, val homeCheck: Boolean = false)
 
+/**
+ * One-hour quick test: an alarm every [INTERVAL_MINUTES] with rotating modes, each with
+ * a home check, so a walk away from home shows up in the log.
+ */
+object QuickTest {
+    const val INTERVAL_MINUTES = 5L
+    const val DURATION_MINUTES = 60L
+    private val modes = listOf(AlarmMode.VISIBLE, AlarmMode.LOUD, AlarmMode.SILENT)
+
+    fun modeFor(index: Int) = modes[index % modes.size]
+}
+
 /** Fixed daily slots for the multi-day test. */
 object TestPlan {
     val slots = listOf(

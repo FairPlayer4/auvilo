@@ -47,7 +47,6 @@ class MainActivity : ComponentActivity() {
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
-        Notifications.createChannels(this)
         setContent {
             MaterialTheme {
                 Surface(Modifier.fillMaxSize()) {
@@ -100,7 +99,14 @@ private fun MainScreen(refresh: Int, onChanged: () -> Unit) {
         }
         Text("Zustand: ${SpikeLog.deviceState(context)}", fontSize = 12.sp)
 
-        Heading("Testplan (02:00, 08:00, 13:00, 19:00, 20:30)")
+        Heading("Schnelltest (60 min, alle 5 min)")
+        Text(AlarmScheduler.quickStatus(context) ?: "Gestoppt")
+        Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+            Button(onClick = { AlarmScheduler.startQuickTest(context); onChanged() }) { Text("Start") }
+            OutlinedButton(onClick = { AlarmScheduler.stopQuickTest(context, "manuell"); onChanged() }) { Text("Stopp") }
+        }
+
+        Heading("Mehrtagestest (02:00, 08:00, 13:00, 19:00, 20:30)")
         Text(
             if (AlarmScheduler.isPlanActive(context)) "Aktiv – nächster: ${AlarmScheduler.nextPlanAlarm(context)}"
             else "Gestoppt",
@@ -129,6 +135,10 @@ private fun MainScreen(refresh: Int, onChanged: () -> Unit) {
             enabled = granted(Manifest.permission.ACCESS_FINE_LOCATION),
             onClick = { HomeLocation.setHomeToCurrentLocation(context, onChanged) },
         ) { Text("Aktuellen Standort als Zuhause setzen") }
+        OutlinedButton(
+            enabled = HomeLocation.home(context) != null,
+            onClick = { HomeLocation.checkAtHome(context, onChanged) },
+        ) { Text("Zuhause-Prüfung jetzt") }
 
         Row(verticalAlignment = Alignment.Bottom) {
             Heading("Protokoll (neueste zuerst)")

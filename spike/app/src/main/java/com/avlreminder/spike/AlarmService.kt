@@ -31,7 +31,7 @@ class AlarmService : Service() {
         private const val EXTRA_LABEL = "label"
         private const val EXTRA_MODE = "mode"
 
-        private const val TIMEOUT_MILLIS = 5 * 60 * 1000L
+        private const val TIMEOUT_MILLIS = 3 * 60 * 1000L
 
         /** Long, unusual pattern (ms): off/on pairs, easy to tell apart from normal notifications. */
         private val VIBRATION_PATTERN = longArrayOf(0, 800, 200, 800, 200, 100, 100, 100, 100, 100, 1200)
