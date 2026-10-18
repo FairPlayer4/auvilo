@@ -43,8 +43,23 @@ Android-CLI) fehl, weil der Unix-Domain-Socket im Standard-Temp-Verzeichnis
   `%LOCALAPPDATA%\Programs` entpacken. Alternativ reicht VS Code + Gradle-CLI.
 - **Emulator gestartet**: noch nicht – dafür fehlt ein System-Image (~1,5 GB).
   Beschleunigung ist aber bestätigt.
-- **Echtes Gerät per USB**: Hersteller-USB-Treiber brauchen oft Admin.
-  Ausweg: **Wireless Debugging** (Android 11+, `adb pair`) – braucht keinen Treiber.
-  Für die App ist Testen am echten Gerät wichtig (Akku-Management, Alarme, Geofences).
-- **Firmen-Sicherheitssoftware** könnte adb über WLAN oder Emulator-Netzwerk blockieren
-  – beim ersten echten Test prüfen.
+- **Firmen-Sicherheitssoftware** könnte adb über WLAN oder das Emulator-Netzwerk
+  blockieren (USB funktioniert, siehe unten).
+
+## Echtes Gerät: ✅ per USB (2026-10-18)
+
+- S24 Ultra per USB-Kabel angeschlossen, USB-Debugging aktiviert → `adb devices`
+  zeigt das Gerät. **Kein Treiber nötig**, Windows lädt die ADB-Schnittstelle selbst.
+  Wireless Debugging ist damit nur Ausweichlösung.
+- Gerätedaten:
+
+| Eigenschaft | Wert |
+|---|---|
+| Modell | SM-S928B (S24 Ultra, Europa) |
+| Android | 17, API 37 (`REL`) |
+| One UI | 9.0 |
+| Build | CP2A.260605.016.S928BXXU6EZIF |
+| Sicherheitspatch | 2026-09-05 |
+| Google AICore | vorhanden (2026-09-17) → Gemini Nano voraussichtlich nutzbar |
+| Samsung AICore | vorhanden (2.1.09.57) |
+| Google Play-Dienste | 26.40.32 (Geofencing, Fused Location verfügbar) |
