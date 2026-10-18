@@ -29,9 +29,10 @@ Android-CLI) fehl, weil der Unix-Domain-Socket im Standard-Temp-Verzeichnis
 -Djdk.net.unixdomain.tmpdir=%USERPROFILE%.Bartik\.jt
 ```
 
-- Für Kommandozeile/Tools: Umgebungsvariable `JAVA_TOOL_OPTIONS` mit obigem Wert
-  (am besten dauerhaft als Benutzer-Umgebungsvariable; erzeugt die harmlose Meldung
-  `Picked up JAVA_TOOL_OPTIONS`).
+- Für Kommandozeile/Tools: Benutzer-Umgebungsvariable `JAVA_TOOL_OPTIONS` mit obigem
+  Wert – **seit 2026-10-18 dauerhaft gesetzt** (wirkt in neu gestarteten Terminals/
+  Programmen; erzeugt die harmlose Meldung `Picked up JAVA_TOOL_OPTIONS`).
+  Das Verzeichnis `%USERPROFILE%.Bartik\.jt` muss existieren.
 - Für Gradle zusätzlich in `gradle.properties` → `org.gradle.jvmargs`.
 - Android Studio (noch nicht getestet): vermutlich gleiche Option in
   *Help → Edit Custom VM Options* nötig.
