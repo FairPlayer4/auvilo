@@ -60,9 +60,41 @@ Kleine Test-App (nicht die spätere App), die protokolliert, was wann passiert:
 
 Laufzeit: ca. 3–7 Tage normale Nutzung, danach Logs auswerten.
 
-## 4. Vorbereitung am PC
+## 4. Die Spike-App (`spike/`)
 
-- Android-SDK-Plattform **android-37** installieren und eine AGP-Version mit
-  API-37-Unterstützung verwenden (Download, siehe
-  [entwicklungsumgebung.md](entwicklungsumgebung.md)).
-- Spike-App unter `spike/` im Repo anlegen.
+Gebaut am 2026-10-18 mit AGP 9.4.1, Kotlin 2.4.21, Gradle 9.8.1 (Wrapper),
+compileSdk/minSdk/targetSdk 37. Paket `com.avlreminder.spike`, App-Name "AVL Spike".
+
+Bauen: `cd spike && gradlew assembleDebug` → `app/build/outputs/apk/debug/app-debug.apk`
+
+### Was die App tut
+
+| Datei | Aufgabe |
+|---|---|
+| `MainActivity.kt` | Steuerzentrale: Berechtigungen prüfen/erteilen, Testplan starten/stoppen, Sofort-Tests, Zuhause setzen, Protokoll anzeigen |
+| `TestPlan.kt` | Feste Testzeiten **02:00, 08:00, 13:00, 19:00, 20:30**; Modus nach Uhrzeit: 7–21 Uhr sichtbar, 18–21 Uhr laut, sonst still |
+| `AlarmScheduler.kt` | Plant Alarme mit `setAlarmClock()` (Kette: jeder Plan-Alarm plant den nächsten); erkennt Alarme, die nie ausgelöst haben ("VERPASST") |
+| `AlarmReceiver.kt` | Wird vom System geweckt: misst die **Verspätung**, protokolliert den Energiespar-Zustand, startet den Alarm |
+| `AlarmService.kt` | Foreground-Service: Vollbild-Benachrichtigung, **eigenes Vibrationsmuster** in Schleife, Alarmton im Modus laut; Ende durch *Bestätigen*, *+5 min* oder nach 5 min ohne Reaktion |
+| `AlarmActivity.kt` | Vollbild über dem Sperrbildschirm mit *Bestätigen* / *+5 min* |
+| `HomeLocation.kt`, `GeofenceReceiver.kt` | Geofence "zuhause" (150 m) mit Ankunft/Verlassen; um 19:00 Prüfung "bin ich zuhause?" |
+| `BootReceiver.kt` | Nach Neustart: Alarm und Geofence neu registrieren, verpasste Alarme melden |
+| `SpikeLog.kt` | Protokoll in `files/spike-log.txt` (nur in der App, nichts verlässt das Handy) |
+
+**Keine Netzwerk-Berechtigung**: Die App kann nichts ins Internet senden. Standort
+bleibt im App-Speicher (Koordinaten "zuhause" + Protokolleinträge mit Distanz).
+
+### Berechtigungen
+- Automatisch bei Installation: exakte Alarme (`USE_EXACT_ALARM`), Vibration,
+  Foreground-Service, Start nach Neustart.
+- In der App zu erteilen: Benachrichtigungen, Vollbild, Akku "nicht optimieren",
+  Standort genau + "immer erlauben".
+
+### Ablauf auf dem Handy
+1. Installieren: `adb install app-debug.apk`
+2. App öffnen, alle Berechtigungen auf ✅ bringen.
+3. Zuhause: Zuhause → *Aktuellen Standort als Zuhause setzen*.
+4. Sofort-Tests (still / sichtbar / laut), jeweils Handy sperren und lautlos legen.
+5. *Testplan Start* → 3–7 Tage normal nutzen, App möglichst **nicht** öffnen.
+6. Protokoll auslesen: `adb shell run-as com.avlreminder.spike cat files/spike-log.txt`
+7. Danach: `adb uninstall com.avlreminder.spike`
