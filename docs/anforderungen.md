@@ -1,7 +1,7 @@
 # Anforderungen – avlreminder
 
 > Arbeitsname. AVL = **A**udio / **V**isual / **L**ocation.
-> Stand: 2026-10-18 – vierter Entwurf, wird iterativ verfeinert.
+> Stand: 2026-10-18 – fünfter Entwurf, wird iterativ verfeinert.
 
 ## 1. Vision
 
@@ -132,11 +132,22 @@ Die Einordnung ist vorläufig.
   verschieben"**, solange die Frist weit genug weg ist **[V1]**
 
 ### 7.3 Wahrnehmung sicherstellen (Audio / Visual)
-- **Eskalation** = laut oder wirklich blockierend: Vollbild-Reminder oder wiederholte
-  Benachrichtigung, bis der Nutzer reagiert. **[V1]**
-- **Eskalationsfenster: 7–21 Uhr** (vorerst global). Gilt ausdrücklich auch während
-  der Arbeitszeit – dort gesetzte Reminder (beruflich wie privat) brauchen Aufmerksamkeit.
-  Außerhalb des Fensters nur stille Benachrichtigung.
+- **Eskalation** = auffällig oder wirklich blockierend: Vollbild-Reminder oder
+  wiederholte Benachrichtigung, bis der Nutzer reagiert. **[V1]**
+- **Zwei Zeitfenster** (vorerst global):
+  - **7–21 Uhr – sichtbar:** Vollbild (damit man es sieht, wenn das Handy lautlos
+    auf dem Tisch liegt) + Signal je nach Einstellung, meist **Vibration**. Gilt
+    ausdrücklich auch während der Arbeitszeit.
+  - **18–21 Uhr – laut:** zusätzlich richtig laut (Alarmton wie ein Wecker), wenn
+    der Reminder es erlaubt.
+  - Außerhalb 7–21 Uhr nur stille Benachrichtigung.
+- **Eigene Vibrationsmuster**: länger und ungewöhnlich, damit man sie von normalen
+  Benachrichtigungen unterscheidet **[V1]**
+- Besprechungen: kein Kalenderabgleich; Schnellknopf *nach dem Termin* (+30/60 min) reicht.
+- Häufige Erinnerungen (z. B. stündlich bei Fristen): nicht laut, sondern Vibration
+  nach Einstellung.
+- Rettungs-Erinnerung: Droht ein Wochenziel bei 0 zu bleiben, erinnert die App am
+  Wochenende gezielt. Wochen laufen Montag–Sonntag. **[V1]**
 - W1 Eskalationsstufen: Notification → wiederholte Notification/Ton → Vollbild-Alarm **[V1]**
 - W2 Vollbild-Alarm über Sperrbildschirm, Bypass von "Nicht stören", Alarmton wie
   ein Wecker **[V1]**
@@ -148,7 +159,7 @@ Die Einordnung ist vorläufig.
 Erster Satz, wird mit der Nutzung angepasst: **[V1]**
 - *Jetzt erledigen* (→ Nachweis)
 - *Minimum* (→ Nachweis)
-- *Später heute (+x min)*
+- *Später heute (+x min)* / *nach dem Termin* (+30/60 min)
 - *Verschieben auf …* (zählt gegen das Limit; "morgen" als Schnellwahl)
 - *Auslassen (mit Grund)* – zählt **neutral**
 
@@ -187,7 +198,8 @@ Erster Satz, wird mit der Nutzung angepasst: **[V1]**
 - P1 **Statistik, Serien, Fortschritt** – Erfolg über die Zeit sichtbar machen,
   Zeiträume **Woche, Monat, Jahr, gesamt** ("was habe ich alles erledigt") **[V1]**
 - P1b **Serienregeln:** Serie bleibt bei Minimum erhalten; **ein Aussetzer pro
-  Woche/Monat** ist erlaubt ("Joker"). Auslassen zählt neutral. Später einstellbar. **[V1]**
+  Woche/Monat** ist erlaubt ("Joker"): 1 pro Woche bei täglichen, 1 pro Monat bei
+  wöchentlichen Remindern. Auslassen zählt neutral. Später einstellbar. **[V1]**
 - P7 **Motivations-Audio vom eigenen Ich**: Bei der Erstellung eine Botschaft
   aufnehmen; abgespielt **nur auf Klick** **[V1]**
 - P3 Commitment: Begründung "Warum ist mir das wichtig?" beim Anlegen **[V1]**
@@ -206,8 +218,11 @@ Erster Satz, wird mit der Nutzung angepasst: **[V1]**
 
 ### 7.9 Bedienung
 - **Widget**: ein Klick → direkt in die Reminder-Erstellung **[V1]**
-- **Vorlagen / Strenge-Stufen** (*locker / normal / streng*), die Eskalation,
-  Nachweis und Limits bündeln; Details brauchen noch Refinement **[V1]**
+- **Vorlagen / Strenge-Stufen**, die Eskalation, Nachweis und Limits bündeln
+  (Startwerte, Refinement mit der Nutzung): **[V1]**
+  - *locker*: stille Benachrichtigung, Quittieren, Verschieben unbegrenzt
+  - *normal*: wiederholte Benachrichtigung, Nachweis wählbar, 3× Verschieben
+  - *streng*: Vollbild-Alarm, Nachweis Pflicht, 1× Verschieben, Minimum max. 1×/Woche
 - UI wird sich mit der tatsächlichen Nutzung stark anpassen → früh benutzbare
   Version wichtiger als vollständige Planung.
 
@@ -291,53 +306,32 @@ früh am S24 Ultra testen (Spike, siehe Abschnitt 10).
 | 2026-10-18 | Motivations-Audio nur auf Klick |
 | 2026-10-18 | Übersicht morgens und abends (einstellbar), inkl. Rückblick |
 | 2026-10-18 | Daten nur lokal, kein Backup in V1 |
-| 2026-10-18 | Eskalation = Vollbild oder wiederholte Benachrichtigung bis Reaktion; Fenster **7–21 Uhr** (ersetzt 18–21 Uhr) |
+| 2026-10-18 | Eskalation = Vollbild oder wiederholte Benachrichtigung bis Reaktion; **7–21 Uhr sichtbar** (Vollbild + Vibration), **18–21 Uhr laut** |
 | 2026-10-18 | Training: Tagesangebot (Ankunft / 19 Uhr / sonst entfällt) + Wochenziel 3–4×, nie eine Woche ohne |
 | 2026-10-18 | Wiederkehrendes standardmäßig ab letzter Erledigung, kalendarisch optional |
 | 2026-10-18 | Reminder kennen Ausführungsfenster; Fristen erinnern häufig, "auf morgen" möglich |
 | 2026-10-18 | Auslassen zählt neutral; Serie hält bei Minimum; ein Aussetzer pro Woche/Monat erlaubt |
 | 2026-10-18 | Dokumentation per Freitext + Audio; Zahlenwerte später |
-| 2026-10-18 | Widget für Ein-Klick-Erstellung; Strenge-Vorlagen in V1 (Details offen) |
+| 2026-10-18 | Widget für Ein-Klick-Erstellung; Strenge-Vorlagen in V1 (Startwerte siehe 7.9) |
+| 2026-10-18 | Besprechungen: Schnellknopf statt Kalenderabgleich |
+| 2026-10-18 | Wochen Mo–So; Rettungs-Erinnerung am Wochenende; Joker 1/Woche (täglich) bzw. 1/Monat (wöchentlich) |
+| 2026-10-18 | V1 in Etappen V1.0 / V1.1 / V1.2 (siehe Abschnitt 10) |
 
 ## 10. Nächste Schritte
 
-1. Restliche offene Fragen klären (unten)
-2. Technischer Spike auf dem S24 Ultra: exakter Alarm + Vollbild-Alarm + Eskalation,
-   Geofence "Ankunft zuhause", Überleben von Neustart und Samsung-Akkumanagement
-   über mehrere Tage
-3. V1-Umfang festlegen – Vorschlag: in Etappen, damit früh echte Nutzung möglich ist
-   (siehe Frage 6)
-
-## 11. Offene Fragen
-
-**M – Eskalation im Alltag**
-1. Eskalation 7–21 Uhr auch in der Arbeitszeit: Was ist mit Besprechungen? Soll die
-   App einen Kalender (privat oder dienstlich auf dem Handy?) lesen und in Terminen
-   nur vibrieren – oder reicht ein schnelles "nach dem Termin" (+30/60 min)?
-2. Fristen stündlich erinnern: Jede Erinnerung eskalierend (Vollbild), oder still
-   und erst zum Ende des Ausführungsfensters / kurz vor der Frist laut?
-
-**N – Ziele über Zeitraum**
-3. Wochenziel Training: Woche = Montag–Sonntag? Soll am Wochenende eine
-   "Rettungs-Erinnerung" kommen, wenn die Woche sonst auf 0 bliebe?
-4. Joker: Vorschlag **1 Aussetzer pro Woche bei täglichen Remindern, 1 pro Monat
-   bei wöchentlichen** – passt das als Startregel?
-
-**O – Vorlagen**
-5. Erster Wurf für die Strenge-Stufen:
-   - *locker*: stille Benachrichtigung, Quittieren, Verschieben unbegrenzt
-   - *normal*: wiederholte Benachrichtigung, Nachweis wählbar, 3× Verschieben
-   - *streng*: Vollbild-Alarm, Nachweis Pflicht, 1× Verschieben, Minimum max. 1×/Woche
-   Was würdest du ändern?
-
-**P – Vorgehen**
-6. Die Anforderungen für V1 sind schon umfangreich. Vorschlag für Etappen:
+1. **Technischer Spike auf dem S24 Ultra** (Plan: [spike.md](spike.md)): exakter
+   Alarm, Vollbild über Sperrbildschirm, Vibrationsmuster, Alarmton, Geofence
+   "Ankunft zuhause", Überleben von Neustart und Samsung-Akkumanagement über mehrere Tage
+2. **V1 in Etappen**, damit früh echte Nutzung möglich ist:
    - **V1.0 (benutzbar):** Zeit-Reminder, Eskalation, Aktionen, Quittieren/Foto,
      Ziel/Minimum, einfache Liste der Erledigungen, Widget
    - **V1.1:** Ort (Ankunft zuhause), Intervall ab letzter Erledigung, Audio-Nachweis,
      Motivations-Audio
    - **V1.2:** Wochenziele, Fristen mit Ausführungsfenstern, Serien/Joker,
      Statistik, Übersicht morgens/abends, Vorlagen
-   Passt die Reihenfolge, oder ist dir etwas für den Start wichtiger?
-7. Für den Spike brauche ich das S24 Ultra per Wireless Debugging am PC (Handy und PC
-   im selben WLAN). Ist das bei dir möglich, und erlaubt das Firmennetz es?
+3. Weitere Anforderungen ergeben sich aus der Nutzung.
+
+## 11. Offene Fragen
+
+Aktuell keine großen offenen Fragen. Details (Oberfläche, Vorlagen, Vibrationsmuster)
+werden mit der Nutzung geklärt.
