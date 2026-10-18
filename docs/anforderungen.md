@@ -91,9 +91,7 @@ Geofence-Latenz – beides am Zielgerät früh testen.
 - Build: Gradle; Entwicklung in Android Studio
 
 ### Entwicklungsumgebung (geprüft 2026-10-18)
-- ❌ Kein Android SDK / Android Studio gefunden
-- ❌ Kein JDK im PATH
-- → Android Studio installieren (bringt JDK + SDK mit), Gerät per USB-Debugging verbinden
+- ✅ Ohne Adminrechte möglich – Details in [entwicklungsumgebung.md](entwicklungsumgebung.md)
 
 ## 5. Offene Fragen
 
