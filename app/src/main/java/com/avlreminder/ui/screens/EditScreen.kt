@@ -148,8 +148,8 @@ fun EditScreen(
 }
 
 private fun presetText(s: Strictness) = when (s) {
-    Strictness.RELAXED -> "Alarm: stille Benachrichtigung · Verschieben unbegrenzt"
-    Strictness.NORMAL -> "Alarm: Banner + Vibration, alle 10 min · Verschieben 3×"
+    Strictness.RELAXED -> "Alarm: Banner + Vibration, alle 10 min · Verschieben unbegrenzt"
+    Strictness.NORMAL -> "Alarm: Vollbild + Vibration wie ein Wecker, ohne Ton · Verschieben 3×"
     Strictness.STRICT -> "Alarm: Vollbild + Vibration, 18–21 Uhr mit Alarmton · Verschieben 1× · Foto · Minimum 1×/Woche"
 }
 

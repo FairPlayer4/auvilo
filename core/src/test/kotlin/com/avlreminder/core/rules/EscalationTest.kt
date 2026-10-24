@@ -6,7 +6,6 @@ import com.avlreminder.core.model.Strictness.NORMAL
 import com.avlreminder.core.model.Strictness.RELAXED
 import com.avlreminder.core.model.Strictness.STRICT
 import org.junit.jupiter.api.Assertions.assertEquals
-import org.junit.jupiter.api.Assertions.assertNull
 import org.junit.jupiter.api.Test
 import org.junit.jupiter.api.assertThrows
 import java.time.LocalTime
@@ -25,14 +24,14 @@ class EscalationTest {
     }
 
     @Test
-    fun `relaxed stays silent inside the window`() {
-        assertEquals(AlarmLevel.SILENT, Escalation.level(RELAXED, t(12), w))
+    fun `relaxed shows a banner with vibration`() {
+        assertEquals(AlarmLevel.BANNER, Escalation.level(RELAXED, t(12), w))
     }
 
     @Test
-    fun `normal shows a banner with vibration`() {
-        assertEquals(AlarmLevel.BANNER, Escalation.level(NORMAL, t(7), w))
-        assertEquals(AlarmLevel.BANNER, Escalation.level(NORMAL, t(19), w))
+    fun `normal is full screen but never loud`() {
+        assertEquals(AlarmLevel.FULLSCREEN, Escalation.level(NORMAL, t(7), w))
+        assertEquals(AlarmLevel.FULLSCREEN, Escalation.level(NORMAL, t(19), w))
     }
 
     @Test
@@ -49,19 +48,14 @@ class EscalationTest {
     }
 
     @Test
-    fun `relaxed reminders do not repeat`() {
-        assertNull(Escalation.nextRound(RELAXED, at(26, 12), ZONE, w))
-    }
-
-    @Test
     fun `next round comes ten minutes later inside the window`() {
-        assertEquals(at(26, 12, 10), Escalation.nextRound(NORMAL, at(26, 12), ZONE, w))
+        assertEquals(at(26, 12, 10), Escalation.nextRound(at(26, 12), ZONE, w))
     }
 
     @Test
     fun `next round waits for the window to open`() {
-        assertEquals(at(27, 7), Escalation.nextRound(STRICT, at(26, 20, 55), ZONE, w))
-        assertEquals(at(26, 7), Escalation.nextRound(STRICT, at(26, 2), ZONE, w))
+        assertEquals(at(27, 7), Escalation.nextRound(at(26, 20, 55), ZONE, w))
+        assertEquals(at(26, 7), Escalation.nextRound(at(26, 2), ZONE, w))
     }
 
     @Test

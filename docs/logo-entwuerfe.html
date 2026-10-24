@@ -1,0 +1,104 @@
+<!doctype html>
+<html lang="de">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>AVL-Reminder Logo</title>
+<style>
+  :root { --bg: #f5f6f8; --card: #ffffff; --text: #16191f; --muted: #5b6270; --line: #e2e5ea; }
+  @media (prefers-color-scheme: dark) { :root { --bg: #101216; --card: #1b1e24; --text: #eceef2; --muted: #a9b0bc; --line: #2e323b; } }
+  body { margin: 0; padding: 24px 16px; background: var(--bg); color: var(--text); font: 15px/1.45 system-ui, sans-serif; }
+  h1 { font-size: 22px; margin: 0 0 4px; }
+  p.lead { color: var(--muted); margin: 0 0 24px; max-width: 640px; }
+  .grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(280px, 1fr)); gap: 16px; max-width: 1200px; }
+  .card { background: var(--card); border: 1px solid var(--line); border-radius: 16px; padding: 16px; }
+  .card h2 { font-size: 17px; margin: 0 0 2px; }
+  .card p { color: var(--muted); margin: 0 0 14px; font-size: 13px; }
+  .row { display: flex; gap: 14px; align-items: flex-end; flex-wrap: wrap; }
+  .homes { display: flex; gap: 10px; margin-top: 14px; }
+  .home { flex: 1; border-radius: 12px; padding: 14px 6px 8px; text-align: center; font-size: 11px; }
+  .home.light { background: linear-gradient(160deg, #dfe7f5, #c4d2ee); color: #16191f; }
+  .home.dark { background: linear-gradient(160deg, #22262f, #0c0e12); color: #eceef2; }
+  .home svg { display: block; margin: 0 auto 4px; }
+  svg.icon { display: block; }
+</style>
+</head>
+<body>
+<h1>AVL-Reminder – Logo-Entwürfe</h1>
+<p class="lead">Vier Richtungen, alle in den App-Farben. Gezeigt als runde und abgerundet-eckige Maske (je nach Launcher) und unten in echter Launcher-Größe auf hellem und dunklem Hintergrund.</p>
+
+<svg width="0" height="0" style="position:absolute">
+  <defs>
+    <clipPath id="circle"><circle cx="54" cy="54" r="36"/></clipPath>
+    <clipPath id="squircle"><rect x="18" y="18" width="72" height="72" rx="20"/></clipPath>
+
+    <!-- 1: V als Haken, weiß auf Blau -->
+    <symbol id="c1" viewBox="0 0 108 108">
+      <rect width="108" height="108" fill="#2F5FE0"/>
+      <g fill="none" stroke="#fff" stroke-width="6.5" stroke-linecap="round" stroke-linejoin="round">
+        <path d="M27 66 L35 42 L43 66 M30.5 58 H39.5"/>
+        <path d="M47 54 L53 64 L63 40"/>
+        <path d="M68 42 V66 H81"/>
+      </g>
+    </symbol>
+
+    <!-- 2: dunkel, Haken in Akzentfarbe -->
+    <symbol id="c2" viewBox="0 0 108 108">
+      <rect width="108" height="108" fill="#101216"/>
+      <g fill="none" stroke-width="6.5" stroke-linecap="round" stroke-linejoin="round">
+        <path d="M27 66 L35 42 L43 66 M30.5 58 H39.5 M68 42 V66 H81" stroke="#ECEEF2"/>
+        <path d="M47 54 L53 64 L63 40" stroke="#8AA8FF"/>
+      </g>
+    </symbol>
+
+    <!-- 3: Glocke mit AVL -->
+    <symbol id="c3" viewBox="0 0 108 108">
+      <rect width="108" height="108" fill="#2F5FE0"/>
+      <circle cx="54" cy="31" r="3.5" fill="#fff"/>
+      <path d="M35 71 C37 67 38 63 38 55 C38 43 45 34 54 34 C63 34 70 43 70 55 C70 63 71 67 73 71 Z" fill="#fff"/>
+      <rect x="32" y="70" width="44" height="5" rx="2.5" fill="#fff"/>
+      <circle cx="54" cy="80" r="4" fill="#fff"/>
+      <g fill="none" stroke="#2F5FE0" stroke-width="3.6" stroke-linecap="round" stroke-linejoin="round">
+        <path d="M41 64 L45 52 L49 64 M42.7 60 H47.3"/>
+        <path d="M51.5 58 L54.5 62.5 L59.5 51"/>
+        <path d="M62 52 V64 H67"/>
+      </g>
+    </symbol>
+
+    <!-- 4: AVL mit Erinnerungs-Punkt -->
+    <symbol id="c4" viewBox="0 0 108 108">
+      <rect width="108" height="108" fill="#2F5FE0"/>
+      <g fill="none" stroke="#fff" stroke-width="6.5" stroke-linecap="round" stroke-linejoin="round">
+        <path d="M27 66 L35 42 L43 66 M30.5 58 H39.5"/>
+        <path d="M49 42 L56 66 L63 42"/>
+        <path d="M68 48 V66 H81"/>
+      </g>
+      <circle cx="78" cy="39" r="7.5" fill="#2F5FE0"/>
+      <circle cx="78" cy="39" r="5.5" fill="#FF9A62"/>
+    </symbol>
+  </defs>
+</svg>
+
+<div class="grid" id="grid"></div>
+
+<script>
+  const concepts = [
+    ["c1", "1 · Haken-V", "Das V ist ein Erledigt-Haken. Ruhig, eindeutig, gut lesbar auch klein."],
+    ["c2", "2 · Haken-V dunkel", "Wie 1, auf dem dunklen App-Hintergrund; nur der Haken leuchtet blau."],
+    ["c3", "3 · Glocke", "Klassische Erinnerungs-Glocke mit AVL im Körper. Klein wird die Schrift knapp."],
+    ["c4", "4 · Erinnerungs-Punkt", "AVL normal geschrieben, orangefarbener Punkt wie eine ungelesene Benachrichtigung."],
+  ];
+  const icon = (id, clip, size) =>
+    `<svg class="icon" width="${size}" height="${size}" viewBox="18 18 72 72"><g clip-path="url(#${clip})"><use href="#${id}" width="108" height="108"/></g></svg>`;
+  document.getElementById("grid").innerHTML = concepts.map(([id, name, text]) => `
+    <div class="card">
+      <h2>${name}</h2><p>${text}</p>
+      <div class="row">${icon(id, "circle", 112)}${icon(id, "squircle", 112)}</div>
+      <div class="homes">
+        <div class="home light">${icon(id, "circle", 52)}AVL-Reminder</div>
+        <div class="home dark">${icon(id, "squircle", 52)}AVL-Reminder</div>
+      </div>
+    </div>`).join("");
+</script>
+</body>
+</html>

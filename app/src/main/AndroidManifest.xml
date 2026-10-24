@@ -19,8 +19,8 @@
 
     <application
         android:name=".AvlApp"
-        android:label="avlreminder"
-        android:icon="@android:drawable/ic_lock_idle_alarm"
+        android:label="AVL-Reminder"
+        android:icon="@mipmap/ic_launcher"
         android:allowBackup="false"
         android:dataExtractionRules="@xml/data_extraction_rules"
         android:theme="@android:style/Theme.Material.NoActionBar">
@@ -71,7 +71,7 @@
         <receiver
             android:name=".widget.AvlWidgetReceiver"
             android:exported="true"
-            android:label="avlreminder">
+            android:label="AVL-Reminder">
             <intent-filter>
                 <action android:name="android.appwidget.action.APPWIDGET_UPDATE" />
             </intent-filter>

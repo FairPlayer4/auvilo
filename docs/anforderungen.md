@@ -220,8 +220,8 @@ Erster Satz, wird mit der Nutzung angepasst: **[V1]**
 - **Widget**: ein Klick → direkt in die Reminder-Erstellung **[V1]**
 - **Vorlagen / Strenge-Stufen**, die Eskalation, Nachweis und Limits bündeln
   (Startwerte, Refinement mit der Nutzung): **[V1]**
-  - *locker*: stille Benachrichtigung, Quittieren, Verschieben unbegrenzt
-  - *normal*: wiederholte Benachrichtigung, Nachweis wählbar, 3× Verschieben
+  - *locker*: Banner + Vibration, alle 10 min wiederholt, Quittieren, Verschieben unbegrenzt
+  - *normal*: Vollbild-Alarm wie ein Wecker, aber ohne Ton; Nachweis wählbar, 3× Verschieben
   - *streng*: Vollbild-Alarm, Nachweis Pflicht, 1× Verschieben, Minimum max. 1×/Woche
 - UI wird sich mit der tatsächlichen Nutzung stark anpassen → früh benutzbare
   Version wichtiger als vollständige Planung.

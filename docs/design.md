@@ -133,8 +133,8 @@ Stufe = f(Strenge, Uhrzeit). Zeitfenster global in den Einstellungen.
 
 | Strenge | 7–18 Uhr | 18–21 Uhr | außerhalb 7–21 |
 |---|---|---|---|
-| `RELAXED` | stille Benachrichtigung | stille Benachrichtigung | still |
-| `NORMAL` | Banner + Vibration, alle 10 min wiederholen | dto. | still |
+| `RELAXED` | Banner + Vibration, alle 10 min wiederholen | dto. | still |
+| `NORMAL` | **Vollbild** + Vibrationsmuster in Schleife (Wecker ohne Ton) | dto. | still |
 | `STRICT` | **Vollbild** + Vibrationsmuster in Schleife | **Vollbild + Vibration + Alarmton** | still |
 
 - Wiederholung bis Reaktion; Timeout pro Runde 3 min, danach nächste Runde nach 10 min.

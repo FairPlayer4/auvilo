@@ -5,6 +5,7 @@ import android.app.NotificationChannel
 import android.app.NotificationManager
 import android.app.PendingIntent
 import android.content.Context
+import com.avlreminder.R
 import com.avlreminder.core.model.ProofType
 import com.avlreminder.core.usecases.Ring
 
@@ -74,7 +75,7 @@ object Notifications {
 
     private fun builder(context: Context, channel: String, info: AlarmInfo): Notification.Builder {
         val builder = Notification.Builder(context, channel)
-            .setSmallIcon(android.R.drawable.ic_lock_idle_alarm)
+            .setSmallIcon(R.drawable.ic_bell)
             .setContentTitle(info.title)
             .setContentIntent(openAlarm(context, info.occurrenceId))
         info.text?.let { builder.setContentText(it) }

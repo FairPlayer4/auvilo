@@ -14,8 +14,8 @@
 
 | # | Test | Erwartung |
 |---|---|---|
-| 1 | Reminder *locker*, einmalig in 3 min | stille Benachrichtigung, kein Ton, keine Vibration; "Erledigt" in der Benachrichtigung → Verlauf "Ziel" |
-| 2 | Reminder *normal*, einmalig in 3 min | Banner + Vibration; "+10 min" → nach 10 min erneut |
+| 1 | Reminder *locker*, einmalig in 3 min | Banner + Vibration, kein Ton; "Erledigt" in der Benachrichtigung → Verlauf "Ziel" |
+| 2 | Reminder *normal*, einmalig in 3 min | Vollbild + Vibrationsmuster, **kein** Ton; "+10 min" → nach 10 min erneut |
 | 3 | Reminder *streng*, Foto, gesperrtes Handy, vor 18 Uhr | Vollbild über Sperrbildschirm, Vibrationsmuster, **kein** Ton |
 | 4 | wie 3, zwischen 18 und 21 Uhr | zusätzlich Alarmton |
 | 5 | Im Vollbild "Erledigt" → Foto aufnehmen | Verlauf "Ziel · mit Foto"; Foto nicht in der Galerie |

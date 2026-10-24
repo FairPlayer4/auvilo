@@ -105,7 +105,7 @@ class ReminderEngineTest {
         clock.now = at(26, 18, 10)
         val ring = engine.onAlarm(o.id)!!
         assertEquals(OccurrenceState.ESCALATING, ring.occurrence.state)
-        assertEquals(AlarmLevel.BANNER, ring.level)
+        assertEquals(AlarmLevel.FULLSCREEN, ring.level)
     }
 
     @Test
@@ -130,12 +130,12 @@ class ReminderEngineTest {
     }
 
     @Test
-    fun `relaxed reminders ring once and then wait for the deadline`() = runTest {
+    fun `relaxed reminders show a banner and repeat every ten minutes`() = runTest {
         val id = create(reminder().copy(strictness = Strictness.RELAXED))
         val o = open(id)
         clock.now = at(26, 18)
-        assertEquals(AlarmLevel.SILENT, engine.onAlarm(o.id)!!.level)
-        assertEquals(at(26, 21), alarms.set[o.id]!!.first)
+        assertEquals(AlarmLevel.BANNER, engine.onAlarm(o.id)!!.level)
+        assertEquals(at(26, 18, 10), alarms.set[o.id]!!.first)
     }
 
     @Test

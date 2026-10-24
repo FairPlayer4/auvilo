@@ -41,18 +41,17 @@ object Escalation {
     fun level(strictness: Strictness, time: LocalTime, windows: EscalationWindows): AlarmLevel {
         if (!windows.isVisible(time)) return AlarmLevel.SILENT
         return when (strictness) {
-            Strictness.RELAXED -> AlarmLevel.SILENT
-            Strictness.NORMAL -> AlarmLevel.BANNER
+            Strictness.RELAXED -> AlarmLevel.BANNER
+            Strictness.NORMAL -> AlarmLevel.FULLSCREEN
             Strictness.STRICT -> if (windows.isLoud(time)) AlarmLevel.FULLSCREEN_LOUD else AlarmLevel.FULLSCREEN
         }
     }
 
     /**
-     * When to ring again for an open, already fired occurrence. Relaxed reminders do not repeat.
+     * When to ring again for an open, already fired occurrence.
      * Outside the visible window the next round waits for the window to open.
      */
-    fun nextRound(strictness: Strictness, now: Instant, zone: ZoneId, windows: EscalationWindows): Instant? {
-        if (strictness == Strictness.RELAXED) return null
+    fun nextRound(now: Instant, zone: ZoneId, windows: EscalationWindows): Instant {
         val candidate = now.plus(REPEAT)
         val local = candidate.atZone(zone)
         if (windows.isVisible(local.toLocalTime())) return candidate

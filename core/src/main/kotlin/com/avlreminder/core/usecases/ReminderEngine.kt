@@ -196,8 +196,8 @@ class ReminderEngine(
             occurrence.currentAt
         } else {
             val deadline = missedAt(occurrence)
-            val round = Escalation.nextRound(reminder.strictness, now(), zone, windows())
-            if (round == null || round > deadline) deadline else round
+            val round = Escalation.nextRound(now(), zone, windows())
+            if (round > deadline) deadline else round
         }
         val kind = if (reminder.strictness == Strictness.RELAXED) AlarmKind.EXACT else AlarmKind.ALARM_CLOCK
         alarms.set(occurrence.id, at, kind)
