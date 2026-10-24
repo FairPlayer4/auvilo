@@ -1,7 +1,7 @@
 # Design – avlreminder V1.0
 
 > Stand: 2026-10-24 – erster Entwurf. Grundlage: [anforderungen.md](anforderungen.md),
-> Ergebnisse aus [spike.md](spike.md). Mocks: siehe Abschnitt 8.
+> Ergebnisse aus [spike.md](spike.md). Mocks: siehe Abschnitt 9.
 
 ## 1. Ziel von V1.0
 
@@ -42,7 +42,7 @@ Das Datenmodell ist aber so angelegt, dass diese Teile ohne Umbau dazukommen.
 
 **Regeln:**
 - `:core` kennt kein Android. Alle Regeln aus den Anforderungen leben dort und werden
-  mit schnellen Unit-Tests abgesichert (Coverage ≥ 90 %, siehe Abschnitt 7).
+  mit schnellen Unit-Tests abgesichert (Coverage ≥ 90 %, siehe Abschnitt 8).
 - Zeit kommt immer über `Clock` (testbar, keine `System.currentTimeMillis()` in der Logik).
 - **Die Datenbank ist die einzige Wahrheit.** Alarme und (später) Geofences sind nur
   abgeleitet und werden jederzeit aus der DB neu aufgebaut (Erkenntnis aus dem Spike:
@@ -156,14 +156,40 @@ Stufe = f(Strenge, Uhrzeit). Zeitfenster global in den Einstellungen.
 | Widget | Jetpack Glance, öffnet direkt "Neuer Reminder" |
 | Berechtigungen | Einrichtungsseite beim ersten Start (wie Spike): Benachrichtigungen, Vollbild, Akku nicht optimieren, Kamera |
 
-## 7. Tests und Qualität
+## 7. Darstellung: Hell, Dunkel, System
+
+- Einstellung **Darstellung**: *System* (Standard) · *Hell* · *Dunkel*. Gespeichert mit
+  DataStore (Preferences), wirkt sofort ohne Neustart.
+- Ein `AvlTheme` mit zwei Material-3-`ColorScheme`s plus eigenen Farben für Strenge und
+  Ergebnis (`AvlColors` über `CompositionLocal`). Screens verwenden **nur Tokens**, keine
+  festen Farbwerte – so kostet der Dunkelmodus später nichts extra.
+- **Dynamic Color (Material You) aus:** Die Strenge-Farben sollen immer dasselbe bedeuten.
+- **Alarm-Vollbild ist in beiden Modi dunkel:** blendet nachts nicht, hoher Kontrast,
+  sofort als Alarm erkennbar.
+- **Widget** folgt dem System-Modus (Glance `ColorProviders` mit Tag-/Nachtfarben).
+- Edge-to-Edge; Symbole in Status- und Navigationsleiste passen sich dem Modus an.
+- Kontrast: Text ≥ 4,5 : 1 in beiden Modi. Strenge und Ergebnisse unterscheiden sich
+  auch in der Helligkeit, nicht nur im Farbton.
+
+| Token | Hell | Dunkel |
+|---|---|---|
+| Hintergrund | `#F5F6F8` | `#101216` |
+| Fläche | `#FFFFFF` | `#1B1E24` |
+| Text | `#16191F` | `#ECEEF2` |
+| Text gedämpft | `#5B6270` | `#A9B0BC` |
+| Linie | `#E2E5EA` | `#2E323B` |
+| Akzent (Text, Rahmen) | `#1F4FD1` | `#8AA8FF` |
+| Akzent (Fläche mit weißer Schrift) | `#1F4FD1` | `#2F5FE0` |
+| Streng / verpasst | `#B4400A` | `#FF9A62` |
+
+## 8. Tests und Qualität
 
 | Bereich | Test-Art | Ziel |
 |---|---|---|
 | `:core` (Regeln, Use-Cases) | JUnit 5, Fake-Clock, Fake-Repositories | **Coverage ≥ 90 %** (Kover, Build schlägt sonst fehl) |
 | `:app` data | Room In-Memory-Tests | wichtige Abfragen, Migrationen |
 | `:app` alarm/system | wenige Robolectric-Tests + Geräte-Checkliste (wie Spike) | keine Coverage-Zahl |
-| `:app` ui | Compose-UI-Tests für Kernabläufe (anlegen → Alarm → erledigen) | keine Coverage-Zahl |
+| `:app` ui | Compose-UI-Tests für Kernabläufe (anlegen → Alarm → erledigen, Darstellung umschalten); Compose-Previews jedes Screens in Hell und Dunkel | keine Coverage-Zahl |
 
 - Tests werden zusammen mit dem Code geschrieben, nicht nachträglich.
 - Regeln aus den Anforderungen bekommen sprechende Testnamen
@@ -172,7 +198,7 @@ Stufe = f(Strenge, Uhrzeit). Zeitfenster global in den Einstellungen.
 **Tech:** AGP 9.4.1, Kotlin 2.4.21, Gradle 9.8.1, Compose BOM 2026.09, Room + KSP,
 Glance, CameraX, Kover. minSdk = targetSdk = 37. Paket `com.avlreminder`.
 
-## 8. Screens (siehe Mocks)
+## 9. Screens (siehe Mocks)
 
 Klickbare Mocks: https://claude.ai/artifact/PXA9YgWi8XoHupYnN7Z3cS
 
@@ -183,8 +209,9 @@ Klickbare Mocks: https://claude.ai/artifact/PXA9YgWi8XoHupYnN7Z3cS
 5. **Verschieben** – Schnellwahl (in 1 h, heute Abend, morgen) + Datum/Uhrzeit, Restanzahl
 6. **Verlauf** – Erledigungen nach Tagen, mit Ergebnis (Ziel/Minimum/ohne Nachweis/ausgelassen/verpasst)
 7. **Widget** – "+ Reminder" und nächster fälliger Reminder
+8. **Einstellungen** – Darstellung (System/Hell/Dunkel), Zeitfenster, Berechtigungen
 
-## 9. Offene Punkte
+## 10. Offene Punkte
 
 - Wann endet eine Fälligkeit ohne Reaktion bei Remindern außerhalb des Eskalationsfensters
   (z. B. 02:00)? Vorschlag: am Ende des nächsten Eskalationsfensters.
