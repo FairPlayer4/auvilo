@@ -120,6 +120,37 @@ adb-Befehle (alle umkehrbar, am Ende zurückgesetzt):
 
 Ergebnis danach: Was in der Stunde geklärt ist und was erst der Mehrtagestest zeigt.
 
+### Ergebnis Schnelltest (2026-10-24, 15:30–16:30)
+
+| Test | Ergebnis |
+|---|---|
+| Exakter Alarm (`setAlarmClock`) | ✅ **11 von 11** ausgelösten Alarmen mit **0 s Verspätung** – im leichten Doze, ohne Akku-Ausnahme, nach Prozess-Kill und nach Neustart |
+| Vollbild über Sperrbildschirm | ✅ immer angezeigt (gesperrt, Klingelmodus Vibrieren); Vollbild-Berechtigung bei Sideload automatisch erteilt |
+| Foreground-Service `systemExempted` | ✅ funktioniert auf Android 17 (Dauer-Vibration, Alarmton, Timeout nach 3 min) |
+| Alarmton im Modus Vibrieren | ✅ klingelt über Wecker-Lautstärke (4/15); Samsung-Standardton wird lauter |
+| Still | ✅ nur in der Benachrichtigungsleiste, kein Bildschirm, kein Ton |
+| Bestätigen | ✅ über Vollbild und über Benachrichtigungs-Aktion |
+| Geofence | ✅ Registrierung → "angekommen" nach 12 s; **Verlassen** bei ~300 m sofort; **Ankunft** mit ~1,5 min Verzögerung (Standort-Fix 85 s alt) |
+| Zuhause-Prüfung im Hintergrund | ✅ Distanz korrekt (0–5 m zuhause, 326/347 m unterwegs), Genauigkeit 15–100 m |
+| Neustart | ✅ BOOT_COMPLETED nach Entsperren, Alarm und Geofence neu registriert, nächster Alarm pünktlich |
+| Prozess beendet (`am kill`) | ✅ System startet die App für den Alarm neu, pünktlich |
+| Stopp erzwungen (`am force-stop`) | ⚠️ erwartungsgemäß: **alle Alarme und Geofence gelöscht**, Alarm fällt aus. Beim nächsten App-Start liefert Android BOOT_COMPLETED (Verhalten seit Android 15) → App erkennt den verpassten Alarm und stellt alles wieder her |
+| Tiefer Doze / Standby-Bucket per adb | ❌ von Samsung blockiert (nur leichter Doze erzwingbar) → Mehrtagestest nötig |
+
+**Folgerungen für die Implementierung**
+- `setAlarmClock` + Foreground-Service `systemExempted` + Vollbild-Activity ist die
+  richtige Basis – technisch trägt der Ansatz.
+- Alle Reminder müssen in der **Datenbank** stehen; Alarme und Geofences werden bei
+  Neustart **und** beim App-Start aus der DB neu aufgebaut (Force-Stop-Fall).
+- Verpasste Reminder werden erkannt und gemeldet, nicht still übergangen (passt zu
+  Leitprinzip 1).
+- Ankunft zuhause kommt mit 1–2 min Verzögerung – für "bei Ankunft trainieren" gut genug.
+- Offen für den Mehrtagestest: echter Tief-Doze in der Nacht, Samsungs
+  "Schlafende Apps" nach Tagen ohne Öffnen, Akkuverbrauch durch Geofence.
+- Zu klären: `setAlarmClock` zeigt den Reminder als "nächster Wecker" in Statusleiste
+  und Sperrbildschirm. Ggf. nur für eskalierende Reminder nutzen, stille Reminder
+  über `setExactAndAllowWhileIdle`.
+
 ### Ablauf auf dem Handy (Mehrtagestest)
 1. Installieren: `adb install app-debug.apk`
 2. App öffnen, alle Berechtigungen auf ✅ bringen.
