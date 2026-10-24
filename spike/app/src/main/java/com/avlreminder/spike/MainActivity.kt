@@ -30,6 +30,7 @@ import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.key
 import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
@@ -64,10 +65,9 @@ class MainActivity : ComponentActivity() {
 }
 
 @Composable
-// `refresh` is not read directly: a new value makes Compose run this function again,
-// which re-reads permissions, plan and log.
-@Suppress("UNUSED_PARAMETER")
-private fun MainScreen(refresh: Int, onChanged: () -> Unit) {
+private fun MainScreen(refresh: Int, onChanged: () -> Unit) = key(refresh) {
+    // key(refresh): a new value rebuilds the screen, which re-reads permissions, plan and log.
+    // (Compose skips unused parameters, so the parameter alone would not trigger it.)
     val context = LocalContext.current
     val requestPermission = rememberLauncherForActivityResult(ActivityResultContracts.RequestPermission()) { onChanged() }
 
