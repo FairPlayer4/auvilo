@@ -47,7 +47,7 @@ data class ReminderForm(
             ScheduleKind.ONCE -> Schedule.Once(LocalDateTime.of(date, time))
             ScheduleKind.DAILY -> Schedule.Daily(time)
             ScheduleKind.WEEKDAYS -> if (days.isEmpty()) null else Schedule.Weekdays(time, days)
-            ScheduleKind.AFTER_DONE -> if (intervalDays < 1) null else Schedule.AfterDone(intervalDays, time)
+            ScheduleKind.AFTER_DONE -> if (intervalDays < 1) null else Schedule.AfterDone(intervalDays, time, firstOn = date)
         }
 
     /** The reminder to save, or null if the schedule is incomplete. */
@@ -92,7 +92,7 @@ data class ReminderForm(
                 is Schedule.Once -> base.copy(kind = ScheduleKind.ONCE, date = s.at.toLocalDate(), time = s.at.toLocalTime())
                 is Schedule.Daily -> base.copy(kind = ScheduleKind.DAILY, time = s.time)
                 is Schedule.Weekdays -> base.copy(kind = ScheduleKind.WEEKDAYS, time = s.time, days = s.days)
-                is Schedule.AfterDone -> base.copy(kind = ScheduleKind.AFTER_DONE, time = s.time, intervalDays = s.intervalDays)
+                is Schedule.AfterDone -> base.copy(kind = ScheduleKind.AFTER_DONE, time = s.time, intervalDays = s.intervalDays, date = s.firstOn ?: today)
             }
         }
     }

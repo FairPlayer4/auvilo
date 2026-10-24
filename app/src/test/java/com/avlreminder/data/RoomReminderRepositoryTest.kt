@@ -27,6 +27,7 @@ import org.junit.runner.RunWith
 import java.io.File
 import java.time.DayOfWeek
 import java.time.Instant
+import java.time.LocalDate
 import java.time.LocalDateTime
 import java.time.LocalTime
 
@@ -59,13 +60,14 @@ class RoomReminderRepositoryTest {
             Schedule.Daily(LocalTime.of(18, 0)),
             Schedule.Weekdays(LocalTime.of(6, 45), setOf(DayOfWeek.MONDAY, DayOfWeek.SUNDAY)),
             Schedule.AfterDone(14, LocalTime.of(21, 0)),
+            Schedule.AfterDone(14, LocalTime.of(21, 0), firstOn = LocalDate.of(2026, 10, 30)),
         )
         for (s in schedules) {
             val r = reminder(s)
             val id = repo.saveReminder(r)
             assertEquals(r.copy(id = id), repo.reminder(id))
         }
-        assertEquals(4, repo.reminders().size)
+        assertEquals(5, repo.reminders().size)
     }
 
     @Test

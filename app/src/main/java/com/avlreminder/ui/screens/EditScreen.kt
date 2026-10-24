@@ -194,10 +194,18 @@ private fun ScheduleDetail(form: ReminderForm, onChange: (ReminderForm) -> Unit)
                     )
                 }
             }
-            ScheduleKind.AFTER_DONE -> Row(verticalAlignment = androidx.compose.ui.Alignment.CenterVertically) {
-                OutlinedButton(onClick = { onChange(form.copy(intervalDays = (form.intervalDays - 1).coerceAtLeast(1))) }) { Text("−") }
-                Text("${form.intervalDays} Tage nach letzter Erledigung", Modifier.padding(horizontal = 12.dp), color = c.text)
-                OutlinedButton(onClick = { onChange(form.copy(intervalDays = form.intervalDays + 1)) }) { Text("+") }
+            ScheduleKind.AFTER_DONE -> Column {
+                // Number between the buttons only, the long explanation below: fits narrow screens.
+                Row(verticalAlignment = androidx.compose.ui.Alignment.CenterVertically) {
+                    OutlinedButton(onClick = { onChange(form.copy(intervalDays = (form.intervalDays - 1).coerceAtLeast(1))) }) { Text("−") }
+                    Text(
+                        "${form.intervalDays} Tage", Modifier.padding(horizontal = 16.dp).testTag("interval"),
+                        color = c.text, fontSize = 18.sp, fontWeight = FontWeight.SemiBold,
+                    )
+                    OutlinedButton(onClick = { onChange(form.copy(intervalDays = form.intervalDays + 1)) }) { Text("+") }
+                }
+                Text("nach letzter Erledigung", Modifier.padding(top = 4.dp), color = c.muted, fontSize = 13.sp)
+                OutlinedButton(onClick = { pickDate = true }, Modifier.padding(top = 8.dp)) { Text("erstmals am ${Format.date(form.date)}") }
             }
             ScheduleKind.DAILY -> {}
         }

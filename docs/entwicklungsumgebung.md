@@ -46,6 +46,23 @@ Android-CLI) fehl, weil der Unix-Domain-Socket im Standard-Temp-Verzeichnis
 - **Firmen-Sicherheitssoftware** könnte adb über WLAN oder das Emulator-Netzwerk
   blockieren (USB funktioniert, siehe unten).
 
+## ⚠️ Vorfall: Android-SDK verschwunden (2026-10-24)
+
+- `%LOCALAPPDATA%\Android` war um 18:11 komplett weg (um 17:39 noch da). Dazwischen lag ein
+  **Neustart um 17:51**. Gelöscht wurde nur dieser Ordner; JDK, Gradle (`%LOCALAPPDATA%\Programs`),
+  `~\.gradle` und `~\.android` blieben erhalten. Defender meldete nichts (keine Funde/Quarantäne).
+- Vermutung: eine Bereinigung durch Firmenrichtlinie/Verwaltungssoftware beim Herunterfahren oder
+  Anmelden, die gezielt diesen Ordner trifft. Ein normaler Neustart löscht nichts in AppData.
+- **Neu eingerichtet am 2026-10-24** am selben Ort: cmdline-tools (`commandlinetools-win-16111833`),
+  `platform-tools` (adb 37.0.1), `platforms/android-37.0`, `build-tools/37.0.0`; Gradle installiert
+  `build-tools/36.0.0` bei Bedarf selbst nach. Emulator nicht neu installiert (aktuell nicht gebraucht).
+  Lizenz liegt wieder in `Sdk\licenses`.
+- **Beobachtung:** `tools/sdk-watch.ps1` schreibt Zeit, Zustand (`OK`/`UNVOLLSTAENDIG`/`FEHLT`) und
+  letzte Bootzeit nach `~\sdk-watch.log`. Damit es regelmäßig läuft, als Benutzer-Aufgabe registrieren
+  (bei Anmeldung + alle 30 min, siehe Kommentar im Skript).
+- Falls es wieder passiert: SDK außerhalb von AppData ablegen (z. B. `%USERPROFILE%.Bartik\Android\Sdk`,
+  dann `sdk.dir` in `local.properties` anpassen) und bei der IT nach der Bereinigungsregel fragen.
+
 ## Echtes Gerät: ✅ per USB (2026-10-18)
 
 - S24 Ultra per USB-Kabel angeschlossen, USB-Debugging aktiviert → `adb devices`

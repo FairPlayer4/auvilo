@@ -10,6 +10,7 @@ import org.junit.jupiter.api.assertThrows
 import java.time.DayOfWeek.FRIDAY
 import java.time.DayOfWeek.MONDAY
 import java.time.DayOfWeek.WEDNESDAY
+import java.time.LocalDate
 import java.time.LocalDateTime
 import java.time.LocalTime
 
@@ -67,9 +68,29 @@ class ScheduleRulesTest {
     }
 
     @Test
-    fun `after done without completion yet starts from today`() {
+    fun `after done without start day starts one interval after creation`() {
         val every14 = Schedule.AfterDone(14, LocalTime.of(21, 0))
         assertEquals(at(9, 21, month = 11), next(every14, at(26, 8)))
+    }
+
+    @Test
+    fun `after done is first due on the chosen start day`() {
+        val today = Schedule.AfterDone(14, LocalTime.of(21, 0), firstOn = LocalDate.of(2026, 10, 26))
+        assertEquals(at(26, 21), next(today, at(26, 8)))
+        val later = Schedule.AfterDone(14, LocalTime.of(21, 0), firstOn = LocalDate.of(2026, 10, 30))
+        assertEquals(at(30, 21), next(later, at(26, 8)))
+    }
+
+    @Test
+    fun `after done start day whose time has passed is due at the next possible time`() {
+        val today = Schedule.AfterDone(14, LocalTime.of(7, 0), firstOn = LocalDate.of(2026, 10, 26))
+        assertEquals(at(27, 7), next(today, at(26, 8)))
+    }
+
+    @Test
+    fun `after done ignores the start day once it was done`() {
+        val every14 = Schedule.AfterDone(14, LocalTime.of(21, 0), firstOn = LocalDate.of(2026, 10, 26))
+        assertEquals(at(9, 21, month = 11), next(every14, at(26, 22), prev = at(26, 21), done = at(26, 21, 30)))
     }
 
     @Test

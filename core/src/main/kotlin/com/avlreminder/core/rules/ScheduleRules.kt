@@ -38,6 +38,11 @@ object ScheduleRules {
             is Schedule.AfterDone -> {
                 // Skipped or missed means not done: remind again the next possible day.
                 if (previousDueAt != null && !previousWasDone) return nextAtTime(schedule.time, now, zone) { true }
+                // Never done yet: the chosen first day, or the next possible time if that has passed.
+                if (lastDoneAt == null && schedule.firstOn != null) {
+                    val first = schedule.firstOn.atTime(schedule.time).atZone(zone).toInstant()
+                    return if (first > now) first else nextAtTime(schedule.time, now, zone) { true }
+                }
                 val base = (lastDoneAt ?: now).atZone(zone).toLocalDate()
                 val planned = base.plusDays(schedule.intervalDays.toLong()).atTime(schedule.time).atZone(zone).toInstant()
                 if (planned > now) planned else nextAtTime(schedule.time, now, zone) { true }

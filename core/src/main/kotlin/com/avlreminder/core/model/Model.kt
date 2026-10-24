@@ -2,6 +2,7 @@ package com.avlreminder.core.model
 
 import java.time.DayOfWeek
 import java.time.Instant
+import java.time.LocalDate
 import java.time.LocalDateTime
 import java.time.LocalTime
 
@@ -25,8 +26,11 @@ sealed interface Schedule {
     data class Weekdays(val time: LocalTime, val days: Set<DayOfWeek>) : Schedule {
         init { require(days.isNotEmpty()) { "at least one weekday" } }
     }
-    /** [intervalDays] after the last completion, at [time]. */
-    data class AfterDone(val intervalDays: Int, val time: LocalTime) : Schedule {
+    /**
+     * [intervalDays] after the last completion, at [time]. Before the first completion it is due
+     * on [firstOn]; without [firstOn] one interval after creation.
+     */
+    data class AfterDone(val intervalDays: Int, val time: LocalTime, val firstOn: LocalDate? = null) : Schedule {
         init { require(intervalDays >= 1) { "interval must be at least one day" } }
     }
 }

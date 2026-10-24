@@ -76,7 +76,8 @@ fun ReminderEntity.toModel(): Reminder = Reminder(
         ScheduleType.ONCE -> Schedule.Once(requireNotNull(onceAt))
         ScheduleType.DAILY -> Schedule.Daily(requireNotNull(timeMinutes).toTime())
         ScheduleType.WEEKDAYS -> Schedule.Weekdays(requireNotNull(timeMinutes).toTime(), weekdays.toDays())
-        ScheduleType.AFTER_DONE -> Schedule.AfterDone(requireNotNull(intervalDays), requireNotNull(timeMinutes).toTime())
+        // For AFTER_DONE, onceAt holds the first due day (no schema change needed).
+        ScheduleType.AFTER_DONE -> Schedule.AfterDone(requireNotNull(intervalDays), requireNotNull(timeMinutes).toTime(), onceAt?.toLocalDate())
     },
     goal = goal,
     minimum = minimum,
@@ -107,7 +108,11 @@ fun Reminder.toEntity(): ReminderEntity {
             is Schedule.Weekdays -> s.time.toMinutes()
             is Schedule.AfterDone -> s.time.toMinutes()
         },
-        onceAt = (s as? Schedule.Once)?.at,
+        onceAt = when (s) {
+            is Schedule.Once -> s.at
+            is Schedule.AfterDone -> s.firstOn?.atTime(s.time)
+            else -> null
+        },
         weekdays = (s as? Schedule.Weekdays)?.days?.toBits() ?: 0,
         intervalDays = (s as? Schedule.AfterDone)?.intervalDays,
         goal = goal,

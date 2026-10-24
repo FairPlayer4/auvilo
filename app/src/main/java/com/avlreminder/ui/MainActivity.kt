@@ -16,6 +16,7 @@ import androidx.activity.result.contract.ActivityResultContracts
 import androidx.activity.viewModels
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.setValue
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
@@ -43,7 +44,7 @@ class MainActivity : ComponentActivity() {
     private val vm: AppViewModel by viewModels()
     private var permissions by mutableStateOf(emptyList<PermissionItem>())
     private var startRoute by mutableStateOf(Routes.TODAY)
-    private var launch by mutableStateOf(0)
+    private var launch by mutableIntStateOf(0)
 
     private val requestPermission = registerForActivityResult(ActivityResultContracts.RequestPermission()) {
         refreshPermissions()

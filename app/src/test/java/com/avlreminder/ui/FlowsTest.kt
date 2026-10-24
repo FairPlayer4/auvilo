@@ -29,6 +29,7 @@ import org.junit.Rule
 import org.junit.Test
 import org.junit.runner.RunWith
 import java.time.Instant
+import java.time.LocalDate
 import java.time.LocalTime
 import java.time.ZoneId
 
@@ -75,7 +76,8 @@ class FlowsTest {
         assertEquals("Katzenbrunnen reinigen", r.title)
         assertEquals(Strictness.STRICT, r.strictness)
         assertEquals(ProofType.PHOTO, r.proof)
-        assertEquals(Schedule.AfterDone(14, LocalTime.of(19, 0)), r.schedule)
+        // First due today, not only after the first interval.
+        assertEquals(Schedule.AfterDone(14, LocalTime.of(19, 0), firstOn = LocalDate.of(2026, 10, 24)), r.schedule)
         // Saved: back on "Heute".
         compose.onNodeWithText("Speichern").assertDoesNotExist()
     }
