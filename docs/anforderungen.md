@@ -1,7 +1,7 @@
 # Anforderungen – avlreminder
 
 > Arbeitsname. AVL = **A**udio / **V**isual / **L**ocation.
-> Stand: 2026-10-25 – zehnter Entwurf (Startklar-Fragen und Blocker bei Überwindung), wird iterativ verfeinert.
+> Stand: 2026-10-25 – elfter Entwurf (Aufsteh-Wecker), wird iterativ verfeinert.
 
 ## 1. Vision
 
@@ -145,7 +145,8 @@ Die Einordnung ist vorläufig.
     ausdrücklich auch während der Arbeitszeit.
   - **18–21 Uhr – laut:** zusätzlich richtig laut (Alarmton wie ein Wecker), wenn
     der Reminder es erlaubt.
-  - Außerhalb 7–21 Uhr nur stille Benachrichtigung.
+  - Außerhalb 7–21 Uhr nur stille Benachrichtigung – **Ausnahme:** der
+    Aufsteh-Wecker (7.22) klingelt zu seiner Zeit laut.
 - **Eigene Vibrationsmuster**: länger und ungewöhnlich, damit man sie von normalen
   Benachrichtigungen unterscheidet **[V1]**
 - Besprechungen: kein Kalenderabgleich; Schnellknopf *nach dem Termin* (+30/60 min) reicht.
@@ -500,6 +501,41 @@ Hindernis, Plan).
   verschoben, ausgelassen oder verpasst, fragt die App "Was hält dich gerade ab?" –
   die Antwort wird ein neuer Blocker. Schwelle einstellbar. **[V1.2]**
 
+### 7.22 Aufsteh-Wecker – erst aus, wenn man aus dem Bett ist
+Aufstehen ist sehr unattraktiv; der Wecker soll es **forcieren**. Extreme Methode,
+aber mit viel echtem Mehrwert. **[V2 – Kandidat zum Vorziehen]**
+- AW1 **Zwei Stufen:**
+  1. **Wecker 1 – normal**, abschaltbar (optional zuerst Vibration auf der Uhr).
+  2. **Kontrollfenster** (Standard 10 min): Die App prüft still, ob man aufgestanden
+     ist.
+  3. **Wecker 2 – nicht abschaltbar**, laut; kommt nur, wenn im Kontrollfenster
+     kein Nachweis kam, und endet nur mit Nachweis.
+- AW2 **Wach-bleiben-Prüfung** (Standard 15 min nach dem Nachweis): Deutet etwas
+  darauf hin, dass man wieder liegt (keine Schritte, Schlafzimmer, Bettsensor),
+  startet Wecker 2 erneut.
+- AW3 **Nachweis "aufgestanden"** – stufenweise:
+  - **PoC / einfachste Variante:** Schritte (Schrittdetektor) auf der **Uhr**
+    oder dem Handy, z. B. 30–50 Schritte innerhalb weniger Minuten. Ohne Home
+    Assistant umsetzbar.
+  - Später: Foto von einem festen Ort (z. B. Waschbecken) mit Bildvergleich (lokale
+    KI, V2).
+  - Später, mit Home Assistant (7.19, noch wacklig): Raumwechsel der Uhr (z. B.
+    2 min im Bad), Taster in Bad/Küche, Bettsensor (Druckmatte) – Letzterer ideal
+    für AW2.
+  - Bewegungsabfolgen/Gesten: nicht verfolgen (aufwendig, im Bett machbar).
+- AW4 **Auslassen nur am Vorabend** (krank, Urlaub, Wochenende) – nicht morgens im
+  Halbschlaf.
+- AW5 **Notausgang** für echte Notfälle (z. B. langen Satz abtippen); zählt als
+  nicht erfolgreich.
+- AW6 "Nicht abschaltbar" heißt unter Android "sehr lästig", nicht "unmöglich"
+  (Ausschalten, Stopp erzwingen). Umgehungen werden erkannt und ehrlich als
+  "nicht aufgestanden" gewertet.
+- AW7 **Akku-Warnung** am Abend, wenn das Handy fast leer bzw. nicht am Ladegerät ist.
+- AW8 **Positive Verstärkung:** Zeit bis zum nachgewiesenen Aufstehen wird
+  festgehalten; "mit Wecker 1 aufgestanden" wird als Erfolg eigens ausgewiesen,
+  Wecker 2 ist der ehrliche Fallback. Motivations-Audio (P7) passt hier besonders.
+- Später mit mehreren Personen (V3): Wecker 1 rücksichtsvoll nur auf der Uhr.
+
 ## 8. Zielplattform und Technik
 
 ### 8.1 Zielgerät
@@ -604,6 +640,7 @@ früh am S24 Ultra testen (Spike, siehe Abschnitt 10).
 | 2026-10-25 | Watch-App ist Fernbedienung und Anzeige, Logik bleibt auf dem Handy (Handy immer in der Nähe); laufende Reminder komplett über die Uhr bedienbar |
 | 2026-10-25 | Raumerkennung über Bluetooth-Empfänger mit der Uhr als Sender, ergänzt um aktive Methoden (Bewegung, Präsenzmelder, Taster) |
 | 2026-10-25 | Reminder vorab erledigen (V1.1) und vorgezogen starten (V1.3); "vor dem Reminder erledigt" wird positiv ausgewiesen |
+| 2026-10-25 | Aufsteh-Wecker zweistufig (normal, dann nicht abschaltbar bis Nachweis), V2; einfachste Variante (Schritte) als PoC früher möglich, Home-Assistant-Varianten später |
 | 2026-10-25 | Startklar-Fragen (Ziel, Hindernisse, Startbereitschaft, erster Schritt) Pflicht bei Überwindung, änderbar mit Verlauf (V1.1); Blocker als Vorbereitungsaufgaben, Nachfragen bei wiederholtem Verschieben, "Blocker gelöst" als Minimum (V1.2) |
 | 2026-10-25 | Bewegungsdaten von Handy und Uhr als Forschungsprojekt (messen, später auswerten), V2 |
 | 2026-10-25 | GPS-Routen erst V2/V3 – punktuelle Ortserkennung reicht vorerst |
@@ -627,6 +664,8 @@ früh am S24 Ultra testen (Spike, siehe Abschnitt 10).
      für Training (7.12), **Galaxy Watch** über Benachrichtigungen (7.14),
      **vorgezogen starten** (7.20)
    - **V1.4:** **eigene Watch-App** für laufende Reminder (7.14, G5–G9)
+   - **Kandidat zum Vorziehen:** Aufsteh-Wecker (7.22) als PoC mit Schritten –
+     sinnvoll ab V1.4 (Schritte auf der Uhr), eine Handy-only-Variante auch früher.
 3. Weitere Anforderungen ergeben sich aus der Nutzung.
 
 ## 11. Offene Fragen
