@@ -1,7 +1,7 @@
 # Anforderungen – avlreminder
 
 > Arbeitsname. AVL = **A**udio / **V**isual / **L**ocation.
-> Stand: 2026-10-25 – elfter Entwurf (Aufsteh-Wecker), wird iterativ verfeinert.
+> Stand: 2026-10-25 – zwölfter Entwurf (Haushaltsinventar und Einkaufsliste), wird iterativ verfeinert.
 
 ## 1. Vision
 
@@ -13,6 +13,10 @@ Verstärkung – **mit Schwerpunkt auf positiver Verstärkung**.
 Keine Consumer-App: sehr kleine, spezialisierte Zielgruppe, die sich bewusst für
 "strenge" Mechanismen entscheidet. Störende/invasive Mechanismen sind gewollt,
 solange der Nutzer sie selbst konfiguriert.
+
+Langfristig entwickelt sich die App ein Stück **Richtung Lebensplanung** (z. B.
+Haushaltsinventar und Einkaufsliste, 7.23) – immer im Dienst der Reminder, nicht
+als eigenständige Verwaltungs-App.
 
 ## 2. Ausgangslage (Problem)
 
@@ -58,7 +62,7 @@ solange der Nutzer sie selbst konfiguriert.
 |---|---|---|
 | **V1** | Einzelnutzer, komplett lokal, Kernmechanismen | Kein Backend, Sideload-APK |
 | V2 | Abgleich mit Zielen, lokale KI, Zahlenwerte, Backup, **Forschung Bewegungsdaten** (7.16), **Räume und Taster über Home Assistant** (7.19), ggf. GPS-Routen (7.17) | lokal bzw. im Heimnetz |
-| V3 | Mehrere Personen im Haushalt, gemeinsame Reminder (7.18), KI über Backend, ggf. NFC-Kontrollpunkte (7.15) | Lokale Synchronisation zwischen den Handys – Backend nur, wenn nötig |
+| V3 | Mehrere Personen im Haushalt, gemeinsame Reminder (7.18), KI über Backend, ggf. NFC-Kontrollpunkte (7.15), ggf. **Haushaltsinventar und Einkaufsliste** (7.23) | Lokale Synchronisation zwischen den Handys – Backend nur, wenn nötig |
 
 "Alignment" umfasst langfristig: **Erledigung erzwingen** (V1), **Abgleich mit
 Zielen** (V2), **Abstimmung mehrerer Personen** (V3).
@@ -536,6 +540,49 @@ aber mit viel echtem Mehrwert. **[V2 – Kandidat zum Vorziehen]**
   Wecker 2 ist der ehrliche Fallback. Motivations-Audio (P7) passt hier besonders.
 - Später mit mehreren Personen (V3): Wecker 1 rücksichtsvoll nur auf der Uhr.
 
+### 7.23 Haushaltsinventar und Einkaufsliste
+Ein **ungefährer Ist-Stand** aller Dinge im Haushalt – Lager, Keller und in
+begrenztem Maß Verbrauchsgüter wie Gewürze. Bewusst ungenau, weil man das
+Aktualisieren vergisst. Das Inventar **liefert Gründe für Reminder** (auffüllen,
+warten) und ist keine eigenständige Verwaltungs-App. **[V3 – vielleicht nie]**
+- I1 **Grobe Füllstände** statt Zahlen: *voll / genug / wenig / leer*. Stückzahlen
+  nur, wo es sich lohnt (z. B. Filter, Batterien).
+- I2 **"Zuletzt gesehen"** pro Eintrag; die App zeigt ehrlich, wie verlässlich der
+  Stand ist ("Stand: vor 8 Monaten").
+- I3 **Orte als Hierarchie** (Keller → Regal 2 → blaue Kiste). "Wo ist das?" ist oft
+  wichtiger als die Menge.
+- I4 **Eine Kiste kann ein Eintrag sein**: Foto plus Stichworte ("Weihnachtsdeko,
+  Lichterketten") statt jedes Ding einzeln.
+- I5 **Aktualisieren nebenbei**:
+  - Abhaken auf der Einkaufsliste füllt den Bestand auf.
+  - "Leer" antippen setzt den Artikel auf die Einkaufsliste.
+  - **Teil-Inventur-Reminder** (z. B. vierteljährlich "Keller-Regal 2 kurz
+    prüfen"), Charakter *Dokumentation*.
+- I6 **Reminder aus dem Inventar**: auffüllen, wenn etwas knapp wird; Wartung mit
+  Bezug auf den Vorrat (z. B. "Filter Katzenbrunnen wechseln – noch 1 im Keller").
+- I7 **Ersterfassung per Import** (JSON o. ä.): Die Inventarisierung läuft
+  **außerhalb der App**, z. B. mit Fotos und einer starken Cloud-KI; die App
+  importiert nur das Ergebnis. Das liegt in der Verantwortung des Nutzers, nicht
+  der App. Import mit Vorschau und Bestätigung.
+- **Einkaufsliste:**
+  - E1 Einkaufsliste in der App; Artikel kommen von Hand, aus dem Inventar (I5) oder
+    aus Remindern.
+  - E2 **Geschäfts-Trigger** (wie der Trigger für Zuhause, T2): Ankunft in einem
+    Geschäft erinnert an die Liste. Eigene Geschäfte werden markiert (keine
+    Filialsuche über Online-Kartendaten); **Geschäftstyp pro Artikel** (Supermarkt,
+    Drogerie, Baumarkt); Verweildauer ca. 1–2 min, damit Vorbeifahren nicht
+    auslöst; nur bei nicht leerer Liste für diesen Typ.
+  - E3 Abhaken im Geschäft schnell, auch auf der Uhr.
+  - E4 **Teilen mit Haushaltsmitgliedern.** Eine Einkaufsliste braucht Abgleich
+    **aus der Ferne** (einer im Geschäft, einer zuhause) – die lokale
+    Synchronisation aus 7.18 reicht dafür wohl nicht. Kandidat: Home Assistant als
+    Sync-Medium (Einkaufs-/To-do-Listen, Zugang von unterwegs per VPN). Alternativ
+    ein eigenes Backend, falls es bis dahin wirklich nötig und sinnvoll ist.
+    Entscheidung erst in V3.
+- **Keine Anbindung an externe Listen-Apps** (z. B. Bring!, Google Tasks) – der
+  Datenschutz wäre dann nicht mehr gewährleistet.
+- Inventardaten sind sensibel (was steht wo im Haus) → gleiche Regeln wie 8.4.
+
 ## 8. Zielplattform und Technik
 
 ### 8.1 Zielgerät
@@ -590,6 +637,8 @@ früh am S24 Ultra testen (Spike, siehe Abschnitt 10).
 - **Sensible Daten** (Fotos, Audio, Standorte, Bewegungsdaten) bleiben grundsätzlich
   **nur auf dem Gerät** – auch in späteren Versionen. Synchronisation mit anderen
   Geräten im Haushalt (7.18) nur für ausdrücklich geteilte Inhalte.
+- Inventar (7.23) zählt zu den sensiblen Daten. Was außerhalb der App mit Fotos und
+  Cloud-KI für den Import vorbereitet wird, verantwortet der Nutzer selbst.
 - Rohdaten der Bewegungssensoren (7.16) nach einer einstellbaren Frist löschen;
   das Ergebnis (Dauer, erkanntes Muster) bleibt.
 - Kein Backup in V1 (später nachrüstbar, z. B. Export als ZIP).
@@ -640,6 +689,7 @@ früh am S24 Ultra testen (Spike, siehe Abschnitt 10).
 | 2026-10-25 | Watch-App ist Fernbedienung und Anzeige, Logik bleibt auf dem Handy (Handy immer in der Nähe); laufende Reminder komplett über die Uhr bedienbar |
 | 2026-10-25 | Raumerkennung über Bluetooth-Empfänger mit der Uhr als Sender, ergänzt um aktive Methoden (Bewegung, Präsenzmelder, Taster) |
 | 2026-10-25 | Reminder vorab erledigen (V1.1) und vorgezogen starten (V1.3); "vor dem Reminder erledigt" wird positiv ausgewiesen |
+| 2026-10-25 | Haushaltsinventar (grob, "zuletzt gesehen", Import aus externer KI-Erfassung) und Einkaufsliste mit Geschäfts-Trigger, V3 – vielleicht nie; keine Anbindung an externe Listen-Apps; geteilte Liste ggf. über Home Assistant, Backend nur wenn wirklich nötig – Entscheidung in V3 |
 | 2026-10-25 | Aufsteh-Wecker zweistufig (normal, dann nicht abschaltbar bis Nachweis), V2; einfachste Variante (Schritte) als PoC früher möglich, Home-Assistant-Varianten später |
 | 2026-10-25 | Startklar-Fragen (Ziel, Hindernisse, Startbereitschaft, erster Schritt) Pflicht bei Überwindung, änderbar mit Verlauf (V1.1); Blocker als Vorbereitungsaufgaben, Nachfragen bei wiederholtem Verschieben, "Blocker gelöst" als Minimum (V1.2) |
 | 2026-10-25 | Bewegungsdaten von Handy und Uhr als Forschungsprojekt (messen, später auswerten), V2 |
@@ -666,6 +716,9 @@ früh am S24 Ultra testen (Spike, siehe Abschnitt 10).
    - **V1.4:** **eigene Watch-App** für laufende Reminder (7.14, G5–G9)
    - **Kandidat zum Vorziehen:** Aufsteh-Wecker (7.22) als PoC mit Schritten –
      sinnvoll ab V1.4 (Schritte auf der Uhr), eine Handy-only-Variante auch früher.
+   - **Möglicher Kandidat zum Vorziehen:** Einkaufsliste nur für einen selbst mit
+     Geschäfts-Trigger (7.23, E1–E3) – ohne Inventar, KI und Abgleich; Technik
+     ab V1.1 vorhanden. Nicht festgelegt.
 3. Weitere Anforderungen ergeben sich aus der Nutzung.
 
 ## 11. Offene Fragen
@@ -684,3 +737,5 @@ Für später:
   mit echten Messdaten (7.16).
 - V3: Wie oft und worüber synchronisieren (Nearby Connections vs. Heim-WLAN), und
   welche Konfliktregel gilt bei gleichzeitigen Änderungen (7.18)?
+- V3: Wie wird die geteilte Einkaufsliste aus der Ferne abgeglichen – Home
+  Assistant oder eigenes Backend (7.23, E4)?
