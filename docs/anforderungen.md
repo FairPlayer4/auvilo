@@ -1,7 +1,7 @@
 # Anforderungen – avlreminder
 
 > Arbeitsname. AVL = **A**udio / **V**isual / **L**ocation.
-> Stand: 2026-10-25 – achter Entwurf (Watch-App in V1.4, Raumerkennung und Taster über Home Assistant, NFC nach V3), wird iterativ verfeinert.
+> Stand: 2026-10-25 – neunter Entwurf (Vorziehen und vorab erledigen), wird iterativ verfeinert.
 
 ## 1. Vision
 
@@ -237,6 +237,7 @@ Erster Satz, wird mit der Nutzung angepasst: **[V1]**
 ```
 geplant ─► Vorab-Reminder ─► fällig ─► eskaliert
    │                          │
+   ├─► vorab erledigt / vorgezogen gestartet (vor der Fälligkeit – siehe 7.20)
    │                          ├─► läuft (Ich starte jetzt, Timer/Ablauf, Nachfragen – siehe 7.11)
    │                          │     └─► endet wie unten: Ziel / Minimum / abgebrochen (nicht erfolgreich)
    │                          ├─► teilweise erledigt (Checkliste: Restpunkte auf später – siehe 7.13)
@@ -439,6 +440,33 @@ Das Haus kennt den Raum, nicht nur das Handy. **[V2, ggf. V3]**
   Zusatz.
 - Raumdaten sind Bewegungsdaten → gleiche Regeln wie 8.4.
 
+### 7.20 Vorziehen und vorab erledigen
+Der Reminder ist oft nur der **letztmögliche Zeitpunkt**. Wer vorher handelt, soll
+das ohne Umweg tun können – und es soll sich gut anfühlen.
+- V1 **Vorab erledigen**: Jeder anstehende Reminder (Heute-Liste, *Später heute*,
+  Detailansicht) lässt sich schon vor der Fälligkeit erledigen – Ziel, Minimum oder
+  mit Nachweis wie sonst auch. Der Alarm entfällt, ein Vorab-Reminder (T6) auch.
+  **[V1.1]**
+- V2 **Vorziehen und starten**: Reminder mit Durchführung (7.11) oder Ablauf (7.12)
+  lassen sich vorher **starten**, z. B. Training früher beginnen – mit Timer,
+  Nachfragen, Schritten und Uhr wie beim regulären Reminder. **[V1.3]**
+- V3 Folgen für den Takt:
+  - *nach Erledigung*: Das Intervall zählt ab der tatsächlichen Erledigung.
+  - *fester Kalender-Rhythmus*: Erledigt wird der nächste Termin; der übernächste
+    bleibt, wo er ist.
+  - *Wochenziel*: Zählt für die Woche, in der es erledigt wurde.
+  - *Tagesangebot mit Bedingung* (Training bei Ankunft / 19 Uhr): Wurde heute schon
+    trainiert, kommt das Angebot heute nicht mehr.
+  - *Checkliste*: Einzelne Punkte vorab abhaken; der Reminder kommt nur mit den
+    Restpunkten.
+- V4 Vorziehen ist nur für den **nächsten** Termin eines Reminders möglich, nicht
+  für mehrere im Voraus.
+- V5 **Positive Verstärkung**: "vor dem Reminder erledigt" wird im Verlauf und in
+  der Statistik eigens ausgewiesen (z. B. "12× diesen Monat vor der Erinnerung").
+  Kein Malus, wenn man es erst beim Reminder macht.
+- V6 Schnellzugriff: Widget und (ab V1.4) Uhr bieten *Jetzt starten* bzw.
+  *Erledigt* für den nächsten Reminder.
+
 ## 8. Zielplattform und Technik
 
 ### 8.1 Zielgerät
@@ -542,6 +570,7 @@ früh am S24 Ultra testen (Spike, siehe Abschnitt 10).
 | 2026-10-25 | Leitprinzip 10: nicht ans Handy gebunden |
 | 2026-10-25 | Watch-App ist Fernbedienung und Anzeige, Logik bleibt auf dem Handy (Handy immer in der Nähe); laufende Reminder komplett über die Uhr bedienbar |
 | 2026-10-25 | Raumerkennung über Bluetooth-Empfänger mit der Uhr als Sender, ergänzt um aktive Methoden (Bewegung, Präsenzmelder, Taster) |
+| 2026-10-25 | Reminder vorab erledigen (V1.1) und vorgezogen starten (V1.3); "vor dem Reminder erledigt" wird positiv ausgewiesen |
 | 2026-10-25 | Bewegungsdaten von Handy und Uhr als Forschungsprojekt (messen, später auswerten), V2 |
 | 2026-10-25 | GPS-Routen erst V2/V3 – punktuelle Ortserkennung reicht vorerst |
 | 2026-10-25 | Sensible Daten grundsätzlich nur lokal auf dem Gerät |
@@ -557,11 +586,12 @@ früh am S24 Ultra testen (Spike, siehe Abschnitt 10).
      Ziel/Minimum, einfache Liste der Erledigungen, Widget
      – ✅ seit 2026-10-24 auf dem Gerät, inkl. Intervall ab letzter Erledigung
    - **V1.1:** Ort (Ankunft zuhause), **Checklisten** (7.13), Audio-Nachweis,
-     Motivations-Audio
+     Motivations-Audio, **vorab erledigen** (7.20)
    - **V1.2:** Wochenziele, Fristen mit Ausführungsfenstern, Serien/Joker,
      Statistik, Übersicht morgens/abends, Vorlagen
    - **V1.3:** **Durchführung mit Timer** und Nachfrage-Muster (7.11), **Abläufe**
-     für Training (7.12), **Galaxy Watch** über Benachrichtigungen (7.14)
+     für Training (7.12), **Galaxy Watch** über Benachrichtigungen (7.14),
+     **vorgezogen starten** (7.20)
    - **V1.4:** **eigene Watch-App** für laufende Reminder (7.14, G5–G9)
 3. Weitere Anforderungen ergeben sich aus der Nutzung.
 
