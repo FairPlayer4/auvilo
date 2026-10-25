@@ -1,7 +1,7 @@
 # Anforderungen – avlreminder
 
 > Arbeitsname. AVL = **A**udio / **V**isual / **L**ocation.
-> Stand: 2026-10-25 – neunter Entwurf (Vorziehen und vorab erledigen), wird iterativ verfeinert.
+> Stand: 2026-10-25 – zehnter Entwurf (Startklar-Fragen und Blocker bei Überwindung), wird iterativ verfeinert.
 
 ## 1. Vision
 
@@ -97,7 +97,7 @@ Alle Anwendungsfälle lassen sich mit denselben Bausteinen beschreiben:
 
 | Baustein | Frage | Beispiele |
 |---|---|---|
-| **Aufgabe** | Was? | Titel, "Warum ist mir das wichtig?", Motivations-Audio |
+| **Aufgabe** | Was? | Titel, "Warum ist mir das wichtig?", Motivations-Audio, Startklar-Fragen und Blocker (7.21) |
 | **Gelegenheit** | Wann/wo ist es möglich? | Zeitfenster pro Wochentag (Praxis Mo–Fr 8–12), Ort (zuhause), Kombination |
 | **Takt** | Wie oft / bis wann? | einmalig, Frist, fester Kalender-Rhythmus, Intervall ab letzter Erledigung, x-mal pro Zeitraum |
 | **Ziel** | Wie viel? | Zielwert, Minimum, Limit für Minimum |
@@ -209,7 +209,8 @@ Erster Satz, wird mit der Nutzung angepasst: **[V1]**
 - P7 **Motivations-Audio vom eigenen Ich**: Bei der Erstellung eine Botschaft
   aufnehmen; abgespielt **nur auf Klick** **[V1]**
 - P3 Commitment: Begründung "Warum ist mir das wichtig?" beim Anlegen **[V1]**
-- P4 Wenn-dann-Vorsätze ("Wenn X, dann tue ich Y") [später]
+- P4 Wenn-dann-Vorsätze ("Wenn X, dann tue ich Y") [später]; Hindernisse und
+  erster Schritt sind schon Teil der Startklar-Fragen (7.21)
 - Belohnungen/Punkte/Level: eher nicht – Belohnungen sind in einer App schwierig.
 
 **Negativ (begrenzt, taktisch):**
@@ -467,6 +468,38 @@ das ohne Umweg tun können – und es soll sich gut anfühlen.
 - V6 Schnellzugriff: Widget und (ab V1.4) Uhr bieten *Jetzt starten* bzw.
   *Erledigt* für den nächsten Reminder.
 
+### 7.21 Startklar-Fragen und Blocker bei Überwindung
+Reminder scheitern selten am Erinnern, sondern am **Grund, warum man nicht
+anfängt** – oft eine ungelöste Vorbedingung, die zur Dauer-Ausrede wird (Beispiel:
+Training braucht erst eine größere Aufräumaktion). Wichtig ist, sich damit
+auseinanderzusetzen, **warum dieser Reminder Überwindung braucht**. Besonders
+relevant für Arbeitsaufgaben und Wartung. Angelehnt an WOOP (Wunsch, Ergebnis,
+Hindernis, Plan).
+- S1 Beim Anlegen eines Reminders mit Charakter **Überwindung** beantwortet man
+  (Pflicht; bei *Dokumentation* optional): **[V1.1]**
+  1. **Was hast du davon, wenn es erledigt ist?** (Attraktivität des Ziels)
+  2. **Was könnte dich abhalten?** (Hindernisse)
+  3. **Kannst du sofort starten? Wenn nein: was fehlt?** (Startbereitschaft)
+  4. **Was ist der allererste Schritt?** (kleinster konkreter Anfang, z. B.
+     "Matte ausrollen", "Ticket X öffnen")
+- S2 *Weiß ich noch nicht* ist eine erlaubte Antwort und wird als offener Punkt
+  markiert – das Anlegen darf keine Hürde werden. **[V1.1]**
+- S3 Fragen und Antworten sind **im Reminder gespeichert und jederzeit änderbar**
+  (z. B. eintragen, dass ein Blocker beseitigt ist). Frühere Fassungen bleiben im
+  Verlauf erhalten – so sieht man, welche Blocker immer wiederkehren. **[V1.1]**
+- S4 Der **Alarm zeigt** Ziel (Frage 1), ersten Schritt (Frage 4) und offene
+  Blocker. **[V1.1]**
+- S5 **Blocker werden zu Aufgaben**: Ein "was fehlt" aus Frage 3 wird eine
+  **Vorbereitungsaufgabe** mit eigenem Termin vor dem Reminder; abhaken = Blocker
+  beseitigt. So beginnt die Vorbereitung, bevor der Reminder kommt. **[V1.2]**
+- S6 Der **Vorab-Reminder** (T6) erinnert gezielt an offene Blocker ("Morgen
+  Training – Bereich ist noch nicht aufgeräumt"). **[V1.2]**
+- S7 **"Blocker gelöst" kann als Minimum zählen**, pro Reminder einstellbar; das
+  Limit für Minimum gilt. **[V1.2]**
+- S8 **Nachfragen, wenn es hakt**: Wird ein Überwindungs-Reminder z. B. 2× in Folge
+  verschoben, ausgelassen oder verpasst, fragt die App "Was hält dich gerade ab?" –
+  die Antwort wird ein neuer Blocker. Schwelle einstellbar. **[V1.2]**
+
 ## 8. Zielplattform und Technik
 
 ### 8.1 Zielgerät
@@ -571,6 +604,7 @@ früh am S24 Ultra testen (Spike, siehe Abschnitt 10).
 | 2026-10-25 | Watch-App ist Fernbedienung und Anzeige, Logik bleibt auf dem Handy (Handy immer in der Nähe); laufende Reminder komplett über die Uhr bedienbar |
 | 2026-10-25 | Raumerkennung über Bluetooth-Empfänger mit der Uhr als Sender, ergänzt um aktive Methoden (Bewegung, Präsenzmelder, Taster) |
 | 2026-10-25 | Reminder vorab erledigen (V1.1) und vorgezogen starten (V1.3); "vor dem Reminder erledigt" wird positiv ausgewiesen |
+| 2026-10-25 | Startklar-Fragen (Ziel, Hindernisse, Startbereitschaft, erster Schritt) Pflicht bei Überwindung, änderbar mit Verlauf (V1.1); Blocker als Vorbereitungsaufgaben, Nachfragen bei wiederholtem Verschieben, "Blocker gelöst" als Minimum (V1.2) |
 | 2026-10-25 | Bewegungsdaten von Handy und Uhr als Forschungsprojekt (messen, später auswerten), V2 |
 | 2026-10-25 | GPS-Routen erst V2/V3 – punktuelle Ortserkennung reicht vorerst |
 | 2026-10-25 | Sensible Daten grundsätzlich nur lokal auf dem Gerät |
@@ -586,9 +620,9 @@ früh am S24 Ultra testen (Spike, siehe Abschnitt 10).
      Ziel/Minimum, einfache Liste der Erledigungen, Widget
      – ✅ seit 2026-10-24 auf dem Gerät, inkl. Intervall ab letzter Erledigung
    - **V1.1:** Ort (Ankunft zuhause), **Checklisten** (7.13), Audio-Nachweis,
-     Motivations-Audio, **vorab erledigen** (7.20)
+     Motivations-Audio, **vorab erledigen** (7.20), **Startklar-Fragen** (7.21, S1–S4)
    - **V1.2:** Wochenziele, Fristen mit Ausführungsfenstern, Serien/Joker,
-     Statistik, Übersicht morgens/abends, Vorlagen
+     Statistik, Übersicht morgens/abends, Vorlagen, **Blocker als Aufgaben** (7.21, S5–S8)
    - **V1.3:** **Durchführung mit Timer** und Nachfrage-Muster (7.11), **Abläufe**
      für Training (7.12), **Galaxy Watch** über Benachrichtigungen (7.14),
      **vorgezogen starten** (7.20)
