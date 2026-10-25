@@ -342,8 +342,15 @@ Guter Hebel für neue Anforderungen; zuerst so viel wie möglich über
     sie erst spiegeln muss.
   - G7 *Ich starte jetzt* und Checklisten-Punkte von der Uhr aus.
   - G8 Kachel (Tile) mit dem nächsten fälligen Reminder bzw. der laufenden Sitzung.
-  - G9 Fällt die Verbindung zum Handy kurz aus, läuft die Sitzung auf der Uhr weiter
-    und gleicht danach ab.
+  - G9 **Die Uhr ist Fernbedienung und Anzeige, das Handy das Gehirn.** Annahme: Das
+    Handy ist immer in der Nähe der Uhr. Timer, Alarme, Abläufe und Daten laufen nur
+    auf dem Handy; die Uhr zeigt den Zustand, den das Handy schickt, sendet
+    Knopfdrücke zurück und vibriert auf Befehl. Countdowns rechnet die Uhr nur für die
+    Anzeige aus Startzeit und Dauer. Ohne Verbindung zeigt die Uhr das deutlich an;
+    die Sitzung läuft auf dem Handy weiter.
+  - G10 **Während ein Reminder läuft, muss man das Handy nie in die Hand nehmen.**
+    Jede Aktion einer laufenden Sitzung (inkl. Nachfragen und letzter Reminder aus D5)
+    ist auf der Uhr möglich. Nur Foto-Nachweis bleibt am Handy.
   - Grundlage für die Sensor-Aufzeichnung der Forschung (7.16).
 
 ### 7.15 NFC-Kontrollpunkte
@@ -406,9 +413,21 @@ regelmäßig **lokal**, da sie oft zusammen sind. **[V3]**
 
 ### 7.19 Räume und Taster über Home Assistant
 Das Haus kennt den Raum, nicht nur das Handy. **[V2, ggf. V3]**
-- H1 **Raumerkennung per Bluetooth**: Empfänger in den Räumen (z. B. ESP32 mit
-  ESPresense oder Bluetooth-Proxys mit *Bermuda* in Home Assistant) erkennen Uhr und
-  Handy. Die App erfährt über Home Assistant, in welchem Raum man ist.
+- H1 **Raumerkennung per Bluetooth-Empfängern**: Empfänger in den Räumen (z. B. ESP32
+  mit ESPresense oder Bluetooth-Proxys mit *Bermuda* in Home Assistant) erkennen die
+  **Uhr als Sender** (das Handy liegt oft woanders). Raumgenauigkeit reicht. Die App
+  erfährt über Home Assistant, in welchem Raum man ist.
+- H1b **Die Watch-App sendet selbst ein Beacon-Signal** mit fester Kennung, solange
+  eine Sitzung läuft. Grund: Uhren wechseln ihre Bluetooth-Adresse aus
+  Datenschutzgründen regelmäßig und werden sonst nicht stabil erkannt. Nur während
+  Sitzungen → wenig Akku.
+- H1c **Aktive Methoden für den Raumwechsel**, um schneller und sicherer zu sein als
+  Signalstärke allein:
+  - Bewegung der Uhr erkannt (Gehen) → Beacon kurz häufiger senden, danach wieder
+    sparsam.
+  - Präsenzmelder (mmWave/PIR) oder Türkontakte in Home Assistant bestätigen, dass
+    in einem Raum gerade jemand ist bzw. eine Tür passiert wurde.
+  - Taster (H3) als eindeutige Bestätigung.
 - H2 Raum als **Gelegenheit** (Reminder kommt, wenn man in der Küche ist) und als
   **Nachweis** (Ablauf: erst Wohnzimmer bei den Brunnen, dann Küche an der Spüle).
 - H3 **Physische Taster** (z. B. Zigbee-Taster) an festen Stellen: Druck bestätigt
@@ -521,6 +540,8 @@ früh am S24 Ultra testen (Spike, siehe Abschnitt 10).
 | 2026-10-25 | NFC-Kontrollpunkte nach V3 – zu unflexibel; stattdessen Raumerkennung per Bluetooth und Taster über Home Assistant, V2 (ggf. V3) |
 | 2026-10-25 | Eigene Watch-App in V1.4 – Bedienung laufender Reminder ohne Handy |
 | 2026-10-25 | Leitprinzip 10: nicht ans Handy gebunden |
+| 2026-10-25 | Watch-App ist Fernbedienung und Anzeige, Logik bleibt auf dem Handy (Handy immer in der Nähe); laufende Reminder komplett über die Uhr bedienbar |
+| 2026-10-25 | Raumerkennung über Bluetooth-Empfänger mit der Uhr als Sender, ergänzt um aktive Methoden (Bewegung, Präsenzmelder, Taster) |
 | 2026-10-25 | Bewegungsdaten von Handy und Uhr als Forschungsprojekt (messen, später auswerten), V2 |
 | 2026-10-25 | GPS-Routen erst V2/V3 – punktuelle Ortserkennung reicht vorerst |
 | 2026-10-25 | Sensible Daten grundsätzlich nur lokal auf dem Gerät |
@@ -553,9 +574,9 @@ kurz prüfen, ob *Ich starte jetzt* und die Nachfrage-Antworten auf der Uhr gena
 ankommen wie *Erledigt* / *+10 min*.
 
 Für später:
-- V1.4: Wie viel Logik läuft auf der Uhr selbst (Sitzung weiterführen ohne Handy)?
 - V2: Welche Home-Assistant-Lösung für Räume (Bermuda mit Bluetooth-Proxys oder
-  ESPresense), wie genau ist sie pro Raum, und erkennt sie die Uhr zuverlässig?
+  ESPresense), wie viele Empfänger pro Wohnung, und wie schnell wird ein Raumwechsel
+  der Uhr erkannt? Vorher kurzer Test mit 2–3 Empfängern.
 - V2: Welche Kennzahlen machen ein Bewegungsmuster "gleich genug"? Klärt sich erst
   mit echten Messdaten (7.16).
 - V3: Wie oft und worüber synchronisieren (Nearby Connections vs. Heim-WLAN), und
