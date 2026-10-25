@@ -1,7 +1,7 @@
 # Anforderungen – avlreminder
 
 > Arbeitsname. AVL = **A**udio / **V**isual / **L**ocation.
-> Stand: 2026-10-18 – fünfter Entwurf, wird iterativ verfeinert.
+> Stand: 2026-10-25 – sechster Entwurf (Checklisten, Durchführung mit Timer, Abläufe, Watch in V1.3), wird iterativ verfeinert.
 
 ## 1. Vision
 
@@ -54,7 +54,7 @@ solange der Nutzer sie selbst konfiguriert.
 | Stufe | Inhalt | Technik |
 |---|---|---|
 | **V1** | Einzelnutzer, komplett lokal, Kernmechanismen | Kein Backend, Sideload-APK |
-| V2 | Galaxy-Watch-Integration, Abgleich mit Zielen, lokale KI, Zahlenwerte, Backup | lokal |
+| V2 | Abgleich mit Zielen, lokale KI, Zahlenwerte, Backup, ggf. eigene Watch-App | lokal |
 | V3 | Mehrere Personen, gemeinsame Reminder, KI über Backend | Backend nötig |
 
 "Alignment" umfasst langfristig: **Erledigung erzwingen** (V1), **Abgleich mit
@@ -100,6 +100,8 @@ Alle Anwendungsfälle lassen sich mit denselben Bausteinen beschreiben:
 | **Ziel** | Wie viel? | Zielwert, Minimum, Limit für Minimum |
 | **Nachweis** | Womit belegt? | keiner, Quittieren, Foto, Ort, Audio, Kombination |
 | **Strenge** | Wie hartnäckig? | Vorlage *locker / normal / streng*: Eskalation, Erinnerungsintervall, Limits für Verschieben |
+| **Teile** | Woraus besteht es? | eine Aufgabe, oder Checkliste mit einzeln verschiebbaren Punkten (Brunnen 1, Brunnen 2, Futterautomat) |
+| **Durchführung** | Wie läuft es ab? | einfach erledigen, oder *Ich starte jetzt* mit Timer und Nachfrage-Muster, oder Ablauf mit Schritten (Training: Sätze, Pausen) |
 
 ## 7. Mechanismen
 
@@ -152,7 +154,7 @@ Die Einordnung ist vorläufig.
 - W2 Vollbild-Alarm über Sperrbildschirm, Bypass von "Nicht stören", Alarmton wie
   ein Wecker **[V1]**
 - W3 Overlay über anderen Apps [später]
-- W4 Vibrationsmuster, Galaxy Watch [später, V2]
+- W4 Vibrationsmuster, Galaxy Watch **[V1.3]** (siehe 7.14)
 - W5 Sprachausgabe (TTS) mit Aufgabentext [später]
 
 ### 7.4 Aktionen im Reminder/Alarm
@@ -231,6 +233,9 @@ Erster Satz, wird mit der Nutzung angepasst: **[V1]**
 ```
 geplant ─► Vorab-Reminder ─► fällig ─► eskaliert
    │                          │
+   │                          ├─► läuft (Ich starte jetzt, Timer/Ablauf, Nachfragen – siehe 7.11)
+   │                          │     └─► endet wie unten: Ziel / Minimum / abgebrochen (nicht erfolgreich)
+   │                          ├─► teilweise erledigt (Checkliste: Restpunkte auf später – siehe 7.13)
    │                          ├─► erledigt (Ziel)
    │                          ├─► erledigt (Minimum)
    │                          ├─► nicht erfolgreich (Nachweis fehlt)
@@ -240,11 +245,98 @@ geplant ─► Vorab-Reminder ─► fällig ─► eskaliert
    └─► entfallen (Gelegenheit trat nicht ein, z. B. um 19 Uhr nicht zuhause – neutral)
 ```
 
+### 7.11 Durchführung mit Timer – "Ich starte jetzt"
+Für Reminder, bei denen das Tun selbst Zeit braucht (Training, Aufräumen, Lernen).
+Pro Reminder einschaltbar. **[V1.3]**
+- D1 Aktion **Ich starte jetzt** im Alarm, in der Benachrichtigung und in der App.
+  Starten zählt als Reaktion: die Eskalation endet, eine **Sitzung** beginnt.
+- D2 **Timer** läuft sichtbar mit (laufende Benachrichtigung, Sperrbildschirm, Uhr).
+  Die Dauer wird automatisch dokumentiert.
+- D3 **Nachfragen** nach dem Start sind **zeitbasiert**: Intervall pro Reminder
+  einstellbar (Standard **alle 10 min**), ebenso die **Strenge der Nachfragen**
+  (unabhängig von der Strenge des Reminders). Zweck: Kein Reminder bleibt
+  versehentlich offen. Die App fragt:
+  - *Noch dran* → weiter bis zur nächsten Nachfrage
+  - *Fertig* → **Ziel** erreicht (→ Nachweis, falls gefordert)
+  - *Teilschritt erreicht, beenden* → **Minimum** erreicht (zählt gegen das Limit für Minimum)
+  - *Abbruch ohne Minimalziel* → **nicht erfolgreich (abgebrochen)**, ehrlich in der Statistik
+- D4 Ziel und Minimum können als **Dauer** angegeben werden ("45 min" / "10 min");
+  die App schlägt dann die passende Antwort vor.
+- D5 **Maximale Dauer** pro Reminder einstellbar. Ist der Reminder bis dahin nicht
+  abgeschlossen, kommt ein **letzter Reminder, so streng wie zu der Uhrzeit möglich**
+  (Vollbild, im lauten Fenster mit Alarmton) mit **einigen Minuten Reaktionszeit**
+  (Standard 5 min). Danach gilt er als **nicht erfüllt** – außer es wurden schon
+  Teilschritte abgeschlossen, dann zählt das **Minimum**.
+- D6 **Schnell und effizient fertig werden soll sich lohnen:** Die Dauer jeder
+  Sitzung wird festgehalten und im Verlauf gezeigt, mit Vergleich zu früheren
+  Sitzungen (z. B. "6 min schneller als im Schnitt"). Positive Verstärkung, kein Druck.
+- Technik: Foreground-Service mit laufender Benachrichtigung (wie der Alarm),
+  Nachfragen als exakte Alarme – überlebt Bildschirm aus und App im Hintergrund.
+
+### 7.12 Abläufe – gut geregeltes Training
+Keine Trainings-App, aber der **Mechanismus für ein gut geregeltes Training** gehört
+dazu, weil die App genau auf einen Nutzer zugeschnitten ist. Begrenzt auf das
+Wichtigste. **[V1.3]**
+- A1 Ein **Ablauf** ist eine Folge von Schritten, die die Sitzung aus 7.11 führt.
+  Das einfache Nachfrage-Muster aus D3 ist der Sonderfall "ein Schritt".
+- A2 Schrittarten:
+  - *zeitgesteuert* – läuft ab, dann Signal (z. B. Aufwärmen 5 min)
+  - *offen* – bis man *Fertig* tippt (z. B. ein Satz)
+  - *Pause* – Countdown mit Signal am Ende (z. B. 90 s)
+- A3 **Wiederholungen**: Schrittgruppen mehrfach ("3 Sätze à Satz + Pause").
+- A4 **Eigene Signale** pro Schrittart (Vibrationsmuster für "Pause vorbei",
+  "nächster Satz"), auf dem Handy und der Uhr; ohne aufs Display schauen zu müssen.
+- A5 **Fortschritt** sichtbar: Schritt x von y, Satz 2 von 3, Restzeit.
+  Abbruch speichert den erreichten Stand.
+- A6 Minimum kann über den Ablauf definiert sein (z. B. "Aufwärmen + 1 Satz").
+- A7 Abläufe sind **Vorlagen**, mehreren Remindern zuordenbar und vor dem Start
+  anpassbar (Schritt überspringen, Pause verlängern).
+- Nicht enthalten: Übungsdatenbank, Trainingspläne, Gewichte/Wiederholungen als
+  Logbuch (Zahlenwerte bleiben bei N9, V2).
+
+### 7.13 Checklisten
+Für Reminder, die aus mehreren Teilen bestehen, die man nicht alle am selben Tag
+schafft oder schaffen will. **[V1.1]**
+- C1 Ein Reminder kann eine **Checkliste** haben (z. B. Katzenbrunnen 1,
+  Katzenbrunnen 2, Futterautomat).
+- C2 Punkte **einzeln abhaken**, auch direkt aus der Benachrichtigung.
+- C3 Offene Punkte **auf morgen** (oder ein Datum) **schieben**; der Reminder kommt
+  dann nur mit den Restpunkten wieder. Beispiel: heute Brunnen 1, morgen Brunnen 2,
+  übermorgen Futterautomat.
+- C4 Die Verteilung kann man auch **gleich beim Start planen** ("heute A, morgen B,
+  übermorgen C").
+- C5 Der Reminder ist **erledigt (Ziel)**, wenn alle Punkte erledigt sind. Ein
+  Minimum (z. B. "mindestens 1 Punkt heute") ist möglich.
+- C5b Die Checkliste ist ein **Block**: Sie hilft, nichts zu vergessen, und erlaubt
+  bei wenig Motivation, nur Teile zu erledigen – der Rest kommt wieder. Bei
+  *nach Erledigung* läuft das Intervall für den **ganzen Block ab dem ersten
+  erledigten Punkt**; die nächste Runde bringt wieder alle Punkte.
+  (Wenn sich zeigt, dass ein Block realistisch nie an einem Tag klappt, lieber in
+  einzelne Reminder aufteilen.)
+- C5c Restpunkte auf morgen schieben zählt **nicht** gegen das Verschiebe-Limit,
+  wenn am selben Tag mindestens ein Punkt erledigt wurde; sonst schon.
+- C6 Nachweis wahlweise **pro Punkt** (Foto je Brunnen) oder einmal für alles.
+- C7 Verlauf zeigt pro Punkt, wann er erledigt wurde.
+
+### 7.14 Galaxy Watch
+Guter Hebel für neue Anforderungen; zuerst so viel wie möglich über
+**Benachrichtigungen**, eigene Watch-App nur wenn nötig. **[V1.3]**
+- G1 Erinnerungen, Eskalation und Vibration kommen **auf der Uhr** an.
+  ✅ Schon mit V1.0 beobachtet: Benachrichtigung samt *Erledigt* und *+10 min*
+  erscheint auf der Uhr.
+- G2 **Aktionen auf der Uhr**: Erledigt, +10 min, Ich starte jetzt, Checklisten-Punkt
+  abhaken, Antworten auf Nachfragen (Noch dran / Fertig / Teilschritt / Abbruch).
+- G3 **Laufende Sitzung** (Timer, aktueller Schritt, Pausen-Countdown) auf der Uhr
+  sichtbar, Signale am Handgelenk – wichtig fürs Training (Handy liegt weg).
+- G4 Foto-Nachweis bleibt auf dem Handy; die Uhr verweist darauf.
+- Später, falls Benachrichtigungen nicht reichen: Wear-OS-Kachel oder eigene
+  Watch-App (V2).
+
 ## 8. Zielplattform und Technik
 
 ### 8.1 Zielgerät
 - **Samsung Galaxy S24 Ultra, Android 17** (API 37), nur Privatgeräte
-- Galaxy Watch vorhanden → Integration in V2
+- Galaxy Watch vorhanden → Integration in V1.3 (zuerst über Benachrichtigungen, siehe 7.14)
 - **Entscheidung:** minSdk = targetSdk = 37. Kein Rückwärts-Support nötig, da
   absehbar nur ein Nutzer. Moderne APIs und Energiespar-Mechanismen nutzen.
 
@@ -264,7 +356,7 @@ vom Nutzer in den Systemeinstellungen erteilt werden.
 | T5 App geöffnet | ⚠️ | `UsageStatsManager` / Accessibility-Service | Funktioniert, aber akkuintensiv bzw. heikle Berechtigung |
 | W1/W2 Vollbild, DND-Bypass | ✅ | Full-Screen-Intent, Alarm-Audiostream | Full-Screen-Intent manuell erlauben |
 | W3 Overlay | ✅ | `SYSTEM_ALERT_WINDOW` | manuell erlauben |
-| W4 Galaxy Watch | ✅ | Notifications spiegeln sich automatisch; eigene Wear-OS-App optional | V2 |
+| W4 Galaxy Watch | ✅ | Notifications spiegeln sich automatisch (inkl. Aktionen); laufende Sitzung als Ongoing Activity; eigene Wear-OS-App optional | V1.3; Erledigt und +10 min kommen schon auf der Uhr an (2026-10-25) |
 | Widget | ✅ | Jetpack Glance | |
 | N2 Foto | ✅ | CameraX (In-App-Aufnahme) | |
 | N4 Ort | ✅ | Fused Location (Standort beim Nachweis) | Vordergrund-Standort reicht für Nachweis |
@@ -297,7 +389,7 @@ früh am S24 Ultra testen (Spike, siehe Abschnitt 10).
 | 2026-10-18 | V1 lokal, nur ein Nutzer, Sideload |
 | 2026-10-18 | Nur Android 17 (API 37), Zielgerät S24 Ultra, nur Privatgeräte |
 | 2026-10-18 | Positive Verstärkung vor negativer; negative nur taktisch und begrenzt |
-| 2026-10-18 | Galaxy Watch nicht in V1 |
+| 2026-10-18 | Galaxy Watch nicht in V1 (geändert am 2026-10-25, siehe unten) |
 | 2026-10-18 | KI später: teils lokal, teils über Backend |
 | 2026-10-18 | Feste, flexible und ortsbasierte Reminder in V1 |
 | 2026-10-18 | Minimum entscheidet der Nutzer; Limits für Minimum und Verschieben pro Reminder |
@@ -316,6 +408,18 @@ früh am S24 Ultra testen (Spike, siehe Abschnitt 10).
 | 2026-10-18 | Besprechungen: Schnellknopf statt Kalenderabgleich |
 | 2026-10-18 | Wochen Mo–So; Rettungs-Erinnerung am Wochenende; Joker 1/Woche (täglich) bzw. 1/Monat (wöchentlich) |
 | 2026-10-18 | V1 in Etappen V1.0 / V1.1 / V1.2 (siehe Abschnitt 10) |
+| 2026-10-24 | Strenge hochgestuft: *locker* = Banner + Vibration alle 10 min, *normal* = Vollbild wie Wecker ohne Ton |
+| 2026-10-25 | Alles bis einschließlich V1.3 kommt vor V2 |
+| 2026-10-25 | Galaxy Watch vorgezogen auf V1.3, zuerst über Benachrichtigungen |
+| 2026-10-25 | Durchführung mit Timer ("Ich starte jetzt") und Nachfrage-Muster; Abläufe für geregeltes Training, begrenzt aufs Wichtigste – keine Trainings-App |
+| 2026-10-25 | Checklisten mit einzeln verschiebbaren Punkten |
+| 2026-10-25 | Checkliste = Block: Intervall ab dem ersten erledigten Punkt, nächste Runde mit allen Punkten |
+| 2026-10-25 | Restpunkte verschieben zählt nicht gegen das Limit, wenn am Tag mindestens ein Punkt erledigt wurde |
+| 2026-10-25 | Nachfragen in Sitzungen zeitbasiert (Standard alle 10 min), Strenge der Nachfragen einstellbar |
+| 2026-10-25 | Maximale Dauer pro Sitzung; danach letzter Reminder so streng wie möglich, kurze Reaktionszeit, dann nicht erfüllt – mit erledigten Teilschritten zählt das Minimum |
+| 2026-10-25 | Dauer wird getrackt und mit früheren Sitzungen verglichen (schnell fertig werden soll sich lohnen) |
+| 2026-10-25 | Training: nur Dauer und erledigte Schritte/Sätze; Wiederholungen/Gewicht bleiben V2 |
+| 2026-10-25 | Watch: Benachrichtigungen samt Aktionen kommen bereits an – kein eigener Spike nötig |
 
 ## 10. Nächste Schritte
 
@@ -325,13 +429,19 @@ früh am S24 Ultra testen (Spike, siehe Abschnitt 10).
 2. **V1 in Etappen**, damit früh echte Nutzung möglich ist:
    - **V1.0 (benutzbar):** Zeit-Reminder, Eskalation, Aktionen, Quittieren/Foto,
      Ziel/Minimum, einfache Liste der Erledigungen, Widget
-   - **V1.1:** Ort (Ankunft zuhause), Intervall ab letzter Erledigung, Audio-Nachweis,
+     – ✅ seit 2026-10-24 auf dem Gerät, inkl. Intervall ab letzter Erledigung
+   - **V1.1:** Ort (Ankunft zuhause), **Checklisten** (7.13), Audio-Nachweis,
      Motivations-Audio
    - **V1.2:** Wochenziele, Fristen mit Ausführungsfenstern, Serien/Joker,
      Statistik, Übersicht morgens/abends, Vorlagen
+   - **V1.3:** **Durchführung mit Timer** und Nachfrage-Muster (7.11), **Abläufe**
+     für Training (7.12), **Galaxy Watch** über Benachrichtigungen (7.14)
 3. Weitere Anforderungen ergeben sich aus der Nutzung.
 
 ## 11. Offene Fragen
 
-Aktuell keine großen offenen Fragen. Details (Oberfläche, Vorlagen, Vibrationsmuster)
-werden mit der Nutzung geklärt.
+Aktuell keine großen offenen Fragen; die Fragen vom 2026-10-25 sind entschieden
+(Abschnitt 9). Details (Oberfläche, Vorlagen, Vibrationsmuster, Standardwerte für
+Nachfrage-Intervall und Reaktionszeit) werden mit der Nutzung geklärt. Vor V1.3
+kurz prüfen, ob *Ich starte jetzt* und die Nachfrage-Antworten auf der Uhr genauso
+ankommen wie *Erledigt* / *+10 min*.
