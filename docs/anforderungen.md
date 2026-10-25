@@ -1,7 +1,7 @@
 # Anforderungen – avlreminder
 
 > Arbeitsname. AVL = **A**udio / **V**isual / **L**ocation.
-> Stand: 2026-10-25 – sechster Entwurf (Checklisten, Durchführung mit Timer, Abläufe, Watch in V1.3), wird iterativ verfeinert.
+> Stand: 2026-10-25 – siebter Entwurf (NFC-Kontrollpunkte, Forschung Bewegungsdaten, lokale Synchronisation), wird iterativ verfeinert.
 
 ## 1. Vision
 
@@ -54,8 +54,8 @@ solange der Nutzer sie selbst konfiguriert.
 | Stufe | Inhalt | Technik |
 |---|---|---|
 | **V1** | Einzelnutzer, komplett lokal, Kernmechanismen | Kein Backend, Sideload-APK |
-| V2 | Abgleich mit Zielen, lokale KI, Zahlenwerte, Backup, ggf. eigene Watch-App | lokal |
-| V3 | Mehrere Personen, gemeinsame Reminder, KI über Backend | Backend nötig |
+| V2 | Abgleich mit Zielen, lokale KI, Zahlenwerte, Backup, ggf. eigene Watch-App, **Forschung Bewegungsdaten** (7.16), ggf. GPS-Routen (7.17) | lokal |
+| V3 | Mehrere Personen im Haushalt, gemeinsame Reminder (7.18), KI über Backend | Lokale Synchronisation zwischen den Handys – Backend nur, wenn nötig |
 
 "Alignment" umfasst langfristig: **Erledigung erzwingen** (V1), **Abgleich mit
 Zielen** (V2), **Abstimmung mehrerer Personen** (V3).
@@ -98,7 +98,7 @@ Alle Anwendungsfälle lassen sich mit denselben Bausteinen beschreiben:
 | **Gelegenheit** | Wann/wo ist es möglich? | Zeitfenster pro Wochentag (Praxis Mo–Fr 8–12), Ort (zuhause), Kombination |
 | **Takt** | Wie oft / bis wann? | einmalig, Frist, fester Kalender-Rhythmus, Intervall ab letzter Erledigung, x-mal pro Zeitraum |
 | **Ziel** | Wie viel? | Zielwert, Minimum, Limit für Minimum |
-| **Nachweis** | Womit belegt? | keiner, Quittieren, Foto, Ort, Audio, Kombination |
+| **Nachweis** | Womit belegt? | keiner, Quittieren, Foto, Ort, Audio, NFC-Kontrollpunkte, Kombination |
 | **Strenge** | Wie hartnäckig? | Vorlage *locker / normal / streng*: Eskalation, Erinnerungsintervall, Limits für Verschieben |
 | **Teile** | Woraus besteht es? | eine Aufgabe, oder Checkliste mit einzeln verschiebbaren Punkten (Brunnen 1, Brunnen 2, Futterautomat) |
 | **Durchführung** | Wie läuft es ab? | einfach erledigen, oder *Ich starte jetzt* mit Timer und Nachfrage-Muster, oder Ablauf mit Schritten (Training: Sätze, Pausen) |
@@ -178,7 +178,7 @@ Erster Satz, wird mit der Nutzung angepasst: **[V1]**
 - **Fehlender Nachweis:** Wird ein geforderter Nachweis nicht erbracht, gilt der
   Reminder als **nicht erfolgreich** und wird so markiert. Kommt vor und ist in
   Maßen unkritisch – kein Drama, aber ehrlich in der Statistik. **[V1]**
-- N3 QR-/NFC-Tag scannen [später]
+- N3 **NFC-Kontrollpunkte** scannen – siehe 7.15 **[V1.3]**; QR-Codes [später]
 - N5 Quiz/Rechenaufgabe gegen "im Halbschlaf wegdrücken" [später]
 - N8 KI-Prüfung des Nachweises (Foto passt zur Aufgabe? Audio transkribieren und
   zusammenfassen) [später]
@@ -332,6 +332,59 @@ Guter Hebel für neue Anforderungen; zuerst so viel wie möglich über
 - Später, falls Benachrichtigungen nicht reichen: Wear-OS-Kachel oder eigene
   Watch-App (V2).
 
+### 7.15 NFC-Kontrollpunkte
+Nachweis für Abläufe **im Haus**, wo GPS zu ungenau ist. Günstige NFC-Sticker
+(ca. 0,50 € pro Stück) an den Orten, an denen etwas passieren muss. **[V1.3]**
+- K1 **Kontrollpunkte anlernen**: Sticker in der App scannen und benennen
+  ("Brunnen Wohnzimmer", "Spüle"). Ein Kontrollpunkt ist mehreren Remindern
+  zuordenbar.
+- K2 **Scannen = abhaken**: Das Handy kurz an den Sticker halten hakt den
+  zugehörigen Checklisten-Punkt (7.13) bzw. Ablauf-Schritt (7.12) ab – auch bei
+  gesperrtem Bildschirm, ohne die App zu öffnen.
+- K3 **Reihenfolge** optional vorgeben (erst Brunnen einsammeln, dann Spüle).
+- K4 **Mindestzeiten** zwischen Kontrollpunkten optional (z. B. zwischen Spüle und
+  *Fertig* mindestens 5 min) – grobe Prüfung, dass wirklich etwas gemacht wurde.
+- K5 Ein Scan außerhalb einer laufenden Sitzung kann die Sitzung starten
+  (*Ich starte jetzt* per Sticker).
+- K6 Kombinierbar mit anderen Nachweisen (z. B. Foto am Ende).
+- Austricksen bleibt möglich; Ziel ist eine spürbare Hürde und eine ehrliche
+  Dokumentation, keine Überwachung.
+
+### 7.16 Forschung: Bewegungsdaten von Handy und Uhr
+**Forschungsprojekt der App**, kein fertiges Feature: erst messen, nach einer Weile
+auswerten, ob sich damit etwas anfangen lässt. **[V2]**
+- R1 Während einer Sitzung (7.11) **Rohdaten der Bewegungssensoren** aufzeichnen:
+  Beschleunigung, Gyroskop, Schrittzähler, erkannte Aktivität (Gehen/Stehen);
+  auf der Uhr zusätzlich Handgelenksbewegung (braucht eigene Watch-App, siehe 7.14).
+- R2 Aufzeichnung **nur während einer Sitzung** und nur für Reminder, bei denen sie
+  eingeschaltet ist – kein Dauer-Tracking.
+- R3 Ziel: ein **grobes Bewegungsmuster** pro Aufgabe erkennen, speichern und neue
+  Sitzungen damit vergleichen ("sieht aus wie die letzten Male Katzenbrunnen").
+- R4 NFC-Kontrollpunkte (7.15) dienen als **Markierungen** in den Daten (wann war man
+  an der Spüle) – das macht die Auswertung deutlich einfacher.
+- R5 Auswertung zuerst am Rechner (Export der Rohdaten), erst bei brauchbaren
+  Ergebnissen in die App einbauen.
+- Erwartung ehrlich: unsicher. Das Handy liegt oft weg; mit der Uhr sind die
+  Chancen besser.
+
+### 7.17 Routen und Bereiche per GPS
+Bewegungsverlauf **draußen** aufzeichnen (Route abgelaufen, Zeit in einem Bereich
+verbracht). Aktuell nicht wichtig – punktuelle Ortserkennung (T2, N4) reicht.
+**[V2 oder V3]**
+- Nur während einer Sitzung, Prüfung grob (Anteil im Bereich, Strecke, Punkte
+  passiert).
+
+### 7.18 Mehrere Personen im Haushalt
+Mehrere Personen **ohne Backend**: Die Handys im Haushalt synchronisieren sich
+regelmäßig **lokal**, da sie oft zusammen sind. **[V3]**
+- M1 Gemeinsame Reminder und Checklisten (wer hat welchen Brunnen gemacht).
+- M2 Abgleich, sobald die Geräte in der Nähe bzw. im selben WLAN sind; ohne
+  Internet und ohne Server.
+- M3 Konflikte (beide haken denselben Punkt ab) werden automatisch aufgelöst.
+- M4 Was geteilt wird, ist pro Reminder festgelegt; persönliche Daten (Fotos,
+  Audio, Bewegungsdaten) bleiben standardmäßig auf dem eigenen Gerät.
+- Backend nur, falls die lokale Synchronisation im Alltag nicht reicht.
+
 ## 8. Zielplattform und Technik
 
 ### 8.1 Zielgerät
@@ -361,7 +414,10 @@ vom Nutzer in den Systemeinstellungen erteilt werden.
 | N2 Foto | ✅ | CameraX (In-App-Aufnahme) | |
 | N4 Ort | ✅ | Fused Location (Standort beim Nachweis) | Vordergrund-Standort reicht für Nachweis |
 | N7 Audio | ✅ | `MediaRecorder` | Mikrofon-Berechtigung |
-| N3 QR / NFC | ✅ | ML Kit Barcode, NFC-API | |
+| N3 QR / NFC | ✅ | ML Kit Barcode, NFC-API (Foreground Dispatch, NDEF-Tags) | NFC-Kontrollpunkte V1.3; Sticker NTAG213/215 reichen |
+| R1 Bewegungssensoren | ✅ Aufzeichnen / ⚠️ Auswerten | `SensorManager`, Activity Recognition; Uhr: eigene Wear-OS-App | Aufzeichnen ist einfach, ob Muster erkennbar sind, ist offen (Forschung) |
+| GPS-Routen | ✅ | Fused Location im Foreground-Service | Nur während Sitzungen, sonst zu akkuintensiv |
+| M2 Lokale Synchronisation | ✅ | Nearby Connections (Bluetooth/WLAN ohne Internet) oder WLAN im Haushalt | Konfliktauflösung ist der eigentliche Aufwand |
 | N8 / KI lokal | ⚠️ zu prüfen | On-Device-Modelle (z. B. Gemini Nano / ML Kit GenAI, Speech-to-Text) | Verfügbarkeit auf S24 Ultra mit Android 17 prüfen |
 | P2 Apps sperren | ✅ / ⚠️ | Accessibility-Service oder Overlay-Blocker | |
 | Zuverlässigkeit | ⚠️ | Akku-Optimierung deaktivieren | **Samsung "Schlafende Apps"/Geräteschutz ist das größte Risiko** |
@@ -379,6 +435,11 @@ früh am S24 Ultra testen (Spike, siehe Abschnitt 10).
 
 ### 8.4 Daten
 - Alle Daten inkl. Fotos und Audio **nur lokal** auf dem Gerät.
+- **Sensible Daten** (Fotos, Audio, Standorte, Bewegungsdaten) bleiben grundsätzlich
+  **nur auf dem Gerät** – auch in späteren Versionen. Synchronisation mit anderen
+  Geräten im Haushalt (7.18) nur für ausdrücklich geteilte Inhalte.
+- Rohdaten der Bewegungssensoren (7.16) nach einer einstellbaren Frist löschen;
+  das Ergebnis (Dauer, erkanntes Muster) bleibt.
 - Kein Backup in V1 (später nachrüstbar, z. B. Export als ZIP).
 - Aufbewahrung: vorerst unbegrenzt.
 
@@ -420,6 +481,11 @@ früh am S24 Ultra testen (Spike, siehe Abschnitt 10).
 | 2026-10-25 | Dauer wird getrackt und mit früheren Sitzungen verglichen (schnell fertig werden soll sich lohnen) |
 | 2026-10-25 | Training: nur Dauer und erledigte Schritte/Sätze; Wiederholungen/Gewicht bleiben V2 |
 | 2026-10-25 | Watch: Benachrichtigungen samt Aktionen kommen bereits an – kein eigener Spike nötig |
+| 2026-10-25 | NFC-Kontrollpunkte als Nachweis im Haus, V1.3 |
+| 2026-10-25 | Bewegungsdaten von Handy und Uhr als Forschungsprojekt (messen, später auswerten), V2 |
+| 2026-10-25 | GPS-Routen erst V2/V3 – punktuelle Ortserkennung reicht vorerst |
+| 2026-10-25 | Sensible Daten grundsätzlich nur lokal auf dem Gerät |
+| 2026-10-25 | Mehrere Personen (V3) möglichst ohne Backend über lokale Synchronisation im Haushalt |
 
 ## 10. Nächste Schritte
 
@@ -435,7 +501,8 @@ früh am S24 Ultra testen (Spike, siehe Abschnitt 10).
    - **V1.2:** Wochenziele, Fristen mit Ausführungsfenstern, Serien/Joker,
      Statistik, Übersicht morgens/abends, Vorlagen
    - **V1.3:** **Durchführung mit Timer** und Nachfrage-Muster (7.11), **Abläufe**
-     für Training (7.12), **Galaxy Watch** über Benachrichtigungen (7.14)
+     für Training (7.12), **Galaxy Watch** über Benachrichtigungen (7.14),
+     **NFC-Kontrollpunkte** (7.15)
 3. Weitere Anforderungen ergeben sich aus der Nutzung.
 
 ## 11. Offene Fragen
@@ -445,3 +512,9 @@ Aktuell keine großen offenen Fragen; die Fragen vom 2026-10-25 sind entschieden
 Nachfrage-Intervall und Reaktionszeit) werden mit der Nutzung geklärt. Vor V1.3
 kurz prüfen, ob *Ich starte jetzt* und die Nachfrage-Antworten auf der Uhr genauso
 ankommen wie *Erledigt* / *+10 min*.
+
+Für später:
+- V2: Welche Kennzahlen machen ein Bewegungsmuster "gleich genug"? Klärt sich erst
+  mit echten Messdaten (7.16).
+- V3: Wie oft und worüber synchronisieren (Nearby Connections vs. Heim-WLAN), und
+  welche Konfliktregel gilt bei gleichzeitigen Änderungen (7.18)?
