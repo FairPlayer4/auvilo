@@ -1,7 +1,7 @@
 # Anforderungen – avlreminder
 
 > Arbeitsname. AVL = **A**udio / **V**isual / **L**ocation.
-> Stand: 2026-10-25 – siebter Entwurf (NFC-Kontrollpunkte, Forschung Bewegungsdaten, lokale Synchronisation), wird iterativ verfeinert.
+> Stand: 2026-10-25 – achter Entwurf (Watch-App in V1.4, Raumerkennung und Taster über Home Assistant, NFC nach V3), wird iterativ verfeinert.
 
 ## 1. Vision
 
@@ -48,14 +48,17 @@ solange der Nutzer sie selbst konfiguriert.
 9. **Der Rhythmus zählt, nicht der einzelne Tag.** Weiche Ziele (z. B. Training
    3–4× pro Woche) werden über den Zeitraum bewertet; ein entfallener Tag ist kein
    Misserfolg.
+10. **Nicht ans Handy gebunden.** Das Handy liegt oft in Reichweite, wird aber nicht
+    immer getragen – die Uhr schon. Laufende Reminder müssen sich ab V1.4 auch ohne
+    Handy bedienen lassen (Uhr, später Taster im Haus).
 
 ## 4. Ausbaustufen
 
 | Stufe | Inhalt | Technik |
 |---|---|---|
 | **V1** | Einzelnutzer, komplett lokal, Kernmechanismen | Kein Backend, Sideload-APK |
-| V2 | Abgleich mit Zielen, lokale KI, Zahlenwerte, Backup, ggf. eigene Watch-App, **Forschung Bewegungsdaten** (7.16), ggf. GPS-Routen (7.17) | lokal |
-| V3 | Mehrere Personen im Haushalt, gemeinsame Reminder (7.18), KI über Backend | Lokale Synchronisation zwischen den Handys – Backend nur, wenn nötig |
+| V2 | Abgleich mit Zielen, lokale KI, Zahlenwerte, Backup, **Forschung Bewegungsdaten** (7.16), **Räume und Taster über Home Assistant** (7.19), ggf. GPS-Routen (7.17) | lokal bzw. im Heimnetz |
+| V3 | Mehrere Personen im Haushalt, gemeinsame Reminder (7.18), KI über Backend, ggf. NFC-Kontrollpunkte (7.15) | Lokale Synchronisation zwischen den Handys – Backend nur, wenn nötig |
 
 "Alignment" umfasst langfristig: **Erledigung erzwingen** (V1), **Abgleich mit
 Zielen** (V2), **Abstimmung mehrerer Personen** (V3).
@@ -98,7 +101,7 @@ Alle Anwendungsfälle lassen sich mit denselben Bausteinen beschreiben:
 | **Gelegenheit** | Wann/wo ist es möglich? | Zeitfenster pro Wochentag (Praxis Mo–Fr 8–12), Ort (zuhause), Kombination |
 | **Takt** | Wie oft / bis wann? | einmalig, Frist, fester Kalender-Rhythmus, Intervall ab letzter Erledigung, x-mal pro Zeitraum |
 | **Ziel** | Wie viel? | Zielwert, Minimum, Limit für Minimum |
-| **Nachweis** | Womit belegt? | keiner, Quittieren, Foto, Ort, Audio, NFC-Kontrollpunkte, Kombination |
+| **Nachweis** | Womit belegt? | keiner, Quittieren, Foto, Ort, Audio, Kombination; später Raum oder Taster (Home Assistant) |
 | **Strenge** | Wie hartnäckig? | Vorlage *locker / normal / streng*: Eskalation, Erinnerungsintervall, Limits für Verschieben |
 | **Teile** | Woraus besteht es? | eine Aufgabe, oder Checkliste mit einzeln verschiebbaren Punkten (Brunnen 1, Brunnen 2, Futterautomat) |
 | **Durchführung** | Wie läuft es ab? | einfach erledigen, oder *Ich starte jetzt* mit Timer und Nachfrage-Muster, oder Ablauf mit Schritten (Training: Sätze, Pausen) |
@@ -154,7 +157,7 @@ Die Einordnung ist vorläufig.
 - W2 Vollbild-Alarm über Sperrbildschirm, Bypass von "Nicht stören", Alarmton wie
   ein Wecker **[V1]**
 - W3 Overlay über anderen Apps [später]
-- W4 Vibrationsmuster, Galaxy Watch **[V1.3]** (siehe 7.14)
+- W4 Vibrationsmuster, Galaxy Watch **[V1.3 / V1.4]** (siehe 7.14)
 - W5 Sprachausgabe (TTS) mit Aufgabentext [später]
 
 ### 7.4 Aktionen im Reminder/Alarm
@@ -178,7 +181,8 @@ Erster Satz, wird mit der Nutzung angepasst: **[V1]**
 - **Fehlender Nachweis:** Wird ein geforderter Nachweis nicht erbracht, gilt der
   Reminder als **nicht erfolgreich** und wird so markiert. Kommt vor und ist in
   Maßen unkritisch – kein Drama, aber ehrlich in der Statistik. **[V1]**
-- N3 **NFC-Kontrollpunkte** scannen – siehe 7.15 **[V1.3]**; QR-Codes [später]
+- N3 NFC-Kontrollpunkte (7.15) [V3]; QR-Codes [später]
+- N10 **Raum** oder **Taster** über Home Assistant als Nachweis – siehe 7.19 [V2]
 - N5 Quiz/Rechenaufgabe gegen "im Halbschlaf wegdrücken" [später]
 - N8 KI-Prüfung des Nachweises (Foto passt zur Aufgabe? Audio transkribieren und
   zusammenfassen) [später]
@@ -329,12 +333,27 @@ Guter Hebel für neue Anforderungen; zuerst so viel wie möglich über
 - G3 **Laufende Sitzung** (Timer, aktueller Schritt, Pausen-Countdown) auf der Uhr
   sichtbar, Signale am Handgelenk – wichtig fürs Training (Handy liegt weg).
 - G4 Foto-Nachweis bleibt auf dem Handy; die Uhr verweist darauf.
-- Später, falls Benachrichtigungen nicht reichen: Wear-OS-Kachel oder eigene
-  Watch-App (V2).
+- **Eigene Watch-App [V1.4]:** Die Uhr ist der beste Hebel für laufende Reminder,
+  besonders wenn das Handy weiter weg liegt (Training). Ziel: eine Sitzung komplett
+  von der Uhr aus bedienen können.
+  - G5 Laufende Sitzung als eigene Ansicht: Timer, aktueller Schritt, Pausen-Countdown,
+    große Knöpfe für *Fertig* / *Nächster Schritt* / *Pause verlängern*.
+  - G6 Nachfragen (7.11) und Signale (A4) direkt auf der Uhr, ohne dass das Handy
+    sie erst spiegeln muss.
+  - G7 *Ich starte jetzt* und Checklisten-Punkte von der Uhr aus.
+  - G8 Kachel (Tile) mit dem nächsten fälligen Reminder bzw. der laufenden Sitzung.
+  - G9 Fällt die Verbindung zum Handy kurz aus, läuft die Sitzung auf der Uhr weiter
+    und gleicht danach ab.
+  - Grundlage für die Sensor-Aufzeichnung der Forschung (7.16).
 
 ### 7.15 NFC-Kontrollpunkte
-Nachweis für Abläufe **im Haus**, wo GPS zu ungenau ist. Günstige NFC-Sticker
-(ca. 0,50 € pro Stück) an den Orten, an denen etwas passieren muss. **[V1.3]**
+Nachweis für Abläufe **im Haus**, wo GPS zu ungenau ist. NFC-Sticker an den Orten,
+an denen etwas passieren muss. **[V3]** – zurückgestellt, weil zu unflexibel (man
+muss genau hin und das Handy dabeihaben; Metall und Nässe brauchen Spezial-Tags).
+Raumerkennung und Taster (7.19) sind vorerst der bessere Weg.
+- Hinweise für später: NTAG213 (NFC Forum Type 2) reicht; an Metall *On-Metal*-Tags,
+  an Spüle/Brunnen wasserfeste Tags; kein MIFARE Classic. Ob die Galaxy Watch Tags
+  lesen darf, ist offen (eher nicht).
 - K1 **Kontrollpunkte anlernen**: Sticker in der App scannen und benennen
   ("Brunnen Wohnzimmer", "Spüle"). Ein Kontrollpunkt ist mehreren Remindern
   zuordenbar.
@@ -355,13 +374,13 @@ Nachweis für Abläufe **im Haus**, wo GPS zu ungenau ist. Günstige NFC-Sticker
 auswerten, ob sich damit etwas anfangen lässt. **[V2]**
 - R1 Während einer Sitzung (7.11) **Rohdaten der Bewegungssensoren** aufzeichnen:
   Beschleunigung, Gyroskop, Schrittzähler, erkannte Aktivität (Gehen/Stehen);
-  auf der Uhr zusätzlich Handgelenksbewegung (braucht eigene Watch-App, siehe 7.14).
+  auf der Uhr zusätzlich Handgelenksbewegung (über die Watch-App aus V1.4, siehe 7.14).
 - R2 Aufzeichnung **nur während einer Sitzung** und nur für Reminder, bei denen sie
   eingeschaltet ist – kein Dauer-Tracking.
 - R3 Ziel: ein **grobes Bewegungsmuster** pro Aufgabe erkennen, speichern und neue
   Sitzungen damit vergleichen ("sieht aus wie die letzten Male Katzenbrunnen").
-- R4 NFC-Kontrollpunkte (7.15) dienen als **Markierungen** in den Daten (wann war man
-  an der Spüle) – das macht die Auswertung deutlich einfacher.
+- R4 Raumwechsel und Taster (7.19) dienen als **Markierungen** in den Daten (wann
+  war man an der Spüle) – das macht die Auswertung deutlich einfacher.
 - R5 Auswertung zuerst am Rechner (Export der Rohdaten), erst bei brauchbaren
   Ergebnissen in die App einbauen.
 - Erwartung ehrlich: unsicher. Das Handy liegt oft weg; mit der Uhr sind die
@@ -385,11 +404,27 @@ regelmäßig **lokal**, da sie oft zusammen sind. **[V3]**
   Audio, Bewegungsdaten) bleiben standardmäßig auf dem eigenen Gerät.
 - Backend nur, falls die lokale Synchronisation im Alltag nicht reicht.
 
+### 7.19 Räume und Taster über Home Assistant
+Das Haus kennt den Raum, nicht nur das Handy. **[V2, ggf. V3]**
+- H1 **Raumerkennung per Bluetooth**: Empfänger in den Räumen (z. B. ESP32 mit
+  ESPresense oder Bluetooth-Proxys mit *Bermuda* in Home Assistant) erkennen Uhr und
+  Handy. Die App erfährt über Home Assistant, in welchem Raum man ist.
+- H2 Raum als **Gelegenheit** (Reminder kommt, wenn man in der Küche ist) und als
+  **Nachweis** (Ablauf: erst Wohnzimmer bei den Brunnen, dann Küche an der Spüle).
+- H3 **Physische Taster** (z. B. Zigbee-Taster) an festen Stellen: Druck bestätigt
+  einen Checklisten-Punkt, Ablauf-Schritt oder *Fertig* – ganz ohne Handy und Uhr.
+- H4 Taster und Räume sind in der App benennbar und Remindern zuordenbar.
+- H5 Kommunikation nur **im Heimnetz** mit der lokalen Home-Assistant-Instanz
+  (Zugriffs-Token), keine Cloud.
+- H6 Ohne Home Assistant funktioniert die App wie bisher; die Integration ist ein
+  Zusatz.
+- Raumdaten sind Bewegungsdaten → gleiche Regeln wie 8.4.
+
 ## 8. Zielplattform und Technik
 
 ### 8.1 Zielgerät
 - **Samsung Galaxy S24 Ultra, Android 17** (API 37), nur Privatgeräte
-- Galaxy Watch vorhanden → Integration in V1.3 (zuerst über Benachrichtigungen, siehe 7.14)
+- Galaxy Watch vorhanden → Integration in V1.3 über Benachrichtigungen, eigene Watch-App in V1.4 (siehe 7.14)
 - **Entscheidung:** minSdk = targetSdk = 37. Kein Rückwärts-Support nötig, da
   absehbar nur ein Nutzer. Moderne APIs und Energiespar-Mechanismen nutzen.
 
@@ -409,12 +444,13 @@ vom Nutzer in den Systemeinstellungen erteilt werden.
 | T5 App geöffnet | ⚠️ | `UsageStatsManager` / Accessibility-Service | Funktioniert, aber akkuintensiv bzw. heikle Berechtigung |
 | W1/W2 Vollbild, DND-Bypass | ✅ | Full-Screen-Intent, Alarm-Audiostream | Full-Screen-Intent manuell erlauben |
 | W3 Overlay | ✅ | `SYSTEM_ALERT_WINDOW` | manuell erlauben |
-| W4 Galaxy Watch | ✅ | Notifications spiegeln sich automatisch (inkl. Aktionen); laufende Sitzung als Ongoing Activity; eigene Wear-OS-App optional | V1.3; Erledigt und +10 min kommen schon auf der Uhr an (2026-10-25) |
+| W4 Galaxy Watch | ✅ | Notifications spiegeln sich automatisch (inkl. Aktionen); laufende Sitzung als Ongoing Activity; eigene Wear-OS-App mit Compose for Wear OS, Tiles, Data Layer API | V1.3 Benachrichtigungen (Erledigt und +10 min kommen schon an, 2026-10-25), V1.4 eigene App |
 | Widget | ✅ | Jetpack Glance | |
 | N2 Foto | ✅ | CameraX (In-App-Aufnahme) | |
 | N4 Ort | ✅ | Fused Location (Standort beim Nachweis) | Vordergrund-Standort reicht für Nachweis |
 | N7 Audio | ✅ | `MediaRecorder` | Mikrofon-Berechtigung |
-| N3 QR / NFC | ✅ | ML Kit Barcode, NFC-API (Foreground Dispatch, NDEF-Tags) | NFC-Kontrollpunkte V1.3; Sticker NTAG213/215 reichen |
+| N3 QR / NFC | ✅ | ML Kit Barcode, NFC-API (Reader Mode) | NFC-Kontrollpunkte V3; NTAG213 reicht |
+| H1–H3 Home Assistant | ✅ | REST-/WebSocket-API von Home Assistant im Heimnetz; Raumerkennung über Bermuda/ESPresense, Taster über Zigbee | Erfordert laufendes Home Assistant und Empfänger pro Raum |
 | R1 Bewegungssensoren | ✅ Aufzeichnen / ⚠️ Auswerten | `SensorManager`, Activity Recognition; Uhr: eigene Wear-OS-App | Aufzeichnen ist einfach, ob Muster erkennbar sind, ist offen (Forschung) |
 | GPS-Routen | ✅ | Fused Location im Foreground-Service | Nur während Sitzungen, sonst zu akkuintensiv |
 | M2 Lokale Synchronisation | ✅ | Nearby Connections (Bluetooth/WLAN ohne Internet) oder WLAN im Haushalt | Konfliktauflösung ist der eigentliche Aufwand |
@@ -481,7 +517,10 @@ früh am S24 Ultra testen (Spike, siehe Abschnitt 10).
 | 2026-10-25 | Dauer wird getrackt und mit früheren Sitzungen verglichen (schnell fertig werden soll sich lohnen) |
 | 2026-10-25 | Training: nur Dauer und erledigte Schritte/Sätze; Wiederholungen/Gewicht bleiben V2 |
 | 2026-10-25 | Watch: Benachrichtigungen samt Aktionen kommen bereits an – kein eigener Spike nötig |
-| 2026-10-25 | NFC-Kontrollpunkte als Nachweis im Haus, V1.3 |
+| 2026-10-25 | NFC-Kontrollpunkte als Nachweis im Haus, V1.3 (geändert, siehe unten) |
+| 2026-10-25 | NFC-Kontrollpunkte nach V3 – zu unflexibel; stattdessen Raumerkennung per Bluetooth und Taster über Home Assistant, V2 (ggf. V3) |
+| 2026-10-25 | Eigene Watch-App in V1.4 – Bedienung laufender Reminder ohne Handy |
+| 2026-10-25 | Leitprinzip 10: nicht ans Handy gebunden |
 | 2026-10-25 | Bewegungsdaten von Handy und Uhr als Forschungsprojekt (messen, später auswerten), V2 |
 | 2026-10-25 | GPS-Routen erst V2/V3 – punktuelle Ortserkennung reicht vorerst |
 | 2026-10-25 | Sensible Daten grundsätzlich nur lokal auf dem Gerät |
@@ -501,8 +540,8 @@ früh am S24 Ultra testen (Spike, siehe Abschnitt 10).
    - **V1.2:** Wochenziele, Fristen mit Ausführungsfenstern, Serien/Joker,
      Statistik, Übersicht morgens/abends, Vorlagen
    - **V1.3:** **Durchführung mit Timer** und Nachfrage-Muster (7.11), **Abläufe**
-     für Training (7.12), **Galaxy Watch** über Benachrichtigungen (7.14),
-     **NFC-Kontrollpunkte** (7.15)
+     für Training (7.12), **Galaxy Watch** über Benachrichtigungen (7.14)
+   - **V1.4:** **eigene Watch-App** für laufende Reminder (7.14, G5–G9)
 3. Weitere Anforderungen ergeben sich aus der Nutzung.
 
 ## 11. Offene Fragen
@@ -514,6 +553,9 @@ kurz prüfen, ob *Ich starte jetzt* und die Nachfrage-Antworten auf der Uhr gena
 ankommen wie *Erledigt* / *+10 min*.
 
 Für später:
+- V1.4: Wie viel Logik läuft auf der Uhr selbst (Sitzung weiterführen ohne Handy)?
+- V2: Welche Home-Assistant-Lösung für Räume (Bermuda mit Bluetooth-Proxys oder
+  ESPresense), wie genau ist sie pro Raum, und erkennt sie die Uhr zuverlässig?
 - V2: Welche Kennzahlen machen ein Bewegungsmuster "gleich genug"? Klärt sich erst
   mit echten Messdaten (7.16).
 - V3: Wie oft und worüber synchronisieren (Nearby Connections vs. Heim-WLAN), und
