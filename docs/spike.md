@@ -151,6 +151,22 @@ Ergebnis danach: Was in der Stunde geklärt ist und was erst der Mehrtagestest z
   und Sperrbildschirm. Ggf. nur für eskalierende Reminder nutzen, stille Reminder
   über `setExactAndAllowWhileIdle`.
 
+### Zwischenstand Mehrtagestest (2026-10-25, 16:00)
+
+Laufzeit seit 2026-10-24 16:35, knapp 1 Tag, App nicht geöffnet.
+
+| Test | Ergebnis |
+|---|---|
+| Plan-Alarme | ✅ **5 von 5** (19:00, 20:30, 02:00, 08:00, 13:00), Verspätung 0–1 s |
+| Nacht (02:00) | ✅ pünktlich trotz Energiesparmodus (`powerSave=true`) und "Nicht stören" (`dnd=2`) |
+| Prozess vom System beendet | ✅ vor fast jedem Alarm neu gestartet – Android weckt die App zuverlässig |
+| Vollbild | ✅ bei gesperrtem Handy (08:00, 13:00, 19:00); bei benutztem Handy Banner, bestätigt per Benachrichtigung |
+| Geofence | ✅ Verlassen 09:31 / Ankunft 09:36 (Standort-Fix 117 s alt), Verlassen 13:54 – stimmt, Handy ist seitdem unterwegs |
+| Standby-Bucket | `bucket=5` durchgehend, Samsung hat die App bisher nicht schlafen gelegt |
+
+Noch offen bis zum Ende: Samsungs "Schlafende Apps" nach mehreren Tagen ohne
+Öffnen, Ankunft nach längerer Abwesenheit, Akkuverbrauch.
+
 ### Ablauf auf dem Handy (Mehrtagestest)
 1. Installieren: `adb install app-debug.apk`
 2. App öffnen, alle Berechtigungen auf ✅ bringen.
