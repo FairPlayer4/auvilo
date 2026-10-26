@@ -1,7 +1,7 @@
 # Anforderungen – avlreminder
 
 > Arbeitsname. AVL = **A**udio / **V**isual / **L**ocation.
-> Stand: 2026-10-25 – vierzehnter Entwurf ("Nicht stören" statt fester Ruhezeiten), wird iterativ verfeinert.
+> Stand: 2026-10-25 – fünfzehnter Entwurf (Verschiebe-Knöpfe pro Reminder), wird iterativ verfeinert.
 
 ## 1. Vision
 
@@ -190,6 +190,16 @@ Erster Satz, wird mit der Nutzung angepasst: **[V1]**
 - *Jetzt erledigen* (→ Nachweis)
 - *Minimum* (→ Nachweis)
 - *Später heute (+x min)* / *nach dem Termin* (+30/60 min)
+  - **Verschiebe-Knöpfe pro Reminder** **[V1.1]**: 1–2 Knöpfe frei wählbar, z. B.
+    *+10 min* (Standard) oder *+30 / +60 min* für Arbeitsreminder. Höchstens zwei,
+    weil eine Benachrichtigung max. 3 Aktionen zeigt (eine davon *Erledigt*) – so
+    passt es auch auf die Uhr.
+  - Der Vollbild-Alarm zeigt dieselben Knöpfe groß.
+  - Auswahl beim Anlegen; ab V1.2 setzen Vorlagen sie mit (z. B. Vorlage "Arbeit"
+    → *+30 / +60*).
+  - Kurzes Verschieben bleibt **ohne Limit**, wird aber ehrlich im Verlauf gezählt
+    und fließt in "Was hält dich ab?" (S8) ein. Ein Knopf, der über die
+    Tagesgrenze (7.3) hinausführen würde, wird ausgeblendet.
 - *Verschieben auf …* (zählt gegen das Limit; "morgen" als Schnellwahl)
 - *Auslassen (mit Grund)* – zählt **neutral**
 
@@ -710,6 +720,7 @@ früh am S24 Ultra testen (Spike, siehe Abschnitt 10).
 | 2026-10-25 | Dauer wird getrackt und mit früheren Sitzungen verglichen (schnell fertig werden soll sich lohnen) |
 | 2026-10-25 | Training: nur Dauer und erledigte Schritte/Sätze; Wiederholungen/Gewicht bleiben V2 |
 | 2026-10-25 | Watch: Benachrichtigungen samt Aktionen kommen bereits an – kein eigener Spike nötig |
+| 2026-10-26 | Verschiebe-Knöpfe pro Reminder (1–2, z. B. +10 oder +30/+60 min), V1.1; kurzes Verschieben ohne Limit, aber gezählt, nicht über die Tagesgrenze |
 | 2026-10-26 | Feste Ruhezeit (außerhalb 7–21 Uhr still) entfällt ab V1.1; stattdessen gilt "Nicht stören" des Handys. Pro Reminder "auch bei Nicht stören" für besondere Ereignisse (ersetzt die Aufsteh-Wecker-Ausnahme). Laut weiterhin ab 18 Uhr; verpasst ab Tagesgrenze, Standard 23 Uhr |
 | 2026-10-26 | Vollbild-Alarme ("normal", "streng") erscheinen nicht auf der Uhr → zusätzliche spiegelbare Benachrichtigung in V1.1 (G1b) |
 | 2026-10-25 | NFC-Kontrollpunkte als Nachweis im Haus, V1.3 (geändert, siehe unten) |
@@ -739,7 +750,7 @@ früh am S24 Ultra testen (Spike, siehe Abschnitt 10).
    - **V1.1:** Ort (Ankunft zuhause), **Checklisten** (7.13), Audio-Nachweis,
      Motivations-Audio, **vorab erledigen** (7.20), **Startklar-Fragen** (7.21, S1–S4),
      **Vollbild-Alarme auf der Uhr** (7.14, G1b), **"Nicht stören" statt Ruhezeiten**
-     und Tagesgrenze (7.3)
+     und Tagesgrenze (7.3), **Verschiebe-Knöpfe pro Reminder** (7.4)
    - **V1.2:** Wochenziele, Fristen mit Ausführungsfenstern, Serien/Joker,
      Statistik, Übersicht morgens/abends, Vorlagen, **Blocker als Aufgaben** (7.21, S5–S8)
    - **V1.3:** **Durchführung mit Timer** und Nachfrage-Muster (7.11), **Abläufe**
