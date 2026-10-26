@@ -1,7 +1,7 @@
 # Anforderungen – avlreminder
 
 > Arbeitsname. AVL = **A**udio / **V**isual / **L**ocation.
-> Stand: 2026-10-25 – dreizehnter Entwurf (Vollbild-Alarme auf der Uhr), wird iterativ verfeinert.
+> Stand: 2026-10-25 – vierzehnter Entwurf ("Nicht stören" statt fester Ruhezeiten), wird iterativ verfeinert.
 
 ## 1. Vision
 
@@ -143,14 +143,33 @@ Die Einordnung ist vorläufig.
 ### 7.3 Wahrnehmung sicherstellen (Audio / Visual)
 - **Eskalation** = auffällig oder wirklich blockierend: Vollbild-Reminder oder
   wiederholte Benachrichtigung, bis der Nutzer reagiert. **[V1]**
-- **Zwei Zeitfenster** (vorerst global):
-  - **7–21 Uhr – sichtbar:** Vollbild (damit man es sieht, wenn das Handy lautlos
-    auf dem Tisch liegt) + Signal je nach Einstellung, meist **Vibration**. Gilt
+- **Wann sichtbar, wann laut** (V1.0 noch mit festen Zeitfenstern 7–21 Uhr; ab
+  **V1.1** wie folgt):
+  - **Sichtbar:** Vollbild (damit man es sieht, wenn das Handy lautlos auf dem
+    Tisch liegt) + Signal je nach Einstellung, meist **Vibration**. Gilt
     ausdrücklich auch während der Arbeitszeit.
-  - **18–21 Uhr – laut:** zusätzlich richtig laut (Alarmton wie ein Wecker), wenn
+  - **Ab 18 Uhr – laut:** zusätzlich richtig laut (Alarmton wie ein Wecker), wenn
     der Reminder es erlaubt.
-  - Außerhalb 7–21 Uhr nur stille Benachrichtigung – **Ausnahme:** der
-    Aufsteh-Wecker (7.22) klingelt zu seiner Zeit laut.
+  - **"Nicht stören" statt fester Ruhezeiten** **[V1.1]**: Ist auf dem Handy
+    "Nicht stören" aktiv (auch Prioritätsmodus oder ein Samsung-Modus, der es
+    einschaltet), kommt nur eine stille Benachrichtigung. Grund: "Nicht stören" ist
+    je nach Tag anders eingestellt (z. B. werktags bis 6 Uhr, am Wochenende bis
+    10 Uhr) – eine zweite Ruhezeit in der App wäre doppelt.
+    - Die App kennt den Zeitplan von "Nicht stören" nicht. Die Eskalation läuft
+      währenddessen still in 10-Minuten-Runden weiter; die erste Runde nach dem
+      Ende alarmiert normal (höchstens gut 10 min später).
+    - Hinweis in der App, solange "Nicht stören" aktiv ist und Reminder warten
+      ("Nicht stören aktiv – 2 Reminder warten").
+  - **"Auch bei Nicht stören"** **[V1.1]**, pro Reminder einstellbar, für besondere
+    Ereignisse: Der Reminder alarmiert trotz "Nicht stören" wie eingestellt (normal
+    oder streng, auch laut). Der Aufsteh-Wecker (7.22) ist ein solcher Reminder.
+    - Voraussetzung: Die App ist einmalig in den Einstellungen von "Nicht stören"
+      als **Ausnahme** freigegeben – sonst unterdrückt Android den Vollbild-Alarm.
+      Die Berechtigungsliste der App prüft das und warnt, wenn ein Reminder die
+      Option nutzt, die Freigabe aber fehlt.
+  - **Tagesgrenze** **[V1.1]**, einstellbar, Standard **23 Uhr**: Was bis dahin ohne
+    Reaktion offen ist, gilt als **verpasst** (bisher: Ende des Fensters um 21 Uhr).
+    Unabhängig von "Nicht stören".
 - **Eigene Vibrationsmuster**: länger und ungewöhnlich, damit man sie von normalen
   Benachrichtigungen unterscheidet **[V1]**
 - Besprechungen: kein Kalenderabgleich; Schnellknopf *nach dem Termin* (+30/60 min) reicht.
@@ -159,7 +178,8 @@ Die Einordnung ist vorläufig.
 - Rettungs-Erinnerung: Droht ein Wochenziel bei 0 zu bleiben, erinnert die App am
   Wochenende gezielt. Wochen laufen Montag–Sonntag. **[V1]**
 - W1 Eskalationsstufen: Notification → wiederholte Notification/Ton → Vollbild-Alarm **[V1]**
-- W2 Vollbild-Alarm über Sperrbildschirm, Bypass von "Nicht stören", Alarmton wie
+- W2 Vollbild-Alarm über Sperrbildschirm, Bypass von "Nicht stören" (nur mit Option
+  "auch bei Nicht stören", siehe 7.3), Alarmton wie
   ein Wecker **[V1]**
 - W3 Overlay über anderen Apps [später]
 - W4 Vibrationsmuster, Galaxy Watch **[V1.3 / V1.4]** (siehe 7.14)
@@ -613,6 +633,7 @@ vom Nutzer in den Systemeinstellungen erteilt werden.
 | T4 Kalender | ✅ | `CalendarContract` | Leseberechtigung |
 | T5 App geöffnet | ⚠️ | `UsageStatsManager` / Accessibility-Service | Funktioniert, aber akkuintensiv bzw. heikle Berechtigung |
 | W1/W2 Vollbild, DND-Bypass | ✅ | Full-Screen-Intent, Alarm-Audiostream | Full-Screen-Intent manuell erlauben |
+| "Nicht stören" erkennen | ✅ | `NotificationManager.getCurrentInterruptionFilter()`, keine Berechtigung nötig; Zeitplan selbst nicht lesbar | Bypass braucht Freigabe der App als Ausnahme in "Nicht stören" (prüfbar über den Kanal bzw. Policy-Zugriff) |
 | W3 Overlay | ✅ | `SYSTEM_ALERT_WINDOW` | manuell erlauben |
 | W4 Galaxy Watch | ✅ | Notifications spiegeln sich automatisch (inkl. Aktionen); laufende Sitzung als Ongoing Activity; eigene Wear-OS-App mit Compose for Wear OS, Tiles, Data Layer API | V1.3 Benachrichtigungen (Erledigt und +10 min kommen bei "locker" schon an, 2026-10-25; "normal"/"streng" als Vollbild-Alarm noch nicht → G1b, V1.1), V1.4 eigene App |
 | Widget | ✅ | Jetpack Glance | |
@@ -689,6 +710,7 @@ früh am S24 Ultra testen (Spike, siehe Abschnitt 10).
 | 2026-10-25 | Dauer wird getrackt und mit früheren Sitzungen verglichen (schnell fertig werden soll sich lohnen) |
 | 2026-10-25 | Training: nur Dauer und erledigte Schritte/Sätze; Wiederholungen/Gewicht bleiben V2 |
 | 2026-10-25 | Watch: Benachrichtigungen samt Aktionen kommen bereits an – kein eigener Spike nötig |
+| 2026-10-26 | Feste Ruhezeit (außerhalb 7–21 Uhr still) entfällt ab V1.1; stattdessen gilt "Nicht stören" des Handys. Pro Reminder "auch bei Nicht stören" für besondere Ereignisse (ersetzt die Aufsteh-Wecker-Ausnahme). Laut weiterhin ab 18 Uhr; verpasst ab Tagesgrenze, Standard 23 Uhr |
 | 2026-10-26 | Vollbild-Alarme ("normal", "streng") erscheinen nicht auf der Uhr → zusätzliche spiegelbare Benachrichtigung in V1.1 (G1b) |
 | 2026-10-25 | NFC-Kontrollpunkte als Nachweis im Haus, V1.3 (geändert, siehe unten) |
 | 2026-10-25 | NFC-Kontrollpunkte nach V3 – zu unflexibel; stattdessen Raumerkennung per Bluetooth und Taster über Home Assistant, V2 (ggf. V3) |
@@ -716,7 +738,8 @@ früh am S24 Ultra testen (Spike, siehe Abschnitt 10).
      – ✅ seit 2026-10-24 auf dem Gerät, inkl. Intervall ab letzter Erledigung
    - **V1.1:** Ort (Ankunft zuhause), **Checklisten** (7.13), Audio-Nachweis,
      Motivations-Audio, **vorab erledigen** (7.20), **Startklar-Fragen** (7.21, S1–S4),
-     **Vollbild-Alarme auf der Uhr** (7.14, G1b)
+     **Vollbild-Alarme auf der Uhr** (7.14, G1b), **"Nicht stören" statt Ruhezeiten**
+     und Tagesgrenze (7.3)
    - **V1.2:** Wochenziele, Fristen mit Ausführungsfenstern, Serien/Joker,
      Statistik, Übersicht morgens/abends, Vorlagen, **Blocker als Aufgaben** (7.21, S5–S8)
    - **V1.3:** **Durchführung mit Timer** und Nachfrage-Muster (7.11), **Abläufe**
