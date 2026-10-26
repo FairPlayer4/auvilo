@@ -1,7 +1,7 @@
 # Anforderungen – avlreminder
 
 > Arbeitsname. AVL = **A**udio / **V**isual / **L**ocation.
-> Stand: 2026-10-25 – zwölfter Entwurf (Haushaltsinventar und Einkaufsliste), wird iterativ verfeinert.
+> Stand: 2026-10-25 – dreizehnter Entwurf (Vollbild-Alarme auf der Uhr), wird iterativ verfeinert.
 
 ## 1. Vision
 
@@ -334,7 +334,14 @@ Guter Hebel für neue Anforderungen; zuerst so viel wie möglich über
 **Benachrichtigungen**, eigene Watch-App nur wenn nötig. **[V1.3]**
 - G1 Erinnerungen, Eskalation und Vibration kommen **auf der Uhr** an.
   ✅ Schon mit V1.0 beobachtet: Benachrichtigung samt *Erledigt* und *+10 min*
-  erscheint auf der Uhr.
+  erscheint auf der Uhr – **aber nur bei "locker"** (stille Benachrichtigung).
+  ⚠️ "normal" und "streng" kommen nicht an (beobachtet 2026-10-26). Ursache
+  vermutlich: Der Vollbild-Alarm ist eine laufende Vordergrund-Benachrichtigung,
+  und solche spiegelt Android nicht auf die Uhr.
+- G1b **Vollbild-Alarme auch auf der Uhr** **[V1.1]**: Zusätzlich zum Vollbild-Alarm
+  eine normale, spiegelbare Benachrichtigung mit *Erledigt* / *+10 min*, die mit dem
+  Alarm verschwindet; die Uhr vibriert bei jeder Eskalationsrunde. Auf dem Handy
+  darf dadurch kein doppelter Eintrag stören. Auf dem Gerät prüfen.
 - G2 **Aktionen auf der Uhr**: Erledigt, +10 min, Ich starte jetzt, Checklisten-Punkt
   abhaken, Antworten auf Nachfragen (Noch dran / Fertig / Teilschritt / Abbruch).
 - G3 **Laufende Sitzung** (Timer, aktueller Schritt, Pausen-Countdown) auf der Uhr
@@ -607,7 +614,7 @@ vom Nutzer in den Systemeinstellungen erteilt werden.
 | T5 App geöffnet | ⚠️ | `UsageStatsManager` / Accessibility-Service | Funktioniert, aber akkuintensiv bzw. heikle Berechtigung |
 | W1/W2 Vollbild, DND-Bypass | ✅ | Full-Screen-Intent, Alarm-Audiostream | Full-Screen-Intent manuell erlauben |
 | W3 Overlay | ✅ | `SYSTEM_ALERT_WINDOW` | manuell erlauben |
-| W4 Galaxy Watch | ✅ | Notifications spiegeln sich automatisch (inkl. Aktionen); laufende Sitzung als Ongoing Activity; eigene Wear-OS-App mit Compose for Wear OS, Tiles, Data Layer API | V1.3 Benachrichtigungen (Erledigt und +10 min kommen schon an, 2026-10-25), V1.4 eigene App |
+| W4 Galaxy Watch | ✅ | Notifications spiegeln sich automatisch (inkl. Aktionen); laufende Sitzung als Ongoing Activity; eigene Wear-OS-App mit Compose for Wear OS, Tiles, Data Layer API | V1.3 Benachrichtigungen (Erledigt und +10 min kommen bei "locker" schon an, 2026-10-25; "normal"/"streng" als Vollbild-Alarm noch nicht → G1b, V1.1), V1.4 eigene App |
 | Widget | ✅ | Jetpack Glance | |
 | N2 Foto | ✅ | CameraX (In-App-Aufnahme) | |
 | N4 Ort | ✅ | Fused Location (Standort beim Nachweis) | Vordergrund-Standort reicht für Nachweis |
@@ -682,6 +689,7 @@ früh am S24 Ultra testen (Spike, siehe Abschnitt 10).
 | 2026-10-25 | Dauer wird getrackt und mit früheren Sitzungen verglichen (schnell fertig werden soll sich lohnen) |
 | 2026-10-25 | Training: nur Dauer und erledigte Schritte/Sätze; Wiederholungen/Gewicht bleiben V2 |
 | 2026-10-25 | Watch: Benachrichtigungen samt Aktionen kommen bereits an – kein eigener Spike nötig |
+| 2026-10-26 | Vollbild-Alarme ("normal", "streng") erscheinen nicht auf der Uhr → zusätzliche spiegelbare Benachrichtigung in V1.1 (G1b) |
 | 2026-10-25 | NFC-Kontrollpunkte als Nachweis im Haus, V1.3 (geändert, siehe unten) |
 | 2026-10-25 | NFC-Kontrollpunkte nach V3 – zu unflexibel; stattdessen Raumerkennung per Bluetooth und Taster über Home Assistant, V2 (ggf. V3) |
 | 2026-10-25 | Eigene Watch-App in V1.4 – Bedienung laufender Reminder ohne Handy |
@@ -707,7 +715,8 @@ früh am S24 Ultra testen (Spike, siehe Abschnitt 10).
      Ziel/Minimum, einfache Liste der Erledigungen, Widget
      – ✅ seit 2026-10-24 auf dem Gerät, inkl. Intervall ab letzter Erledigung
    - **V1.1:** Ort (Ankunft zuhause), **Checklisten** (7.13), Audio-Nachweis,
-     Motivations-Audio, **vorab erledigen** (7.20), **Startklar-Fragen** (7.21, S1–S4)
+     Motivations-Audio, **vorab erledigen** (7.20), **Startklar-Fragen** (7.21, S1–S4),
+     **Vollbild-Alarme auf der Uhr** (7.14, G1b)
    - **V1.2:** Wochenziele, Fristen mit Ausführungsfenstern, Serien/Joker,
      Statistik, Übersicht morgens/abends, Vorlagen, **Blocker als Aufgaben** (7.21, S5–S8)
    - **V1.3:** **Durchführung mit Timer** und Nachfrage-Muster (7.11), **Abläufe**
