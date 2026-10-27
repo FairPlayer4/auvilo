@@ -1,8 +1,9 @@
 package com.avlreminder.ui
 
-import com.avlreminder.core.model.ProofType
+import com.avlreminder.core.model.ProofSpec
 import com.avlreminder.core.model.Schedule
 import com.avlreminder.core.model.Strictness
+import com.avlreminder.ui.screens.PrepDraft
 import com.avlreminder.ui.screens.ReminderForm
 import com.avlreminder.ui.screens.ScheduleKind
 import org.junit.Assert.assertEquals
@@ -30,7 +31,7 @@ class ReminderFormTest {
     @Test
     fun strictnessAppliesThePreset() {
         val strict = ReminderForm.new(now, zone).withStrictness(Strictness.STRICT)
-        assertEquals(ProofType.PHOTO, strict.proof)
+        assertEquals(ProofSpec.PHOTO, strict.proof)
         assertEquals(1, strict.postponeLimit)
         assertEquals(1, strict.minimumLimitPerWeek)
     }
@@ -62,5 +63,33 @@ class ReminderFormTest {
         for (r in schedules) {
             assertEquals(r, ReminderForm.of(r.copy(id = 5), LocalDate.of(2026, 10, 24)).toReminder(now)!!.copy(id = 0))
         }
+    }
+
+    @Test
+    fun onlyAnsweredPrepQuestionsAreSaved() {
+        val form = ReminderForm.new(now, zone).copy(
+            id = 4,
+            prep = mapOf(1 to PrepDraft(" Ruhe "), 2 to PrepDraft(unknown = true), 3 to PrepDraft("  ")),
+        )
+        val answers = form.prepAnswers(now)
+        assertEquals(listOf(1, 2), answers.map { it.question })
+        assertEquals("Ruhe", answers[0].text)
+        assertNull(answers[1].text)
+        assertEquals(true, answers[1].unknown)
+        assertEquals(4L, answers[0].reminderId)
+    }
+
+    @Test
+    fun newFieldsGoIntoTheReminderAndBack() {
+        val form = ReminderForm.new(now, zone).copy(
+            title = "Steuer", ignoreDnd = true, snoozeMinutes = listOf(30, 60), motivationAudio = "/a.m4a",
+        )
+        val r = form.toReminder(now)!!
+        assertEquals(true, r.ignoreDnd)
+        assertEquals(listOf(30, 60), r.snoozeMinutes)
+        assertEquals("/a.m4a", r.motivationAudio)
+        val back = ReminderForm.of(r, form.date)
+        assertEquals(form.snoozeMinutes, back.snoozeMinutes)
+        assertEquals(form.motivationAudio, back.motivationAudio)
     }
 }

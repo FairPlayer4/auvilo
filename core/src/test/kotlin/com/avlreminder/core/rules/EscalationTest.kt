@@ -11,61 +11,77 @@ import org.junit.jupiter.api.assertThrows
 import java.time.LocalTime
 
 class EscalationTest {
-    private val w = EscalationWindows()
+    private val s = AlertSettings()
     private fun t(h: Int, m: Int = 0) = LocalTime.of(h, m)
 
     @Test
-    fun `everything is silent outside the visible window`() {
-        for (s in listOf(RELAXED, NORMAL, STRICT)) {
-            assertEquals(AlarmLevel.SILENT, Escalation.level(s, t(6, 59), w))
-            assertEquals(AlarmLevel.SILENT, Escalation.level(s, t(21, 0), w))
-            assertEquals(AlarmLevel.SILENT, Escalation.level(s, t(2), w))
+    fun `do not disturb makes everything silent`() {
+        for (strictness in listOf(RELAXED, NORMAL, STRICT)) {
+            assertEquals(AlarmLevel.SILENT, Escalation.level(strictness, t(12), s, doNotDisturb = true))
+            assertEquals(AlarmLevel.SILENT, Escalation.level(strictness, t(19), s, doNotDisturb = true))
         }
     }
 
     @Test
+    fun `without do not disturb the night is no longer silent`() {
+        assertEquals(AlarmLevel.FULLSCREEN, Escalation.level(NORMAL, t(2), s))
+        assertEquals(AlarmLevel.FULLSCREEN, Escalation.level(NORMAL, t(22), s))
+    }
+
+    @Test
+    fun `reminders that ignore do not disturb ring as usual`() {
+        assertEquals(AlarmLevel.BANNER, Escalation.level(RELAXED, t(12), s, doNotDisturb = true, ignoreDnd = true))
+        assertEquals(AlarmLevel.FULLSCREEN, Escalation.level(NORMAL, t(6), s, doNotDisturb = true, ignoreDnd = true))
+        assertEquals(AlarmLevel.FULLSCREEN_LOUD, Escalation.level(STRICT, t(19), s, doNotDisturb = true, ignoreDnd = true))
+    }
+
+    @Test
     fun `relaxed shows a banner with vibration`() {
-        assertEquals(AlarmLevel.BANNER, Escalation.level(RELAXED, t(12), w))
+        assertEquals(AlarmLevel.BANNER, Escalation.level(RELAXED, t(12), s))
     }
 
     @Test
     fun `normal is full screen but never loud`() {
-        assertEquals(AlarmLevel.FULLSCREEN, Escalation.level(NORMAL, t(7), w))
-        assertEquals(AlarmLevel.FULLSCREEN, Escalation.level(NORMAL, t(19), w))
+        assertEquals(AlarmLevel.FULLSCREEN, Escalation.level(NORMAL, t(7), s))
+        assertEquals(AlarmLevel.FULLSCREEN, Escalation.level(NORMAL, t(19), s))
     }
 
     @Test
-    fun `strict is full screen and loud only from 18 to 21`() {
-        assertEquals(AlarmLevel.FULLSCREEN, Escalation.level(STRICT, t(17, 59), w))
-        assertEquals(AlarmLevel.FULLSCREEN_LOUD, Escalation.level(STRICT, t(18), w))
-        assertEquals(AlarmLevel.FULLSCREEN_LOUD, Escalation.level(STRICT, t(20, 59), w))
+    fun `strict is loud from 18`() {
+        assertEquals(AlarmLevel.FULLSCREEN, Escalation.level(STRICT, t(17, 59), s))
+        assertEquals(AlarmLevel.FULLSCREEN_LOUD, Escalation.level(STRICT, t(18), s))
+        assertEquals(AlarmLevel.FULLSCREEN_LOUD, Escalation.level(STRICT, t(23, 30), s))
+        assertEquals(AlarmLevel.FULLSCREEN, Escalation.level(STRICT, t(2), s))
     }
 
     @Test
-    fun `windows must be consistent`() {
-        assertThrows<IllegalArgumentException> { EscalationWindows(visibleFrom = t(22), visibleUntil = t(7)) }
-        assertThrows<IllegalArgumentException> { EscalationWindows(loudFrom = t(22)) }
+    fun `settings must be consistent`() {
+        assertThrows<IllegalArgumentException> { AlertSettings(loudFrom = t(23), dayEnd = t(22)) }
     }
 
     @Test
-    fun `next round comes ten minutes later inside the window`() {
-        assertEquals(at(26, 12, 10), Escalation.nextRound(at(26, 12), ZONE, w))
+    fun `next round always comes ten minutes later`() {
+        assertEquals(at(26, 12, 10), Escalation.nextRound(at(26, 12)))
+        assertEquals(at(26, 2, 10), Escalation.nextRound(at(26, 2)))
     }
 
     @Test
-    fun `next round waits for the window to open`() {
-        assertEquals(at(27, 7), Escalation.nextRound(at(26, 20, 55), ZONE, w))
-        assertEquals(at(26, 7), Escalation.nextRound(at(26, 2), ZONE, w))
+    fun `missed at the end of the due day`() {
+        assertEquals(at(26, 23), Escalation.missedAt(at(26, 18), ZONE, s))
+        assertEquals(at(26, 23), Escalation.missedAt(at(26, 2), ZONE, s))
     }
 
     @Test
-    fun `missed at the end of the window of the due day`() {
-        assertEquals(at(26, 21), Escalation.missedAt(at(26, 18), ZONE, w))
-        assertEquals(at(26, 21), Escalation.missedAt(at(26, 2), ZONE, w))
+    fun `due after the day end means missed at the next day end`() {
+        assertEquals(at(27, 23), Escalation.missedAt(at(26, 23, 30), ZONE, s))
+        assertEquals(at(27, 22), Escalation.missedAt(at(26, 22), ZONE, AlertSettings(dayEnd = t(22))))
     }
 
     @Test
-    fun `due after the window means missed at the end of the next day's window`() {
-        assertEquals(at(27, 21), Escalation.missedAt(at(26, 21, 30), ZONE, w))
+    fun `snooze buttons past the day end are hidden`() {
+        val missed = at(26, 23)
+        assertEquals(listOf(30, 60), Escalation.snoozeOptions(listOf(30, 60), at(26, 21), missed))
+        assertEquals(listOf(30), Escalation.snoozeOptions(listOf(30, 60), at(26, 22), missed))
+        assertEquals(emptyList<Int>(), Escalation.snoozeOptions(listOf(30, 60), at(26, 22, 30), missed))
     }
 }

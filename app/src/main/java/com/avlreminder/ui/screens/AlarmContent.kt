@@ -9,6 +9,7 @@ import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.imePadding
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.RoundedCornerShape
@@ -32,13 +33,17 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.text.font.FontStyle
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.avlreminder.core.model.Occurrence
-import com.avlreminder.core.model.ProofType
+import com.avlreminder.core.model.PrepAnswer
 import com.avlreminder.core.model.Reminder
+import com.avlreminder.core.rules.Evidence
+import com.avlreminder.core.rules.Prep
+import com.avlreminder.core.rules.ProofCheck
 import com.avlreminder.ui.Format
 import com.avlreminder.ui.theme.Avl
 import java.time.Instant
@@ -56,73 +61,142 @@ data class AlarmUi(
     val canPostpone: Boolean,
     /** null = unlimited. */
     val postponesLeft: Int?,
+    /** Snooze buttons that stay before the end of the day. */
+    val snooze: List<Int> = emptyList(),
+    /** Current "Startklar" answers. */
+    val prep: Map<Int, PrepAnswer> = emptyMap(),
+    val lastProofText: String? = null,
+    /** Opened before the reminder is due ("vorab erledigen"): only done and minimum. */
+    val early: Boolean = false,
 )
 
 private enum class View { MAIN, PROOF, POSTPONE, SKIP }
 
+/** Slots for what needs the device, so tests run without camera, microphone or speaker. */
+class AlarmDevices(
+    val camera: @Composable (onPhoto: (String) -> Unit) -> Unit,
+    val recorder: @Composable (onRecorded: (String, Int) -> Unit) -> Unit,
+    val play: (String) -> Unit,
+)
+
 /**
- * Alarm (always dark), with its sub-steps proof, postpone and skip. [camera] takes the photo;
- * it is a slot so tests do not need a camera.
+ * Alarm (always dark), with its sub-steps proof, postpone and skip. Opening the proof pauses
+ * the alarm ([onStartProof]); going back resumes it ([onAbortProof]).
  */
 @Composable
 fun AlarmContent(
     ui: AlarmUi,
     now: Instant,
     zone: ZoneId,
-    onComplete: (minimumOnly: Boolean, photoPath: String?, note: String?) -> Unit,
-    onSnooze: () -> Unit,
+    onComplete: (minimumOnly: Boolean, evidence: Evidence, note: String?) -> Unit,
+    onSnooze: (minutes: Int) -> Unit,
     onPostpone: (Instant) -> Unit,
     onSkip: (String) -> Unit,
-    camera: @Composable (onPhoto: (String) -> Unit) -> Unit,
+    onStartProof: () -> Unit,
+    onAbortProof: () -> Unit,
+    devices: AlarmDevices,
 ) {
     val c = Avl.colors
     var view by remember { mutableStateOf(View.MAIN) }
     var minimumOnly by remember { mutableStateOf(false) }
     val r = ui.reminder
 
+    fun complete(minimum: Boolean) {
+        minimumOnly = minimum
+        if (r.proof.needsEvidence) {
+            if (!ui.early) onStartProof()
+            view = View.PROOF
+        } else {
+            onComplete(minimum, Evidence(), null)
+        }
+    }
+
     Box(Modifier.fillMaxSize().background(c.background)) {
-        Column(Modifier.fillMaxSize().verticalScroll(rememberScrollState()).padding(24.dp)) {
+        Column(Modifier.fillMaxSize().verticalScroll(rememberScrollState()).imePadding().padding(24.dp)) {
             when (view) {
                 View.MAIN -> {
-                    Text(
-                        "${Format.strictness(r.strictness).replaceFirstChar { it.uppercase() }} · fällig seit ${Format.time(ui.occurrence.currentAt, zone)}",
-                        color = c.muted, fontSize = 14.sp,
-                    )
+                    val head = if (ui.early) "Vorab erledigen · fällig um ${Format.time(ui.occurrence.currentAt, zone)}"
+                    else "${Format.strictness(r.strictness).replaceFirstChar { it.uppercase() }} · fällig seit ${Format.time(ui.occurrence.currentAt, zone)}"
+                    Text(head, color = c.muted, fontSize = 14.sp)
                     Text(Format.time(now, zone), color = c.text, fontSize = 56.sp, fontWeight = FontWeight.Light)
                     Spacer(Modifier.height(16.dp))
                     Text(r.title, color = c.text, fontSize = 28.sp, fontWeight = FontWeight.Bold)
                     r.why?.let { Text("„$it“", Modifier.padding(top = 8.dp), color = c.muted, fontSize = 16.sp, fontStyle = FontStyle.Italic) }
+                    r.motivationAudio?.let { path ->
+                        TextButton(onClick = { devices.play(path) }) { Text("▶ Botschaft an mich abspielen", color = c.accent) }
+                    }
                     Spacer(Modifier.height(20.dp))
+                    PrepCards(ui.prep)
                     r.goal?.let { InfoCard("Ziel", it) }
                     r.minimum?.let { min ->
                         val left = ui.minimumsLeft?.let { " · noch ${it}× diese Woche" } ?: ""
                         InfoCard("Minimum$left", min)
                     }
                     Spacer(Modifier.height(24.dp))
-                    Button(
-                        onClick = { minimumOnly = false; if (r.proof == ProofType.PHOTO) view = View.PROOF else onComplete(false, null, null) },
-                        modifier = Modifier.fillMaxWidth().height(56.dp),
-                    ) { Text("Erledigt", fontSize = 18.sp) }
+                    Button(onClick = { complete(false) }, modifier = Modifier.fillMaxWidth().height(56.dp)) { Text("Erledigt", fontSize = 18.sp) }
                     if (r.minimum != null) {
                         OutlinedButton(
-                            onClick = { minimumOnly = true; if (r.proof == ProofType.PHOTO) view = View.PROOF else onComplete(true, null, null) },
+                            onClick = { complete(true) },
                             enabled = ui.minimumAllowed,
                             modifier = Modifier.fillMaxWidth().padding(top = 8.dp),
                         ) { Text(if (ui.minimumAllowed) "Nur Minimum geschafft" else "Minimum diese Woche aufgebraucht") }
                     }
-                    Row(Modifier.fillMaxWidth().padding(top = 8.dp), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                        OutlinedButton(onClick = onSnooze, modifier = Modifier.weight(1f)) { Text("Später\n+10 min") }
-                        OutlinedButton(onClick = { view = View.POSTPONE }, enabled = ui.canPostpone, modifier = Modifier.weight(1f)) {
-                            Text("Verschieben\n" + (ui.postponesLeft?.let { "noch ${it}×" } ?: "beliebig"))
+                    if (!ui.early) {
+                        if (ui.snooze.isNotEmpty()) {
+                            Row(Modifier.fillMaxWidth().padding(top = 8.dp), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                                ui.snooze.forEach { minutes ->
+                                    OutlinedButton(onClick = { onSnooze(minutes) }, modifier = Modifier.weight(1f)) { Text("Später\n+$minutes min") }
+                                }
+                            }
                         }
-                        OutlinedButton(onClick = { view = View.SKIP }, modifier = Modifier.weight(1f)) { Text("Auslassen\nmit Grund") }
+                        Row(Modifier.fillMaxWidth().padding(top = 8.dp), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                            OutlinedButton(onClick = { view = View.POSTPONE }, enabled = ui.canPostpone, modifier = Modifier.weight(1f)) {
+                                Text("Verschieben\n" + (ui.postponesLeft?.let { "noch ${it}×" } ?: "beliebig"))
+                            }
+                            OutlinedButton(onClick = { view = View.SKIP }, modifier = Modifier.weight(1f)) { Text("Auslassen\nmit Grund") }
+                        }
                     }
                 }
-                View.PROOF -> ProofStep(ui, minimumOnly, onComplete, onBack = { view = View.MAIN }, camera = camera)
+                View.PROOF -> ProofStep(
+                    ui, minimumOnly, onComplete,
+                    onBack = {
+                        if (!ui.early) onAbortProof()
+                        view = View.MAIN
+                    },
+                    devices = devices,
+                )
                 View.POSTPONE -> PostponeStep(ui, now, zone, onPostpone, onBack = { view = View.MAIN })
                 View.SKIP -> SkipStep(onSkip, onBack = { view = View.MAIN })
             }
         }
+    }
+}
+
+/** Goal (question 1), first step (question 4) and open points from the "Startklar" answers. */
+@Composable
+private fun PrepCards(prep: Map<Int, PrepAnswer>) {
+    prep[Prep.GOAL]?.takeIf { !it.unknown && !it.text.isNullOrBlank() }?.let { InfoCard("Davon hast du", it.text!!) }
+    prep[Prep.FIRST_STEP]?.takeIf { !it.unknown && !it.text.isNullOrBlank() }?.let { InfoCard("Erster Schritt", it.text!!) }
+    val open = Prep.open(prep)
+    if (open.isNotEmpty()) {
+        InfoCard("Offen", open.joinToString("\n") { if (it.unknown) "${PrepTexts.short(it.question)}: weiß ich noch nicht" else it.text!! })
+    }
+}
+
+/** The four questions (requirements 7.21), shared by the form and the alarm. */
+object PrepTexts {
+    val QUESTIONS = mapOf(
+        1 to "Was hast du davon, wenn es erledigt ist?",
+        2 to "Was könnte dich abhalten?",
+        3 to "Kannst du sofort starten? Wenn nein: was fehlt?",
+        4 to "Was ist der allererste Schritt?",
+    )
+
+    fun short(question: Int) = when (question) {
+        1 -> "Ziel"
+        2 -> "Hindernis"
+        3 -> "Startbereit"
+        else -> "Erster Schritt"
     }
 }
 
@@ -142,22 +216,68 @@ private fun StepHeader(title: String, subtitle: String) {
     Text(subtitle, Modifier.padding(top = 4.dp, bottom = 16.dp), color = c.muted, fontSize = 14.sp)
 }
 
+/** Photo, text and audio as the reminder asks; parts can be given in any order. */
 @Composable
 private fun ProofStep(
     ui: AlarmUi,
     minimumOnly: Boolean,
-    onComplete: (Boolean, String?, String?) -> Unit,
+    onComplete: (Boolean, Evidence, String?) -> Unit,
     onBack: () -> Unit,
-    camera: @Composable (onPhoto: (String) -> Unit) -> Unit,
+    devices: AlarmDevices,
 ) {
     val c = Avl.colors
+    val spec = ui.reminder.proof
+    var photo by remember { mutableStateOf<String?>(null) }
+    var text by remember { mutableStateOf("") }
+    var audio by remember { mutableStateOf<Pair<String, Int>?>(null) }
     var note by remember { mutableStateOf("") }
-    StepHeader("Foto-Nachweis", "${ui.reminder.title} · ${if (minimumOnly) "Minimum" else "Ziel"}")
-    camera { path -> onComplete(minimumOnly, path, note.ifBlank { null }) }
-    Text("Foto bleibt in der App, nicht in der Galerie.", Modifier.padding(top = 6.dp), color = c.muted, fontSize = 13.sp)
-    OutlinedTextField(note, { note = it }, Modifier.fillMaxWidth().padding(top = 12.dp), label = { Text("Notiz (optional)") })
-    TextButton(onClick = { onComplete(minimumOnly, null, note.ifBlank { null }) }, Modifier.padding(top = 12.dp)) {
-        Text("Ohne Foto abschließen – zählt als nicht erfolgreich", color = c.strict)
+    val evidence = Evidence(photo, text.ifBlank { null }, audio?.first, audio?.second)
+    val problems = ProofCheck.problems(spec, evidence, ui.lastProofText)
+
+    val pause = if (ui.early) "" else " · Alarm pausiert ${spec.windowMinutes} min"
+    StepHeader("Nachweis", "${ui.reminder.title} · ${if (minimumOnly) "Minimum" else "Ziel"}$pause")
+
+    if (spec.photo) {
+        Text("Foto", color = c.text, fontWeight = FontWeight.SemiBold, modifier = Modifier.padding(bottom = 6.dp))
+        if (photo == null) {
+            devices.camera { photo = it }
+            Text("Foto bleibt in der App, nicht in der Galerie.", Modifier.padding(top = 6.dp), color = c.muted, fontSize = 13.sp)
+        } else {
+            Row {
+                Text("✓ Foto aufgenommen", Modifier.weight(1f).padding(top = 12.dp), color = c.text)
+                TextButton(onClick = { photo = null }) { Text("Neu", color = c.accent) }
+            }
+        }
+    }
+    spec.textMinChars?.let { min ->
+        Text("Was hast du getan?", color = c.text, fontWeight = FontWeight.SemiBold, modifier = Modifier.padding(top = 16.dp))
+        OutlinedTextField(
+            text, { text = it }, Modifier.fillMaxWidth().padding(top = 6.dp).testTag("proofText"), minLines = 3,
+            supportingText = { Text("${ProofCheck.chars(text)} / $min Zeichen · Diktieren über die Tastatur geht auch") },
+        )
+    }
+    spec.audioMinSeconds?.let { min ->
+        Text("Sprachaufnahme (mind. $min s)", color = c.text, fontWeight = FontWeight.SemiBold, modifier = Modifier.padding(top = 16.dp, bottom = 6.dp))
+        audio?.let { (path, seconds) ->
+            Row {
+                Text("✓ Aufnahme · $seconds s", Modifier.weight(1f).padding(top = 12.dp), color = c.text)
+                TextButton(onClick = { devices.play(path) }) { Text("▶", color = c.accent) }
+            }
+        }
+        devices.recorder { path, seconds -> audio = path to seconds }
+    }
+    if (spec.textMinChars == null) {
+        OutlinedTextField(note, { note = it }, Modifier.fillMaxWidth().padding(top = 12.dp), label = { Text("Notiz (optional)") })
+    }
+
+    problems.forEach { Text(it, Modifier.padding(top = 8.dp), color = c.muted, fontSize = 14.sp) }
+    Button(
+        onClick = { onComplete(minimumOnly, evidence, note.ifBlank { null }) },
+        enabled = problems.isEmpty(),
+        modifier = Modifier.fillMaxWidth().padding(top = 16.dp).height(56.dp),
+    ) { Text("Abschließen", fontSize = 18.sp) }
+    TextButton(onClick = { onComplete(minimumOnly, evidence, note.ifBlank { null }) }, Modifier.padding(top = 12.dp), enabled = problems.isNotEmpty()) {
+        Text("Ohne vollständigen Nachweis abschließen – zählt als nicht erfolgreich", color = if (problems.isNotEmpty()) c.strict else c.muted)
     }
     TextButton(onClick = onBack) { Text("Zurück", color = c.muted) }
 }

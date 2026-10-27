@@ -11,6 +11,7 @@ import androidx.compose.foundation.lazy.items
 import androidx.compose.material3.FilterChip
 import androidx.compose.material3.Switch
 import androidx.compose.material3.Text
+import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
@@ -21,6 +22,8 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.avlreminder.core.model.Occurrence
+import com.avlreminder.core.model.Proof
+import com.avlreminder.core.model.ProofType
 import com.avlreminder.core.model.Reminder
 import com.avlreminder.core.model.Resolution
 import com.avlreminder.core.usecases.HistoryDay
@@ -77,10 +80,11 @@ fun RemindersScreen(
 @Composable
 fun HistoryScreen(
     days: List<HistoryDay>,
-    photos: Set<Long>,
+    proofs: Map<Long, List<Proof>>,
     today: LocalDate,
     zone: ZoneId,
     modifier: Modifier = Modifier,
+    onPlay: (String) -> Unit = {},
 ) {
     val c = Avl.colors
     var filter by rememberSaveable { mutableStateOf<Long?>(null) }
@@ -108,16 +112,36 @@ fun HistoryScreen(
             items(day.entries, key = { "h" + it.occurrence.id }) { e ->
                 val o = e.occurrence
                 val time = Format.time(o.resolvedAt!!, zone)
+                val own = proofs[o.id].orEmpty()
+                val audio = own.firstOrNull { it.type == ProofType.AUDIO }?.filePath
                 val detail = when (o.resolution) {
                     Resolution.MISSED -> "keine Reaktion bis $time"
                     Resolution.SKIPPED -> "$time · Grund: ${o.note ?: "–"}"
-                    else -> listOfNotNull(time, if (o.id in photos) "mit Foto" else null, o.note).joinToString(" · ")
+                    else -> listOfNotNull(
+                        time,
+                        "vor dem Reminder erledigt".takeIf { o.resolvedAt!! < o.dueAt },
+                        proofLine(own),
+                        own.firstOrNull { it.type == ProofType.TEXT }?.text?.let { "„$it“" },
+                        o.note,
+                    ).joinToString(" · ")
                 }
                 EntryCard(title = e.reminder.title, detail = detail, time = time) {
+                    if (audio != null) TextButton(onClick = { onPlay(audio) }) { Text("▶ Audio", color = c.accent) }
                     o.resolution?.let { ResultBadge(it) }
                 }
             }
         }
         item { Spacer(Modifier.height(32.dp)) }
     }
+}
+
+private fun proofLine(proofs: List<Proof>): String? {
+    val kinds = proofs.map { it.type }.distinct().sorted().map {
+        when (it) {
+            ProofType.PHOTO -> "Foto"
+            ProofType.TEXT -> "Text"
+            ProofType.AUDIO -> "Audio"
+        }
+    }
+    return if (kinds.isEmpty()) null else "mit " + kinds.joinToString(" + ")
 }

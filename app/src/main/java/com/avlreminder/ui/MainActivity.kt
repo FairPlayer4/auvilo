@@ -20,8 +20,14 @@ import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.setValue
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
+import com.avlreminder.AndroidDeviceState
 import com.avlreminder.alarm.AlarmActivity
+import com.avlreminder.alarm.AudioPlayer
+import com.avlreminder.alarm.AudioRecorder
+import com.avlreminder.alarm.Notifications
+import com.avlreminder.core.model.PrepAnswer
 import com.avlreminder.core.model.Reminder
+import com.avlreminder.core.rules.AlertSettings
 import com.avlreminder.core.usecases.SaveResult
 import com.avlreminder.data.ThemeMode
 import com.avlreminder.ui.screens.PermissionItem
@@ -60,23 +66,30 @@ class MainActivity : ComponentActivity() {
             val reminders by vm.reminders.collectAsStateWithLifecycle()
             val openByReminder by vm.openByReminder.collectAsStateWithLifecycle()
             val history by vm.history.collectAsStateWithLifecycle()
-            val photos by vm.photos.collectAsStateWithLifecycle()
+            val proofs by vm.proofs.collectAsStateWithLifecycle()
+            val prep by vm.prep.collectAsStateWithLifecycle()
+            val alert by vm.alert.collectAsStateWithLifecycle()
             var now by androidx.compose.runtime.remember { mutableStateOf(Instant.now()) }
+            var dnd by androidx.compose.runtime.remember { mutableStateOf(device.isDoNotDisturb()) }
             LaunchedEffect(Unit) {
                 while (true) {
                     delay(30_000)
                     now = Instant.now()
+                    dnd = device.isDoNotDisturb()
                 }
             }
+            // The DND exception is only needed once a reminder asks for it.
+            LaunchedEffect(reminders) { refreshPermissions() }
             AvlTheme(dark = isDark(theme)) {
                 // A new key restarts the UI on the requested route (e.g. widget tap while the app is open).
                 androidx.compose.runtime.key(launch) {
                     AvlAppUi(
-                        state = AppState(today, reminders, openByReminder, history, photos, theme, permissions),
+                        state = AppState(today, reminders, openByReminder, history, proofs, theme, permissions, prep, alert, dnd),
                         actions = actions,
                         now = now,
                         zone = ZoneId.systemDefault(),
                         startRoute = startRoute,
+                        recorder = { onRecorded -> AudioRecorder("motivation", "● Botschaft aufnehmen", onRecorded) },
                     )
                 }
             }
@@ -86,6 +99,13 @@ class MainActivity : ComponentActivity() {
     override fun onNewIntent(intent: Intent) {
         super.onNewIntent(intent)
         handle(intent)
+    }
+
+    private val device by lazy { AndroidDeviceState(this) }
+
+    override fun onPause() {
+        super.onPause()
+        AudioPlayer.stop()
     }
 
     override fun onResume() {
@@ -103,11 +123,14 @@ class MainActivity : ComponentActivity() {
     }
 
     private val actions = object : AppActions {
-        override fun save(reminder: Reminder, onResult: (SaveResult) -> Unit) = vm.save(reminder, onResult)
+        override fun save(reminder: Reminder, prep: List<PrepAnswer>, onResult: (SaveResult) -> Unit) = vm.save(reminder, prep, onResult)
         override fun delete(reminderId: Long) = vm.delete(reminderId)
         override fun setActive(reminderId: Long, active: Boolean) = vm.setActive(reminderId, active)
         override fun setTheme(mode: ThemeMode) = vm.setTheme(mode)
+        override fun setAlert(settings: AlertSettings) = vm.setAlert(settings)
         override fun openAlarm(occurrenceId: Long) = startActivity(AlarmActivity.intent(this@MainActivity, occurrenceId))
+        override fun completeEarly(occurrenceId: Long) = startActivity(AlarmActivity.intent(this@MainActivity, occurrenceId, early = true))
+        override fun play(path: String) = AudioPlayer.play(this@MainActivity, path)
     }
 
     private fun granted(permission: String) = checkSelfPermission(permission) == PackageManager.PERMISSION_GRANTED
@@ -119,7 +142,9 @@ class MainActivity : ComponentActivity() {
     private fun refreshPermissions() {
         val notifications = getSystemService(NotificationManager::class.java)
         val power = getSystemService(PowerManager::class.java)
-        permissions = listOf(
+        val blocked = Notifications.channelsBlockedByDnd(this)
+        val dndNeeded = vm.reminders.value.any { it.active && it.ignoreDnd }
+        permissions = listOfNotNull(
             PermissionItem("Benachrichtigungen", "ohne sie gibt es keinen Alarm", granted(Manifest.permission.POST_NOTIFICATIONS)) {
                 requestPermission.launch(Manifest.permission.POST_NOTIFICATIONS)
             },
@@ -131,6 +156,20 @@ class MainActivity : ComponentActivity() {
             },
             PermissionItem("Kamera", "für Foto-Nachweise", granted(Manifest.permission.CAMERA), required = false) {
                 requestPermission.launch(Manifest.permission.CAMERA)
+            },
+            PermissionItem("Mikrofon", "für Audio-Nachweise und die Botschaft an dich", granted(Manifest.permission.RECORD_AUDIO), required = false) {
+                requestPermission.launch(Manifest.permission.RECORD_AUDIO)
+            },
+            // Only asked for when a reminder should ring despite "Nicht stören".
+            if (!dndNeeded) null else PermissionItem(
+                "Ausnahme bei „Nicht stören“", "für Reminder mit „Auch bei Nicht stören“: dort „Nicht stören ignorieren“ einschalten",
+                blocked.isEmpty(),
+            ) {
+                startActivity(
+                    Intent(Settings.ACTION_CHANNEL_NOTIFICATION_SETTINGS)
+                        .putExtra(Settings.EXTRA_APP_PACKAGE, packageName)
+                        .putExtra(Settings.EXTRA_CHANNEL_ID, blocked.firstOrNull() ?: Notifications.CHANNEL_ALARM),
+                )
             },
         )
     }

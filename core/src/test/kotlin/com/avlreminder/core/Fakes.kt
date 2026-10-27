@@ -1,14 +1,18 @@
 package com.avlreminder.core
 
+import com.avlreminder.core.model.Character
 import com.avlreminder.core.model.Event
 import com.avlreminder.core.model.Occurrence
 import com.avlreminder.core.model.OccurrenceState
+import com.avlreminder.core.model.PrepAnswer
 import com.avlreminder.core.model.Proof
+import com.avlreminder.core.model.ProofType
 import com.avlreminder.core.model.Reminder
 import com.avlreminder.core.model.Resolution
 import com.avlreminder.core.model.Schedule
 import com.avlreminder.core.ports.AlarmKind
 import com.avlreminder.core.ports.AlarmPort
+import com.avlreminder.core.ports.DeviceStatePort
 import com.avlreminder.core.ports.ReminderRepository
 import java.time.Clock
 import java.time.Instant
@@ -31,7 +35,12 @@ class MutableClock(var now: Instant, private val zone: ZoneId = ZONE) : Clock() 
 fun reminder(
     schedule: Schedule = Schedule.Daily(LocalTime.of(18, 0)),
     created: Instant = at(26, 8),
-) = Reminder(title = "Katzenbrunnen", schedule = schedule, createdAt = created)
+    character: Character = Character.DOCUMENT,
+) = Reminder(title = "Katzenbrunnen", schedule = schedule, createdAt = created, character = character)
+
+class FakeDevice(var dnd: Boolean = false) : DeviceStatePort {
+    override fun isDoNotDisturb() = dnd
+}
 
 class FakeAlarms : AlarmPort {
     val set = mutableMapOf<Long, Pair<Instant, AlarmKind>>()
@@ -48,6 +57,7 @@ class FakeRepository : ReminderRepository {
     val occurrences = linkedMapOf<Long, Occurrence>()
     val events = mutableListOf<Event>()
     val proofs = mutableListOf<Proof>()
+    val prep = mutableListOf<PrepAnswer>()
     private var nextId = 1L
 
     override suspend fun reminders() = reminders.values.toList()
@@ -63,6 +73,7 @@ class FakeRepository : ReminderRepository {
         ids.forEach { occurrences.remove(it) }
         events.removeAll { it.occurrenceId in ids }
         proofs.removeAll { it.occurrenceId in ids }
+        prep.removeAll { it.reminderId == id }
     }
 
     override suspend fun occurrence(id: Long) = occurrences[id]
@@ -87,6 +98,15 @@ class FakeRepository : ReminderRepository {
         events += event
     }
     override suspend fun addProof(proof: Proof) {
-        proofs += proof
+        proofs += proof.copy(id = nextId++)
+    }
+    override suspend fun lastProofText(reminderId: Long): String? {
+        val ids = occurrences.values.filter { it.reminderId == reminderId }.map { it.id }.toSet()
+        return proofs.lastOrNull { it.occurrenceId in ids && it.type == ProofType.TEXT }?.text
+    }
+
+    override suspend fun prepAnswers(reminderId: Long) = prep.filter { it.reminderId == reminderId }
+    override suspend fun addPrepAnswer(answer: PrepAnswer) {
+        prep += answer.copy(id = nextId++)
     }
 }

@@ -22,6 +22,7 @@ import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.OutlinedTextField
+import androidx.compose.material3.Switch
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.material3.TimeInput
@@ -39,8 +40,9 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.avlreminder.core.model.Character
-import com.avlreminder.core.model.ProofType
+import com.avlreminder.core.model.ProofKind
 import com.avlreminder.core.model.Strictness
+import com.avlreminder.core.rules.Prep
 import com.avlreminder.ui.AvlIcons
 import com.avlreminder.ui.Format
 import com.avlreminder.ui.SectionTitle
@@ -52,7 +54,7 @@ import java.time.ZoneOffset
 
 /**
  * "Reminder anlegen / bearbeiten". Holds the form state itself; [onSave] gets the finished form,
- * [problems] shows what the engine rejected.
+ * [problems] shows what the engine rejected. [recorder] and [play] handle the motivation audio.
  */
 @Composable
 fun EditScreen(
@@ -62,6 +64,8 @@ fun EditScreen(
     onCancel: () -> Unit,
     onDelete: (() -> Unit)?,
     modifier: Modifier = Modifier,
+    recorder: @Composable (onRecorded: (String, Int) -> Unit) -> Unit = {},
+    play: (String) -> Unit = {},
 ) {
     val c = Avl.colors
     var form by remember(initial) { mutableStateOf(initial) }
@@ -99,6 +103,11 @@ fun EditScreen(
                 color = { if (it == Strictness.STRICT) c.strict else c.accentFill },
             ) { form = form.withStrictness(it) }
             Text(presetText(form.strictness), Modifier.padding(top = 6.dp), color = c.muted, fontSize = 13.sp)
+            SwitchLine(
+                "Auch bei „Nicht stören“",
+                "für besondere Ereignisse; braucht die Ausnahme in den Einstellungen",
+                form.ignoreDnd,
+            ) { form = form.copy(ignoreDnd = it) }
 
             SectionTitle("Ziel")
             OutlinedTextField(form.goal, { form = form.copy(goal = it) }, Modifier.fillMaxWidth(), placeholder = { Text("z. B. 45 min") }, singleLine = true)
@@ -106,17 +115,21 @@ fun EditScreen(
             OutlinedTextField(form.minimum, { form = form.copy(minimum = it) }, Modifier.fillMaxWidth(), placeholder = { Text("leer = kein Minimum") }, singleLine = true)
 
             SectionTitle("Nachweis")
-            Choice(listOf(ProofType.NONE to "Keiner", ProofType.CONFIRM to "Quittieren", ProofType.PHOTO to "Foto"), form.proof) {
-                form = form.copy(proof = it)
-            }
-            Text("Ohne verlangten Nachweis zählt eine Erledigung als nicht erfolgreich.", Modifier.padding(top = 6.dp), color = c.muted, fontSize = 13.sp)
+            ProofSection(form) { form = it }
 
             SectionTitle("Warum ist mir das wichtig?")
             OutlinedTextField(form.why, { form = form.copy(why = it) }, Modifier.fillMaxWidth(), minLines = 2)
+            MotivationAudio(form.motivationAudio, recorder, play) { form = form.copy(motivationAudio = it) }
+
+            SectionTitle(if (form.character == Character.OVERCOME) "Startklar (Pflicht bei Überwindung)" else "Startklar (optional)")
+            PrepSection(form) { form = it }
 
             SectionTitle("Feineinstellungen")
             Text("Verschieben max. pro Fälligkeit", color = c.text, fontSize = 14.sp)
             LimitChoice(listOf(0, 1, 2, 3, 5), form.postponeLimit) { form = form.copy(postponeLimit = it) }
+            Text("Später-Knöpfe im Alarm", Modifier.padding(top = 12.dp), color = c.text, fontSize = 14.sp)
+            val snoozeSets = (SNOOZE_SETS + listOf(form.snoozeMinutes)).distinct()
+            Choice(snoozeSets.map { it to it.joinToString(" / ") { m -> "+$m" } }, form.snoozeMinutes) { form = form.copy(snoozeMinutes = it) }
             if (form.minimum.isNotBlank()) {
                 Text("Minimum max. pro Woche", Modifier.padding(top = 12.dp), color = c.text, fontSize = 14.sp)
                 LimitChoice(listOf(1, 2, 3), form.minimumLimitPerWeek) { form = form.copy(minimumLimitPerWeek = it) }
@@ -150,7 +163,109 @@ fun EditScreen(
 private fun presetText(s: Strictness) = when (s) {
     Strictness.RELAXED -> "Alarm: Banner + Vibration, alle 10 min · Verschieben unbegrenzt"
     Strictness.NORMAL -> "Alarm: Vollbild + Vibration wie ein Wecker, ohne Ton · Verschieben 3×"
-    Strictness.STRICT -> "Alarm: Vollbild + Vibration, 18–21 Uhr mit Alarmton · Verschieben 1× · Foto · Minimum 1×/Woche"
+    Strictness.STRICT -> "Alarm: Vollbild + Vibration, ab 18 Uhr mit Alarmton · Verschieben 1× · Foto · Minimum 1×/Woche"
+}
+
+/** At most two buttons: a notification has room for "done" plus two. */
+private val SNOOZE_SETS = listOf(listOf(10), listOf(15), listOf(30), listOf(10, 30), listOf(30, 60))
+
+@Composable
+private fun SwitchLine(label: String, hint: String, checked: Boolean, onChange: (Boolean) -> Unit) {
+    val c = Avl.colors
+    Row(Modifier.fillMaxWidth().padding(top = 8.dp), verticalAlignment = androidx.compose.ui.Alignment.CenterVertically) {
+        Column(Modifier.weight(1f)) {
+            Text(label, color = c.text, fontSize = 15.sp)
+            Text(hint, color = c.muted, fontSize = 13.sp)
+        }
+        Switch(checked, onChange)
+    }
+}
+
+/** Kind of proof; for "Nachweis" which parts (combinable), their minimum and the quiet window. */
+@OptIn(ExperimentalLayoutApi::class)
+@Composable
+private fun ProofSection(form: ReminderForm, onChange: (ReminderForm) -> Unit) {
+    val c = Avl.colors
+    val p = form.proof
+    Choice(listOf(ProofKind.NONE to "Keiner", ProofKind.CONFIRM to "Quittieren", ProofKind.EVIDENCE to "Nachweis"), p.kind) { kind ->
+        // A fresh "Nachweis" starts with a photo, the most common case.
+        val photo = if (kind == ProofKind.EVIDENCE && !p.photo && p.textMinChars == null && p.audioMinSeconds == null) true else p.photo
+        onChange(form.copy(proof = p.copy(kind = kind, photo = photo)))
+    }
+    if (p.needsEvidence) {
+        FlowRow(Modifier.padding(top = 8.dp), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+            FilterChip(p.photo, { onChange(form.copy(proof = p.copy(photo = !p.photo))) }, label = { Text("Foto") })
+            FilterChip(
+                p.textMinChars != null,
+                { onChange(form.copy(proof = p.copy(textMinChars = if (p.textMinChars == null) 50 else null))) },
+                label = { Text("Text") },
+            )
+            FilterChip(
+                p.audioMinSeconds != null,
+                { onChange(form.copy(proof = p.copy(audioMinSeconds = if (p.audioMinSeconds == null) 10 else null))) },
+                label = { Text("Audio") },
+            )
+        }
+        p.textMinChars?.let { min ->
+            Text("Text: mindestens Zeichen (ohne Leerzeichen)", Modifier.padding(top = 10.dp), color = c.text, fontSize = 14.sp)
+            Choice((listOf(20, 50, 100) + min).distinct().sorted().map { it to "$it" }, min) {
+                onChange(form.copy(proof = p.copy(textMinChars = it)))
+            }
+        }
+        p.audioMinSeconds?.let { min ->
+            Text("Audio: mindestens", Modifier.padding(top = 10.dp), color = c.text, fontSize = 14.sp)
+            Choice((listOf(5, 10, 30) + min).distinct().sorted().map { it to "$it s" }, min) {
+                onChange(form.copy(proof = p.copy(audioMinSeconds = it)))
+            }
+        }
+        Text("Alarm pausiert während des Nachweises", Modifier.padding(top = 10.dp), color = c.text, fontSize = 14.sp)
+        Choice((listOf(5, 10, 15, 30) + p.windowMinutes).distinct().sorted().map { it to "$it min" }, p.windowMinutes) {
+            onChange(form.copy(proof = p.copy(windowMinutes = it)))
+        }
+    }
+    Text("Ohne verlangten Nachweis zählt eine Erledigung als nicht erfolgreich.", Modifier.padding(top = 6.dp), color = c.muted, fontSize = 13.sp)
+}
+
+/** Message to oneself, played in the alarm on tap only. */
+@Composable
+private fun MotivationAudio(
+    path: String?,
+    recorder: @Composable (onRecorded: (String, Int) -> Unit) -> Unit,
+    play: (String) -> Unit,
+    onChange: (String?) -> Unit,
+) {
+    val c = Avl.colors
+    Text("Botschaft an mich (Audio, optional)", Modifier.padding(top = 12.dp, bottom = 6.dp), color = c.text, fontSize = 14.sp)
+    if (path != null) {
+        Row(verticalAlignment = androidx.compose.ui.Alignment.CenterVertically) {
+            Text("✓ aufgenommen", Modifier.weight(1f), color = c.text)
+            TextButton(onClick = { play(path) }) { Text("▶ Abspielen") }
+            TextButton(onClick = { onChange(null) }) { Text("Entfernen", color = c.strict) }
+        }
+    }
+    recorder { newPath, _ -> onChange(newPath) }
+}
+
+/** The four "Startklar" questions; "weiß ich noch nicht" is a valid answer. */
+@Composable
+private fun PrepSection(form: ReminderForm, onChange: (ReminderForm) -> Unit) {
+    val c = Avl.colors
+    Prep.QUESTIONS.forEach { q ->
+        val draft = form.prep[q] ?: PrepDraft()
+        fun set(d: PrepDraft) = onChange(form.copy(prep = form.prep + (q to d)))
+        Text(PrepTexts.QUESTIONS.getValue(q), Modifier.padding(top = 10.dp), color = c.text, fontSize = 14.sp)
+        OutlinedTextField(
+            draft.text, { set(draft.copy(text = it, unknown = false)) },
+            Modifier.fillMaxWidth().padding(top = 4.dp).testTag("prep$q"),
+            enabled = !draft.unknown,
+        )
+        FlowRow(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+            if (q == Prep.READY) {
+                FilterChip(draft.text == Prep.READY_YES, { set(PrepDraft(Prep.READY_YES)) }, label = { Text(Prep.READY_YES) })
+            }
+            FilterChip(draft.unknown, { set(draft.copy(unknown = !draft.unknown)) }, label = { Text("weiß ich noch nicht") })
+        }
+    }
 }
 
 @OptIn(ExperimentalLayoutApi::class)

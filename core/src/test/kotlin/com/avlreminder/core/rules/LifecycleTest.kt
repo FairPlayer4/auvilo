@@ -8,15 +8,16 @@ import com.avlreminder.core.model.OccurrenceState.DONE
 import com.avlreminder.core.model.OccurrenceState.DUE
 import com.avlreminder.core.model.OccurrenceState.ESCALATING
 import com.avlreminder.core.model.OccurrenceState.PLANNED
-import com.avlreminder.core.model.ProofType
+import com.avlreminder.core.model.ProofKind
+import com.avlreminder.core.model.ProofSpec
 import com.avlreminder.core.model.Resolution
 import com.avlreminder.core.reminder
+import java.time.Duration
 import org.junit.jupiter.api.Assertions.assertEquals
 import org.junit.jupiter.api.Assertions.assertFalse
 import org.junit.jupiter.api.Assertions.assertNull
 import org.junit.jupiter.api.Assertions.assertTrue
 import org.junit.jupiter.api.Test
-import java.time.Duration
 
 class LifecycleTest {
     private val now = at(26, 18, 5)
@@ -81,7 +82,7 @@ class LifecycleTest {
 
     @Test
     fun `complete reaches the goal`() {
-        val res = ok(Lifecycle.transition(r, due, Action.Complete(minimumOnly = false, proofProvided = true, note = "Filter"), now))
+        val res = ok(Lifecycle.transition(r, due, Action.Complete(minimumOnly = false, note = "Filter"), now))
         assertEquals(DONE, res.occurrence.state)
         assertEquals(Resolution.GOAL, res.occurrence.resolution)
         assertEquals(now, res.occurrence.resolvedAt)
@@ -90,26 +91,26 @@ class LifecycleTest {
 
     @Test
     fun `complete is possible before the alarm`() {
-        assertEquals(DONE, ok(Lifecycle.transition(r, planned, Action.Complete(false, true), now)).occurrence.state)
+        assertEquals(DONE, ok(Lifecycle.transition(r, planned, Action.Complete(false), now)).occurrence.state)
     }
 
     @Test
     fun `missing photo counts as not successful`() {
-        val photo = r.copy(proof = ProofType.PHOTO)
-        val res = ok(Lifecycle.transition(photo, due, Action.Complete(minimumOnly = false, proofProvided = false), now))
+        val photo = r.copy(proof = ProofSpec.PHOTO)
+        val res = ok(Lifecycle.transition(photo, due, Action.Complete(minimumOnly = false), now))
         assertEquals(Resolution.NO_PROOF, res.occurrence.resolution)
         assertEquals(DONE, res.occurrence.state)
     }
 
     @Test
     fun `confirm needs no extra proof`() {
-        val res = ok(Lifecycle.transition(r, due, Action.Complete(minimumOnly = false, proofProvided = false), now))
+        val res = ok(Lifecycle.transition(r, due, Action.Complete(minimumOnly = false), now))
         assertEquals(Resolution.GOAL, res.occurrence.resolution)
     }
 
     @Test
     fun `minimum counts as minimum`() {
-        val res = ok(Lifecycle.transition(r, due, Action.Complete(minimumOnly = true, proofProvided = true), now))
+        val res = ok(Lifecycle.transition(r, due, Action.Complete(minimumOnly = true), now))
         assertEquals(Resolution.MINIMUM, res.occurrence.resolution)
     }
 
@@ -117,7 +118,7 @@ class LifecycleTest {
     fun `minimum is disabled when weekly limit is reached`() {
         assertFalse(Lifecycle.canUseMinimum(r, Limits(minimumsThisWeek = 1)))
         assertEquals(0, Lifecycle.minimumsLeft(r, Limits(minimumsThisWeek = 3)))
-        rejected(Lifecycle.transition(r, due, Action.Complete(true, true), now, Limits(minimumsThisWeek = 1)))
+        rejected(Lifecycle.transition(r, due, Action.Complete(true), now, Limits(minimumsThisWeek = 1)))
     }
 
     @Test
@@ -148,6 +149,44 @@ class LifecycleTest {
     fun `resolved occurrences accept no further action`() {
         val done = ok(Lifecycle.transition(r, due, Action.Miss, now)).occurrence
         assertFalse(done.isOpen)
-        rejected(Lifecycle.transition(r, done, Action.Complete(false, true), now))
+        rejected(Lifecycle.transition(r, done, Action.Complete(false), now))
+    }
+
+    @Test
+    fun `starting the proof pauses until the window ends`() {
+        val res = ok(Lifecycle.transition(r, due, Action.StartProof(at(26, 18, 15)), now))
+        assertEquals(at(26, 18, 15), res.occurrence.pausedUntil)
+        assertEquals(DUE, res.occurrence.state)
+        assertEquals(EventType.PROOF_STARTED, res.event.type)
+        rejected(Lifecycle.transition(r, planned, Action.StartProof(at(26, 18, 15)), now))
+        rejected(Lifecycle.transition(r, due, Action.StartProof(now), now))
+    }
+
+    @Test
+    fun `aborting the proof shortens the pause`() {
+        val proving = due.copy(pausedUntil = at(26, 18, 15))
+        val res = ok(Lifecycle.transition(r, proving, Action.AbortProof(at(26, 18, 6)), now))
+        assertEquals(at(26, 18, 6), res.occurrence.pausedUntil)
+        assertEquals(EventType.PROOF_ABORTED, res.event.type)
+        rejected(Lifecycle.transition(r, due, Action.AbortProof(at(26, 18, 6)), now))
+    }
+
+    @Test
+    fun `escalating or snoozing ends the pause`() {
+        val proving = due.copy(pausedUntil = at(26, 18, 15))
+        assertNull(ok(Lifecycle.transition(r, proving, Action.Escalate, now)).occurrence.pausedUntil)
+        assertNull(ok(Lifecycle.transition(r, proving, Action.Snooze(Duration.ofMinutes(10)), now)).occurrence.pausedUntil)
+        assertNull(ok(Lifecycle.transition(r, proving, Action.Postpone(at(27, 9)), now)).occurrence.pausedUntil)
+    }
+
+    @Test
+    fun `text proof counts only when complete and new`() {
+        val textual = r.copy(proof = ProofSpec(ProofKind.EVIDENCE, textMinChars = 5))
+        fun resolve(text: String, last: String? = null) =
+            ok(Lifecycle.transition(textual, due, Action.Complete(false, Evidence(text = text)), now, Limits(lastProofText = last)))
+                .occurrence.resolution
+        assertEquals(Resolution.GOAL, resolve("Filter gewechselt"))
+        assertEquals(Resolution.NO_PROOF, resolve("kurz"))
+        assertEquals(Resolution.NO_PROOF, resolve("Filter gewechselt", last = "Filter gewechselt"))
     }
 }

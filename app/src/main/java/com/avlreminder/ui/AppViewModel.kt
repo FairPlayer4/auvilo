@@ -4,7 +4,11 @@ import android.app.Application
 import androidx.lifecycle.AndroidViewModel
 import androidx.lifecycle.viewModelScope
 import com.avlreminder.core.model.Occurrence
+import com.avlreminder.core.model.PrepAnswer
+import com.avlreminder.core.model.Proof
 import com.avlreminder.core.model.Reminder
+import com.avlreminder.core.rules.AlertSettings
+import com.avlreminder.core.rules.Prep
 import com.avlreminder.core.usecases.HistoryDay
 import com.avlreminder.core.usecases.Overview
 import com.avlreminder.core.usecases.SaveResult
@@ -59,20 +63,36 @@ class AppViewModel(app: Application) : AndroidViewModel(app) {
         combine(reminders, resolved) { r, d -> Overview.history(r, d, zone) },
     )
 
-    /** Occurrence ids that have a photo proof. */
-    val photos: StateFlow<Set<Long>> = state(
-        emptySet(),
-        dao.observeProofs().map { l -> l.filter { it.filePath != null }.map { it.occurrenceId }.toSet() },
+    /** Proofs per occurrence, for the history. */
+    val proofs: StateFlow<Map<Long, List<Proof>>> = state(
+        emptyMap(),
+        dao.observeProofs().map { l -> l.map { it.toModel() }.groupBy { it.occurrenceId } },
+    )
+
+    /** Current "Startklar" answers per reminder. */
+    val prep: StateFlow<Map<Long, Map<Int, PrepAnswer>>> = state(
+        emptyMap(),
+        dao.observePrepAnswers().map { l -> l.map { it.toModel() }.groupBy { it.reminderId }.mapValues { Prep.latest(it.value) } },
     )
 
     val theme: StateFlow<ThemeMode> = state(ThemeMode.SYSTEM, graph.settings.theme)
+
+    val alert: StateFlow<AlertSettings> = state(AlertSettings(), graph.settings.alert)
 
     fun setTheme(mode: ThemeMode) {
         viewModelScope.launch { graph.settings.setTheme(mode) }
     }
 
-    fun save(reminder: Reminder, onResult: (SaveResult) -> Unit) {
-        viewModelScope.launch { onResult(graph.withEngine { it.save(reminder) }) }
+    /** New times apply to the next alarm; [sync] plans the open occurrences again. */
+    fun setAlert(settings: AlertSettings) {
+        viewModelScope.launch {
+            graph.settings.setAlert(settings)
+            graph.syncAndRing()
+        }
+    }
+
+    fun save(reminder: Reminder, prep: List<PrepAnswer>, onResult: (SaveResult) -> Unit) {
+        viewModelScope.launch { onResult(graph.withEngine { it.save(reminder, prep) }) }
     }
 
     fun delete(reminderId: Long) {

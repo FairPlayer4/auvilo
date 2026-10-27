@@ -8,7 +8,10 @@ import com.avlreminder.core.model.Event
 import com.avlreminder.core.model.EventType
 import com.avlreminder.core.model.Occurrence
 import com.avlreminder.core.model.OccurrenceState
+import com.avlreminder.core.model.PrepAnswer
 import com.avlreminder.core.model.Proof
+import com.avlreminder.core.model.ProofSpec
+import com.avlreminder.core.model.ProofKind
 import com.avlreminder.core.model.ProofType
 import com.avlreminder.core.model.Reminder
 import com.avlreminder.core.model.Resolution
@@ -49,7 +52,7 @@ class RoomReminderRepositoryTest {
 
     private fun reminder(schedule: Schedule) = Reminder(
         title = "Training", why = "fit bleiben", strictness = Strictness.STRICT, schedule = schedule,
-        goal = "45 min", minimum = "10 min", minimumLimitPerWeek = 1, proof = ProofType.PHOTO,
+        goal = "45 min", minimum = "10 min", minimumLimitPerWeek = 1, proof = ProofSpec.PHOTO,
         postponeLimit = 1, createdAt = t0,
     )
 
@@ -119,6 +122,59 @@ class RoomReminderRepositoryTest {
         assertTrue(db.dao().events(o).isEmpty())
         assertTrue(db.dao().observeProofs().first().isEmpty())
         assertFalse(photo.exists())
+    }
+
+    @Test
+    fun newReminderFieldsSurviveTheRoundTrip() = runTest {
+        val r = reminder(Schedule.Daily(LocalTime.NOON)).copy(
+            proof = ProofSpec(ProofKind.EVIDENCE, photo = false, textMinChars = 50, audioMinSeconds = 10, windowMinutes = 15),
+            ignoreDnd = true, snoozeMinutes = listOf(10, 30), motivationAudio = "/audio/m.m4a",
+        )
+        val id = repo.saveReminder(r)
+        assertEquals(r.copy(id = id), repo.reminder(id))
+
+        val o = repo.saveOccurrence(Occurrence(reminderId = id, dueAt = t0, state = OccurrenceState.DUE, pausedUntil = t0.plusSeconds(600)))
+        assertEquals(t0.plusSeconds(600), repo.occurrence(o)!!.pausedUntil)
+    }
+
+    @Test
+    fun lastProofTextIsTheNewestOfThisReminder() = runTest {
+        val id = repo.saveReminder(reminder(Schedule.Daily(LocalTime.NOON)))
+        val other = repo.saveReminder(reminder(Schedule.Daily(LocalTime.NOON)))
+        assertNull(repo.lastProofText(id))
+        val o1 = repo.saveOccurrence(Occurrence(reminderId = id, dueAt = t0))
+        val o2 = repo.saveOccurrence(Occurrence(reminderId = id, dueAt = t0.plusSeconds(86_400)))
+        val o3 = repo.saveOccurrence(Occurrence(reminderId = other, dueAt = t0.plusSeconds(90_000)))
+        repo.addProof(Proof(occurrenceId = o1, type = ProofType.TEXT, filePath = null, takenAt = t0, text = "alt"))
+        repo.addProof(Proof(occurrenceId = o2, type = ProofType.TEXT, filePath = null, takenAt = t0.plusSeconds(86_400), text = "neu"))
+        repo.addProof(Proof(occurrenceId = o3, type = ProofType.TEXT, filePath = null, takenAt = t0.plusSeconds(90_000), text = "anderer"))
+        assertEquals("neu", repo.lastProofText(id))
+    }
+
+    @Test
+    fun prepAnswersAreKeptAsHistoryAndDeletedWithTheReminder() = runTest {
+        val id = repo.saveReminder(reminder(Schedule.Daily(LocalTime.NOON)))
+        repo.addPrepAnswer(PrepAnswer(reminderId = id, question = 1, text = "Ruhe", at = t0))
+        repo.addPrepAnswer(PrepAnswer(reminderId = id, question = 2, text = null, unknown = true, at = t0))
+        repo.addPrepAnswer(PrepAnswer(reminderId = id, question = 1, text = "mehr Ruhe", at = t0.plusSeconds(60)))
+        assertEquals(listOf("Ruhe", null, "mehr Ruhe"), repo.prepAnswers(id).map { it.text })
+        assertTrue(repo.prepAnswers(id)[1].unknown)
+
+        repo.deleteReminder(id)
+        assertTrue(repo.prepAnswers(id).isEmpty())
+    }
+
+    @Test
+    fun replacedMotivationAudioIsDeleted() = runTest {
+        val first = File.createTempFile("motivation", ".m4a")
+        val second = File.createTempFile("motivation", ".m4a")
+        val id = repo.saveReminder(reminder(Schedule.Daily(LocalTime.NOON)).copy(motivationAudio = first.path))
+        repo.saveReminder(repo.reminder(id)!!.copy(motivationAudio = second.path))
+        assertFalse(first.exists())
+        assertTrue(second.exists())
+
+        repo.deleteReminder(id)
+        assertFalse(second.exists())
     }
 
     @Test

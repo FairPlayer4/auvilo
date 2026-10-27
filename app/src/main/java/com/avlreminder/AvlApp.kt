@@ -1,11 +1,14 @@
 package com.avlreminder
 
 import android.app.Application
+import android.app.NotificationManager
 import android.content.Context
 import androidx.glance.appwidget.updateAll
 import com.avlreminder.alarm.AndroidAlarmPort
 import com.avlreminder.alarm.Notifications
 import com.avlreminder.alarm.Ringer
+import com.avlreminder.core.ports.DeviceStatePort
+import com.avlreminder.core.rules.AlertSettings
 import com.avlreminder.core.usecases.ReminderEngine
 import com.avlreminder.data.AvlDatabase
 import com.avlreminder.data.RoomReminderRepository
@@ -14,6 +17,7 @@ import com.avlreminder.widget.AvlWidget
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.SupervisorJob
+import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.sync.Mutex
 import kotlinx.coroutines.sync.withLock
@@ -43,18 +47,31 @@ object SystemZoneClock : Clock() {
     override fun instant(): Instant = Instant.now()
 }
 
+/** "Do not disturb" in any form; an unknown filter counts as off. */
+class AndroidDeviceState(private val context: Context) : DeviceStatePort {
+    override fun isDoNotDisturb(): Boolean {
+        val filter = context.getSystemService(NotificationManager::class.java).currentInterruptionFilter
+        return filter != NotificationManager.INTERRUPTION_FILTER_ALL && filter != NotificationManager.INTERRUPTION_FILTER_UNKNOWN
+    }
+}
+
 /** Manually wired dependencies; no DI library needed for one user and a handful of classes. */
 class AppGraph(private val context: Context) {
     val db = AvlDatabase.create(context)
     val repository = RoomReminderRepository(db)
     val settings = Settings(context)
     val scope = CoroutineScope(SupervisorJob() + Dispatchers.Default)
-    private val engine = ReminderEngine(repository, AndroidAlarmPort(context), SystemZoneClock)
+    @Volatile private var alert = AlertSettings()
+    private val engine = ReminderEngine(repository, AndroidAlarmPort(context), SystemZoneClock, AndroidDeviceState(context)) { alert }
     private val mutex = Mutex()
 
     /** Runs use cases one at a time and refreshes the widget afterwards. */
     suspend fun <T> withEngine(block: suspend (ReminderEngine) -> T): T {
-        val result = mutex.withLock { block(engine) }
+        val result = mutex.withLock {
+            // Read fresh each time: an alarm may start the process before anything else loaded the settings.
+            alert = settings.alert.first()
+            block(engine)
+        }
         scope.launch { runCatching { AvlWidget().updateAll(context) } }
         return result
     }

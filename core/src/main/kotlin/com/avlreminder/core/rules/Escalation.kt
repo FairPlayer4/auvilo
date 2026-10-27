@@ -6,19 +6,19 @@ import java.time.Instant
 import java.time.LocalTime
 import java.time.ZoneId
 
-/** Global time windows (settings). Outside [visibleFrom]..[visibleUntil] everything is silent. */
-data class EscalationWindows(
-    val visibleFrom: LocalTime = LocalTime.of(7, 0),
-    val visibleUntil: LocalTime = LocalTime.of(21, 0),
+/**
+ * Global alert settings. Quiet times come from the phone's "do not disturb";
+ * [dayEnd] is when an unanswered occurrence counts as missed.
+ */
+data class AlertSettings(
     val loudFrom: LocalTime = LocalTime.of(18, 0),
+    val dayEnd: LocalTime = LocalTime.of(23, 0),
 ) {
     init {
-        require(visibleFrom < visibleUntil) { "visible window must not cross midnight" }
-        require(loudFrom in visibleFrom..visibleUntil) { "loud window must lie inside the visible window" }
+        require(loudFrom < dayEnd) { "loud must start before the end of the day" }
     }
 
-    fun isVisible(time: LocalTime) = time >= visibleFrom && time < visibleUntil
-    fun isLoud(time: LocalTime) = time >= loudFrom && time < visibleUntil
+    fun isLoud(time: LocalTime) = time >= loudFrom
 }
 
 enum class AlarmLevel {
@@ -35,37 +35,43 @@ enum class AlarmLevel {
 object Escalation {
     /** How long one ringing round lasts without reaction. */
     val ROUND: Duration = Duration.ofMinutes(3)
-    /** Pause between two rounds. */
+    /** Pause between two rounds; also while "do not disturb" keeps them silent. */
     val REPEAT: Duration = Duration.ofMinutes(10)
+    /** After leaving the proof the escalation goes on this much later. */
+    val PROOF_GRACE: Duration = Duration.ofMinutes(1)
 
-    fun level(strictness: Strictness, time: LocalTime, windows: EscalationWindows): AlarmLevel {
-        if (!windows.isVisible(time)) return AlarmLevel.SILENT
+    /**
+     * [doNotDisturb]: the phone is on "do not disturb"; [ignoreDnd]: the reminder rings anyway.
+     */
+    fun level(
+        strictness: Strictness,
+        time: LocalTime,
+        settings: AlertSettings,
+        doNotDisturb: Boolean = false,
+        ignoreDnd: Boolean = false,
+    ): AlarmLevel {
+        if (doNotDisturb && !ignoreDnd) return AlarmLevel.SILENT
         return when (strictness) {
             Strictness.RELAXED -> AlarmLevel.BANNER
             Strictness.NORMAL -> AlarmLevel.FULLSCREEN
-            Strictness.STRICT -> if (windows.isLoud(time)) AlarmLevel.FULLSCREEN_LOUD else AlarmLevel.FULLSCREEN
+            Strictness.STRICT -> if (settings.isLoud(time)) AlarmLevel.FULLSCREEN_LOUD else AlarmLevel.FULLSCREEN
         }
     }
 
-    /**
-     * When to ring again for an open, already fired occurrence.
-     * Outside the visible window the next round waits for the window to open.
-     */
-    fun nextRound(now: Instant, zone: ZoneId, windows: EscalationWindows): Instant {
-        val candidate = now.plus(REPEAT)
-        val local = candidate.atZone(zone)
-        if (windows.isVisible(local.toLocalTime())) return candidate
-        val date = if (local.toLocalTime() < windows.visibleFrom) local.toLocalDate() else local.toLocalDate().plusDays(1)
-        return date.atTime(windows.visibleFrom).atZone(zone).toInstant()
-    }
+    /** When to ring again for an open, already fired occurrence. */
+    fun nextRound(now: Instant): Instant = now.plus(REPEAT)
 
     /**
-     * An occurrence without reaction counts as missed at the end of the first visible window
-     * that ends after it became due. Due at 02:00 → 21:00 the same day; due at 21:30 → 21:00 next day.
+     * An occurrence without reaction counts as missed at the end of the day it is due.
+     * Due at 02:00 → 23:00 the same day; due at 23:30 → 23:00 the next day.
      */
-    fun missedAt(currentAt: Instant, zone: ZoneId, windows: EscalationWindows): Instant {
+    fun missedAt(currentAt: Instant, zone: ZoneId, settings: AlertSettings): Instant {
         val local = currentAt.atZone(zone)
-        val date = if (local.toLocalTime() < windows.visibleUntil) local.toLocalDate() else local.toLocalDate().plusDays(1)
-        return date.atTime(windows.visibleUntil).atZone(zone).toInstant()
+        val date = if (local.toLocalTime() < settings.dayEnd) local.toLocalDate() else local.toLocalDate().plusDays(1)
+        return date.atTime(settings.dayEnd).atZone(zone).toInstant()
     }
+
+    /** The snooze buttons that stay before the end of the day; a later one would dodge "missed". */
+    fun snoozeOptions(minutes: List<Int>, now: Instant, missedAt: Instant): List<Int> =
+        minutes.filter { now.plus(Duration.ofMinutes(it.toLong())) < missedAt }
 }

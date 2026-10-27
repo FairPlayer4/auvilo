@@ -69,13 +69,13 @@ class AlarmReceiver : BroadcastReceiver() {
     }
 }
 
-/** Buttons in the notification: done (without photo) and snooze. */
+/** Buttons in the notification: done (without photo, text or audio) and snooze. */
 class ActionReceiver : BroadcastReceiver() {
     override fun onReceive(context: Context, intent: Intent) {
         val id = intent.getLongExtra(AndroidAlarmPort.EXTRA_OCCURRENCE, -1)
         val action = when (intent.action) {
-            ACTION_DONE -> Action.Complete(minimumOnly = false, proofProvided = false)
-            ACTION_SNOOZE -> Action.Snooze(SNOOZE)
+            ACTION_DONE -> Action.Complete(minimumOnly = false)
+            ACTION_SNOOZE -> Action.Snooze(Duration.ofMinutes(intent.getIntExtra(EXTRA_MINUTES, 10).toLong()))
             else -> return
         }
         val result = goAsync()
@@ -93,7 +93,19 @@ class ActionReceiver : BroadcastReceiver() {
     companion object {
         const val ACTION_DONE = "com.avlreminder.DONE"
         const val ACTION_SNOOZE = "com.avlreminder.SNOOZE"
-        val SNOOZE: Duration = Duration.ofMinutes(10)
+        private const val EXTRA_MINUTES = "minutes"
+
+        /** One snooze button; the minutes are part of the data URI so two buttons stay apart. */
+        fun snooze(context: Context, occurrenceId: Long, minutes: Int): PendingIntent = PendingIntent.getBroadcast(
+            context,
+            0,
+            Intent(context, ActionReceiver::class.java)
+                .setAction(ACTION_SNOOZE)
+                .setData("avl://occurrence/$occurrenceId/snooze/$minutes".toUri())
+                .putExtra(AndroidAlarmPort.EXTRA_OCCURRENCE, occurrenceId)
+                .putExtra(EXTRA_MINUTES, minutes),
+            PendingIntent.FLAG_IMMUTABLE or PendingIntent.FLAG_UPDATE_CURRENT,
+        )
 
         fun pending(context: Context, action: String, occurrenceId: Long): PendingIntent = PendingIntent.getBroadcast(
             context,

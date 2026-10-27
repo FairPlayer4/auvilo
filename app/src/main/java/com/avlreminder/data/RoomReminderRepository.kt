@@ -3,7 +3,9 @@ package com.avlreminder.data
 import androidx.room.withTransaction
 import com.avlreminder.core.model.Event
 import com.avlreminder.core.model.Occurrence
+import com.avlreminder.core.model.PrepAnswer
 import com.avlreminder.core.model.Proof
+import com.avlreminder.core.model.ProofSpec
 import com.avlreminder.core.model.Reminder
 import com.avlreminder.core.model.Resolution
 import com.avlreminder.core.model.Schedule
@@ -22,14 +24,17 @@ class RoomReminderRepository(private val db: AvlDatabase) : ReminderRepository {
     override suspend fun saveReminder(reminder: Reminder): Long {
         val entity = reminder.toEntity()
         if (reminder.id == 0L) return dao.insert(entity)
+        val oldAudio = dao.reminder(reminder.id)?.motivationAudio
         dao.update(entity)
+        // A replaced or removed motivation audio is no longer referenced anywhere.
+        if (oldAudio != null && oldAudio != reminder.motivationAudio) File(oldAudio).delete()
         return reminder.id
     }
 
-    /** Also deletes the proof photos; rows go with the foreign-key cascade. */
+    /** Also deletes the proof files and the motivation audio; rows go with the foreign-key cascade. */
     override suspend fun deleteReminder(id: Long) {
         val files = db.withTransaction {
-            val files = dao.proofFiles(id)
+            val files = dao.proofFiles(id) + listOfNotNull(dao.reminder(id)?.motivationAudio)
             dao.deleteReminder(id)
             files
         }
@@ -54,8 +59,17 @@ class RoomReminderRepository(private val db: AvlDatabase) : ReminderRepository {
     override suspend fun addEvent(event: Event) =
         dao.insert(EventEntity(occurrenceId = event.occurrenceId, at = event.at, type = event.type, detail = event.detail))
 
-    override suspend fun addProof(proof: Proof) =
-        dao.insert(ProofEntity(occurrenceId = proof.occurrenceId, type = proof.type, filePath = proof.filePath, takenAt = proof.takenAt))
+    override suspend fun addProof(proof: Proof) = dao.insert(
+        ProofEntity(occurrenceId = proof.occurrenceId, type = proof.type, filePath = proof.filePath, takenAt = proof.takenAt, text = proof.text),
+    )
+
+    override suspend fun lastProofText(reminderId: Long) = dao.lastProofText(reminderId)
+
+    override suspend fun prepAnswers(reminderId: Long) = dao.prepAnswers(reminderId).map { it.toModel() }
+
+    override suspend fun addPrepAnswer(answer: PrepAnswer) = dao.insert(
+        PrepAnswerEntity(reminderId = answer.reminderId, question = answer.question, text = answer.text, unknown = answer.unknown, at = answer.at),
+    )
 }
 
 // --- Mapping ----------------------------------------------------------------------------------
@@ -82,10 +96,13 @@ fun ReminderEntity.toModel(): Reminder = Reminder(
     goal = goal,
     minimum = minimum,
     minimumLimitPerWeek = minimumLimitPerWeek,
-    proof = proof,
+    proof = ProofSpec(proofKind, proofPhoto, proofTextMinChars, proofAudioMinSeconds, proofWindowMinutes),
     postponeLimit = postponeLimit,
     active = active,
     createdAt = createdAt,
+    ignoreDnd = ignoreDnd,
+    snoozeMinutes = snoozeMinutes.split(',').mapNotNull { it.trim().toIntOrNull() }.ifEmpty { listOf(10) },
+    motivationAudio = motivationAudio,
 )
 
 fun Reminder.toEntity(): ReminderEntity {
@@ -118,19 +135,32 @@ fun Reminder.toEntity(): ReminderEntity {
         goal = goal,
         minimum = minimum,
         minimumLimitPerWeek = minimumLimitPerWeek,
-        proof = proof,
+        proofKind = proof.kind,
         postponeLimit = postponeLimit,
         active = active,
         createdAt = createdAt,
+        proofPhoto = proof.photo,
+        proofTextMinChars = proof.textMinChars,
+        proofAudioMinSeconds = proof.audioMinSeconds,
+        proofWindowMinutes = proof.windowMinutes,
+        ignoreDnd = ignoreDnd,
+        snoozeMinutes = snoozeMinutes.joinToString(","),
+        motivationAudio = motivationAudio,
     )
 }
 
 fun OccurrenceEntity.toModel() = Occurrence(
     id = id, reminderId = reminderId, dueAt = dueAt, currentAt = currentAt, state = state,
     postponeCount = postponeCount, resolvedAt = resolvedAt, resolution = resolution, note = note,
+    pausedUntil = pausedUntil,
 )
 
 fun Occurrence.toEntity() = OccurrenceEntity(
     id = id, reminderId = reminderId, dueAt = dueAt, currentAt = currentAt, state = state,
     postponeCount = postponeCount, resolvedAt = resolvedAt, resolution = resolution, note = note,
+    pausedUntil = pausedUntil,
 )
+
+fun PrepAnswerEntity.toModel() = PrepAnswer(id = id, reminderId = reminderId, question = question, text = text, unknown = unknown, at = at)
+
+fun ProofEntity.toModel() = Proof(id = id, occurrenceId = occurrenceId, type = type, filePath = filePath, takenAt = takenAt, text = text)

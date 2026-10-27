@@ -1,7 +1,8 @@
 package com.avlreminder.ui.screens
 
 import com.avlreminder.core.model.Character
-import com.avlreminder.core.model.ProofType
+import com.avlreminder.core.model.PrepAnswer
+import com.avlreminder.core.model.ProofSpec
 import com.avlreminder.core.model.Reminder
 import com.avlreminder.core.model.Schedule
 import com.avlreminder.core.model.Strictness
@@ -15,6 +16,11 @@ import java.time.ZoneId
 import java.time.temporal.ChronoUnit
 
 enum class ScheduleKind { ONCE, DAILY, WEEKDAYS, AFTER_DONE }
+
+/** One "Startklar" answer while editing. */
+data class PrepDraft(val text: String = "", val unknown: Boolean = false) {
+    val answered: Boolean get() = unknown || text.isNotBlank()
+}
 
 /** Editable state of the "Reminder anlegen" screen. Keeps all schedule fields so switching kinds loses nothing. */
 data class ReminderForm(
@@ -32,9 +38,14 @@ data class ReminderForm(
     val intervalDays: Int = 14,
     val goal: String = "",
     val minimum: String = "",
-    val proof: ProofType = Presets.of(Strictness.NORMAL).proof,
+    val proof: ProofSpec = Presets.of(Strictness.NORMAL).proof,
     val postponeLimit: Int? = Presets.of(Strictness.NORMAL).postponeLimit,
     val minimumLimitPerWeek: Int? = Presets.of(Strictness.NORMAL).minimumLimitPerWeek,
+    val ignoreDnd: Boolean = false,
+    val snoozeMinutes: List<Int> = listOf(10),
+    val motivationAudio: String? = null,
+    /** Question 1..4 → answer; only answered ones are saved. */
+    val prep: Map<Int, PrepDraft> = emptyMap(),
 ) {
     /** Picking a strictness resets proof and limits to the preset; each can be changed afterwards. */
     fun withStrictness(s: Strictness): ReminderForm {
@@ -69,7 +80,15 @@ data class ReminderForm(
             postponeLimit = postponeLimit,
             active = active,
             createdAt = createdAt ?: now,
+            ignoreDnd = ignoreDnd,
+            snoozeMinutes = snoozeMinutes,
+            motivationAudio = motivationAudio,
         )
+    }
+
+    /** Answered questions; the engine stores only what changed. */
+    fun prepAnswers(now: Instant): List<PrepAnswer> = prep.filterValues { it.answered }.map { (q, d) ->
+        PrepAnswer(reminderId = id, question = q, text = d.text.trim().ifEmpty { null }, unknown = d.unknown, at = now)
     }
 
     companion object {
@@ -81,12 +100,14 @@ data class ReminderForm(
             return ReminderForm(date = next.toLocalDate(), time = next.toLocalTime())
         }
 
-        fun of(r: Reminder, today: LocalDate): ReminderForm {
+        fun of(r: Reminder, today: LocalDate, prep: Map<Int, PrepAnswer> = emptyMap()): ReminderForm {
             val base = ReminderForm(
                 id = r.id, createdAt = r.createdAt, active = r.active, title = r.title, why = r.why.orEmpty(),
                 character = r.character, strictness = r.strictness, date = today, time = LocalTime.of(18, 0),
                 goal = r.goal.orEmpty(), minimum = r.minimum.orEmpty(), proof = r.proof,
                 postponeLimit = r.postponeLimit, minimumLimitPerWeek = r.minimumLimitPerWeek,
+                ignoreDnd = r.ignoreDnd, snoozeMinutes = r.snoozeMinutes, motivationAudio = r.motivationAudio,
+                prep = prep.mapValues { (_, a) -> PrepDraft(a.text.orEmpty(), a.unknown) },
             )
             return when (val s = r.schedule) {
                 is Schedule.Once -> base.copy(kind = ScheduleKind.ONCE, date = s.at.toLocalDate(), time = s.at.toLocalTime())

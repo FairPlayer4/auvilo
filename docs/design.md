@@ -291,10 +291,12 @@ Nicht stören").
   nicht nur ein wiederholtes Zeichen, nicht identisch mit dem letzten Text) und
   Audio-Dauer. Fehlt etwas, bleibt wie bisher *ohne Nachweis abschließen* → `NO_PROOF`.
 
-**Alarm aus während des Nachweises (N0):** neues Feld `Occurrence.proofStartedAt`.
-- `Action.StartProof` setzt es; die App stoppt Ton und Vibration; der nächste Alarm
-  liegt bei `proofStartedAt + windowMinutes` (höchstens Tagesgrenze).
-- `Action.AbortProof` (Zurück, App verlassen) → nächster Alarm in 1 min.
+**Alarm aus während des Nachweises (N0):** neues Feld `Occurrence.pausedUntil`.
+- `Action.StartProof` setzt es auf jetzt + `windowMinutes` (höchstens Tagesgrenze); die
+  App stoppt Ton und Vibration; der nächste Alarm liegt bei `pausedUntil`.
+- `Action.AbortProof` (Zurück, App verlassen) → `pausedUntil` = jetzt + 1 min.
+- Gespeichert wird das Ende statt des Starts: Der nächste Alarm ergibt sich direkt aus
+  dem Feld, auch nach einem Neustart oder einer späteren Synchronisation.
 - Events `PROOF_STARTED`, `PROOF_ABORTED` – auch Grundlage für die Statistik.
 - Bewusst ein Feld statt eines eigenen Zustands: Der Zustandsautomat bleibt klein.
 
@@ -375,7 +377,7 @@ Eintrag stört, entscheidet der Gerätetest – notfalls bündelt eine Gruppe be
 ```
 PLANNED ──► DUE ──► ESCALATING
   │  ▲        │ ▲       │
-  │  │        │ └ Nachweis läuft (proofStartedAt, Frist) ┘
+  │  │        │ └ Nachweis läuft (pausedUntil, Frist) ┘
   │  └ Später / Verschieben / Rest auf morgen (Checkliste)
   ├── vorab erledigt ──────────────► DONE (GOAL | MINIMUM | NO_PROOF)
   ├── Ort: nicht da zur Fallback-Zeit ► CLOSED (DROPPED, neutral)
@@ -392,3 +394,27 @@ Wie Abschnitt 8, zusätzlich:
 - Gerätetest ([geraetetest.md](geraetetest.md)) erweitert um: "Nicht stören" an/aus,
   Ausnahme-Freigabe, Uhr bei *normal*/*streng*, Nachweis-Frist, Ankunft mit
   Verweildauer, Vorbeifahren.
+
+### 11.13 Umsetzung V1.1a – Abweichungen und Präzisierungen
+
+- **`pausedUntil` statt `proofStartedAt`** (siehe 11.4).
+- **Migration ohne Tabellen-Neubau:** Die Spalte `reminder.proof` bleibt und trägt jetzt
+  `ProofKind`; die übrigen Felder kommen per `ALTER TABLE ADD COLUMN`. So greift keine
+  Fremdschlüssel-Kaskade auf Vorkommen, Events und Nachweise.
+- **Backup** per `VACUUM INTO` nach `filesDir/backup/avlreminder-v1-<Zeit>.db`, nur wenn
+  die vorhandene DB älter ist. Scheitert die Kopie, startet die App trotzdem (Log-Eintrag).
+- **App verlassen während des Nachweises** (auch Bildschirm aus) zählt als Abbruch:
+  Alarm in 1 min. Bei der Rückkehr startet die Frist neu.
+- **Ausnahme bei "Nicht stören"** wird über die Kanäle geprüft (`canBypassDnd` für Alarm
+  und Banner). Der Eintrag auf der Berechtigungsseite erscheint nur, wenn ein aktiver
+  Reminder `ignoreDnd` nutzt, und öffnet die Kanal-Einstellungen.
+- **Uhr-Kopie** auf einem eigenen Kanal *Alarm auf der Uhr* (ohne Ton, mit Vibration).
+- **Schnell-Reminder "Meeting"** hat jetzt Charakter *Dokumentieren* und keinen Nachweis,
+  damit er ohne Startklar-Fragen gespeichert werden kann.
+- **Startklar-Pflicht** gilt beim Speichern (auch beim Bearbeiten älterer Reminder);
+  gespeichert werden nur geänderte Antworten.
+- **Vorab erledigen** gibt es in V1.1a nur über *Später heute*; eine eigene
+  Detailansicht kommt später.
+- **Ersetzte Motivations-Audios** werden beim Speichern gelöscht.
+- **Tagesgrenze und "laut ab"** sind in den Einstellungen wählbar (laut 16–20 Uhr,
+  Grenze 21–23 Uhr).

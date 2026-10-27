@@ -32,6 +32,7 @@ class AlarmService : Service() {
         private const val EXTRA_TITLE = "title"
         private const val EXTRA_TEXT = "text"
         private const val EXTRA_QUICK_DONE = "quickDone"
+        private const val EXTRA_SNOOZE = "snooze"
         private const val EXTRA_LOUD = "loud"
 
         /** Long, unusual pattern (ms): off/on pairs, easy to tell apart from normal notifications. */
@@ -48,6 +49,7 @@ class AlarmService : Service() {
                 .putExtra(EXTRA_TITLE, info.title)
                 .putExtra(EXTRA_TEXT, info.text)
                 .putExtra(EXTRA_QUICK_DONE, info.quickDone)
+                .putExtra(EXTRA_SNOOZE, info.snooze.toIntArray())
                 .putExtra(EXTRA_LOUD, loud)
             try {
                 context.startForegroundService(intent)
@@ -86,6 +88,7 @@ class AlarmService : Service() {
                     title = intent.getStringExtra(EXTRA_TITLE) ?: "",
                     text = intent.getStringExtra(EXTRA_TEXT),
                     quickDone = intent.getBooleanExtra(EXTRA_QUICK_DONE, false),
+                    snooze = intent.getIntArrayExtra(EXTRA_SNOOZE)?.toList().orEmpty(),
                 ),
                 intent.getBooleanExtra(EXTRA_LOUD, false),
             )
@@ -117,6 +120,8 @@ class AlarmService : Service() {
         _ringing.value = newInfo.occurrenceId
         vibrate()
         if (loud) playSound()
+        // After the looping vibration has started, so the copy's own short vibration does not replace it.
+        Notifications.showMirror(this, newInfo)
         handler.removeCallbacks(roundOver)
         handler.postDelayed(roundOver, Escalation.ROUND.toMillis())
     }
@@ -157,6 +162,7 @@ class AlarmService : Service() {
     private fun stopAlarm() {
         handler.removeCallbacks(roundOver)
         stopSound()
+        info?.let { Notifications.cancelMirror(this, it.occurrenceId) }
         info = null
         _ringing.value = null
         stopForeground(STOP_FOREGROUND_REMOVE)

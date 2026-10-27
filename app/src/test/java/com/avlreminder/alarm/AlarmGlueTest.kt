@@ -8,7 +8,7 @@ import androidx.test.core.app.ApplicationProvider
 import androidx.test.ext.junit.runners.AndroidJUnit4
 import com.avlreminder.core.model.Occurrence
 import com.avlreminder.core.model.OccurrenceState
-import com.avlreminder.core.model.ProofType
+import com.avlreminder.core.model.ProofSpec
 import com.avlreminder.core.model.Reminder
 import com.avlreminder.core.model.Resolution
 import com.avlreminder.core.model.Schedule
@@ -42,13 +42,13 @@ class AlarmGlueTest {
         ShadowLooper.idleMainLooper()
     }
 
-    private fun reminder(strictness: Strictness, proof: ProofType) = Reminder(
+    private fun reminder(strictness: Strictness, proof: ProofSpec) = Reminder(
         id = 7, title = "Katzenbrunnen", why = "Katzen trinken", strictness = strictness,
         schedule = Schedule.Daily(LocalTime.of(18, 0)), proof = proof, createdAt = Instant.now(),
     )
 
-    private fun ring(level: AlarmLevel, proof: ProofType = ProofType.CONFIRM) =
-        Ring(reminder(Strictness.NORMAL, proof), Occurrence(id = 42, reminderId = 7, dueAt = at, state = OccurrenceState.DUE), level)
+    private fun ring(level: AlarmLevel, proof: ProofSpec = ProofSpec.CONFIRM, snooze: List<Int> = listOf(10, 30)) =
+        Ring(reminder(Strictness.NORMAL, proof), Occurrence(id = 42, reminderId = 7, dueAt = at, state = OccurrenceState.DUE), level, snooze)
 
     @Test
     fun strictAndNormalUseAlarmClockRelaxedUsesExactAlarm() {
@@ -70,7 +70,7 @@ class AlarmGlueTest {
         Ringer.ring(context, ring(AlarmLevel.BANNER))
         val n = shadowOf(notifications).getNotification(Notifications.id(42))
         assertNotNull(n)
-        assertEquals(listOf("Erledigt", "+10 min"), n.actions.map { it.title.toString() })
+        assertEquals(listOf("Erledigt", "+10 min", "+30 min"), n.actions.map { it.title.toString() })
         assertEquals("banner", n.channelId)
 
         Ringer.dismiss(context, 42)
@@ -79,10 +79,27 @@ class AlarmGlueTest {
 
     @Test
     fun photoProofCannotBeCompletedFromTheNotification() {
-        Ringer.ring(context, ring(AlarmLevel.SILENT, ProofType.PHOTO))
+        Ringer.ring(context, ring(AlarmLevel.SILENT, ProofSpec.PHOTO))
         val n = shadowOf(notifications).getNotification(Notifications.id(42))
-        assertEquals(listOf("+10 min"), n.actions.map { it.title.toString() })
+        assertEquals(listOf("+10 min", "+30 min"), n.actions.map { it.title.toString() })
         assertEquals("silent", n.channelId)
+    }
+
+    @Test
+    fun noSnoozeButtonsShortlyBeforeTheDayEnds() {
+        Ringer.ring(context, ring(AlarmLevel.BANNER, snooze = emptyList()))
+        val n = shadowOf(notifications).getNotification(Notifications.id(42))
+        assertEquals(listOf("Erledigt"), n.actions.map { it.title.toString() })
+    }
+
+    @Test
+    fun pauseForTheProofReplacesTheAlarmWithAQuietNote() {
+        Ringer.ring(context, ring(AlarmLevel.BANNER))
+        Ringer.pause(context, AlarmInfo(42, "Katzenbrunnen", null, quickDone = false), at.plusSeconds(600))
+        val n = shadowOf(notifications).getNotification(Notifications.id(42))
+        assertNotNull(n)
+        assertEquals(true, n.extras.getCharSequence(android.app.Notification.EXTRA_TEXT).toString().startsWith("Nachweis läuft"))
+        assertEquals(0, n.actions?.size ?: 0)
     }
 
     @Test
@@ -95,7 +112,7 @@ class AlarmGlueTest {
     @Test
     fun doneActionCompletesTheOccurrence() = runBlocking {
         val graph = context.graph
-        val id = graph.repository.saveReminder(reminder(Strictness.NORMAL, ProofType.CONFIRM).copy(id = 0))
+        val id = graph.repository.saveReminder(reminder(Strictness.NORMAL, ProofSpec.CONFIRM).copy(id = 0))
         val occurrenceId = graph.repository.saveOccurrence(
             Occurrence(reminderId = id, dueAt = Instant.now().minusSeconds(60), state = OccurrenceState.DUE),
         )

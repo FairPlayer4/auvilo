@@ -29,8 +29,10 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import com.avlreminder.core.model.Occurrence
+import com.avlreminder.core.model.PrepAnswer
+import com.avlreminder.core.model.Proof
 import com.avlreminder.core.model.Reminder
-import com.avlreminder.core.rules.EscalationWindows
+import com.avlreminder.core.rules.AlertSettings
 import com.avlreminder.core.usecases.HistoryDay
 import com.avlreminder.core.usecases.SaveResult
 import com.avlreminder.core.usecases.Today
@@ -52,17 +54,26 @@ data class AppState(
     val reminders: List<Reminder>,
     val openByReminder: Map<Long, Occurrence>,
     val history: List<HistoryDay>,
-    val photos: Set<Long>,
+    val proofs: Map<Long, List<Proof>>,
     val theme: ThemeMode,
     val permissions: List<PermissionItem>,
+    /** Current "Startklar" answers per reminder. */
+    val prep: Map<Long, Map<Int, PrepAnswer>> = emptyMap(),
+    val alert: AlertSettings = AlertSettings(),
+    /** "Nicht stören" is on right now. */
+    val doNotDisturb: Boolean = false,
 )
 
 interface AppActions {
-    fun save(reminder: Reminder, onResult: (SaveResult) -> Unit)
+    fun save(reminder: Reminder, prep: List<PrepAnswer>, onResult: (SaveResult) -> Unit)
     fun delete(reminderId: Long)
     fun setActive(reminderId: Long, active: Boolean)
     fun setTheme(mode: ThemeMode)
+    fun setAlert(settings: AlertSettings)
     fun openAlarm(occurrenceId: Long)
+    /** "Vorab erledigen": the alarm screen for an occurrence that is not due yet. */
+    fun completeEarly(occurrenceId: Long)
+    fun play(path: String)
 }
 
 /** Simple navigation without a library: one route string, back goes to "today". */
@@ -82,6 +93,8 @@ fun AvlAppUi(
     now: Instant,
     zone: ZoneId,
     startRoute: String = Routes.TODAY,
+    /** Record button for the motivation audio; empty in previews and tests. */
+    recorder: @Composable (onRecorded: (String, Int) -> Unit) -> Unit = {},
 ) {
     val c = Avl.colors
     var route by rememberSaveable { mutableStateOf(startRoute) }
@@ -127,6 +140,8 @@ fun AvlAppUi(
                             today = today, date = date, zone = zone,
                             onOpenDue = { actions.openAlarm(it.occurrence.id) },
                             onEdit = { go(Routes.edit(it.id)) },
+                            onCompleteEarly = { actions.completeEarly(it.occurrence.id) },
+                            doNotDisturb = state.doNotDisturb,
                         )
                     }
                 }
@@ -134,7 +149,7 @@ fun AvlAppUi(
                     Icon(AvlIcons.Settings, "Einstellungen", tint = c.text)
                 }
             }
-            route == Routes.HISTORY -> HistoryScreen(state.history, state.photos, date, zone, m)
+            route == Routes.HISTORY -> HistoryScreen(state.history, state.proofs, date, zone, m, onPlay = actions::play)
             route == Routes.REMINDERS -> RemindersScreen(
                 reminders = state.reminders, openByReminder = state.openByReminder, today = date, zone = zone,
                 onEdit = { go(Routes.edit(it.id)) },
@@ -142,14 +157,14 @@ fun AvlAppUi(
                 modifier = m,
             )
             route == Routes.SETTINGS -> SettingsScreen(
-                theme = state.theme, onTheme = actions::setTheme, windows = EscalationWindows(),
+                theme = state.theme, onTheme = actions::setTheme, alert = state.alert, onAlert = actions::setAlert,
                 permissions = state.permissions, onBack = { go(Routes.TODAY) }, modifier = m,
             )
             route.startsWith("edit:") -> {
                 val id = route.removePrefix("edit:").toLong()
                 val existing = state.reminders.firstOrNull { it.id == id }
                 val initial = remember(id, existing != null) {
-                    existing?.let { ReminderForm.of(it, date) } ?: ReminderForm.new(now, zone)
+                    existing?.let { ReminderForm.of(it, date, state.prep[it.id].orEmpty()) } ?: ReminderForm.new(now, zone)
                 }
                 EditScreen(
                     initial = initial,
@@ -159,7 +174,7 @@ fun AvlAppUi(
                         if (reminder == null) {
                             problems = listOf("Mindestens einen Wochentag wählen")
                         } else {
-                            actions.save(reminder) { result ->
+                            actions.save(reminder, form.prepAnswers(now)) { result ->
                                 when (result) {
                                     is SaveResult.Saved -> go(Routes.TODAY)
                                     is SaveResult.Invalid -> problems = result.problems
@@ -170,6 +185,8 @@ fun AvlAppUi(
                     onCancel = { go(Routes.TODAY) },
                     onDelete = existing?.let { r -> { actions.delete(r.id); go(Routes.TODAY) } },
                     modifier = m,
+                    recorder = recorder,
+                    play = actions::play,
                 )
             }
         }

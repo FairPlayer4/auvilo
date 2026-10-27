@@ -18,14 +18,14 @@ import com.avlreminder.core.model.OccurrenceState
 import com.avlreminder.core.rules.Action
 import com.avlreminder.core.rules.Lifecycle
 import com.avlreminder.core.rules.TransitionResult
-import com.avlreminder.data.toModel
 import com.avlreminder.graph
 import com.avlreminder.ui.screens.AlarmContent
+import com.avlreminder.ui.screens.AlarmDevices
 import com.avlreminder.ui.screens.AlarmUi
 import com.avlreminder.ui.theme.AvlTheme
 import kotlinx.coroutines.delay
-import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.launch
+import java.time.Duration
 import java.time.Instant
 import java.time.ZoneId
 
@@ -33,18 +33,27 @@ import java.time.ZoneId
 class AlarmActivity : ComponentActivity() {
     companion object {
         private const val EXTRA_ID = "occurrence"
+        private const val EXTRA_EARLY = "early"
 
-        fun intent(context: Context, occurrenceId: Long): Intent =
+        /** [early]: complete before the reminder is due ("vorab erledigen"). */
+        fun intent(context: Context, occurrenceId: Long, early: Boolean = false): Intent =
             Intent(context, AlarmActivity::class.java)
                 .putExtra(EXTRA_ID, occurrenceId)
+                .putExtra(EXTRA_EARLY, early)
                 .addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
     }
 
     private var occurrenceId by mutableLongStateOf(-1L)
+    private var early = false
+    /** The proof screen is open and the alarm paused. */
+    private var proofRunning = false
+    /** The proof was paused because the app went to the background; resumes on return. */
+    private var proofLeft = false
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         occurrenceId = intent.getLongExtra(EXTRA_ID, -1)
+        early = intent.getBooleanExtra(EXTRA_EARLY, false)
         setContent {
             AvlTheme(dark = true) { AlarmHost(occurrenceId) }
         }
@@ -53,6 +62,24 @@ class AlarmActivity : ComponentActivity() {
     override fun onNewIntent(intent: Intent) {
         super.onNewIntent(intent)
         occurrenceId = intent.getLongExtra(EXTRA_ID, -1)
+        early = intent.getBooleanExtra(EXTRA_EARLY, false)
+    }
+
+    override fun onStart() {
+        super.onStart()
+        if (proofLeft) {
+            proofLeft = false
+            startProof(occurrenceId)
+        }
+    }
+
+    override fun onStop() {
+        super.onStop()
+        // Leaving the app with the proof open must not keep the alarm quiet (requirement N0).
+        if (proofRunning && !isChangingConfigurations) {
+            proofLeft = true
+            abortProof(occurrenceId)
+        }
     }
 
     @Composable
@@ -66,7 +93,7 @@ class AlarmActivity : ComponentActivity() {
         LaunchedEffect(id) {
             graph.db.dao().observeOpenOccurrences().collect { open ->
                 val o = open.firstOrNull { it.id == id }
-                if (o == null || o.state == OccurrenceState.PLANNED) finish()
+                if (o == null || (o.state == OccurrenceState.PLANNED && !early)) finish()
             }
         }
         val now by produceState(Instant.now()) {
@@ -80,13 +107,17 @@ class AlarmActivity : ComponentActivity() {
             ui = current,
             now = now,
             zone = zone,
-            onComplete = { minimumOnly, photo, note ->
-                act(id, Action.Complete(minimumOnly, proofProvided = photo != null, note = note), photo)
-            },
-            onSnooze = { act(id, Action.Snooze(ActionReceiver.SNOOZE)) },
+            onComplete = { minimumOnly, evidence, note -> act(id, Action.Complete(minimumOnly, evidence, note)) },
+            onSnooze = { act(id, Action.Snooze(Duration.ofMinutes(it.toLong()))) },
             onPostpone = { act(id, Action.Postpone(it)) },
             onSkip = { act(id, Action.Skip(it)) },
-            camera = { onPhoto -> ProofCamera(id, onPhoto) },
+            onStartProof = { startProof(id) },
+            onAbortProof = { abortProof(id) },
+            devices = AlarmDevices(
+                camera = { onPhoto -> ProofCamera(id, onPhoto) },
+                recorder = { onRecorded -> AudioRecorder("occ-$id", "● Aufnahme starten", onRecorded) },
+                play = { AudioPlayer.play(this, it) },
+            ),
         )
     }
 
@@ -94,24 +125,48 @@ class AlarmActivity : ComponentActivity() {
         val repo = graph.repository
         val occurrence = repo.occurrence(id) ?: return null
         val reminder = repo.reminder(occurrence.reminderId) ?: return null
-        val limits = graph.withEngine { it.limits(reminder) }
-        return AlarmUi(
-            reminder = reminder,
-            occurrence = occurrence,
-            minimumAllowed = Lifecycle.canUseMinimum(reminder, limits),
-            minimumsLeft = Lifecycle.minimumsLeft(reminder, limits),
-            canPostpone = Lifecycle.canPostpone(reminder, occurrence),
-            postponesLeft = Lifecycle.postponesLeft(reminder, occurrence),
-        )
+        return graph.withEngine { engine ->
+            val limits = engine.limits(reminder)
+            AlarmUi(
+                reminder = reminder,
+                occurrence = occurrence,
+                minimumAllowed = Lifecycle.canUseMinimum(reminder, limits),
+                minimumsLeft = Lifecycle.minimumsLeft(reminder, limits),
+                canPostpone = Lifecycle.canPostpone(reminder, occurrence),
+                postponesLeft = Lifecycle.postponesLeft(reminder, occurrence),
+                snooze = engine.snoozeOptions(reminder, occurrence),
+                prep = engine.prep(reminder.id),
+                lastProofText = limits.lastProofText,
+                early = early,
+            )
+        }
     }
 
-    private fun act(id: Long, action: Action, photo: String? = null) {
+    private fun startProof(id: Long) {
+        proofRunning = true
         lifecycleScope.launch {
-            val result = graph.withEngine { it.act(id, action, photo) }
+            val result = graph.withEngine { it.startProof(id) }
+            val o = (result as? TransitionResult.Ok)?.occurrence ?: return@launch
+            val r = graph.repository.reminder(o.reminderId) ?: return@launch
+            Ringer.pause(this@AlarmActivity, AlarmInfo(o.id, r.title, r.why ?: r.goal, quickDone = false), o.pausedUntil!!)
+        }
+    }
+
+    private fun abortProof(id: Long) {
+        proofRunning = false
+        // The application scope survives the activity going to the background.
+        graph.scope.launch { graph.withEngine { it.abortProof(id) } }
+    }
+
+    private fun act(id: Long, action: Action) {
+        proofRunning = false
+        lifecycleScope.launch {
+            val result = graph.withEngine { it.act(id, action) }
             if (result is TransitionResult.Rejected) {
                 Toast.makeText(this@AlarmActivity, "Nicht möglich: ${result.reason}", Toast.LENGTH_LONG).show()
                 return@launch
             }
+            AudioPlayer.stop()
             Ringer.dismiss(this@AlarmActivity, id)
             finish()
         }

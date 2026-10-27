@@ -7,12 +7,12 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.material3.Text
+import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
-import com.avlreminder.core.model.ProofType
 import com.avlreminder.core.model.Reminder
 import com.avlreminder.core.usecases.Entry
 import com.avlreminder.core.usecases.Today
@@ -34,13 +34,24 @@ fun TodayScreen(
     onOpenDue: (Entry) -> Unit,
     onEdit: (Reminder) -> Unit,
     modifier: Modifier = Modifier,
+    onCompleteEarly: (Entry) -> Unit = {},
+    doNotDisturb: Boolean = false,
 ) {
     val c = Avl.colors
+    val waiting = if (doNotDisturb) today.dueNow.count { !it.reminder.ignoreDnd } else 0
     LazyColumn(modifier.padding(horizontal = 16.dp)) {
         item {
             Column(Modifier.padding(top = 8.dp)) {
                 Text(Format.longDay(date), color = c.muted, fontSize = 14.sp)
                 Text("Heute", color = c.text, fontSize = 30.sp, fontWeight = FontWeight.Bold)
+            }
+        }
+        if (waiting > 0) {
+            item {
+                Text(
+                    "„Nicht stören“ aktiv – $waiting ${if (waiting == 1) "Reminder wartet" else "Reminder warten"} still bis zum Ende",
+                    Modifier.padding(top = 12.dp), color = c.muted, fontSize = 14.sp,
+                )
             }
         }
         if (today.dueNow.isEmpty() && today.laterToday.isEmpty() && today.resolved.isEmpty()) {
@@ -70,7 +81,10 @@ fun TodayScreen(
                     detail = goalLine(e.reminder) ?: Format.schedule(e.reminder.schedule),
                     time = Format.time(e.occurrence.currentAt, zone),
                     onClick = { onEdit(e.reminder) },
-                ) { StrictnessTag(e.reminder.strictness) }
+                ) {
+                    StrictnessTag(e.reminder.strictness)
+                    TextButton(onClick = { onCompleteEarly(e) }) { Text("Erledigen", color = c.accent) }
+                }
             }
         }
         if (today.resolved.isNotEmpty()) {
@@ -93,4 +107,9 @@ internal fun goalLine(r: Reminder): String? = when {
     else -> null
 }
 
-private fun proofHint(r: Reminder) = if (r.proof == ProofType.PHOTO) " · Foto-Nachweis" else ""
+private fun proofHint(r: Reminder): String {
+    val p = r.proof
+    if (!p.needsEvidence) return ""
+    val parts = listOfNotNull("Foto".takeIf { p.photo }, "Text".takeIf { p.textMinChars != null }, "Audio".takeIf { p.audioMinSeconds != null })
+    return " · Nachweis: " + parts.joinToString(" + ")
+}

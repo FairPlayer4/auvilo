@@ -2,7 +2,10 @@ package com.avlreminder.ui.screens
 
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
+import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.ExperimentalLayoutApi
+import androidx.compose.foundation.layout.FlowRow
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.heightIn
@@ -10,6 +13,7 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
+import androidx.compose.material3.FilterChip
 import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
@@ -23,12 +27,13 @@ import androidx.compose.ui.draw.clip
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
-import com.avlreminder.core.rules.EscalationWindows
+import com.avlreminder.core.rules.AlertSettings
 import com.avlreminder.data.ThemeMode
 import com.avlreminder.ui.AvlIcons
 import com.avlreminder.ui.Format
 import com.avlreminder.ui.SectionTitle
 import com.avlreminder.ui.theme.Avl
+import java.time.LocalTime
 
 /** A permission the app needs, with its state and how to ask for it. */
 data class PermissionItem(
@@ -44,7 +49,8 @@ data class PermissionItem(
 fun SettingsScreen(
     theme: ThemeMode,
     onTheme: (ThemeMode) -> Unit,
-    windows: EscalationWindows,
+    alert: AlertSettings,
+    onAlert: (AlertSettings) -> Unit,
     permissions: List<PermissionItem>,
     onBack: () -> Unit,
     modifier: Modifier = Modifier,
@@ -79,13 +85,24 @@ fun SettingsScreen(
             }
             Text("Der Alarm bleibt immer dunkel. Das Widget folgt dem System.", Modifier.padding(4.dp), color = c.muted, fontSize = 13.sp)
 
-            SectionTitle("Zeitfenster")
+            SectionTitle("Alarmzeiten")
             Card {
-                Line("Sichtbar (Vollbild, Vibration)", "${Format.time(windows.visibleFrom)} – ${Format.time(windows.visibleUntil)}")
-                HorizontalDivider(color = c.line)
-                Line("Laut (mit Alarmton)", "${Format.time(windows.loudFrom)} – ${Format.time(windows.visibleUntil)}")
+                Column(Modifier.padding(16.dp)) {
+                    Text("Laut (mit Alarmton) ab", color = c.text, fontSize = 15.sp)
+                    Hours(listOf(16, 17, 18, 19, 20).filter { LocalTime.of(it, 0) < alert.dayEnd }, alert.loudFrom) {
+                        onAlert(alert.copy(loudFrom = it))
+                    }
+                    Text("Tagesgrenze", Modifier.padding(top = 12.dp), color = c.text, fontSize = 15.sp)
+                    Hours(listOf(21, 22, 23).filter { LocalTime.of(it, 0) > alert.loudFrom }, alert.dayEnd) {
+                        onAlert(alert.copy(dayEnd = it))
+                    }
+                }
             }
-            Text("In V1.0 fest eingestellt.", Modifier.padding(4.dp), color = c.muted, fontSize = 13.sp)
+            Text(
+                "Was bis zur Tagesgrenze offen bleibt, gilt als verpasst. Bei „Nicht stören“ bleibt der Alarm still – " +
+                    "außer bei Remindern mit „Auch bei Nicht stören“.",
+                Modifier.padding(4.dp), color = c.muted, fontSize = 13.sp,
+            )
 
             SectionTitle("Berechtigungen")
             Card {
@@ -101,7 +118,7 @@ fun SettingsScreen(
                     }
                 }
             }
-            Text("AVL-Reminder 1.0-Prototyp", Modifier.padding(vertical = 24.dp, horizontal = 4.dp), color = c.muted, fontSize = 12.sp)
+            Text("AVL-Reminder 1.1a-Prototyp", Modifier.padding(vertical = 24.dp, horizontal = 4.dp), color = c.muted, fontSize = 12.sp)
         }
     }
 }
@@ -111,11 +128,11 @@ private fun Card(content: @Composable () -> Unit) {
     Column(Modifier.fillMaxWidth().clip(RoundedCornerShape(16.dp)).background(Avl.colors.surface)) { content() }
 }
 
+@OptIn(ExperimentalLayoutApi::class)
 @Composable
-private fun Line(label: String, value: String) {
-    val c = Avl.colors
-    Row(Modifier.fillMaxWidth().heightIn(min = 52.dp).padding(horizontal = 16.dp), verticalAlignment = Alignment.CenterVertically) {
-        Text(label, Modifier.weight(1f), color = c.text, fontSize = 15.sp)
-        Text(value, color = c.muted, fontSize = 15.sp)
+private fun Hours(hours: List<Int>, selected: LocalTime, onPick: (LocalTime) -> Unit) {
+    val all = (hours.map { LocalTime.of(it, 0) } + selected).distinct().sorted()
+    FlowRow(Modifier.padding(top = 6.dp), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+        all.forEach { t -> FilterChip(t == selected, { onPick(t) }, label = { Text(Format.time(t)) }) }
     }
 }
