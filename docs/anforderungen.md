@@ -1,7 +1,7 @@
 # Anforderungen – avlreminder
 
 > Arbeitsname. AVL = **A**udio / **V**isual / **L**ocation.
-> Stand: 2026-10-25 – fünfzehnter Entwurf (Verschiebe-Knöpfe pro Reminder), wird iterativ verfeinert.
+> Stand: 2026-10-25 – sechzehnter Entwurf (Nachweis ohne Alarm, Text- und Audionachweis), wird iterativ verfeinert.
 
 ## 1. Vision
 
@@ -105,7 +105,7 @@ Alle Anwendungsfälle lassen sich mit denselben Bausteinen beschreiben:
 | **Gelegenheit** | Wann/wo ist es möglich? | Zeitfenster pro Wochentag (Praxis Mo–Fr 8–12), Ort (zuhause), Kombination |
 | **Takt** | Wie oft / bis wann? | einmalig, Frist, fester Kalender-Rhythmus, Intervall ab letzter Erledigung, x-mal pro Zeitraum |
 | **Ziel** | Wie viel? | Zielwert, Minimum, Limit für Minimum |
-| **Nachweis** | Womit belegt? | keiner, Quittieren, Foto, Ort, Audio, Kombination; später Raum oder Taster (Home Assistant) |
+| **Nachweis** | Womit belegt? | keiner, Quittieren, Foto, Text, Ort, Audio, Kombination; später Raum oder Taster (Home Assistant) |
 | **Strenge** | Wie hartnäckig? | Vorlage *locker / normal / streng*: Eskalation, Erinnerungsintervall, Limits für Verschieben |
 | **Teile** | Woraus besteht es? | eine Aufgabe, oder Checkliste mit einzeln verschiebbaren Punkten (Brunnen 1, Brunnen 2, Futterautomat) |
 | **Durchführung** | Wie läuft es ab? | einfach erledigen, oder *Ich starte jetzt* mit Timer und Nachfrage-Muster, oder Ablauf mit Schritten (Training: Sätze, Pausen) |
@@ -204,14 +204,38 @@ Erster Satz, wird mit der Nutzung angepasst: **[V1]**
 - *Auslassen (mit Grund)* – zählt **neutral**
 
 ### 7.5 Erledigung nachweisen
-- **Nachweisart pro Reminder wählbar** (keiner, Foto, Ort, Audio, Kombination) –
-  der Nutzer weiß, was passt. **[V1]**
+- **Nachweisart pro Reminder wählbar** (keiner, Foto, Text, Ort, Audio,
+  Kombination) – der Nutzer weiß, was passt. **[V1]** Nachweise sind
+  **kombinierbar** (z. B. Foto + Text bei den Katzenbrunnen) **[V1.1]**.
+- Nachweise sind wertvoll: Sie bringen einen dazu, sich mit dem Reminder
+  auseinanderzusetzen.
+- N0 **Alarm aus, solange der Nachweis läuft** **[V1.1]**:
+  - Beim Öffnen des Nachweises verstummen Ton und Vibration sofort, die
+    Eskalation pausiert. Benachrichtigung und Uhr zeigen "Nachweis läuft".
+  - **Frist** für den Nachweis, Standard 10 min, pro Reminder einstellbar. Danach
+    eskaliert es weiter – sonst wäre "Nachweis öffnen und weglegen" eine Hintertür.
+  - Abbrechen oder die App verlassen: nach kurzer Schonfrist (ca. 1 min) geht die
+    Eskalation normal weiter.
+- *Erledigt* direkt in der Benachrichtigung bzw. auf der Uhr gibt es nur bei
+  Reminders ohne Foto-, Text- oder Audionachweis.
 - N1 Einfaches Quittieren – für reine Erinnerungen **[V1]**
 - N2 **Foto-Nachweis**, nur mit der App-Kamera aufgenommen (nicht aus der Galerie),
   mit Zeitstempel **[V1]**
 - N4 **Ortsnachweis**: Standort beim Nachweis wird gespeichert und optional gegen
   einen erwarteten Ort geprüft (kombinierbar mit Foto) **[V1]**
-- N7 **Audio-Nachweis**: kurze Sprachaufnahme "was habe ich erledigt" **[V1]**
+- N7 **Audio-Nachweis**: kurze Sprachaufnahme "was habe ich erledigt" **[V1.1]**
+  - **Mindestdauer** pro Reminder einstellbar (z. B. 10 s).
+  - Im Verlauf abspielbar; später Abschrift per lokaler KI (N8), damit man darin
+    suchen kann.
+  - Ab V1.4 auch **von der Uhr** aufnehmbar (Mikrofon der Galaxy Watch) – Nachweis
+    ohne das Handy in die Hand zu nehmen (G10).
+- N11 **Text-Nachweis** **[V1.1]**: aufschreiben, was man getan hat.
+  - **Mindestzahl an Zeichen** pro Reminder einstellbar (z. B. 50); Leerzeichen
+    zählen nicht.
+  - Leichte Prüfung gegen Unsinn: nicht nur ein wiederholtes Zeichen, nicht
+    identisch mit dem letzten Text. Mehr Prüfung später per lokaler KI (N8).
+  - Diktieren über die Tastatur ist erlaubt.
+  - Die Texte machen den Verlauf wertvoll und sind Grundlage für Zahlenwerte (N9).
 - **Dokumentation** zur Erledigung: Freitext + Audio (z. B. Training) **[V1]**
 - **Fehlender Nachweis:** Wird ein geforderter Nachweis nicht erbracht, gilt der
   Reminder als **nicht erfolgreich** und wird so markiert. Kommt vor und ist in
@@ -386,6 +410,7 @@ Guter Hebel für neue Anforderungen; zuerst so viel wie möglich über
     sie erst spiegeln muss.
   - G7 *Ich starte jetzt* und Checklisten-Punkte von der Uhr aus.
   - G8 Kachel (Tile) mit dem nächsten fälligen Reminder bzw. der laufenden Sitzung.
+  - G8b **Audio-Nachweis direkt auf der Uhr** aufnehmen (N7).
   - G9 **Die Uhr ist Fernbedienung und Anzeige, das Handy das Gehirn.** Annahme: Das
     Handy ist immer in der Nähe der Uhr. Timer, Alarme, Abläufe und Daten laufen nur
     auf dem Handy; die Uhr zeigt den Zustand, den das Handy schickt, sendet
@@ -720,6 +745,7 @@ früh am S24 Ultra testen (Spike, siehe Abschnitt 10).
 | 2026-10-25 | Dauer wird getrackt und mit früheren Sitzungen verglichen (schnell fertig werden soll sich lohnen) |
 | 2026-10-25 | Training: nur Dauer und erledigte Schritte/Sätze; Wiederholungen/Gewicht bleiben V2 |
 | 2026-10-25 | Watch: Benachrichtigungen samt Aktionen kommen bereits an – kein eigener Spike nötig |
+| 2026-10-27 | Alarm verstummt, solange der Nachweis läuft (mit Frist, Standard 10 min); Text-Nachweis mit Mindestzeichen und Audio-Nachweis mit Mindestdauer, Nachweise kombinierbar – alles V1.1; Audio von der Uhr in V1.4 |
 | 2026-10-26 | Verschiebe-Knöpfe pro Reminder (1–2, z. B. +10 oder +30/+60 min), V1.1; kurzes Verschieben ohne Limit, aber gezählt, nicht über die Tagesgrenze |
 | 2026-10-26 | Feste Ruhezeit (außerhalb 7–21 Uhr still) entfällt ab V1.1; stattdessen gilt "Nicht stören" des Handys. Pro Reminder "auch bei Nicht stören" für besondere Ereignisse (ersetzt die Aufsteh-Wecker-Ausnahme). Laut weiterhin ab 18 Uhr; verpasst ab Tagesgrenze, Standard 23 Uhr |
 | 2026-10-26 | Vollbild-Alarme ("normal", "streng") erscheinen nicht auf der Uhr → zusätzliche spiegelbare Benachrichtigung in V1.1 (G1b) |
@@ -750,7 +776,9 @@ früh am S24 Ultra testen (Spike, siehe Abschnitt 10).
    - **V1.1:** Ort (Ankunft zuhause), **Checklisten** (7.13), Audio-Nachweis,
      Motivations-Audio, **vorab erledigen** (7.20), **Startklar-Fragen** (7.21, S1–S4),
      **Vollbild-Alarme auf der Uhr** (7.14, G1b), **"Nicht stören" statt Ruhezeiten**
-     und Tagesgrenze (7.3), **Verschiebe-Knöpfe pro Reminder** (7.4)
+     und Tagesgrenze (7.3), **Verschiebe-Knöpfe pro Reminder** (7.4),
+     **Alarm aus während des Nachweises**, **Text-Nachweis**, kombinierbare
+     Nachweise (7.5)
    - **V1.2:** Wochenziele, Fristen mit Ausführungsfenstern, Serien/Joker,
      Statistik, Übersicht morgens/abends, Vorlagen, **Blocker als Aufgaben** (7.21, S5–S8)
    - **V1.3:** **Durchführung mit Timer** und Nachfrage-Muster (7.11), **Abläufe**
