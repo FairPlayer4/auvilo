@@ -1,4 +1,4 @@
-# Design – avlreminder V1.0
+# Design – avlreminder V1.0 und V1.1
 
 > Stand: 2026-10-24 – erster Entwurf. Grundlage: [anforderungen.md](anforderungen.md),
 > Ergebnisse aus [spike.md](spike.md). Mocks: siehe Abschnitt 9.
@@ -213,6 +213,182 @@ Klickbare Mocks: https://claude.ai/artifact/PXA9YgWi8XoHupYnN7Z3cS
 
 ## 10. Offene Punkte
 
-- Wann endet eine Fälligkeit ohne Reaktion bei Remindern außerhalb des Eskalationsfensters
-  (z. B. 02:00)? Vorschlag: am Ende des nächsten Eskalationsfensters.
-- Mehrtagestest abwarten: Samsungs "Schlafende Apps" und Tief-Doze.
+- ~~Ende einer Fälligkeit außerhalb des Eskalationsfensters~~ → ab V1.1 Tagesgrenze (11.3).
+- ~~Mehrtagestest~~ → abgeschlossen 2026-10-27, keine Probleme mit Samsungs
+  Akkumanagement (siehe [spike.md](spike.md)).
+
+## 11. V1.1 – Design-Anpassungen
+
+> Stand: 2026-10-27 – Entwurf. Grundlage: Anforderungen bis "sechzehnter Entwurf"
+> und Spike-Abschluss.
+
+Die Architektur (`:core` rein, DB als einzige Wahrheit, alles Abgeleitete jederzeit
+neu aufbaubar) trägt auch V1.1. Anpassen müssen sich vor allem **Datenmodell**,
+**Eskalation** und **Nachweis**; dazu kommen zwei neue Konzepte: **Ort-Trigger** und
+**Checklisten**.
+
+### 11.1 Schnitt in zwei Pakete
+
+V1.1 ist groß geworden. Damit früh wieder etwas aufs Handy kommt:
+
+| Paket | Inhalt | Warum zuerst / danach |
+|---|---|---|
+| **V1.1a – Alarm und Nachweis** | "Nicht stören" + Tagesgrenze, Verschiebe-Knöpfe, Alarm aus während des Nachweises, Text- und Audio-Nachweis (kombinierbar), vorab erledigen, Vollbild-Alarme auf der Uhr, Startklar-Fragen, Motivations-Audio | Betrifft jeden Tag; erweitert Vorhandenes, keine neuen Grundkonzepte |
+| **V1.1b – Ort und Checklisten** | Ort-Trigger mit Verweildauer und "sonst um 19 Uhr / entfällt", Checklisten | Neue Konzepte (Trigger innerhalb des Tages, teilweise Erledigung über mehrere Tage) |
+
+### 11.2 Datenbank: Migration statt Neuanlage
+
+Auf dem Handy liegen echte Daten. Deshalb ab jetzt:
+- Room-Version steigt pro Paket (V1.1a → 2, V1.1b → 3), jeweils mit **expliziter
+  Migration**; kein `fallbackToDestructiveMigration`.
+- **Migrations-Tests** gegen die exportierten Schemas (`app/schemas/`).
+- Vor der ersten Migration legt die App eine **Kopie der DB im App-Speicher** ab
+  (`filesDir/backup/`). Die Daten verlassen das Handy nicht.
+
+### 11.3 Eskalation: "Nicht stören" statt Zeitfenster
+
+`EscalationWindows` wird zu `AlertSettings` (global, Einstellungen):
+
+| Einstellung | Standard |
+|---|---|
+| `loudFrom` | 18:00 (laut bei *streng*, wenn erlaubt) |
+| `dayEnd` (Tagesgrenze) | 23:00 |
+
+Neuer Port `DeviceStatePort.isDoNotDisturb()` (Android:
+`getCurrentInterruptionFilter() != ALL`). Neues Feld `Reminder.ignoreDnd` ("auch bei
+Nicht stören").
+
+| Strenge | normal | "Nicht stören" aktiv | … und `ignoreDnd` |
+|---|---|---|---|
+| `RELAXED` | Banner + Vibration | still | Banner + Vibration |
+| `NORMAL` | Vollbild + Vibration | still | Vollbild + Vibration |
+| `STRICT` | Vollbild + Vibration, ab 18 Uhr laut | still | wie normal |
+
+- **Runden:** immer im 10-Minuten-Takt (auch während "Nicht stören", dann still); das
+  Warten bis 7 Uhr entfällt. Die erste Runde nach dem Ende alarmiert normal.
+- **Verpasst:** an der Tagesgrenze des Tages, an dem die Fälligkeit liegt; liegt sie
+  nach der Tagesgrenze, an der Tagesgrenze des Folgetags.
+- `ignoreDnd` braucht die Freigabe der App als Ausnahme in "Nicht stören". Die
+  Berechtigungsseite prüft sie (Kanal darf DND umgehen) und warnt, wenn ein Reminder
+  `ignoreDnd` nutzt, die Freigabe aber fehlt.
+
+### 11.4 Nachweis
+
+**Modell:** `ProofType` (eine Art) wird zu `ProofSpec`:
+
+| Feld | Bedeutung |
+|---|---|
+| `kind` | `NONE` / `CONFIRM` / `EVIDENCE` |
+| `photo` | Foto verlangt |
+| `textMinChars` | Text verlangt, Mindestzeichen ohne Leerzeichen; null = kein Text |
+| `audioMinSeconds` | Audio verlangt, Mindestdauer; null = kein Audio |
+| `windowMinutes` | Frist für den Nachweis, Standard 10 |
+
+- Bestehende Daten: `PHOTO` → `EVIDENCE` mit `photo = true`.
+- Tabelle `proof` bekommt `text`; `type` ∈ `PHOTO`, `TEXT`, `AUDIO`. Audio in
+  `filesDir/audio/` (wie Fotos: nur App-Speicher).
+- `Action.Complete` trägt die erbrachten Nachweise. `:core` prüft Text (Mindestzeichen,
+  nicht nur ein wiederholtes Zeichen, nicht identisch mit dem letzten Text) und
+  Audio-Dauer. Fehlt etwas, bleibt wie bisher *ohne Nachweis abschließen* → `NO_PROOF`.
+
+**Alarm aus während des Nachweises (N0):** neues Feld `Occurrence.proofStartedAt`.
+- `Action.StartProof` setzt es; die App stoppt Ton und Vibration; der nächste Alarm
+  liegt bei `proofStartedAt + windowMinutes` (höchstens Tagesgrenze).
+- `Action.AbortProof` (Zurück, App verlassen) → nächster Alarm in 1 min.
+- Events `PROOF_STARTED`, `PROOF_ABORTED` – auch Grundlage für die Statistik.
+- Bewusst ein Feld statt eines eigenen Zustands: Der Zustandsautomat bleibt klein.
+
+### 11.5 Verschiebe-Knöpfe
+
+`Reminder.snoozeMinutes: List<Int>` (1–2 Werte, Standard `[10]`). Benachrichtigung,
+Uhr und Vollbild zeigen dieselben Knöpfe. Ein Knopf, der über die Tagesgrenze führen
+würde, wird ausgeblendet. Kurzes Verschieben bleibt ohne Limit; jedes zählt als
+Event `SNOOZED`.
+
+### 11.6 Vorab erledigen
+
+Der Zustandsautomat erlaubt `Complete` auf `PLANNED` schon heute; die Zeitplan-Regeln
+liefern danach den richtigen nächsten Termin (getestet für *täglich*, *Wochentage*,
+*nach Erledigung*). Neu sind nur:
+- Knopf *Erledigen* in *Später heute* und in der Detailansicht (Nachweis wie im Alarm).
+- Anzeige "vor dem Reminder erledigt" im Verlauf: abgeleitet aus `resolvedAt < dueAt`,
+  kein neues Feld.
+
+### 11.7 Vollbild-Alarme auf der Uhr
+
+Die Vordergrund-Benachrichtigung des Alarms ist "laufend" und wird von Android nicht
+auf die Uhr gespiegelt. Lösung: zusätzlich eine **normale Benachrichtigung** mit
+denselben Aktionen, die mit dem Alarm verschwindet; die laufende bekommt
+`setLocalOnly(true)`. Ob die Uhr dabei pro Runde vibriert und ob am Handy ein doppelter
+Eintrag stört, entscheidet der Gerätetest – notfalls bündelt eine Gruppe beide.
+
+### 11.8 Startklar-Fragen und Motivations-Audio
+
+- Neue Tabelle `prep_answer` (reminderId, question 1–4, text, `unknown`
+  ("weiß ich noch nicht"), at) – **nur anhängen**: Die aktuelle Antwort ist die
+  neueste pro Frage, der Verlauf ergibt sich von selbst.
+- Pflicht bei *Überwindung* beim Anlegen; bestehende Reminder werden beim nächsten
+  Bearbeiten gefragt (Alarme werden nie blockiert).
+- Der Alarm zeigt Ziel (Frage 1), ersten Schritt (Frage 4) und offene Punkte
+  (Fragen 2/3 bzw. *weiß ich noch nicht*).
+- `Reminder.motivationAudio` (Datei in `filesDir/audio/`), im Alarm nur auf Klick
+  abspielbar. Aufnahme-Komponente teilen sich Motivations-Audio und Audio-Nachweis
+  (`MediaRecorder`, AAC). Mikrofon kommt auf die Berechtigungsseite.
+
+### 11.9 Ort-Trigger (V1.1b)
+
+- Neue Tabelle `place` (id, name, lat, lon, radius; Standard 150 m). V1.1b: nur
+  "Zuhause", gesetzt über *aktuellen Standort*.
+- **Der Zeitplan bestimmt den Tag, der Trigger den Moment:** `Reminder.trigger =
+  Arrival(placeId, fallback: LocalTime?, dropIfAway: Boolean)`. Beispiel Training:
+  Mo–Fr, bei Ankunft; sonst 19:00, falls zuhause; sonst entfällt.
+- Neue Ports `GeofencePort` (wie `AlarmPort`: aus der DB abgeleitet, bei jedem Sync
+  neu registriert) und `LocationPort.isAt(place)` für die aktive Prüfung.
+- **Ankunft bestätigen:** Geofence-Übergang *Dwell* mit Verweildauer aus den
+  Einstellungen (Standard 3 min). Vorbeifahren löst so nicht aus.
+- Zur Fallback-Zeit prüft die App den Standort aktiv: da → Alarm, weg → `Action.Drop`
+  → `CLOSED` mit neuer Resolution **`DROPPED`** ("entfallen", neutral).
+- Nach Neustart/Update: Standort aktiv prüfen statt auf die automatische Meldung zu
+  warten (Spike-Erkenntnis).
+- "Wenn ich zuhause bin" (einmalig): Trigger ohne Fallback; ist man beim Anlegen
+  schon da, ist es sofort fällig.
+- Berechtigung *Standort im Hintergrund* kommt auf die Berechtigungsseite.
+
+### 11.10 Checklisten (V1.1b)
+
+- Neue Tabellen `checklist_item` (reminderId, position, title) und `item_progress`
+  (occurrenceId, itemId, doneAt, plannedFor).
+- Eine Occurrence mit Checkliste kann **über mehrere Tage offen** bleiben:
+  `Action.DeferRest(to)` setzt sie mit den Restpunkten auf `PLANNED`; zählt nicht gegen
+  das Verschiebe-Limit, wenn heute mindestens ein Punkt erledigt wurde (C5c).
+- Alle Punkte erledigt → `GOAL`; *Minimum* schließt den Block mit `MINIMUM`.
+- *Nach Erledigung*: Das Intervall zählt ab dem **ersten** erledigten Punkt (neues Feld
+  `Occurrence.firstProgressAt`).
+- Nachweis pro Punkt möglich: `proof.itemId` (optional).
+- Benachrichtigung: Platz für 3 Aktionen → nächster offener Punkt ✓, Verschiebe-Knopf,
+  App öffnen; die volle Liste im Vollbild bzw. in der App.
+- Verteilung beim Start planen (C4, `plannedFor`): wenn das Paket zu groß wird, nach
+  V1.2.
+
+### 11.11 Lebenszyklus V1.1
+
+```
+PLANNED ──► DUE ──► ESCALATING
+  │  ▲        │ ▲       │
+  │  │        │ └ Nachweis läuft (proofStartedAt, Frist) ┘
+  │  └ Später / Verschieben / Rest auf morgen (Checkliste)
+  ├── vorab erledigt ──────────────► DONE (GOAL | MINIMUM | NO_PROOF)
+  ├── Ort: nicht da zur Fallback-Zeit ► CLOSED (DROPPED, neutral)
+  └── … wie V1.0: SKIPPED, MISSED (jetzt an der Tagesgrenze)
+```
+
+### 11.12 Tests
+
+Wie Abschnitt 8, zusätzlich:
+- `:core`: Eskalation mit "Nicht stören" und Tagesgrenze, Nachweis-Prüfung, Frist des
+  Nachweises, vorab erledigen pro Zeitplan-Art, Ort-Trigger inkl. `DROPPED`,
+  Checklisten-Regeln (C5–C5c). Coverage bleibt ≥ 90 %.
+- `:app`: Migrations-Tests 1→2→3.
+- Gerätetest ([geraetetest.md](geraetetest.md)) erweitert um: "Nicht stören" an/aus,
+  Ausnahme-Freigabe, Uhr bei *normal*/*streng*, Nachweis-Frist, Ankunft mit
+  Verweildauer, Vorbeifahren.
