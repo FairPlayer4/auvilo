@@ -125,6 +125,12 @@ Die Einordnung ist vorläufig.
   (z. B. stündlich) **[V1]**
 - T2 **Ort**: Betreten/Verlassen eines Geofence, z. B. "Ankunft zuhause".
   Verzögerung von einigen Minuten ist akzeptabel. **[V1]**
+  - **Ankunft bestätigen** **[V1.1]**: Der Geofence ist eher grob (Spike: Radius
+    150 m, Vorbeifahren am Zuhause zählte als Ankunft). Ankunft erst nach einer
+    kurzen **Verweildauer** werten (einstellbar, z. B. 2–5 min; Wert zeigt sich in
+    der Praxis), optional zusätzlich Verbindung mit dem Heim-WLAN als Bestätigung.
+  - Nach einem Neustart den Standort aktiv prüfen, statt auf die automatische
+    Meldung zu warten.
 - T2b Kombination Ort + Uhrzeit: "bei Ankunft, sonst um 19 Uhr falls schon dort,
   sonst entfällt" **[V1]**
 - T3 Kontext: WLAN, Bluetooth-Gerät (Auto, Kopfhörer), Ladegerät [später]
@@ -662,7 +668,7 @@ vom Nutzer in den Systemeinstellungen erteilt werden.
 | Mechanismus | Machbar? | Android-Mittel | Anmerkung |
 |---|---|---|---|
 | T1 Zeit, exakt | ✅ | `AlarmManager.setAlarmClock()` | Umgeht Doze; exakte Alarme manuell erlauben |
-| T2 Geofence | ✅ (mit Latenz) | Play Services Geofencing | Hintergrund-Standort nötig; Auslösung oft 1–5 min verzögert – laut Nutzer akzeptabel |
+| T2 Geofence | ✅ (mit Latenz) | Play Services Geofencing (Dwell-Übergang für Verweildauer) | Hintergrund-Standort nötig; Auslösung oft 1–5 min verzögert – laut Nutzer akzeptabel; Spike: grob, Vorbeifahren kann auslösen |
 | T2b "um 19 Uhr am Ort?" | ✅ | Alarm + aktueller Geofence-Status / Standortabfrage | |
 | T3 WLAN/BT/Laden | ✅ teilweise | Broadcasts, `ConnectivityManager` Callbacks | Im Hintergrund nur mit Foreground-Service zuverlässig |
 | T4 Kalender | ✅ | `CalendarContract` | Leseberechtigung |
@@ -745,6 +751,7 @@ früh am S24 Ultra testen (Spike, siehe Abschnitt 10).
 | 2026-10-25 | Dauer wird getrackt und mit früheren Sitzungen verglichen (schnell fertig werden soll sich lohnen) |
 | 2026-10-25 | Training: nur Dauer und erledigte Schritte/Sätze; Wiederholungen/Gewicht bleiben V2 |
 | 2026-10-25 | Watch: Benachrichtigungen samt Aktionen kommen bereits an – kein eigener Spike nötig |
+| 2026-10-27 | Spike abgeschlossen: 13/13 Alarme pünktlich, Update + Neustart überstanden, kein Problem mit Samsungs Akkumanagement. Ankunft zuhause in V1.1 erst nach Verweildauer werten (Geofence grob) |
 | 2026-10-27 | Alarm verstummt, solange der Nachweis läuft (mit Frist, Standard 10 min); Text-Nachweis mit Mindestzeichen und Audio-Nachweis mit Mindestdauer, Nachweise kombinierbar – alles V1.1; Audio von der Uhr in V1.4 |
 | 2026-10-26 | Verschiebe-Knöpfe pro Reminder (1–2, z. B. +10 oder +30/+60 min), V1.1; kurzes Verschieben ohne Limit, aber gezählt, nicht über die Tagesgrenze |
 | 2026-10-26 | Feste Ruhezeit (außerhalb 7–21 Uhr still) entfällt ab V1.1; stattdessen gilt "Nicht stören" des Handys. Pro Reminder "auch bei Nicht stören" für besondere Ereignisse (ersetzt die Aufsteh-Wecker-Ausnahme). Laut weiterhin ab 18 Uhr; verpasst ab Tagesgrenze, Standard 23 Uhr |

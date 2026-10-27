@@ -167,6 +167,37 @@ Laufzeit seit 2026-10-24 16:35, knapp 1 Tag, App nicht geöffnet.
 Noch offen bis zum Ende: Samsungs "Schlafende Apps" nach mehreren Tagen ohne
 Öffnen, Ankunft nach längerer Abwesenheit, Akkuverbrauch.
 
+### Abschluss Mehrtagestest (2026-10-27, 07:30)
+
+Laufzeit 2026-10-24 16:35 bis 2026-10-27 07:30, gut 2,5 Tage, App nie geöffnet
+(nur die V1-App benutzt).
+
+| Test | Ergebnis |
+|---|---|
+| Plan-Alarme | ✅ **13 von 13** pünktlich, Verspätung 0–1 s; nächster Alarm (08:00) korrekt im System eingeplant |
+| Nacht (02:00) | ✅ drei Nächte, jeweils Energiesparmodus und "Nicht stören" |
+| Android-Update + Neustart | ✅ 2026-10-26 18:09 (Sicherheitspatch 2026-10-05): Neustart erkannt, Geofence neu registriert, Alarm 19:00 pünktlich |
+| Samsung "Schlafende Apps" | ✅ nichts beobachtet; Standby-Bucket durchgehend `5` (exempted) |
+| Akku | ✅ nicht messbar (0,001 mAh seit letztem Laden; kurzer Messzeitraum, Handy lädt nachts) |
+| Ankunft nach längerer Abwesenheit | ✅ 2026-10-25: Verlassen 13:54, Ankunft 16:50 (Fix 42 s alt) |
+| Verlassen morgens | ✅ mit Verzögerung bis ca. 3 min (Fix 174 s alt) – unkritisch |
+| Geofence-Größe | ⚠️ siehe unten |
+
+**Geofence ist eher grob (Radius 150 m):** Am 2026-10-26 fuhr Kevin auf dem
+Heimweg nah am Zuhause vorbei (gegen 18:09 bis 18:42 im Geofence, ohne
+Ankunftsmeldung direkt nach dem Update-Neustart), dann einkaufen (Verlassen 18:42)
+und kam gegen 19:00 heim (Ankunft 18:59:55). Bei der Prüfung um 19:00 war das Handy
+noch 110 m vom Zuhause-Punkt entfernt, galt aber schon als "zuhause". Folgen für
+V1.1 (siehe Anforderungen T2):
+- Vorbeifahren kann als Ankunft zählen → Ankunft optional erst nach kurzer
+  **Verweildauer** bestätigen; in der Praxis einstellen.
+- Nach einem Neustart den Standort aktiv prüfen, statt sich auf die automatische
+  Meldung beim Registrieren zu verlassen.
+
+**Fazit:** Alarme, Neustart, Update und Samsungs Akkumanagement sind für V1 kein
+Problem. Der Ort-Trigger funktioniert, braucht aber eine Bestätigung der Ankunft.
+Spike abgeschlossen; die App kann deinstalliert werden.
+
 ### Ablauf auf dem Handy (Mehrtagestest)
 1. Installieren: `adb install app-debug.apk`
 2. App öffnen, alle Berechtigungen auf ✅ bringen.
