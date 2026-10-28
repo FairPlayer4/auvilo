@@ -28,7 +28,9 @@ import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
+import com.avlreminder.core.model.ItemDone
 import com.avlreminder.core.model.Occurrence
+import com.avlreminder.core.model.Place
 import com.avlreminder.core.model.PrepAnswer
 import com.avlreminder.core.model.Proof
 import com.avlreminder.core.model.Reminder
@@ -36,6 +38,7 @@ import com.avlreminder.core.rules.AlertSettings
 import com.avlreminder.core.usecases.HistoryDay
 import com.avlreminder.core.usecases.SaveResult
 import com.avlreminder.core.usecases.Today
+import com.avlreminder.data.Settings
 import com.avlreminder.data.ThemeMode
 import com.avlreminder.ui.screens.EditScreen
 import com.avlreminder.ui.screens.HistoryScreen
@@ -62,6 +65,10 @@ data class AppState(
     val alert: AlertSettings = AlertSettings(),
     /** "Nicht stören" is on right now. */
     val doNotDisturb: Boolean = false,
+    val home: Place? = null,
+    val dwellMinutes: Int = Settings.DEFAULT_DWELL,
+    /** Done checklist items per occurrence. */
+    val itemsDone: Map<Long, List<ItemDone>> = emptyMap(),
 )
 
 interface AppActions {
@@ -74,6 +81,9 @@ interface AppActions {
     /** "Vorab erledigen": the alarm screen for an occurrence that is not due yet. */
     fun completeEarly(occurrenceId: Long)
     fun play(path: String)
+    /** Sets "Zuhause" to the current position; false if there was none. */
+    fun setHomeHere(onResult: (Boolean) -> Unit) {}
+    fun setDwellMinutes(minutes: Int) {}
 }
 
 /** Simple navigation without a library: one route string, back goes to "today". */
@@ -142,6 +152,7 @@ fun AvlAppUi(
                             onEdit = { go(Routes.edit(it.id)) },
                             onCompleteEarly = { actions.completeEarly(it.occurrence.id) },
                             doNotDisturb = state.doNotDisturb,
+                            itemsDone = state.itemsDone,
                         )
                     }
                 }
@@ -149,7 +160,7 @@ fun AvlAppUi(
                     Icon(AvlIcons.Settings, "Einstellungen", tint = c.text)
                 }
             }
-            route == Routes.HISTORY -> HistoryScreen(state.history, state.proofs, date, zone, m, onPlay = actions::play)
+            route == Routes.HISTORY -> HistoryScreen(state.history, state.proofs, date, zone, m, onPlay = actions::play, itemsDone = state.itemsDone)
             route == Routes.REMINDERS -> RemindersScreen(
                 reminders = state.reminders, openByReminder = state.openByReminder, today = date, zone = zone,
                 onEdit = { go(Routes.edit(it.id)) },
@@ -159,12 +170,15 @@ fun AvlAppUi(
             route == Routes.SETTINGS -> SettingsScreen(
                 theme = state.theme, onTheme = actions::setTheme, alert = state.alert, onAlert = actions::setAlert,
                 permissions = state.permissions, onBack = { go(Routes.TODAY) }, modifier = m,
+                home = state.home, onSetHome = actions::setHomeHere,
+                dwellMinutes = state.dwellMinutes, onDwell = actions::setDwellMinutes,
             )
             route.startsWith("edit:") -> {
                 val id = route.removePrefix("edit:").toLong()
                 val existing = state.reminders.firstOrNull { it.id == id }
                 val initial = remember(id, existing != null) {
-                    existing?.let { ReminderForm.of(it, date, state.prep[it.id].orEmpty()) } ?: ReminderForm.new(now, zone)
+                    existing?.let { ReminderForm.of(it, date, state.prep[it.id].orEmpty(), state.home?.id) }
+                        ?: ReminderForm.new(now, zone, state.home?.id)
                 }
                 EditScreen(
                     initial = initial,

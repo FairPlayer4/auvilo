@@ -40,8 +40,10 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.avlreminder.core.model.Character
+import com.avlreminder.core.model.ChecklistItem
 import com.avlreminder.core.model.ProofKind
 import com.avlreminder.core.model.Strictness
+import com.avlreminder.core.model.WhenAway
 import com.avlreminder.core.rules.Prep
 import com.avlreminder.ui.AvlIcons
 import com.avlreminder.ui.Format
@@ -91,10 +93,14 @@ fun EditScreen(
 
             SectionTitle("Wann?")
             Choice(
-                listOf(ScheduleKind.ONCE to "Einmalig", ScheduleKind.DAILY to "Täglich", ScheduleKind.WEEKDAYS to "Wochentage", ScheduleKind.AFTER_DONE to "Nach Erledigung"),
+                listOf(
+                    ScheduleKind.ONCE to "Einmalig", ScheduleKind.DAILY to "Täglich", ScheduleKind.WEEKDAYS to "Wochentage",
+                    ScheduleKind.AFTER_DONE to "Nach Erledigung", ScheduleKind.ON_ARRIVAL to "Wenn ich zuhause bin",
+                ),
                 form.kind,
             ) { form = form.copy(kind = it) }
             ScheduleDetail(form) { form = it }
+            PlaceSection(form) { form = it }
 
             SectionTitle("Wie streng?")
             Choice(
@@ -113,6 +119,9 @@ fun EditScreen(
             OutlinedTextField(form.goal, { form = form.copy(goal = it) }, Modifier.fillMaxWidth(), placeholder = { Text("z. B. 45 min") }, singleLine = true)
             SectionTitle("Minimum")
             OutlinedTextField(form.minimum, { form = form.copy(minimum = it) }, Modifier.fillMaxWidth(), placeholder = { Text("leer = kein Minimum") }, singleLine = true)
+
+            SectionTitle("Checkliste")
+            ChecklistSection(form.checklist) { form = form.copy(checklist = it) }
 
             SectionTitle("Nachweis")
             ProofSection(form) { form = it }
@@ -283,6 +292,44 @@ private fun <T> Choice(options: List<Pair<T, String>>, selected: T, color: @Comp
     }
 }
 
+/** Arrival at home as an earlier trigger; the time stays the fallback. */
+@Composable
+private fun PlaceSection(form: ReminderForm, onChange: (ReminderForm) -> Unit) {
+    val c = Avl.colors
+    if (form.kind != ScheduleKind.ON_ARRIVAL) {
+        Choice(listOf(false to "Nur Uhrzeit", true to "Bei Ankunft zuhause"), form.atHome) {
+            onChange(form.copy(atHome = it))
+        }
+        if (form.atHome) {
+            Text("Bist du vor der Uhrzeit zuhause, klingelt es dann. Um ${Format.time(form.time)} noch nicht zuhause:", Modifier.padding(top = 6.dp), color = c.muted, fontSize = 13.sp)
+            Choice(listOf(WhenAway.DROP to "entfällt", WhenAway.RING to "trotzdem klingeln"), form.whenAway) { onChange(form.copy(whenAway = it)) }
+        }
+    }
+    if ((form.atHome || form.kind == ScheduleKind.ON_ARRIVAL) && form.homeId == null) {
+        Text("Zuhause ist noch nicht festgelegt – in den Einstellungen.", Modifier.padding(top = 6.dp), color = c.strict, fontSize = 13.sp)
+    }
+}
+
+/** Up to 20 items; each is done on its own in the alarm, the last one completes the reminder. */
+@Composable
+private fun ChecklistSection(items: List<ChecklistItem>, onChange: (List<ChecklistItem>) -> Unit) {
+    val c = Avl.colors
+    if (items.isEmpty()) Text("Keine – der Reminder ist eine Aufgabe.", color = c.muted, fontSize = 13.sp)
+    items.forEachIndexed { i, item ->
+        Row(verticalAlignment = androidx.compose.ui.Alignment.CenterVertically) {
+            OutlinedTextField(
+                item.title, { t -> onChange(items.toMutableList().also { it[i] = item.copy(title = t) }) },
+                Modifier.weight(1f).padding(vertical = 2.dp).testTag("item$i"), singleLine = true,
+                placeholder = { Text("Punkt ${i + 1}") },
+            )
+            IconButton(onClick = { onChange(items.toMutableList().also { it.removeAt(i) }) }) { Text("✕", color = c.muted) }
+        }
+    }
+    if (items.size < 20) {
+        TextButton(onClick = { onChange(items + ChecklistItem(title = "")) }) { Text("+ Punkt", color = c.accent) }
+    }
+}
+
 /** Limit as chips; null means unlimited. */
 @Composable
 private fun LimitChoice(values: List<Int>, selected: Int?, onPick: (Int?) -> Unit) {
@@ -323,8 +370,14 @@ private fun ScheduleDetail(form: ReminderForm, onChange: (ReminderForm) -> Unit)
                 OutlinedButton(onClick = { pickDate = true }, Modifier.padding(top = 8.dp)) { Text("erstmals am ${Format.date(form.date)}") }
             }
             ScheduleKind.DAILY -> {}
+            ScheduleKind.ON_ARRIVAL -> Text(
+                "Klingelt, sobald du ein paar Minuten zuhause bist – einmalig. Bist du beim Speichern schon da, sofort.",
+                color = c.muted, fontSize = 13.sp,
+            )
         }
-        OutlinedButton(onClick = { pickTime = true }, Modifier.padding(top = 4.dp).testTag("time")) { Text("um ${Format.time(form.time)}") }
+        if (form.kind != ScheduleKind.ON_ARRIVAL) {
+            OutlinedButton(onClick = { pickTime = true }, Modifier.padding(top = 4.dp).testTag("time")) { Text("um ${Format.time(form.time)}") }
+        }
     }
 
     if (pickTime) {

@@ -1,4 +1,4 @@
-# Gerätetest – Prototyp V1.0 / V1.1a
+# Gerätetest – Prototyp V1.0 / V1.1a / V1.1b
 
 > Ergänzt die automatischen Tests (`:core` JUnit + Kover, `:app` Robolectric/Compose).
 > Alles hier braucht das echte Gerät. Reihenfolge so gewählt, dass nichts nachts klingelt.
@@ -56,3 +56,26 @@ Vorher: Version 1.0 mit echten Daten installiert lassen; 1.1a darüber installie
 | 37 | Startklar mit "weiß ich noch nicht" und Frage 3 nicht "Ja, sofort" | Alarm zeigt "Offen"; Ziel und erster Schritt erscheinen als Karten |
 | 38 | Botschaft an mich aufnehmen, im Alarm "▶ abspielen" | spielt nur auf Tippen, nicht automatisch |
 | 39 | Einstellungen: laut ab 19:00, Tagesgrenze 22:00 | *streng* um 18:30 ohne Ton; um 22:00 offen → verpasst |
+
+## V1.1b
+
+Vorher: 1.1a mit echten Daten installiert lassen; 1.1b darüber installieren. Einstellungen → Zuhause → "Aktuellen Standort als Zuhause" (zuhause ausführen), Standort zuerst "Bei Nutzung", dann "Immer erlauben".
+
+| # | Test | Erwartung |
+|---|---|---|
+| 40 | Erster Start nach dem Update | Reminder, Verlauf und Nachweise sind da; Backup `avlreminder-v2-….db` (wie Test 21) |
+| 41 | Reminder mit "Bei Ankunft zuhause" ohne "Immer erlauben" | Banner "Berechtigungen fehlen"; Eintrag "Standort „Immer erlauben“" |
+| 42 | Training Mo–Fr 19:00, "Bei Ankunft zuhause, sonst entfällt"; vor 19:00 heimkommen | Alarm nach der Verweildauer (Standard 3 min), nicht schon beim Ankommen |
+| 43 | Am Zuhause vorbeifahren (unter der Verweildauer) | kein Alarm |
+| 44 | Wie 42, um 19:00 nicht zuhause | kein Alarm; Verlauf "entfallen" (neutral); nächster Termin morgen |
+| 45 | Wie 44 mit "trotzdem klingeln" | Alarm um 19:00 |
+| 46 | "Wenn ich zuhause bin" anlegen, während man zuhause ist | klingelt sofort (bis ca. 8 s) |
+| 47 | "Wenn ich zuhause bin" unterwegs anlegen | steht unter "Heute → Wenn du zuhause bist"; klingelt nach Heimkehr + Verweildauer |
+| 48 | Handy neu starten, während ein "Wenn ich zuhause bin" wartet und man zuhause ist | klingelt kurz nach dem Start |
+| 49 | Checkliste (3 Punkte, ohne Nachweis): Benachrichtigung "✓ Punkt 1" | Alarm still; stille Benachrichtigung "✓ Punkt 2" erscheint |
+| 50 | Checkliste im Vollbild: einen Punkt abhaken | Haken erscheint, Alarm still, Seite bleibt offen; "Heute" zeigt "1 von 3" |
+| 51 | Checkliste mit Foto-Nachweis: Punkt antippen | Nachweis-Seite für diesen Punkt; danach zurück in der Liste |
+| 52 | Nach einem Punkt "Rest auf morgen" | kommt morgen zur gleichen Uhrzeit wieder; zählt nicht als Verschieben |
+| 53 | Ein Punkt erledigt, Rest bis zur Tagesgrenze offen | nicht verpasst; Rest morgen zur gleichen Uhrzeit |
+| 54 | Letzten Punkt abhaken | erledigt; Verlauf zeigt die Uhrzeit jedes Punkts |
+| 55 | Punkte bearbeiten (umbenennen, umsortieren, einen löschen) | erledigte Punkte bleiben erledigt |

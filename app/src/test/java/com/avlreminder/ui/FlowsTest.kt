@@ -12,6 +12,7 @@ import androidx.compose.ui.test.performClick
 import androidx.compose.ui.test.performScrollTo
 import androidx.compose.ui.test.performTextInput
 import androidx.test.ext.junit.runners.AndroidJUnit4
+import com.avlreminder.core.model.ChecklistItem
 import com.avlreminder.core.model.Occurrence
 import com.avlreminder.core.model.OccurrenceState
 import com.avlreminder.core.model.PrepAnswer
@@ -174,6 +175,59 @@ class FlowsTest {
         compose.onNodeWithText("Fake-Aufnahme").performScrollTo().performClick()
         compose.onNodeWithText("Abschließen").performScrollTo().assertIsEnabled().performClick()
         assertEquals(Evidence(text = "Brunnen gereinigt, Filter neu", audioPath = "/audio/a.m4a", audioSeconds = 12), completed)
+    }
+
+    @Test
+    fun checklistItemsAreDoneOneByOneAndTheRestCanWait() {
+        val checked = mutableListOf<Pair<Long, Evidence>>()
+        var deferred: Instant? = null
+        val list = strict.copy(
+            proof = ProofSpec.CONFIRM,
+            checklist = listOf(ChecklistItem(1, "Brunnen 1"), ChecklistItem(2, "Brunnen 2"), ChecklistItem(3, "Futterautomat")),
+        )
+        compose.setContent {
+            AvlTheme(dark = true) {
+                AlarmContent(
+                    ui = alarmUi(reminder = list).copy(done = setOf(1L), canDeferRest = true), now = now, zone = zone,
+                    onComplete = { _, _, _ -> }, onSnooze = {}, onPostpone = {}, onSkip = {}, onStartProof = {}, onAbortProof = {},
+                    devices = devices,
+                    onCheckItem = { id, e -> checked += id to e },
+                    onDeferRest = { deferred = it },
+                )
+            }
+        }
+        compose.onNodeWithText("Checkliste · 1 von 3").assertExists()
+        compose.onNodeWithText("✓ Brunnen 1").assertExists()
+        compose.onNodeWithText("Alles erledigt").assertExists()
+        compose.onNodeWithTag("item2").performScrollTo().performClick()
+        assertEquals(listOf(2L to Evidence()), checked)
+        compose.onNodeWithText("Rest auf morgen 18:00").performScrollTo().performClick()
+        assertEquals(Instant.parse("2026-10-25T17:00:00Z"), deferred)
+    }
+
+    @Test
+    fun checklistItemWithProofOpensTheProofForThatItem() {
+        var checked: Pair<Long, Evidence>? = null
+        var started = 0
+        val list = strict.copy(checklist = listOf(ChecklistItem(1, "Brunnen 1"), ChecklistItem(2, "Brunnen 2")))
+        compose.setContent {
+            AvlTheme(dark = true) {
+                AlarmContent(
+                    ui = alarmUi(reminder = list), now = now, zone = zone,
+                    onComplete = { _, _, _ -> }, onSnooze = {}, onPostpone = {}, onSkip = {},
+                    onStartProof = { started++ }, onAbortProof = {}, devices = devices,
+                    onCheckItem = { id, e -> checked = id to e },
+                )
+            }
+        }
+        compose.onNodeWithTag("item2").performScrollTo().performClick()
+        assertEquals(1, started)
+        compose.onNodeWithText("Katzenbrunnen reinigen · Brunnen 2", substring = true).assertExists()
+        compose.onNodeWithText("Fake-Foto").performClick()
+        compose.onNodeWithText("Abschließen").performScrollTo().performClick()
+        assertEquals(2L to Evidence(photoPath = "/proofs/x.jpg"), checked)
+        // Back on the checklist for the next item.
+        compose.onNodeWithText("Alles erledigt").assertExists()
     }
 
     @Test

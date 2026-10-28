@@ -1,11 +1,14 @@
 package com.avlreminder.ui.screens
 
+import com.avlreminder.core.model.Arrival
 import com.avlreminder.core.model.Character
+import com.avlreminder.core.model.ChecklistItem
 import com.avlreminder.core.model.PrepAnswer
 import com.avlreminder.core.model.ProofSpec
 import com.avlreminder.core.model.Reminder
 import com.avlreminder.core.model.Schedule
 import com.avlreminder.core.model.Strictness
+import com.avlreminder.core.model.WhenAway
 import com.avlreminder.core.rules.Presets
 import java.time.DayOfWeek
 import java.time.Instant
@@ -15,7 +18,7 @@ import java.time.LocalTime
 import java.time.ZoneId
 import java.time.temporal.ChronoUnit
 
-enum class ScheduleKind { ONCE, DAILY, WEEKDAYS, AFTER_DONE }
+enum class ScheduleKind { ONCE, DAILY, WEEKDAYS, AFTER_DONE, ON_ARRIVAL }
 
 /** One "Startklar" answer while editing. */
 data class PrepDraft(val text: String = "", val unknown: Boolean = false) {
@@ -46,6 +49,13 @@ data class ReminderForm(
     val motivationAudio: String? = null,
     /** Question 1..4 → answer; only answered ones are saved. */
     val prep: Map<Int, PrepDraft> = emptyMap(),
+    /** Ring on arrival at home instead of only at the time. */
+    val atHome: Boolean = false,
+    val whenAway: WhenAway = WhenAway.DROP,
+    /** Id of the "Zuhause" place, if it is set. */
+    val homeId: Long? = null,
+    /** Items keep their id while editing; empty ones are dropped on save. */
+    val checklist: List<ChecklistItem> = emptyList(),
 ) {
     /** Picking a strictness resets proof and limits to the preset; each can be changed afterwards. */
     fun withStrictness(s: Strictness): ReminderForm {
@@ -59,6 +69,15 @@ data class ReminderForm(
             ScheduleKind.DAILY -> Schedule.Daily(time)
             ScheduleKind.WEEKDAYS -> if (days.isEmpty()) null else Schedule.Weekdays(time, days)
             ScheduleKind.AFTER_DONE -> if (intervalDays < 1) null else Schedule.AfterDone(intervalDays, time, firstOn = date)
+            ScheduleKind.ON_ARRIVAL -> Schedule.OnArrival
+        }
+
+    /** Waiting for the arrival needs no time; the arrival option of the other kinds is then implied. */
+    val arrival: Arrival?
+        get() = when {
+            kind == ScheduleKind.ON_ARRIVAL -> Arrival(homeId ?: 0, WhenAway.RING)
+            atHome -> Arrival(homeId ?: 0, whenAway)
+            else -> null
         }
 
     /** The reminder to save, or null if the schedule is incomplete. */
@@ -83,6 +102,9 @@ data class ReminderForm(
             ignoreDnd = ignoreDnd,
             snoozeMinutes = snoozeMinutes,
             motivationAudio = motivationAudio,
+            // Without a place the validation says what is missing.
+            arrival = arrival?.takeIf { homeId != null },
+            checklist = checklist.map { it.copy(title = it.title.trim()) }.filter { it.title.isNotEmpty() },
         )
     }
 
@@ -95,12 +117,12 @@ data class ReminderForm(
         val WORKDAYS = setOf(DayOfWeek.MONDAY, DayOfWeek.TUESDAY, DayOfWeek.WEDNESDAY, DayOfWeek.THURSDAY, DayOfWeek.FRIDAY)
 
         /** A new reminder: next full hour today. */
-        fun new(now: Instant, zone: ZoneId): ReminderForm {
+        fun new(now: Instant, zone: ZoneId, homeId: Long? = null): ReminderForm {
             val next = now.atZone(zone).toLocalDateTime().truncatedTo(ChronoUnit.HOURS).plusHours(1)
-            return ReminderForm(date = next.toLocalDate(), time = next.toLocalTime())
+            return ReminderForm(date = next.toLocalDate(), time = next.toLocalTime(), homeId = homeId)
         }
 
-        fun of(r: Reminder, today: LocalDate, prep: Map<Int, PrepAnswer> = emptyMap()): ReminderForm {
+        fun of(r: Reminder, today: LocalDate, prep: Map<Int, PrepAnswer> = emptyMap(), homeId: Long? = null): ReminderForm {
             val base = ReminderForm(
                 id = r.id, createdAt = r.createdAt, active = r.active, title = r.title, why = r.why.orEmpty(),
                 character = r.character, strictness = r.strictness, date = today, time = LocalTime.of(18, 0),
@@ -108,12 +130,17 @@ data class ReminderForm(
                 postponeLimit = r.postponeLimit, minimumLimitPerWeek = r.minimumLimitPerWeek,
                 ignoreDnd = r.ignoreDnd, snoozeMinutes = r.snoozeMinutes, motivationAudio = r.motivationAudio,
                 prep = prep.mapValues { (_, a) -> PrepDraft(a.text.orEmpty(), a.unknown) },
+                atHome = r.arrival != null && r.schedule != Schedule.OnArrival,
+                whenAway = r.arrival?.whenAway ?: WhenAway.DROP,
+                homeId = r.arrival?.placeId ?: homeId,
+                checklist = r.checklist,
             )
             return when (val s = r.schedule) {
                 is Schedule.Once -> base.copy(kind = ScheduleKind.ONCE, date = s.at.toLocalDate(), time = s.at.toLocalTime())
                 is Schedule.Daily -> base.copy(kind = ScheduleKind.DAILY, time = s.time)
                 is Schedule.Weekdays -> base.copy(kind = ScheduleKind.WEEKDAYS, time = s.time, days = s.days)
                 is Schedule.AfterDone -> base.copy(kind = ScheduleKind.AFTER_DONE, time = s.time, intervalDays = s.intervalDays, date = s.firstOn ?: today)
+                Schedule.OnArrival -> base.copy(kind = ScheduleKind.ON_ARRIVAL)
             }
         }
     }

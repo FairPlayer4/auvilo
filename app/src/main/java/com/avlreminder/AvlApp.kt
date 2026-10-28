@@ -7,12 +7,15 @@ import androidx.glance.appwidget.updateAll
 import com.avlreminder.alarm.AndroidAlarmPort
 import com.avlreminder.alarm.Notifications
 import com.avlreminder.alarm.Ringer
+import com.avlreminder.core.model.Place
 import com.avlreminder.core.ports.DeviceStatePort
 import com.avlreminder.core.rules.AlertSettings
 import com.avlreminder.core.usecases.ReminderEngine
 import com.avlreminder.data.AvlDatabase
 import com.avlreminder.data.RoomReminderRepository
 import com.avlreminder.data.Settings
+import com.avlreminder.location.AndroidGeofences
+import com.avlreminder.location.AndroidLocation
 import com.avlreminder.widget.AvlWidget
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
@@ -62,7 +65,14 @@ class AppGraph(private val context: Context) {
     val settings = Settings(context)
     val scope = CoroutineScope(SupervisorJob() + Dispatchers.Default)
     @Volatile private var alert = AlertSettings()
-    private val engine = ReminderEngine(repository, AndroidAlarmPort(context), SystemZoneClock, AndroidDeviceState(context)) { alert }
+    @Volatile private var dwell = Settings.DEFAULT_DWELL
+    val location = AndroidLocation(context)
+    private val engine = ReminderEngine(
+        repository, AndroidAlarmPort(context), SystemZoneClock, AndroidDeviceState(context),
+        settings = { alert },
+        geofences = AndroidGeofences(context) { dwell },
+        location = location,
+    )
     private val mutex = Mutex()
 
     /** Runs use cases one at a time and refreshes the widget afterwards. */
@@ -70,6 +80,7 @@ class AppGraph(private val context: Context) {
         val result = mutex.withLock {
             // Read fresh each time: an alarm may start the process before anything else loaded the settings.
             alert = settings.alert.first()
+            dwell = settings.dwellMinutes.first()
             block(engine)
         }
         scope.launch { runCatching { AvlWidget().updateAll(context) } }
@@ -79,5 +90,21 @@ class AppGraph(private val context: Context) {
     /** Rebuilds all alarms and rings what was missed. */
     suspend fun syncAndRing() {
         withEngine { it.sync() }.forEach { Ringer.ring(context, it) }
+    }
+
+    /** Rings reminders that wait for an arrival when already there (geofences report only entering). */
+    suspend fun checkPlacesAndRing() {
+        withEngine { it.checkPlaces() }.forEach { Ringer.ring(context, it) }
+    }
+
+    /** Sets "Zuhause" to the current position; false if there is no position. */
+    suspend fun setHomeHere(): Boolean {
+        val here = location.current() ?: return false
+        withEngine { e ->
+            val home = e.places().firstOrNull()
+            e.savePlace(Place(id = home?.id ?: 0, name = "Zuhause", lat = here.latitude, lon = here.longitude))
+        }
+        checkPlacesAndRing()
+        return true
     }
 }

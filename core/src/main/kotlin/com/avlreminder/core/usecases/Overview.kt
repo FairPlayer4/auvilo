@@ -3,6 +3,7 @@ package com.avlreminder.core.usecases
 import com.avlreminder.core.model.Occurrence
 import com.avlreminder.core.model.OccurrenceState
 import com.avlreminder.core.model.Reminder
+import com.avlreminder.core.model.Schedule
 import java.time.Instant
 import java.time.LocalDate
 import java.time.ZoneId
@@ -19,6 +20,8 @@ data class Today(
     val resolved: List<Entry>,
     /** Planned for after today, soonest first (for the reminder list and the widget). */
     val upcoming: List<Entry>,
+    /** Waiting for an arrival without a time ("wenn ich zuhause bin"), oldest first. */
+    val waiting: List<Entry> = emptyList(),
 )
 
 /** One day in the history. */
@@ -34,7 +37,8 @@ object Overview {
 
         val open = entries.filter { it.occurrence.isOpen && it.reminder.active }
         val fired = open.filter { it.occurrence.state != OccurrenceState.PLANNED }
-        val planned = open.filter { it.occurrence.state == OccurrenceState.PLANNED }
+        val (waiting, planned) = open.filter { it.occurrence.state == OccurrenceState.PLANNED }
+            .partition { it.reminder.schedule == Schedule.OnArrival }
         return Today(
             dueNow = fired.sortedBy { it.occurrence.currentAt },
             laterToday = planned.filter { it.occurrence.currentAt.isToday() }.sortedBy { it.occurrence.currentAt },
@@ -42,6 +46,7 @@ object Overview {
                 .filter { !it.occurrence.isOpen && it.occurrence.resolvedAt?.isToday() == true }
                 .sortedByDescending { it.occurrence.resolvedAt },
             upcoming = planned.filter { !it.occurrence.currentAt.isToday() }.sortedBy { it.occurrence.currentAt },
+            waiting = waiting.sortedBy { it.occurrence.currentAt },
         )
     }
 

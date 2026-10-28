@@ -3,10 +3,13 @@ package com.avlreminder.ui
 import android.app.Application
 import androidx.lifecycle.AndroidViewModel
 import androidx.lifecycle.viewModelScope
+import com.avlreminder.core.model.ItemDone
 import com.avlreminder.core.model.Occurrence
+import com.avlreminder.core.model.Place
 import com.avlreminder.core.model.PrepAnswer
 import com.avlreminder.core.model.Proof
 import com.avlreminder.core.model.Reminder
+import com.avlreminder.core.model.Schedule
 import com.avlreminder.core.rules.AlertSettings
 import com.avlreminder.core.rules.Prep
 import com.avlreminder.core.usecases.HistoryDay
@@ -45,7 +48,24 @@ class AppViewModel(app: Application) : AndroidViewModel(app) {
     private fun <T> state(initial: T, flow: Flow<T>): StateFlow<T> =
         flow.stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), initial)
 
-    val reminders: StateFlow<List<Reminder>> = state(emptyList(), dao.observeReminders().map { l -> l.map { it.toModel() } })
+    val reminders: StateFlow<List<Reminder>> = state(
+        emptyList(),
+        combine(dao.observeReminders(), dao.observeItems()) { l, items ->
+            val byReminder = items.groupBy { it.reminderId }
+            l.map { it.toModel(byReminder[it.id].orEmpty()) }
+        },
+    )
+
+    /** V1.1b knows one place, "Zuhause". */
+    val home: StateFlow<Place?> = state(null, dao.observePlaces().map { l -> l.firstOrNull()?.toModel() })
+
+    /** Done checklist items per occurrence. */
+    val itemsDone: StateFlow<Map<Long, List<ItemDone>>> = state(
+        emptyMap(),
+        dao.observeItemsDone().map { l -> l.map { it.toModel() }.groupBy { it.occurrenceId } },
+    )
+
+    val dwellMinutes: StateFlow<Int> = state(com.avlreminder.data.Settings.DEFAULT_DWELL, graph.settings.dwellMinutes)
 
     private val open = dao.observeOpenOccurrences().map { l -> l.map { it.toModel() } }
     private val resolved = dao.observeResolved().map { l -> l.map { it.toModel() } }
@@ -92,7 +112,26 @@ class AppViewModel(app: Application) : AndroidViewModel(app) {
     }
 
     fun save(reminder: Reminder, prep: List<PrepAnswer>, onResult: (SaveResult) -> Unit) {
-        viewModelScope.launch { onResult(graph.withEngine { it.save(reminder, prep) }) }
+        viewModelScope.launch {
+            val result = graph.withEngine { it.save(reminder, prep) }
+            onResult(result)
+            // Already home when saving "wenn ich zuhause bin": the geofence would not report it.
+            if (result is SaveResult.Saved && reminder.schedule == Schedule.OnArrival) {
+                graph.scope.launch { graph.checkPlacesAndRing() }
+            }
+        }
+    }
+
+    fun setHomeHere(onResult: (Boolean) -> Unit) {
+        viewModelScope.launch { onResult(graph.setHomeHere()) }
+    }
+
+    /** The geofences are registered again with the new time. */
+    fun setDwellMinutes(minutes: Int) {
+        viewModelScope.launch {
+            graph.settings.setDwellMinutes(minutes)
+            graph.syncAndRing()
+        }
     }
 
     fun delete(reminderId: Long) {

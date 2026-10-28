@@ -23,6 +23,7 @@ class SystemReceiver : BroadcastReceiver() {
         graph.scope.launch {
             try {
                 graph.syncAndRing()
+                graph.checkPlacesAndRing()
             } finally {
                 result.finish()
             }

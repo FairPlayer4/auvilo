@@ -7,8 +7,11 @@ import android.content.Context
 import android.content.Intent
 import androidx.core.net.toUri
 import com.avlreminder.core.ports.AlarmKind
+import com.avlreminder.core.model.OccurrenceState
 import com.avlreminder.core.ports.AlarmPort
 import com.avlreminder.core.rules.Action
+import com.avlreminder.core.rules.Evidence
+import com.avlreminder.core.rules.TransitionResult
 import com.avlreminder.graph
 import com.avlreminder.ui.MainActivity
 import kotlinx.coroutines.launch
@@ -69,21 +72,30 @@ class AlarmReceiver : BroadcastReceiver() {
     }
 }
 
-/** Buttons in the notification: done (without photo, text or audio) and snooze. */
+/** Buttons in the notification: done or the next checklist item (without photo, text or audio) and snooze. */
 class ActionReceiver : BroadcastReceiver() {
     override fun onReceive(context: Context, intent: Intent) {
         val id = intent.getLongExtra(AndroidAlarmPort.EXTRA_OCCURRENCE, -1)
         val action = when (intent.action) {
             ACTION_DONE -> Action.Complete(minimumOnly = false)
             ACTION_SNOOZE -> Action.Snooze(Duration.ofMinutes(intent.getIntExtra(EXTRA_MINUTES, 10).toLong()))
+            ACTION_CHECK -> Action.CheckItem(intent.getLongExtra(EXTRA_ITEM, -1), Evidence())
             else -> return
         }
         val result = goAsync()
         val graph = context.graph
         graph.scope.launch {
             try {
-                graph.withEngine { it.act(id, action) }
+                val next = graph.withEngine { e ->
+                    val o = (e.act(id, action) as? TransitionResult.Ok)?.occurrence
+                    // Still open after an item: offer the next one, quietly.
+                    if (action !is Action.CheckItem || o == null || o.state != OccurrenceState.DUE) return@withEngine null
+                    val r = graph.repository.reminder(o.reminderId) ?: return@withEngine null
+                    val done = e.itemsDone(o.id).map { it.itemId }.toSet()
+                    AlarmInfo.of(r, o, e.snoozeOptions(r, o), r.checklist.firstOrNull { it.id !in done })
+                }
                 Ringer.dismiss(context, id)
+                next?.let { Notifications.show(context, it, quiet = true) }
             } finally {
                 result.finish()
             }
@@ -93,7 +105,21 @@ class ActionReceiver : BroadcastReceiver() {
     companion object {
         const val ACTION_DONE = "com.avlreminder.DONE"
         const val ACTION_SNOOZE = "com.avlreminder.SNOOZE"
+        const val ACTION_CHECK = "com.avlreminder.CHECK"
         private const val EXTRA_MINUTES = "minutes"
+        private const val EXTRA_ITEM = "item"
+
+        /** Ticks off one checklist item; the item is part of the data URI so each stays apart. */
+        fun check(context: Context, occurrenceId: Long, itemId: Long): PendingIntent = PendingIntent.getBroadcast(
+            context,
+            0,
+            Intent(context, ActionReceiver::class.java)
+                .setAction(ACTION_CHECK)
+                .setData("avl://occurrence/$occurrenceId/item/$itemId".toUri())
+                .putExtra(AndroidAlarmPort.EXTRA_OCCURRENCE, occurrenceId)
+                .putExtra(EXTRA_ITEM, itemId),
+            PendingIntent.FLAG_IMMUTABLE or PendingIntent.FLAG_UPDATE_CURRENT,
+        )
 
         /** One snooze button; the minutes are part of the data URI so two buttons stay apart. */
         fun snooze(context: Context, occurrenceId: Long, minutes: Int): PendingIntent = PendingIntent.getBroadcast(

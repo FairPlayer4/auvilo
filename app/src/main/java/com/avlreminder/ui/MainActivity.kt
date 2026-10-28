@@ -30,6 +30,8 @@ import com.avlreminder.core.model.Reminder
 import com.avlreminder.core.rules.AlertSettings
 import com.avlreminder.core.usecases.SaveResult
 import com.avlreminder.data.ThemeMode
+import com.avlreminder.location.hasBackgroundLocation
+import com.avlreminder.location.hasLocation
 import com.avlreminder.ui.screens.PermissionItem
 import com.avlreminder.ui.theme.AvlTheme
 import com.avlreminder.ui.theme.isDark
@@ -52,6 +54,9 @@ class MainActivity : ComponentActivity() {
     private var startRoute by mutableStateOf(Routes.TODAY)
     private var launch by mutableIntStateOf(0)
 
+    /** Precise position first; "Immer erlauben" can only be asked for afterwards. */
+    private val requestLocation = registerForActivityResult(ActivityResultContracts.RequestMultiplePermissions()) { refreshPermissions() }
+
     private val requestPermission = registerForActivityResult(ActivityResultContracts.RequestPermission()) {
         refreshPermissions()
     }
@@ -69,6 +74,9 @@ class MainActivity : ComponentActivity() {
             val proofs by vm.proofs.collectAsStateWithLifecycle()
             val prep by vm.prep.collectAsStateWithLifecycle()
             val alert by vm.alert.collectAsStateWithLifecycle()
+            val home by vm.home.collectAsStateWithLifecycle()
+            val dwell by vm.dwellMinutes.collectAsStateWithLifecycle()
+            val itemsDone by vm.itemsDone.collectAsStateWithLifecycle()
             var now by androidx.compose.runtime.remember { mutableStateOf(Instant.now()) }
             var dnd by androidx.compose.runtime.remember { mutableStateOf(device.isDoNotDisturb()) }
             LaunchedEffect(Unit) {
@@ -84,7 +92,10 @@ class MainActivity : ComponentActivity() {
                 // A new key restarts the UI on the requested route (e.g. widget tap while the app is open).
                 androidx.compose.runtime.key(launch) {
                     AvlAppUi(
-                        state = AppState(today, reminders, openByReminder, history, proofs, theme, permissions, prep, alert, dnd),
+                        state = AppState(
+                            today, reminders, openByReminder, history, proofs, theme, permissions, prep, alert, dnd,
+                            home = home, dwellMinutes = dwell, itemsDone = itemsDone,
+                        ),
                         actions = actions,
                         now = now,
                         zone = ZoneId.systemDefault(),
@@ -131,6 +142,15 @@ class MainActivity : ComponentActivity() {
         override fun openAlarm(occurrenceId: Long) = startActivity(AlarmActivity.intent(this@MainActivity, occurrenceId))
         override fun completeEarly(occurrenceId: Long) = startActivity(AlarmActivity.intent(this@MainActivity, occurrenceId, early = true))
         override fun play(path: String) = AudioPlayer.play(this@MainActivity, path)
+        override fun setDwellMinutes(minutes: Int) = vm.setDwellMinutes(minutes)
+        override fun setHomeHere(onResult: (Boolean) -> Unit) {
+            if (hasLocation()) {
+                vm.setHomeHere(onResult)
+            } else {
+                requestLocation.launch(arrayOf(Manifest.permission.ACCESS_FINE_LOCATION, Manifest.permission.ACCESS_COARSE_LOCATION))
+                onResult(false)
+            }
+        }
     }
 
     private fun granted(permission: String) = checkSelfPermission(permission) == PackageManager.PERMISSION_GRANTED
@@ -144,6 +164,7 @@ class MainActivity : ComponentActivity() {
         val power = getSystemService(PowerManager::class.java)
         val blocked = Notifications.channelsBlockedByDnd(this)
         val dndNeeded = vm.reminders.value.any { it.active && it.ignoreDnd }
+        val locationNeeded = vm.reminders.value.any { it.active && it.arrival != null }
         permissions = listOfNotNull(
             PermissionItem("Benachrichtigungen", "ohne sie gibt es keinen Alarm", granted(Manifest.permission.POST_NOTIFICATIONS)) {
                 requestPermission.launch(Manifest.permission.POST_NOTIFICATIONS)
@@ -159,6 +180,16 @@ class MainActivity : ComponentActivity() {
             },
             PermissionItem("Mikrofon", "für Audio-Nachweise und die Botschaft an dich", granted(Manifest.permission.RECORD_AUDIO), required = false) {
                 requestPermission.launch(Manifest.permission.RECORD_AUDIO)
+            },
+            // Only asked for when a reminder waits for the arrival at home.
+            if (!locationNeeded) null else PermissionItem(
+                "Standort „Immer erlauben“", "für die Ankunft zuhause; der Standort bleibt auf dem Handy", hasBackgroundLocation(),
+            ) {
+                if (!hasLocation()) {
+                    requestLocation.launch(arrayOf(Manifest.permission.ACCESS_FINE_LOCATION, Manifest.permission.ACCESS_COARSE_LOCATION))
+                } else {
+                    requestPermission.launch(Manifest.permission.ACCESS_BACKGROUND_LOCATION)
+                }
             },
             // Only asked for when a reminder should ring despite "Nicht stören".
             if (!dndNeeded) null else PermissionItem(

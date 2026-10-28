@@ -26,13 +26,14 @@ import com.avlreminder.core.model.ProofKind
 import com.avlreminder.core.model.ProofType
 import com.avlreminder.core.model.Resolution
 import com.avlreminder.core.model.Strictness
+import com.avlreminder.core.model.WhenAway
 import kotlinx.coroutines.flow.Flow
 import java.io.File
 import java.time.Instant
 import java.time.LocalDateTime
 import java.time.format.DateTimeFormatter
 
-enum class ScheduleType { ONCE, DAILY, WEEKDAYS, AFTER_DONE }
+enum class ScheduleType { ONCE, DAILY, WEEKDAYS, AFTER_DONE, ON_ARRIVAL }
 
 @Entity(tableName = "reminder")
 data class ReminderEntity(
@@ -64,6 +65,46 @@ data class ReminderEntity(
     /** Comma-separated minutes, e.g. "30,60". */
     @ColumnInfo(defaultValue = "10") val snoozeMinutes: String = "10",
     val motivationAudio: String? = null,
+    /** Arrival trigger; both null = time only. */
+    val arrivalPlaceId: Long? = null,
+    val arrivalWhenAway: WhenAway? = null,
+)
+
+@Entity(tableName = "place")
+data class PlaceEntity(
+    @PrimaryKey(autoGenerate = true) val id: Long = 0,
+    val name: String,
+    val lat: Double,
+    val lon: Double,
+    val radiusMeters: Int,
+)
+
+@Entity(
+    tableName = "checklist_item",
+    foreignKeys = [ForeignKey(ReminderEntity::class, ["id"], ["reminderId"], onDelete = ForeignKey.CASCADE)],
+    indices = [Index("reminderId")],
+)
+data class ChecklistItemEntity(
+    @PrimaryKey(autoGenerate = true) val id: Long = 0,
+    val reminderId: Long,
+    val position: Int,
+    val title: String,
+)
+
+@Entity(
+    tableName = "item_done",
+    foreignKeys = [
+        ForeignKey(OccurrenceEntity::class, ["id"], ["occurrenceId"], onDelete = ForeignKey.CASCADE),
+        ForeignKey(ChecklistItemEntity::class, ["id"], ["itemId"], onDelete = ForeignKey.CASCADE),
+    ],
+    indices = [Index("occurrenceId"), Index("itemId")],
+)
+data class ItemDoneEntity(
+    @PrimaryKey(autoGenerate = true) val id: Long = 0,
+    val occurrenceId: Long,
+    val itemId: Long,
+    val doneAt: Instant,
+    val withProof: Boolean,
 )
 
 @Entity(
@@ -82,6 +123,7 @@ data class OccurrenceEntity(
     val resolution: Resolution?,
     val note: String?,
     val pausedUntil: Instant? = null,
+    val firstProgressAt: Instant? = null,
 )
 
 @Entity(
@@ -109,6 +151,8 @@ data class ProofEntity(
     @ColumnInfo(name = "filePath") val filePath: String?,
     val takenAt: Instant,
     val text: String? = null,
+    /** Checklist item the proof is for; no foreign key, the proof stays when the item is removed. */
+    val itemId: Long? = null,
 )
 
 @Entity(
@@ -209,6 +253,45 @@ interface AvlDao {
 
     @Insert
     suspend fun insert(answer: PrepAnswerEntity)
+
+    @Query("SELECT * FROM place ORDER BY id")
+    suspend fun places(): List<PlaceEntity>
+
+    @Query("SELECT * FROM place ORDER BY id")
+    fun observePlaces(): Flow<List<PlaceEntity>>
+
+    @Insert
+    suspend fun insert(place: PlaceEntity): Long
+
+    @Update
+    suspend fun update(place: PlaceEntity)
+
+    @Query("SELECT * FROM checklist_item WHERE reminderId = :reminderId ORDER BY position")
+    suspend fun items(reminderId: Long): List<ChecklistItemEntity>
+
+    @Query("SELECT * FROM checklist_item ORDER BY reminderId, position")
+    suspend fun allItems(): List<ChecklistItemEntity>
+
+    @Query("SELECT * FROM checklist_item ORDER BY reminderId, position")
+    fun observeItems(): Flow<List<ChecklistItemEntity>>
+
+    @Insert
+    suspend fun insert(item: ChecklistItemEntity): Long
+
+    @Update
+    suspend fun update(item: ChecklistItemEntity)
+
+    @Query("DELETE FROM checklist_item WHERE reminderId = :reminderId AND id NOT IN (:keep)")
+    suspend fun deleteItemsExcept(reminderId: Long, keep: List<Long>)
+
+    @Query("SELECT * FROM item_done WHERE occurrenceId = :occurrenceId ORDER BY doneAt, id")
+    suspend fun itemsDone(occurrenceId: Long): List<ItemDoneEntity>
+
+    @Query("SELECT * FROM item_done ORDER BY doneAt, id")
+    fun observeItemsDone(): Flow<List<ItemDoneEntity>>
+
+    @Insert
+    suspend fun insert(done: ItemDoneEntity)
 }
 
 class Converters {
@@ -241,11 +324,39 @@ val MIGRATION_1_2 = object : Migration(1, 2) {
     }
 }
 
+/** V1.1b: arrival trigger with places, checklists. */
+val MIGRATION_2_3 = object : Migration(2, 3) {
+    override fun migrate(db: SupportSQLiteDatabase) {
+        db.execSQL("ALTER TABLE reminder ADD COLUMN arrivalPlaceId INTEGER")
+        db.execSQL("ALTER TABLE reminder ADD COLUMN arrivalWhenAway TEXT")
+        db.execSQL("ALTER TABLE occurrence ADD COLUMN firstProgressAt INTEGER")
+        db.execSQL("ALTER TABLE proof ADD COLUMN itemId INTEGER")
+        CREATE_3.forEach(db::execSQL)
+    }
+}
+
+/** The new tables of version 3, as Room generates them (see schemas/…/3.json). */
+private val CREATE_3 = listOf(
+    "CREATE TABLE IF NOT EXISTS `place` (`id` INTEGER PRIMARY KEY AUTOINCREMENT NOT NULL, `name` TEXT NOT NULL, " +
+        "`lat` REAL NOT NULL, `lon` REAL NOT NULL, `radiusMeters` INTEGER NOT NULL)",
+    "CREATE TABLE IF NOT EXISTS `checklist_item` (`id` INTEGER PRIMARY KEY AUTOINCREMENT NOT NULL, `reminderId` INTEGER NOT NULL, " +
+        "`position` INTEGER NOT NULL, `title` TEXT NOT NULL, " +
+        "FOREIGN KEY(`reminderId`) REFERENCES `reminder`(`id`) ON UPDATE NO ACTION ON DELETE CASCADE )",
+    "CREATE INDEX IF NOT EXISTS `index_checklist_item_reminderId` ON `checklist_item` (`reminderId`)",
+    "CREATE TABLE IF NOT EXISTS `item_done` (`id` INTEGER PRIMARY KEY AUTOINCREMENT NOT NULL, `occurrenceId` INTEGER NOT NULL, " +
+        "`itemId` INTEGER NOT NULL, `doneAt` INTEGER NOT NULL, `withProof` INTEGER NOT NULL, " +
+        "FOREIGN KEY(`occurrenceId`) REFERENCES `occurrence`(`id`) ON UPDATE NO ACTION ON DELETE CASCADE , " +
+        "FOREIGN KEY(`itemId`) REFERENCES `checklist_item`(`id`) ON UPDATE NO ACTION ON DELETE CASCADE )",
+    "CREATE INDEX IF NOT EXISTS `index_item_done_occurrenceId` ON `item_done` (`occurrenceId`)",
+    "CREATE INDEX IF NOT EXISTS `index_item_done_itemId` ON `item_done` (`itemId`)",
+)
+
 @Database(
     entities = [
         ReminderEntity::class, OccurrenceEntity::class, EventEntity::class, ProofEntity::class, PrepAnswerEntity::class,
+        PlaceEntity::class, ChecklistItemEntity::class, ItemDoneEntity::class,
     ],
-    version = 2,
+    version = 3,
 )
 @TypeConverters(Converters::class)
 abstract class AvlDatabase : RoomDatabase() {
@@ -253,12 +364,12 @@ abstract class AvlDatabase : RoomDatabase() {
 
     companion object {
         const val NAME = "avlreminder.db"
-        const val VERSION = 2
+        const val VERSION = 3
 
         fun create(context: Context): AvlDatabase {
             backupBeforeMigration(context.getDatabasePath(NAME), File(context.filesDir, "backup"))
             return Room.databaseBuilder(context, AvlDatabase::class.java, NAME)
-                .addMigrations(MIGRATION_1_2)
+                .addMigrations(MIGRATION_1_2, MIGRATION_2_3)
                 .build()
         }
 

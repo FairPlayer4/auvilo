@@ -1,8 +1,10 @@
 package com.avlreminder.ui
 
+import com.avlreminder.core.model.Reminder
 import com.avlreminder.core.model.Resolution
 import com.avlreminder.core.model.Schedule
 import com.avlreminder.core.model.Strictness
+import com.avlreminder.core.model.WhenAway
 import java.time.DayOfWeek
 import java.time.Instant
 import java.time.LocalDate
@@ -54,6 +56,7 @@ object Format {
         Resolution.NO_PROOF -> "ohne Nachweis"
         Resolution.SKIPPED -> "ausgelassen"
         Resolution.MISSED -> "verpasst"
+        Resolution.DROPPED -> "entfallen"
     }
 
     fun schedule(s: Schedule): String = when (s) {
@@ -64,5 +67,16 @@ object Format {
             "$days ${time(s.time)}"
         }
         is Schedule.AfterDone -> "alle ${s.intervalDays} Tage nach Erledigung, ${time(s.time)}"
+        Schedule.OnArrival -> "wenn ich zuhause bin"
+    }
+
+    /** Schedule plus the arrival trigger, e.g. "täglich 19:00 · bei Ankunft zuhause". */
+    fun plan(r: Reminder): String {
+        val arrival = r.arrival
+        return when {
+            arrival == null || r.schedule == Schedule.OnArrival -> schedule(r.schedule)
+            arrival.whenAway == WhenAway.RING -> "${schedule(r.schedule)} · bei Ankunft zuhause, sonst klingeln"
+            else -> "${schedule(r.schedule)} · bei Ankunft zuhause, sonst entfällt"
+        }
     }
 }

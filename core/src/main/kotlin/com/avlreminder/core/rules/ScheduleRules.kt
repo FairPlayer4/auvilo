@@ -30,6 +30,9 @@ object ScheduleRules {
             is Schedule.Once ->
                 if (previousDueAt == null) schedule.at.atZone(zone).toInstant() else null
 
+            // Waits for the arrival; the due time only orders it.
+            Schedule.OnArrival -> if (previousDueAt == null) now else null
+
             is Schedule.Daily -> nextAtTime(schedule.time, after, zone) { true }
 
             is Schedule.Weekdays -> nextAtTime(schedule.time, after, zone) { it.dayOfWeek in schedule.days }

@@ -16,6 +16,10 @@ import java.time.Instant
 sealed interface Action {
     /** The planned time was reached. */
     data object Fire : Action
+    /** Arrived at the trigger's place: due now, before the planned time. */
+    data object Arrive : Action
+    /** Not at the trigger's place at the planned time: the chance did not come (neutral). */
+    data object Drop : Action
     /** Another ringing round without reaction. */
     data object Escalate : Action
     data class Snooze(val duration: Duration) : Action
@@ -28,6 +32,10 @@ sealed interface Action {
     data class Complete(val minimumOnly: Boolean, val evidence: Evidence = Evidence(), val note: String? = null) : Action
     data class Skip(val reason: String?) : Action
     data object Miss : Action
+    /** One checklist item done; the last one completes the occurrence. */
+    data class CheckItem(val itemId: Long, val evidence: Evidence = Evidence()) : Action
+    /** The open checklist items come back at [to]. */
+    data class DeferRest(val to: Instant) : Action
 }
 
 /** Facts beyond the occurrence itself that limit what is allowed. */
@@ -35,6 +43,10 @@ data class Limits(
     val minimumsThisWeek: Int = 0,
     /** The previous text proof of this reminder; the same text again does not count. */
     val lastProofText: String? = null,
+    /** Checklist items already done in this occurrence → whether their proof was complete. */
+    val itemsDone: Map<Long, Boolean> = emptyMap(),
+    /** An item was done today: deferring the rest then does not count as postponing (C5c). */
+    val itemDoneToday: Boolean = false,
 )
 
 sealed interface TransitionResult {
@@ -72,6 +84,17 @@ object Lifecycle {
             Action.Fire ->
                 if (occurrence.state != PLANNED) TransitionResult.Rejected("only a planned occurrence can fire")
                 else ok(occurrence.copy(state = DUE), EventType.DUE)
+
+            Action.Arrive ->
+                if (occurrence.state != PLANNED) TransitionResult.Rejected("only a planned occurrence can fire")
+                else ok(occurrence.copy(state = DUE, currentAt = now), EventType.DUE, "Ankunft")
+
+            Action.Drop ->
+                if (occurrence.state != PLANNED) TransitionResult.Rejected("only a planned occurrence can be dropped")
+                else ok(
+                    occurrence.copy(state = CLOSED, resolution = Resolution.DROPPED, resolvedAt = now),
+                    EventType.DROPPED,
+                )
 
             Action.Escalate ->
                 if (occurrence.state == PLANNED) TransitionResult.Rejected("a planned occurrence cannot escalate")
@@ -118,10 +141,42 @@ object Lifecycle {
                     action.minimumOnly -> Resolution.MINIMUM
                     else -> Resolution.GOAL
                 }
+                val progress = if (reminder.checklist.isEmpty()) occurrence.firstProgressAt else occurrence.firstProgressAt ?: now
                 ok(
-                    occurrence.copy(state = DONE, resolution = resolution, resolvedAt = now, note = action.note),
+                    occurrence.copy(state = DONE, resolution = resolution, resolvedAt = now, note = action.note, firstProgressAt = progress),
                     EventType.COMPLETED, resolution.name,
                 )
+            }
+
+            is Action.CheckItem -> {
+                val item = reminder.checklist.firstOrNull { it.id == action.itemId }
+                    ?: return TransitionResult.Rejected("unknown checklist item")
+                if (item.id in limits.itemsDone) return TransitionResult.Rejected("item already done")
+                val withProof = ProofCheck.problems(reminder.proof, action.evidence, limits.lastProofText).isEmpty()
+                val done = limits.itemsDone + (item.id to withProof)
+                val progressed = occurrence.copy(firstProgressAt = occurrence.firstProgressAt ?: now, pausedUntil = null)
+                if (reminder.checklist.all { it.id in done }) {
+                    val resolution = if (done.values.all { it }) Resolution.GOAL else Resolution.NO_PROOF
+                    ok(progressed.copy(state = DONE, resolution = resolution, resolvedAt = now), EventType.COMPLETED, resolution.name)
+                } else {
+                    ok(progressed, EventType.ITEM_DONE, item.title)
+                }
+            }
+
+            is Action.DeferRest -> {
+                val counts = !limits.itemDoneToday
+                when {
+                    reminder.checklist.isEmpty() -> TransitionResult.Rejected("no checklist")
+                    action.to <= now -> TransitionResult.Rejected("defer target must lie in the future")
+                    counts && !canPostpone(reminder, occurrence) -> TransitionResult.Rejected("postpone limit reached")
+                    else -> ok(
+                        occurrence.copy(
+                            state = PLANNED, currentAt = action.to, pausedUntil = null,
+                            postponeCount = occurrence.postponeCount + if (counts) 1 else 0,
+                        ),
+                        EventType.DEFERRED, action.to.toString(),
+                    )
+                }
             }
 
             is Action.Skip -> ok(

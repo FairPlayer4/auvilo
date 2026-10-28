@@ -1,7 +1,9 @@
 package com.avlreminder.core.ports
 
 import com.avlreminder.core.model.Event
+import com.avlreminder.core.model.ItemDone
 import com.avlreminder.core.model.Occurrence
+import com.avlreminder.core.model.Place
 import com.avlreminder.core.model.PrepAnswer
 import com.avlreminder.core.model.Proof
 import com.avlreminder.core.model.Reminder
@@ -12,7 +14,7 @@ import java.time.Instant
 interface ReminderRepository {
     suspend fun reminders(): List<Reminder>
     suspend fun reminder(id: Long): Reminder?
-    /** Inserts when id is 0, otherwise updates. Returns the id. */
+    /** Inserts when id is 0, otherwise updates; also stores the checklist (items get ids). Returns the id. */
     suspend fun saveReminder(reminder: Reminder): Long
     /** Deletes the reminder with its occurrences, events, proofs and prep answers. */
     suspend fun deleteReminder(id: Long)
@@ -35,6 +37,14 @@ interface ReminderRepository {
     /** All answers ever given, oldest first; see [com.avlreminder.core.rules.Prep.latest]. */
     suspend fun prepAnswers(reminderId: Long): List<PrepAnswer>
     suspend fun addPrepAnswer(answer: PrepAnswer)
+
+    suspend fun places(): List<Place>
+    /** Inserts when id is 0, otherwise updates. Returns the id. */
+    suspend fun savePlace(place: Place): Long
+
+    /** Checklist items done within the occurrence, in the order they were done. */
+    suspend fun itemsDone(occurrenceId: Long): List<ItemDone>
+    suspend fun addItemDone(done: ItemDone)
 }
 
 /** State of the phone that decides how loud an alarm may be. */
@@ -48,6 +58,18 @@ enum class AlarmKind {
     ALARM_CLOCK,
     /** Exact but not shown as alarm clock; for relaxed reminders. */
     EXACT,
+}
+
+/** Geofences for arrival triggers; like alarms derived from the database on every sync. */
+fun interface GeofencePort {
+    /** Watches exactly these places; empty stops watching. */
+    fun watch(places: List<Place>)
+}
+
+/** Active check of the current position. */
+fun interface LocationPort {
+    /** null = position unknown (no permission, no fix in time). */
+    suspend fun isAt(place: Place): Boolean?
 }
 
 /** Derived from the database at any time; see SyncSchedule. */

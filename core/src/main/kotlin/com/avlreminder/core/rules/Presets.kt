@@ -54,7 +54,12 @@ object Validation {
         reminder.postponeLimit?.let { if (it < 0) add("Verschiebe-Limit darf nicht negativ sein") }
         reminder.minimumLimitPerWeek?.let { if (it < 0) add("Minimum-Limit darf nicht negativ sein") }
         if (reminder.minimumLimitPerWeek != null && reminder.minimum.isNullOrBlank()) add("Limit ohne Minimum")
+        if (reminder.schedule == Schedule.OnArrival && reminder.arrival == null) add("„Wenn ich zuhause bin“ braucht einen Ort")
+        if (reminder.checklist.any { it.title.isBlank() }) add("Checklisten-Punkt ohne Text")
+        if (reminder.checklist.size > MAX_ITEMS) add("Höchstens $MAX_ITEMS Checklisten-Punkte")
     }
+
+    const val MAX_ITEMS = 20
 }
 
 /** Weeks run Monday to Sunday. */

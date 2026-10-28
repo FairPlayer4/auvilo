@@ -27,7 +27,13 @@ import androidx.compose.ui.draw.clip
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.setValue
+import com.avlreminder.core.model.Place
 import com.avlreminder.core.rules.AlertSettings
+import com.avlreminder.data.Settings
 import com.avlreminder.data.ThemeMode
 import com.avlreminder.ui.AvlIcons
 import com.avlreminder.ui.Format
@@ -45,6 +51,7 @@ data class PermissionItem(
     val request: () -> Unit,
 )
 
+@OptIn(ExperimentalLayoutApi::class)
 @Composable
 fun SettingsScreen(
     theme: ThemeMode,
@@ -54,8 +61,13 @@ fun SettingsScreen(
     permissions: List<PermissionItem>,
     onBack: () -> Unit,
     modifier: Modifier = Modifier,
+    home: Place? = null,
+    onSetHome: (onResult: (Boolean) -> Unit) -> Unit = {},
+    dwellMinutes: Int = Settings.DEFAULT_DWELL,
+    onDwell: (Int) -> Unit = {},
 ) {
     val c = Avl.colors
+    var homeState by remember { mutableStateOf<String?>(null) }
     Column(modifier) {
         Row(Modifier.padding(4.dp), verticalAlignment = Alignment.CenterVertically) {
             IconButton(onClick = onBack) { Icon(AvlIcons.Back, "Zurück", tint = c.text) }
@@ -104,6 +116,29 @@ fun SettingsScreen(
                 Modifier.padding(4.dp), color = c.muted, fontSize = 13.sp,
             )
 
+            SectionTitle("Zuhause")
+            Card {
+                Column(Modifier.padding(16.dp)) {
+                    Text(if (home == null) "Noch nicht festgelegt" else "Festgelegt · Umkreis ${home.radiusMeters} m", color = c.text, fontSize = 15.sp)
+                    TextButton(onClick = {
+                        homeState = "Standort wird bestimmt …"
+                        onSetHome { ok -> homeState = if (ok) "Zuhause gespeichert" else "Kein Standort – Berechtigung und GPS prüfen" }
+                    }) { Text(if (home == null) "Aktuellen Standort als Zuhause" else "Neu setzen auf aktuellen Standort", color = c.accent) }
+                    homeState?.let { Text(it, color = c.muted, fontSize = 13.sp) }
+                    Text("Ankunft zählt nach", Modifier.padding(top = 12.dp), color = c.text, fontSize = 15.sp)
+                    FlowRow(Modifier.padding(top = 6.dp), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                        (Settings.DWELL_CHOICES + dwellMinutes).distinct().sorted().forEach { m ->
+                            FilterChip(m == dwellMinutes, { onDwell(m) }, label = { Text("$m min") })
+                        }
+                    }
+                }
+            }
+            Text(
+                "Der Standort bleibt auf dem Handy. Vorbeifahren zählt nicht, erst das Bleiben. Für die Ankunft braucht die App " +
+                    "den Standort „Immer erlauben“.",
+                Modifier.padding(4.dp), color = c.muted, fontSize = 13.sp,
+            )
+
             SectionTitle("Berechtigungen")
             Card {
                 permissions.forEachIndexed { i, p ->
@@ -118,7 +153,7 @@ fun SettingsScreen(
                     }
                 }
             }
-            Text("AVL-Reminder 1.1a-Prototyp", Modifier.padding(vertical = 24.dp, horizontal = 4.dp), color = c.muted, fontSize = 12.sp)
+            Text("AVL-Reminder 1.1b-Prototyp", Modifier.padding(vertical = 24.dp, horizontal = 4.dp), color = c.muted, fontSize = 12.sp)
         }
     }
 }

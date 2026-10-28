@@ -9,6 +9,7 @@ import androidx.activity.compose.setContent
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.mutableLongStateOf
 import androidx.compose.runtime.produceState
 import androidx.compose.runtime.remember
@@ -44,6 +45,8 @@ class AlarmActivity : ComponentActivity() {
     }
 
     private var occurrenceId by mutableLongStateOf(-1L)
+    /** Bumped after a checklist item, so the screen shows the new state. */
+    private var version by mutableIntStateOf(0)
     private var early = false
     /** The proof screen is open and the alarm paused. */
     private var proofRunning = false
@@ -86,7 +89,7 @@ class AlarmActivity : ComponentActivity() {
     private fun AlarmHost(id: Long) {
         val graph = remember { graph }
         val zone = ZoneId.systemDefault()
-        val ui by produceState<AlarmUi?>(null, id) {
+        val ui by produceState<AlarmUi?>(null, id, version) {
             value = load(id)
         }
         // Close as soon as the occurrence is resolved or snoozed elsewhere (notification, other device action).
@@ -111,6 +114,8 @@ class AlarmActivity : ComponentActivity() {
             onSnooze = { act(id, Action.Snooze(Duration.ofMinutes(it.toLong()))) },
             onPostpone = { act(id, Action.Postpone(it)) },
             onSkip = { act(id, Action.Skip(it)) },
+            onCheckItem = { itemId, evidence -> act(id, Action.CheckItem(itemId, evidence), stay = true) },
+            onDeferRest = { act(id, Action.DeferRest(it)) },
             onStartProof = { startProof(id) },
             onAbortProof = { abortProof(id) },
             devices = AlarmDevices(
@@ -126,7 +131,7 @@ class AlarmActivity : ComponentActivity() {
         val occurrence = repo.occurrence(id) ?: return null
         val reminder = repo.reminder(occurrence.reminderId) ?: return null
         return graph.withEngine { engine ->
-            val limits = engine.limits(reminder)
+            val limits = engine.limits(reminder, occurrence)
             AlarmUi(
                 reminder = reminder,
                 occurrence = occurrence,
@@ -138,6 +143,9 @@ class AlarmActivity : ComponentActivity() {
                 prep = engine.prep(reminder.id),
                 lastProofText = limits.lastProofText,
                 early = early,
+                done = limits.itemsDone.keys,
+                // Doing an item today makes "Rest auf morgen" free; otherwise it is a postponement.
+                canDeferRest = reminder.checklist.isNotEmpty() && (limits.itemDoneToday || Lifecycle.canPostpone(reminder, occurrence)),
             )
         }
     }
@@ -158,16 +166,21 @@ class AlarmActivity : ComponentActivity() {
         graph.scope.launch { graph.withEngine { it.abortProof(id) } }
     }
 
-    private fun act(id: Long, action: Action) {
+    /** [stay]: a checklist item; the screen stays for the next one unless that was the last. */
+    private fun act(id: Long, action: Action, stay: Boolean = false) {
         proofRunning = false
         lifecycleScope.launch {
             val result = graph.withEngine { it.act(id, action) }
-            if (result is TransitionResult.Rejected) {
-                Toast.makeText(this@AlarmActivity, "Nicht möglich: ${result.reason}", Toast.LENGTH_LONG).show()
+            if (result !is TransitionResult.Ok) {
+                Toast.makeText(this@AlarmActivity, "Nicht möglich: ${(result as TransitionResult.Rejected).reason}", Toast.LENGTH_LONG).show()
+                return@launch
+            }
+            Ringer.dismiss(this@AlarmActivity, id)
+            if (stay && result.occurrence.state != OccurrenceState.DONE) {
+                version++
                 return@launch
             }
             AudioPlayer.stop()
-            Ringer.dismiss(this@AlarmActivity, id)
             finish()
         }
     }

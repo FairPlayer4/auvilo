@@ -1,8 +1,11 @@
 package com.avlreminder.core.usecases
 
+import com.avlreminder.core.model.ChecklistItem
 import com.avlreminder.core.model.Event
+import com.avlreminder.core.model.ItemDone
 import com.avlreminder.core.model.EventType
 import com.avlreminder.core.model.Occurrence
+import com.avlreminder.core.model.Place
 import com.avlreminder.core.model.OccurrenceState
 import com.avlreminder.core.model.PrepAnswer
 import com.avlreminder.core.model.Proof
@@ -11,17 +14,22 @@ import com.avlreminder.core.model.Reminder
 import com.avlreminder.core.model.Resolution
 import com.avlreminder.core.model.Schedule
 import com.avlreminder.core.model.Strictness
+import com.avlreminder.core.model.WhenAway
 import com.avlreminder.core.ports.AlarmKind
 import com.avlreminder.core.ports.AlarmPort
 import com.avlreminder.core.ports.DeviceStatePort
+import com.avlreminder.core.ports.GeofencePort
+import com.avlreminder.core.ports.LocationPort
 import com.avlreminder.core.ports.ReminderRepository
 import com.avlreminder.core.rules.Action
 import com.avlreminder.core.rules.AlarmLevel
 import com.avlreminder.core.rules.AlertSettings
 import com.avlreminder.core.rules.Escalation
+import com.avlreminder.core.rules.Evidence
 import com.avlreminder.core.rules.Lifecycle
 import com.avlreminder.core.rules.Limits
 import com.avlreminder.core.rules.Prep
+import com.avlreminder.core.rules.ProofCheck
 import com.avlreminder.core.rules.ScheduleRules
 import com.avlreminder.core.rules.TransitionResult
 import com.avlreminder.core.rules.Validation
@@ -29,9 +37,19 @@ import com.avlreminder.core.rules.Weeks
 import java.time.Clock
 import java.time.Duration
 import java.time.Instant
+import java.time.LocalDate
 
-/** Something that has to ring now; [snooze] are the buttons that stay before the end of the day. */
-data class Ring(val reminder: Reminder, val occurrence: Occurrence, val level: AlarmLevel, val snooze: List<Int> = emptyList())
+/**
+ * Something that has to ring now; [snooze] are the buttons that stay before the end of the day,
+ * [nextItem] the first open checklist item.
+ */
+data class Ring(
+    val reminder: Reminder,
+    val occurrence: Occurrence,
+    val level: AlarmLevel,
+    val snooze: List<Int> = emptyList(),
+    val nextItem: ChecklistItem? = null,
+)
 
 sealed interface SaveResult {
     data class Saved(val id: Long) : SaveResult
@@ -48,6 +66,8 @@ class ReminderEngine(
     private val clock: Clock,
     private val device: DeviceStatePort = DeviceStatePort { false },
     private val settings: () -> AlertSettings = { AlertSettings() },
+    private val geofences: GeofencePort = GeofencePort {},
+    private val location: LocationPort = LocationPort { null },
 ) {
     private val zone get() = clock.zone
     private fun now(): Instant = clock.instant()
@@ -72,13 +92,16 @@ class ReminderEngine(
         if (Prep.missing(reminder, current + changed.associateBy { it.question }).isNotEmpty()) {
             problems += "Startklar-Fragen beantworten"
         }
+        reminder.arrival?.let { a ->
+            if (repo.places().none { it.id == a.placeId }) problems += "Zuhause zuerst in den Einstellungen festlegen"
+        }
         if (problems.isNotEmpty()) return SaveResult.Invalid(problems)
         val id = repo.saveReminder(reminder)
         val saved = reminder.copy(id = id)
         changed.forEach { repo.addPrepAnswer(it.copy(id = 0, reminderId = id, text = it.text?.trim(), at = now())) }
         val open = repo.openOccurrence(id)
         // A changed schedule moves an occurrence that has not started yet.
-        if (open != null && open.state == OccurrenceState.PLANNED && open.postponeCount == 0) {
+        if (open != null && open.state == OccurrenceState.PLANNED && open.postponeCount == 0 && schedule != Schedule.OnArrival) {
             val due = nextDue(saved, repo.lastResolved(id))
             if (due == null) {
                 close(saved, open, Action.Skip("Zeitplan geändert"))
@@ -87,12 +110,14 @@ class ReminderEngine(
             }
         }
         syncReminder(saved)
+        watchPlaces()
         return SaveResult.Saved(id)
     }
 
     suspend fun delete(reminderId: Long) {
         repo.openOccurrence(reminderId)?.let { alarms.cancel(it.id) }
         repo.deleteReminder(reminderId)
+        watchPlaces()
     }
 
     suspend fun setActive(reminderId: Long, active: Boolean) {
@@ -101,6 +126,7 @@ class ReminderEngine(
         val open = repo.openOccurrence(reminderId)
         if (!active) {
             open?.let { alarms.cancel(it.id) }
+            watchPlaces()
             return
         }
         // Resuming must not report the paused time as missed: plan the open occurrence anew.
@@ -110,6 +136,49 @@ class ReminderEngine(
             else repo.saveOccurrence(open.copy(state = OccurrenceState.PLANNED, dueAt = due, currentAt = due))
         }
         syncReminder(reminder.copy(active = true))
+        watchPlaces()
+    }
+
+    // --- Places ----------------------------------------------------------------------------
+
+    suspend fun places(): List<Place> = repo.places()
+
+    /** Sets a place (V1.1b: "Zuhause" from the current position) and watches it if needed. */
+    suspend fun savePlace(place: Place): Long {
+        val id = repo.savePlace(place)
+        watchPlaces()
+        return id
+    }
+
+    /**
+     * Arrived at [placeId] (geofence after the dwell time): today's occurrences of its reminders
+     * ring now. Snoozed or postponed ones keep their time.
+     */
+    suspend fun onArrival(placeId: Long): List<Ring> {
+        val now = now()
+        val today = now.atZone(zone).toLocalDate()
+        return repo.reminders().filter { it.active && it.arrival?.placeId == placeId }.mapNotNull { r ->
+            val o = repo.openOccurrence(r.id) ?: return@mapNotNull null
+            val waiting = o.state == OccurrenceState.PLANNED && (
+                r.schedule == Schedule.OnArrival ||
+                    (o.currentAt == o.dueAt && o.currentAt > now && o.currentAt.atZone(zone).toLocalDate() == today)
+                )
+            if (waiting) arrive(r, o) else null
+        }
+    }
+
+    /**
+     * Checks the position for reminders that only wait for an arrival: after saving one and after
+     * a reboot, where the geofence does not report being inside already.
+     */
+    suspend fun checkPlaces(): List<Ring> {
+        val places = repo.places().associateBy { it.id }
+        val here = mutableMapOf<Long, Boolean?>()
+        return repo.reminders().filter { it.active && it.schedule == Schedule.OnArrival }.mapNotNull { r ->
+            val place = places[r.arrival?.placeId] ?: return@mapNotNull null
+            val o = repo.openOccurrence(r.id)?.takeIf { it.state == OccurrenceState.PLANNED } ?: return@mapNotNull null
+            if (here.getOrPut(place.id) { location.isAt(place) } == true) arrive(r, o) else null
+        }
     }
 
     // --- Occurrences -----------------------------------------------------------------------
@@ -121,11 +190,28 @@ class ReminderEngine(
         if (action is Action.Snooze && now().plus(action.duration) >= missedAt(occurrence)) {
             return TransitionResult.Rejected("snooze would pass the end of the day")
         }
-        val result = Lifecycle.transition(reminder, occurrence, action, now(), limits(reminder))
+        val limits = limits(reminder, occurrence)
+        val result = Lifecycle.transition(reminder, occurrence, action, now(), limits)
         if (result !is TransitionResult.Ok) return result
         repo.saveOccurrence(result.occurrence)
         repo.addEvent(result.event)
-        if (action is Action.Complete) saveEvidence(occurrence, action)
+        when (action) {
+            is Action.Complete -> {
+                saveEvidence(occurrence, action.evidence)
+                // "Alles erledigt" on a checklist: the open items are done now, with the block's proof.
+                // The minimum closes the block without doing them.
+                val withProof = result.occurrence.resolution != Resolution.NO_PROOF
+                if (!action.minimumOnly) reminder.checklist.filter { it.id !in limits.itemsDone }.forEach {
+                    repo.addItemDone(ItemDone(occurrenceId = occurrence.id, itemId = it.id, doneAt = now(), withProof = withProof))
+                }
+            }
+            is Action.CheckItem -> {
+                saveEvidence(occurrence, action.evidence, action.itemId)
+                val withProof = ProofCheck.problems(reminder.proof, action.evidence, limits.lastProofText).isEmpty()
+                repo.addItemDone(ItemDone(occurrenceId = occurrence.id, itemId = action.itemId, doneAt = now(), withProof = withProof))
+            }
+            else -> {}
+        }
         alarms.cancel(occurrence.id)
         syncReminder(reminder)
         return result
@@ -170,8 +256,7 @@ class ReminderEngine(
             return null
         }
         if (now >= missedAt(occurrence)) {
-            close(reminder, occurrence, Action.Miss)
-            syncReminder(reminder)
+            endDay(reminder, occurrence)
             return null
         }
         val escalated = apply(reminder, occurrence, Action.Escalate)
@@ -183,16 +268,26 @@ class ReminderEngine(
      * Rebuilds all alarms from the database: on app start, boot, time change and after changes.
      * Detects occurrences whose alarm never fired and returns them to ring now.
      */
-    suspend fun sync(): List<Ring> = repo.reminders().mapNotNull { syncReminder(it) }
+    suspend fun sync(): List<Ring> {
+        val rings = repo.reminders().mapNotNull { syncReminder(it) }
+        watchPlaces()
+        return rings
+    }
 
-    /** Limits that apply to [reminder] right now. */
-    suspend fun limits(reminder: Reminder): Limits {
+    /** Limits that apply to [reminder] right now; with [occurrence] also its checklist progress on [day]. */
+    suspend fun limits(reminder: Reminder, occurrence: Occurrence? = null, day: LocalDate = now().atZone(zone).toLocalDate()): Limits {
         val (from, until) = Weeks.range(now(), zone)
+        val done = occurrence?.let { repo.itemsDone(it.id) }.orEmpty()
         return Limits(
             minimumsThisWeek = repo.countResolved(reminder.id, Resolution.MINIMUM, from, until),
             lastProofText = repo.lastProofText(reminder.id),
+            itemsDone = done.associate { it.itemId to it.withProof },
+            itemDoneToday = done.any { it.doneAt.atZone(zone).toLocalDate() == day },
         )
     }
+
+    /** Checklist items done in the occurrence. */
+    suspend fun itemsDone(occurrenceId: Long): List<ItemDone> = repo.itemsDone(occurrenceId)
 
     // --- Internals -------------------------------------------------------------------------
 
@@ -207,19 +302,22 @@ class ReminderEngine(
         }
         val now = now()
         return when {
+            // Waits for the arrival, has no alarm of its own.
+            open.state == OccurrenceState.PLANNED && reminder.schedule == Schedule.OnArrival -> {
+                alarms.cancel(open.id)
+                null
+            }
             open.state == OccurrenceState.PLANNED && open.currentAt < now.minus(GRACE) -> {
                 repo.addEvent(Event(occurrenceId = open.id, at = now, type = EventType.MISSED_DETECTED, detail = open.currentAt.toString()))
                 if (now >= missedAt(open)) {
-                    close(reminder, open, Action.Miss)
-                    createNext(reminder)?.let { plan(reminder, it) }
+                    endDay(reminder, open)
                     null
                 } else {
                     fire(reminder, open)
                 }
             }
             open.state != OccurrenceState.PLANNED && now >= missedAt(open) -> {
-                close(reminder, open, Action.Miss)
-                createNext(reminder)?.let { plan(reminder, it) }
+                endDay(reminder, open)
                 null
             }
             else -> {
@@ -229,20 +327,63 @@ class ReminderEngine(
         }
     }
 
-    private suspend fun fire(reminder: Reminder, occurrence: Occurrence): Ring {
+    /**
+     * The planned time is reached. With "sonst entfällt" the position decides: not at the place
+     * drops the occurrence; an unknown position rings, so nothing is lost.
+     */
+    private suspend fun fire(reminder: Reminder, occurrence: Occurrence): Ring? {
+        val arrival = reminder.arrival
+        if (arrival?.whenAway == WhenAway.DROP) {
+            val place = repo.places().firstOrNull { it.id == arrival.placeId }
+            if (place != null && location.isAt(place) == false) {
+                close(reminder, occurrence, Action.Drop)
+                createNext(reminder)?.let { plan(reminder, it) }
+                return null
+            }
+        }
         val fired = apply(reminder, occurrence, Action.Fire)
         plan(reminder, fired)
         return ring(reminder, fired)
     }
 
-    private suspend fun saveEvidence(occurrence: Occurrence, action: Action.Complete) {
-        val e = action.evidence
-        val at = now()
-        e.photoPath?.let { repo.addProof(Proof(occurrenceId = occurrence.id, type = ProofType.PHOTO, filePath = it, takenAt = at)) }
-        e.text?.trim()?.takeIf { it.isNotEmpty() }?.let {
-            repo.addProof(Proof(occurrenceId = occurrence.id, type = ProofType.TEXT, filePath = null, takenAt = at, text = it))
+    private suspend fun arrive(reminder: Reminder, occurrence: Occurrence): Ring {
+        val arrived = apply(reminder, occurrence, Action.Arrive)
+        plan(reminder, arrived)
+        return ring(reminder, arrived)
+    }
+
+    /**
+     * The end of the day passed without completion. A checklist with an item done that day comes
+     * back the next day with the rest (C3, does not count as postponing); anything else is missed.
+     */
+    private suspend fun endDay(reminder: Reminder, occurrence: Occurrence) {
+        val day = missedAt(occurrence).atZone(zone).toLocalDate()
+        if (reminder.checklist.isNotEmpty()) {
+            val limits = limits(reminder, occurrence, day)
+            if (limits.itemDoneToday) {
+                val time = occurrence.dueAt.atZone(zone).toLocalTime()
+                val to = maxOf(day.plusDays(1).atTime(time).atZone(zone).toInstant(), now().plus(GRACE))
+                plan(reminder, apply(reminder, occurrence, Action.DeferRest(to), limits))
+                return
+            }
         }
-        e.audioPath?.let { repo.addProof(Proof(occurrenceId = occurrence.id, type = ProofType.AUDIO, filePath = it, takenAt = at)) }
+        close(reminder, occurrence, Action.Miss)
+        createNext(reminder)?.let { plan(reminder, it) }
+    }
+
+    private suspend fun saveEvidence(occurrence: Occurrence, e: Evidence, itemId: Long? = null) {
+        val at = now()
+        fun proof(type: ProofType, path: String?, text: String? = null) =
+            Proof(occurrenceId = occurrence.id, type = type, filePath = path, takenAt = at, text = text, itemId = itemId)
+        e.photoPath?.let { repo.addProof(proof(ProofType.PHOTO, it)) }
+        e.text?.trim()?.takeIf { it.isNotEmpty() }?.let { repo.addProof(proof(ProofType.TEXT, null, it)) }
+        e.audioPath?.let { repo.addProof(proof(ProofType.AUDIO, it)) }
+    }
+
+    /** Geofences for the places that active reminders wait for. */
+    private suspend fun watchPlaces() {
+        val needed = repo.reminders().filter { it.active }.mapNotNull { it.arrival?.placeId }.toSet()
+        geofences.watch(repo.places().filter { it.id in needed })
     }
 
     /**
@@ -276,12 +417,18 @@ class ReminderEngine(
             now = now(),
             zone = zone,
             previousDueAt = previous?.dueAt,
-            lastDoneAt = repo.lastDone(reminder.id)?.resolvedAt,
+            // A checklist counts from its first done item (C5b).
+            lastDoneAt = repo.lastDone(reminder.id)?.let { it.firstProgressAt ?: it.resolvedAt },
             previousWasDone = previous?.state == OccurrenceState.DONE,
         )
 
-    private suspend fun apply(reminder: Reminder, occurrence: Occurrence, action: Action): Occurrence {
-        val result = Lifecycle.transition(reminder, occurrence, action, now(), limits(reminder))
+    private suspend fun apply(
+        reminder: Reminder,
+        occurrence: Occurrence,
+        action: Action,
+        limits: Limits? = null,
+    ): Occurrence {
+        val result = Lifecycle.transition(reminder, occurrence, action, now(), limits ?: limits(reminder, occurrence))
         check(result is TransitionResult.Ok) { "internal transition $action rejected: $result" }
         repo.saveOccurrence(result.occurrence)
         repo.addEvent(result.event)
@@ -293,8 +440,13 @@ class ReminderEngine(
         alarms.cancel(occurrence.id)
     }
 
-    private fun ring(reminder: Reminder, occurrence: Occurrence) =
-        Ring(reminder, occurrence, level(reminder, now()), snoozeOptions(reminder, occurrence))
+    private suspend fun ring(reminder: Reminder, occurrence: Occurrence): Ring {
+        val done = if (reminder.checklist.isEmpty()) emptySet() else repo.itemsDone(occurrence.id).map { it.itemId }.toSet()
+        return Ring(
+            reminder, occurrence, level(reminder, now()), snoozeOptions(reminder, occurrence),
+            nextItem = reminder.checklist.firstOrNull { it.id !in done },
+        )
+    }
 
     private fun missedAt(occurrence: Occurrence) = Escalation.missedAt(occurrence.currentAt, zone, settings())
 

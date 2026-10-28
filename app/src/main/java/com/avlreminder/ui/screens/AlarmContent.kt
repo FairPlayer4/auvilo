@@ -38,6 +38,7 @@ import androidx.compose.ui.text.font.FontStyle
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import com.avlreminder.core.model.ChecklistItem
 import com.avlreminder.core.model.Occurrence
 import com.avlreminder.core.model.PrepAnswer
 import com.avlreminder.core.model.Reminder
@@ -68,6 +69,9 @@ data class AlarmUi(
     val lastProofText: String? = null,
     /** Opened before the reminder is due ("vorab erledigen"): only done and minimum. */
     val early: Boolean = false,
+    /** Checklist items already done in this occurrence. */
+    val done: Set<Long> = emptySet(),
+    val canDeferRest: Boolean = false,
 )
 
 private enum class View { MAIN, PROOF, POSTPONE, SKIP }
@@ -95,19 +99,35 @@ fun AlarmContent(
     onStartProof: () -> Unit,
     onAbortProof: () -> Unit,
     devices: AlarmDevices,
+    onCheckItem: (itemId: Long, evidence: Evidence) -> Unit = { _, _ -> },
+    onDeferRest: (Instant) -> Unit = {},
 ) {
     val c = Avl.colors
     var view by remember { mutableStateOf(View.MAIN) }
     var minimumOnly by remember { mutableStateOf(false) }
+    /** The checklist item the proof is for; null = the whole reminder. */
+    var proofItem by remember { mutableStateOf<ChecklistItem?>(null) }
     val r = ui.reminder
+    val checklist = r.checklist.isNotEmpty()
 
     fun complete(minimum: Boolean) {
         minimumOnly = minimum
+        proofItem = null
         if (r.proof.needsEvidence) {
             if (!ui.early) onStartProof()
             view = View.PROOF
         } else {
             onComplete(minimum, Evidence(), null)
+        }
+    }
+
+    fun check(item: ChecklistItem) {
+        if (r.proof.needsEvidence) {
+            proofItem = item
+            if (!ui.early) onStartProof()
+            view = View.PROOF
+        } else {
+            onCheckItem(item.id, Evidence())
         }
     }
 
@@ -132,8 +152,11 @@ fun AlarmContent(
                         val left = ui.minimumsLeft?.let { " · noch ${it}× diese Woche" } ?: ""
                         InfoCard("Minimum$left", min)
                     }
+                    if (checklist) Checklist(r.checklist, ui.done, ::check)
                     Spacer(Modifier.height(24.dp))
-                    Button(onClick = { complete(false) }, modifier = Modifier.fillMaxWidth().height(56.dp)) { Text("Erledigt", fontSize = 18.sp) }
+                    Button(onClick = { complete(false) }, modifier = Modifier.fillMaxWidth().height(56.dp)) {
+                        Text(if (checklist) "Alles erledigt" else "Erledigt", fontSize = 18.sp)
+                    }
                     if (r.minimum != null) {
                         OutlinedButton(
                             onClick = { complete(true) },
@@ -142,6 +165,15 @@ fun AlarmContent(
                         ) { Text(if (ui.minimumAllowed) "Nur Minimum geschafft" else "Minimum diese Woche aufgebraucht") }
                     }
                     if (!ui.early) {
+                        if (checklist) {
+                            val time = ui.occurrence.dueAt.atZone(zone).toLocalTime()
+                            val tomorrow = now.atZone(zone).toLocalDate().plusDays(1).atTime(time).atZone(zone).toInstant()
+                            OutlinedButton(
+                                onClick = { onDeferRest(tomorrow) },
+                                enabled = ui.canDeferRest,
+                                modifier = Modifier.fillMaxWidth().padding(top = 8.dp),
+                            ) { Text("Rest auf morgen ${Format.time(tomorrow, zone)}") }
+                        }
                         if (ui.snooze.isNotEmpty()) {
                             Row(Modifier.fillMaxWidth().padding(top = 8.dp), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                                 ui.snooze.forEach { minutes ->
@@ -158,7 +190,18 @@ fun AlarmContent(
                     }
                 }
                 View.PROOF -> ProofStep(
-                    ui, minimumOnly, onComplete,
+                    ui,
+                    subtitle = proofItem?.title ?: if (minimumOnly) "Minimum" else "Ziel",
+                    onDone = { evidence, note ->
+                        val item = proofItem
+                        if (item == null) {
+                            onComplete(minimumOnly, evidence, note)
+                        } else {
+                            proofItem = null
+                            view = View.MAIN
+                            onCheckItem(item.id, evidence)
+                        }
+                    },
                     onBack = {
                         if (!ui.early) onAbortProof()
                         view = View.MAIN
@@ -167,6 +210,24 @@ fun AlarmContent(
                 )
                 View.POSTPONE -> PostponeStep(ui, now, zone, onPostpone, onBack = { view = View.MAIN })
                 View.SKIP -> SkipStep(onSkip, onBack = { view = View.MAIN })
+            }
+        }
+    }
+}
+
+/** Done items ticked, open ones as buttons; each can be done on its own. */
+@Composable
+private fun Checklist(items: List<ChecklistItem>, done: Set<Long>, onCheck: (ChecklistItem) -> Unit) {
+    val c = Avl.colors
+    Column(Modifier.fillMaxWidth().padding(vertical = 4.dp).clip(RoundedCornerShape(12.dp)).background(c.surface).padding(14.dp)) {
+        Text("Checkliste · ${items.count { it.id in done }} von ${items.size}", color = c.muted, fontSize = 13.sp)
+        items.forEach { item ->
+            if (item.id in done) {
+                Text("✓ ${item.title}", Modifier.padding(vertical = 10.dp), color = c.muted, fontSize = 17.sp)
+            } else {
+                OutlinedButton(onClick = { onCheck(item) }, Modifier.fillMaxWidth().padding(vertical = 2.dp).testTag("item${item.id}")) {
+                    Text("○  ${item.title}", Modifier.weight(1f), color = c.text, fontSize = 17.sp)
+                }
             }
         }
     }
@@ -220,8 +281,8 @@ private fun StepHeader(title: String, subtitle: String) {
 @Composable
 private fun ProofStep(
     ui: AlarmUi,
-    minimumOnly: Boolean,
-    onComplete: (Boolean, Evidence, String?) -> Unit,
+    subtitle: String,
+    onDone: (Evidence, String?) -> Unit,
     onBack: () -> Unit,
     devices: AlarmDevices,
 ) {
@@ -235,7 +296,7 @@ private fun ProofStep(
     val problems = ProofCheck.problems(spec, evidence, ui.lastProofText)
 
     val pause = if (ui.early) "" else " · Alarm pausiert ${spec.windowMinutes} min"
-    StepHeader("Nachweis", "${ui.reminder.title} · ${if (minimumOnly) "Minimum" else "Ziel"}$pause")
+    StepHeader("Nachweis", "${ui.reminder.title} · $subtitle$pause")
 
     if (spec.photo) {
         Text("Foto", color = c.text, fontWeight = FontWeight.SemiBold, modifier = Modifier.padding(bottom = 6.dp))
@@ -272,11 +333,11 @@ private fun ProofStep(
 
     problems.forEach { Text(it, Modifier.padding(top = 8.dp), color = c.muted, fontSize = 14.sp) }
     Button(
-        onClick = { onComplete(minimumOnly, evidence, note.ifBlank { null }) },
+        onClick = { onDone(evidence, note.ifBlank { null }) },
         enabled = problems.isEmpty(),
         modifier = Modifier.fillMaxWidth().padding(top = 16.dp).height(56.dp),
     ) { Text("Abschließen", fontSize = 18.sp) }
-    TextButton(onClick = { onComplete(minimumOnly, evidence, note.ifBlank { null }) }, Modifier.padding(top = 12.dp), enabled = problems.isNotEmpty()) {
+    TextButton(onClick = { onDone(evidence, note.ifBlank { null }) }, Modifier.padding(top = 12.dp), enabled = problems.isNotEmpty()) {
         Text("Ohne vollständigen Nachweis abschließen – zählt als nicht erfolgreich", color = if (problems.isNotEmpty()) c.strict else c.muted)
     }
     TextButton(onClick = onBack) { Text("Zurück", color = c.muted) }

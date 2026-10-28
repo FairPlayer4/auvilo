@@ -13,6 +13,7 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import com.avlreminder.core.model.ItemDone
 import com.avlreminder.core.model.Reminder
 import com.avlreminder.core.usecases.Entry
 import com.avlreminder.core.usecases.Today
@@ -36,7 +37,13 @@ fun TodayScreen(
     modifier: Modifier = Modifier,
     onCompleteEarly: (Entry) -> Unit = {},
     doNotDisturb: Boolean = false,
+    itemsDone: Map<Long, List<ItemDone>> = emptyMap(),
 ) {
+    fun progress(e: Entry): String {
+        val items = e.reminder.checklist
+        return if (items.isEmpty()) "" else " · ${itemsDone[e.occurrence.id].orEmpty().size} von ${items.size}"
+    }
+
     val c = Avl.colors
     val waiting = if (doNotDisturb) today.dueNow.count { !it.reminder.ignoreDnd } else 0
     LazyColumn(modifier.padding(horizontal = 16.dp)) {
@@ -54,7 +61,7 @@ fun TodayScreen(
                 )
             }
         }
-        if (today.dueNow.isEmpty() && today.laterToday.isEmpty() && today.resolved.isEmpty()) {
+        if (today.dueNow.isEmpty() && today.laterToday.isEmpty() && today.resolved.isEmpty() && today.waiting.isEmpty()) {
             item {
                 Text(
                     "Heute steht nichts mehr an. Mit + legst du einen Reminder an.",
@@ -67,7 +74,7 @@ fun TodayScreen(
             items(today.dueNow, key = { "due" + it.occurrence.id }) { e ->
                 EntryCard(
                     title = e.reminder.title,
-                    detail = "seit ${Format.time(e.occurrence.currentAt, zone)}" + proofHint(e.reminder),
+                    detail = "seit ${Format.time(e.occurrence.currentAt, zone)}" + progress(e) + proofHint(e.reminder),
                     highlight = c.strict,
                     onClick = { onOpenDue(e) },
                 ) { StrictnessTag(e.reminder.strictness) }
@@ -78,8 +85,21 @@ fun TodayScreen(
             items(today.laterToday, key = { "later" + it.occurrence.id }) { e ->
                 EntryCard(
                     title = e.reminder.title,
-                    detail = goalLine(e.reminder) ?: Format.schedule(e.reminder.schedule),
+                    detail = (goalLine(e.reminder) ?: Format.plan(e.reminder)) + progress(e),
                     time = Format.time(e.occurrence.currentAt, zone),
+                    onClick = { onEdit(e.reminder) },
+                ) {
+                    StrictnessTag(e.reminder.strictness)
+                    TextButton(onClick = { onCompleteEarly(e) }) { Text("Erledigen", color = c.accent) }
+                }
+            }
+        }
+        if (today.waiting.isNotEmpty()) {
+            item { SectionTitle("Wenn du zuhause bist") }
+            items(today.waiting, key = { "wait" + it.occurrence.id }) { e ->
+                EntryCard(
+                    title = e.reminder.title,
+                    detail = (goalLine(e.reminder) ?: "klingelt bei Ankunft") + progress(e),
                     onClick = { onEdit(e.reminder) },
                 ) {
                     StrictnessTag(e.reminder.strictness)

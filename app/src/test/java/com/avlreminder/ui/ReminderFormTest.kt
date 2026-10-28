@@ -1,8 +1,11 @@
 package com.avlreminder.ui
 
+import com.avlreminder.core.model.Arrival
+import com.avlreminder.core.model.ChecklistItem
 import com.avlreminder.core.model.ProofSpec
 import com.avlreminder.core.model.Schedule
 import com.avlreminder.core.model.Strictness
+import com.avlreminder.core.model.WhenAway
 import com.avlreminder.ui.screens.PrepDraft
 import com.avlreminder.ui.screens.ReminderForm
 import com.avlreminder.ui.screens.ScheduleKind
@@ -91,5 +94,36 @@ class ReminderFormTest {
         val back = ReminderForm.of(r, form.date)
         assertEquals(form.snoozeMinutes, back.snoozeMinutes)
         assertEquals(form.motivationAudio, back.motivationAudio)
+    }
+
+    @Test
+    fun arrivalNeedsTheHomeAndSurvivesEditing() {
+        val base = ReminderForm.new(now, zone, homeId = 7).copy(title = "Training", time = LocalTime.of(19, 0))
+        assertNull(base.toReminder(now)!!.arrival)
+
+        val dropped = base.copy(atHome = true).toReminder(now)!!
+        assertEquals(Arrival(7, WhenAway.DROP), dropped.arrival)
+        val ringing = base.copy(atHome = true, whenAway = WhenAway.RING).toReminder(now)!!
+        assertEquals(Arrival(7, WhenAway.RING), ringing.arrival)
+        val waiting = base.copy(kind = ScheduleKind.ON_ARRIVAL).toReminder(now)!!
+        assertEquals(Schedule.OnArrival, waiting.schedule)
+        assertEquals(7L, waiting.arrival!!.placeId)
+
+        for (r in listOf(dropped, ringing, waiting)) {
+            assertEquals(r, ReminderForm.of(r.copy(id = 5), LocalDate.of(2026, 10, 24)).toReminder(now)!!.copy(id = 0))
+        }
+        // Without "Zuhause" the arrival is left out, so the validation can say what is missing.
+        assertNull(ReminderForm.new(now, zone).copy(kind = ScheduleKind.ON_ARRIVAL).toReminder(now)!!.arrival)
+    }
+
+    @Test
+    fun emptyChecklistItemsAreDroppedAndIdsKept() {
+        val form = ReminderForm.new(now, zone).copy(
+            title = "Katzen",
+            checklist = listOf(ChecklistItem(3, " Brunnen 1 "), ChecklistItem(title = "  "), ChecklistItem(title = "Futter")),
+        )
+        val r = form.toReminder(now)!!
+        assertEquals(listOf(ChecklistItem(3, "Brunnen 1"), ChecklistItem(0, "Futter")), r.checklist)
+        assertEquals(r.checklist, ReminderForm.of(r, LocalDate.of(2026, 10, 24)).checklist)
     }
 }

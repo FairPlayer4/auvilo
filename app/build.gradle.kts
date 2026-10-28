@@ -14,8 +14,8 @@ android {
         applicationId = "com.avlreminder"
         minSdk = 37
         targetSdk = 37
-        versionCode = 2
-        versionName = "1.1a-prototyp"
+        versionCode = 3
+        versionName = "1.1b-prototyp"
     }
 
     buildFeatures {
@@ -57,6 +57,8 @@ dependencies {
     implementation("androidx.room:room-ktx:2.8.5")
     ksp("androidx.room:room-compiler:2.8.5")
     implementation("androidx.datastore:datastore-preferences:1.3.0")
+    // Geofence and current position (V1.1b, tried in the spike)
+    implementation("com.google.android.gms:play-services-location:21.4.0")
 
     implementation("androidx.glance:glance-appwidget:1.2.0")
     implementation("androidx.glance:glance-material3:1.2.0")

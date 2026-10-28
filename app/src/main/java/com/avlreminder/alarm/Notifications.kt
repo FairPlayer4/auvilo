@@ -6,6 +6,9 @@ import android.app.NotificationManager
 import android.app.PendingIntent
 import android.content.Context
 import com.avlreminder.R
+import com.avlreminder.core.model.ChecklistItem
+import com.avlreminder.core.model.Occurrence
+import com.avlreminder.core.model.Reminder
 import com.avlreminder.core.usecases.Ring
 import java.time.Instant
 import java.time.ZoneId
@@ -19,16 +22,24 @@ data class AlarmInfo(
     val quickDone: Boolean,
     /** Snooze buttons in minutes, already without those past the end of the day. */
     val snooze: List<Int> = emptyList(),
+    /** Next open checklist item, to tick off from the notification; only without proof. */
+    val nextItem: ChecklistItem? = null,
 ) {
     companion object {
-        fun of(ring: Ring) = AlarmInfo(
-            occurrenceId = ring.occurrence.id,
-            title = ring.reminder.title,
-            text = ring.reminder.why ?: ring.reminder.goal,
+        fun of(ring: Ring) = of(ring.reminder, ring.occurrence, ring.snooze, ring.nextItem)
+
+        fun of(reminder: Reminder, occurrence: Occurrence, snooze: List<Int>, nextItem: ChecklistItem?): AlarmInfo {
             // Photo, text or audio cannot be given from the notification, so "done" there would always count as without proof.
-            quickDone = !ring.reminder.proof.needsEvidence,
-            snooze = ring.snooze,
-        )
+            val quick = !reminder.proof.needsEvidence
+            return AlarmInfo(
+                occurrenceId = occurrence.id,
+                title = reminder.title,
+                text = nextItem?.let { "Als Nächstes: ${it.title}" } ?: reminder.why ?: reminder.goal,
+                quickDone = quick,
+                snooze = snooze,
+                nextItem = nextItem?.takeIf { quick },
+            )
+        }
     }
 }
 
@@ -134,7 +145,12 @@ object Notifications {
             .setContentTitle(info.title)
             .setContentIntent(openAlarm(context, info.occurrenceId))
         info.text?.let { builder.setContentText(it) }
-        if (info.quickDone) {
+        // A checklist is ticked off item by item; "Alles erledigt" is in the alarm screen.
+        if (info.nextItem != null) {
+            builder.addAction(
+                Notification.Action.Builder(null, "✓ ${info.nextItem.title}", ActionReceiver.check(context, info.occurrenceId, info.nextItem.id)).build(),
+            )
+        } else if (info.quickDone) {
             builder.addAction(action(context, ActionReceiver.ACTION_DONE, "Erledigt", info.occurrenceId))
         }
         // At most three actions fit; "done" plus two snooze buttons.

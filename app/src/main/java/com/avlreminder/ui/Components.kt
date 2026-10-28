@@ -57,6 +57,7 @@ fun ResultBadge(resolution: Resolution) {
         Resolution.NO_PROOF -> Badge(text, c.surface, c.strict, c.strict)
         Resolution.SKIPPED -> Badge(text, c.neutral, c.onNeutral)
         Resolution.MISSED -> Badge(text, c.strict, c.onStrict)
+        Resolution.DROPPED -> Badge(text, Color.Transparent, c.muted, c.line)
     }
 }
 

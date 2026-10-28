@@ -4,10 +4,14 @@ import android.content.Context
 import androidx.room.Room
 import androidx.test.core.app.ApplicationProvider
 import androidx.test.ext.junit.runners.AndroidJUnit4
+import com.avlreminder.core.model.Arrival
+import com.avlreminder.core.model.ChecklistItem
 import com.avlreminder.core.model.Event
 import com.avlreminder.core.model.EventType
+import com.avlreminder.core.model.ItemDone
 import com.avlreminder.core.model.Occurrence
 import com.avlreminder.core.model.OccurrenceState
+import com.avlreminder.core.model.Place
 import com.avlreminder.core.model.PrepAnswer
 import com.avlreminder.core.model.Proof
 import com.avlreminder.core.model.ProofSpec
@@ -17,6 +21,7 @@ import com.avlreminder.core.model.Reminder
 import com.avlreminder.core.model.Resolution
 import com.avlreminder.core.model.Schedule
 import com.avlreminder.core.model.Strictness
+import com.avlreminder.core.model.WhenAway
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.test.runTest
 import org.junit.After
@@ -122,6 +127,55 @@ class RoomReminderRepositoryTest {
         assertTrue(db.dao().events(o).isEmpty())
         assertTrue(db.dao().observeProofs().first().isEmpty())
         assertFalse(photo.exists())
+    }
+
+    @Test
+    fun placesAndArrivalSurviveTheRoundTrip() = runTest {
+        val home = repo.savePlace(Place(name = "Zuhause", lat = 48.1, lon = 11.5))
+        assertEquals(home, repo.savePlace(Place(id = home, name = "Zuhause", lat = 48.2, lon = 11.6, radiusMeters = 200)))
+        assertEquals(listOf(Place(home, "Zuhause", 48.2, 11.6, 200)), repo.places())
+
+        for (r in listOf(
+            reminder(Schedule.Daily(LocalTime.of(19, 0))).copy(arrival = Arrival(home, WhenAway.RING)),
+            reminder(Schedule.Daily(LocalTime.of(19, 0))).copy(arrival = Arrival(home)),
+            reminder(Schedule.OnArrival).copy(arrival = Arrival(home)),
+        )) {
+            val id = repo.saveReminder(r)
+            assertEquals(r.copy(id = id), repo.reminder(id))
+        }
+    }
+
+    @Test
+    fun checklistKeepsItsIdsAndOrderAndTakesRemovedItemsAlong() = runTest {
+        val r = reminder(Schedule.Daily(LocalTime.of(18, 0))).copy(
+            checklist = listOf(ChecklistItem(title = "Brunnen 1"), ChecklistItem(title = "Brunnen 2"), ChecklistItem(title = "Futter")),
+        )
+        val id = repo.saveReminder(r)
+        val saved = repo.reminder(id)!!
+        assertEquals(listOf("Brunnen 1", "Brunnen 2", "Futter"), saved.checklist.map { it.title })
+        assertTrue(saved.checklist.all { it.id > 0 })
+        assertEquals(saved, repo.reminders().single())
+
+        val (b1, b2, futter) = saved.checklist
+        val o = repo.saveOccurrence(Occurrence(reminderId = id, dueAt = t0, state = OccurrenceState.DUE, firstProgressAt = t0))
+        repo.addItemDone(ItemDone(occurrenceId = o, itemId = b2.id, doneAt = t0, withProof = false))
+        repo.addProof(Proof(occurrenceId = o, type = ProofType.TEXT, filePath = null, takenAt = t0, text = "sauber", itemId = b2.id))
+        repo.addItemDone(ItemDone(occurrenceId = o, itemId = futter.id, doneAt = t0.plusSeconds(60)))
+
+        // Reorder, rename, drop one, add one: kept items keep their id and their progress.
+        repo.saveReminder(saved.copy(checklist = listOf(b2.copy(title = "Brunnen Küche"), ChecklistItem(title = "Neu"), b1)))
+        val edited = repo.reminder(id)!!.checklist
+        assertEquals(listOf("Brunnen Küche", "Neu", "Brunnen 1"), edited.map { it.title })
+        assertEquals(b2.id, edited[0].id)
+        assertEquals(b1.id, edited[2].id)
+        assertEquals(listOf(ItemDone(repo.itemsDone(o).single().id, o, b2.id, t0, withProof = false)), repo.itemsDone(o))
+        assertEquals(t0, repo.occurrence(o)!!.firstProgressAt)
+        // The proof stays even if its item goes.
+        assertEquals(b2.id, db.dao().observeProofs().first().single().toModel().itemId)
+
+        repo.saveReminder(repo.reminder(id)!!.copy(checklist = emptyList()))
+        assertTrue(repo.reminder(id)!!.checklist.isEmpty())
+        assertTrue(repo.itemsDone(o).isEmpty())
     }
 
     @Test

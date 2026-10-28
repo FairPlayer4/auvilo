@@ -21,11 +21,14 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import com.avlreminder.core.model.ChecklistItem
+import com.avlreminder.core.model.ItemDone
 import com.avlreminder.core.model.Occurrence
 import com.avlreminder.core.model.Proof
 import com.avlreminder.core.model.ProofType
 import com.avlreminder.core.model.Reminder
 import com.avlreminder.core.model.Resolution
+import com.avlreminder.core.model.Schedule
 import com.avlreminder.core.usecases.HistoryDay
 import com.avlreminder.ui.EntryCard
 import com.avlreminder.ui.Format
@@ -61,8 +64,9 @@ fun RemindersScreen(
         items(reminders, key = { it.id }) { r ->
             val next = openByReminder[r.id]?.currentAt
             val detail = buildString {
-                append(Format.schedule(r.schedule))
+                append(Format.plan(r))
                 if (!r.active) append(" · pausiert")
+                else if (r.schedule == Schedule.OnArrival) append(if (next != null) " · wartet auf Ankunft" else " · erledigt")
                 else if (next != null) append(" · nächstes: ${Format.moment(next, zone, today)}")
             }
             EntryCard(title = r.title, detail = detail, dimmed = !r.active, onClick = { onEdit(r) }) {
@@ -85,6 +89,7 @@ fun HistoryScreen(
     zone: ZoneId,
     modifier: Modifier = Modifier,
     onPlay: (String) -> Unit = {},
+    itemsDone: Map<Long, List<ItemDone>> = emptyMap(),
 ) {
     val c = Avl.colors
     var filter by rememberSaveable { mutableStateOf<Long?>(null) }
@@ -123,6 +128,7 @@ fun HistoryScreen(
                         proofLine(own),
                         own.firstOrNull { it.type == ProofType.TEXT }?.text?.let { "„$it“" },
                         o.note,
+                        itemLine(e.reminder.checklist, itemsDone[o.id].orEmpty(), zone),
                     ).joinToString(" · ")
                 }
                 EntryCard(title = e.reminder.title, detail = detail, time = time) {
@@ -133,6 +139,13 @@ fun HistoryScreen(
         }
         item { Spacer(Modifier.height(32.dp)) }
     }
+}
+
+/** When each checklist item was done (C7), in the order of the list. */
+private fun itemLine(items: List<ChecklistItem>, done: List<ItemDone>, zone: ZoneId): String? {
+    if (done.isEmpty()) return null
+    val at = done.associate { it.itemId to it.doneAt }
+    return items.filter { it.id in at }.joinToString(", ") { "${it.title} ${Format.time(at.getValue(it.id), zone)}" }
 }
 
 private fun proofLine(proofs: List<Proof>): String? {

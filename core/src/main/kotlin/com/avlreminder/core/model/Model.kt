@@ -44,11 +44,16 @@ enum class ProofType { PHOTO, TEXT, AUDIO }
 
 enum class OccurrenceState { PLANNED, DUE, ESCALATING, DONE, CLOSED }
 
-enum class Resolution { GOAL, MINIMUM, NO_PROOF, SKIPPED, MISSED }
+enum class Resolution {
+    GOAL, MINIMUM, NO_PROOF, SKIPPED, MISSED,
+    /** The chance did not come (not at the place at the fallback time); neutral. */
+    DROPPED,
+}
 
 enum class EventType {
     CREATED, DUE, ESCALATED, SNOOZED, POSTPONED, COMPLETED, SKIPPED, MISSED, MISSED_DETECTED,
     PROOF_STARTED, PROOF_ABORTED,
+    DROPPED, ITEM_DONE, DEFERRED,
 }
 
 /** When a reminder is due. */
@@ -65,7 +70,35 @@ sealed interface Schedule {
     data class AfterDone(val intervalDays: Int, val time: LocalTime, val firstOn: LocalDate? = null) : Schedule {
         init { require(intervalDays >= 1) { "interval must be at least one day" } }
     }
+    /** Once, without a time: due only through its [Arrival] ("wenn ich zuhause bin"). */
+    data object OnArrival : Schedule
 }
+
+/** A place for arrival triggers; V1.1b knows only "Zuhause". */
+data class Place(
+    val id: Long = 0,
+    val name: String,
+    val lat: Double,
+    val lon: Double,
+    val radiusMeters: Int = 150,
+)
+
+/** What happens at the scheduled time if the arrival has not come. */
+enum class WhenAway {
+    /** Rings anyway. */
+    RING,
+    /** Rings only when at the place, otherwise the occurrence is dropped (neutral). */
+    DROP,
+}
+
+/**
+ * The schedule picks the day, the arrival the moment: arriving at [placeId] makes the day's
+ * occurrence due right away; at the scheduled time [whenAway] applies.
+ */
+data class Arrival(val placeId: Long, val whenAway: WhenAway = WhenAway.DROP)
+
+/** One point of a checklist; the list order is the order of the points. */
+data class ChecklistItem(val id: Long = 0, val title: String)
 
 data class Reminder(
     val id: Long = 0,
@@ -90,6 +123,10 @@ data class Reminder(
     val snoozeMinutes: List<Int> = listOf(10),
     /** Recorded message to oneself, played on tap only. */
     val motivationAudio: String? = null,
+    /** Arrival trigger; null = time only. */
+    val arrival: Arrival? = null,
+    /** Empty = a single task. */
+    val checklist: List<ChecklistItem> = emptyList(),
 )
 
 /** One concrete time a reminder is due. */
@@ -107,6 +144,8 @@ data class Occurrence(
     val note: String? = null,
     /** While a proof is being made the escalation pauses until then. */
     val pausedUntil: Instant? = null,
+    /** First checked item; "after done" counts from here for a checklist. */
+    val firstProgressAt: Instant? = null,
 ) {
     val isOpen: Boolean get() = state != OccurrenceState.DONE && state != OccurrenceState.CLOSED
 }
@@ -118,6 +157,18 @@ data class Proof(
     val filePath: String?,
     val takenAt: Instant,
     val text: String? = null,
+    /** The checklist item this proof is for; null = the whole occurrence. */
+    val itemId: Long? = null,
+)
+
+/** A checklist item done within one occurrence. */
+data class ItemDone(
+    val id: Long = 0,
+    val occurrenceId: Long,
+    val itemId: Long,
+    val doneAt: Instant,
+    /** The proof the reminder asks for was complete. */
+    val withProof: Boolean = true,
 )
 
 /**

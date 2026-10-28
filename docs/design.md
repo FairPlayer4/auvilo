@@ -418,3 +418,40 @@ Wie Abschnitt 8, zusätzlich:
 - **Ersetzte Motivations-Audios** werden beim Speichern gelöscht.
 - **Tagesgrenze und "laut ab"** sind in den Einstellungen wählbar (laut 16–20 Uhr,
   Grenze 21–23 Uhr).
+
+### 11.14 Umsetzung V1.1b – Abweichungen und Präzisierungen
+
+- **Modell:** Statt `Reminder.trigger` gibt es `Reminder.arrival = Arrival(placeId,
+  whenAway)`. Die Uhrzeit des Zeitplans ist die Fallback-Zeit; `whenAway` ist *entfällt*
+  (`DROP`, Standard) oder *trotzdem klingeln* (`RING`). "Wenn ich zuhause bin" ist eine
+  eigene Zeitplan-Art `Schedule.OnArrival` (einmalig, ohne Uhrzeit).
+- **Ankunft** klingelt nur das heutige, noch geplante Vorkommen vor seiner Uhrzeit.
+  Gesnoozte oder verschobene Vorkommen behalten ihre Zeit.
+- **Geofence:** ein *Dwell*-Geofence pro benötigtem Ort, Verweildauer 1/3/5/10 min
+  (Standard 3). Kein Initial-Trigger. Neu registriert wird nur, wenn sich Orte oder
+  Verweildauer ändern (Merker im Prozess; nach einem Neustart ist er leer). Fehlt
+  "Immer erlauben", wird nichts registriert und die Uhrzeit allein zählt.
+- **Aktive Standortprüfung** (ein frischer Fix, höchstens 8 s):
+  - Zur Fallback-Zeit bei `DROP`: sicher drin → Alarm; sicher draußen (Abstand minus
+    Genauigkeit > Radius) → `DROPPED`. Unbekannt oder ungenau → Alarm, damit nichts
+    verloren geht.
+  - Für `OnArrival` nach dem Speichern, nach dem Setzen von "Zuhause" und nach
+    Neustart/Update. Für zeitbasierte Reminder ist keine Prüfung nötig, die
+    Fallback-Zeit deckt es ab.
+- **Checklisten:** Tabelle `item_done` (occurrenceId, itemId, doneAt, withProof) statt
+  `item_progress`; `plannedFor` entfällt mit C4 (→ V1.2).
+  - Punkte werden einzeln abgehakt (`Action.CheckItem`), auch vorab. Der letzte schließt
+    den Block: `GOAL`, wenn jeder Punkt seinen Nachweis hat, sonst `NO_PROOF`.
+  - *Alles erledigt* schließt mit einem Nachweis für den Rest. *Minimum* schließt mit
+    `MINIMUM`, ohne die Punkte abzuhaken.
+  - **Tagesgrenze:** Wurde an dem Tag ein Punkt erledigt, kommt der Rest am nächsten Tag
+    zur gleichen Uhrzeit wieder (zählt nicht als Verschieben, C3). Sonst verpasst.
+  - *Rest auf morgen* im Alarm: kostenlos nach einem Punkt am selben Tag, sonst zählt es
+    gegen das Verschiebe-Limit.
+  - Nachweis pro Punkt über die Nachweis-Seite (`proof.itemId`).
+- **Benachrichtigung:** "✓ nächster Punkt" nur bei Remindern ohne Nachweis. Nach dem
+  Abhaken kommt eine stille Benachrichtigung mit dem nächsten Punkt.
+- **Punkte bearbeiten:** Gebliebene Punkte behalten ihre Id und damit ihren Fortschritt.
+  Entfernte Punkte nehmen ihren Fortschritt mit; ihre Nachweise bleiben.
+- **Migration 2→3** nur mit `ADD COLUMN` und neuen Tabellen. Das Backup
+  `avlreminder-v2-<Zeit>.db` entsteht wie in 11.13.
