@@ -651,6 +651,28 @@ warten) und ist keine eigenständige Verwaltungs-App. **[V3 – vielleicht nie]*
   Datenschutz wäre dann nicht mehr gewährleistet.
 - Inventardaten sind sensibel (was steht wo im Haus) → gleiche Regeln wie 8.4.
 
+### 7.24 Verbesserung vorschlagen
+Bei der Nutzung fallen oft Kleinigkeiten auf, meist zur Bedienung und teils
+wichtig. Bis zur nächsten Ausbaustufe sind sie wieder vergessen. Die App soll sie
+deshalb dort festhalten, wo sie auffallen. **[V1.2]**
+- VV1 **Von überall erreichbar**: Jeder Bildschirm hat den Eintrag *Verbesserung
+  vorschlagen*, auch der Alarm (dort unauffällig, damit er nicht vom Reagieren
+  ablenkt). Er öffnet einen kurzen Dialog.
+- VV2 **Schnell erfasst**: ein Textfeld (Diktieren über die Tastatur reicht), dazu
+  optional **wichtig**. Nach dem Speichern ist man sofort wieder dort, wo man war.
+  Das Erfassen soll nicht länger als ca. 10 Sekunden dauern.
+- VV3 **Kontext automatisch**: Gespeichert werden auch Zeitpunkt, App-Version und
+  der Bildschirm, von dem aus der Vorschlag kam (bei Alarm und Bearbeiten auch
+  welcher Reminder). Man muss die Situation dann nicht beschreiben.
+- VV4 **Liste der Vorschläge** in den Einstellungen: wichtige zuerst, dann die
+  neuesten. Vorschläge lassen sich bearbeiten, als *umgesetzt* oder *verworfen*
+  markieren und löschen.
+- VV5 **Mitnehmen in die Planung**: *Alle offenen kopieren* bzw. *Teilen* als
+  einfacher Text (Markdown-Liste mit Kontext). Kevin entscheidet selbst, wohin der
+  Text geht.
+- VV6 Die Vorschläge bleiben **lokal** in der App-Datenbank (wie 8.4) und sind im
+  Backup vor Migrationen enthalten. Es gibt keinen automatischen Versand.
+
 ## 8. Zielplattform und Technik
 
 ### 8.1 Zielgerät
@@ -770,6 +792,7 @@ früh am S24 Ultra testen (Spike, siehe Abschnitt 10).
 | 2026-10-25 | GPS-Routen erst V2/V3 – punktuelle Ortserkennung reicht vorerst |
 | 2026-10-25 | Sensible Daten grundsätzlich nur lokal auf dem Gerät |
 | 2026-10-25 | Mehrere Personen (V3) möglichst ohne Backend über lokale Synchronisation im Haushalt |
+| 2026-10-28 | "Verbesserung vorschlagen" in der App: von überall erreichbar, Kontext automatisch, lokal gespeichert, als Text teilbar (V1.2) |
 
 ## 10. Nächste Schritte
 
@@ -787,7 +810,8 @@ früh am S24 Ultra testen (Spike, siehe Abschnitt 10).
      **Alarm aus während des Nachweises**, **Text-Nachweis**, kombinierbare
      Nachweise (7.5)
    - **V1.2:** Wochenziele, Fristen mit Ausführungsfenstern, Serien/Joker,
-     Statistik, Übersicht morgens/abends, Vorlagen, **Blocker als Aufgaben** (7.21, S5–S8)
+     Statistik, Übersicht morgens/abends, Vorlagen, **Blocker als Aufgaben** (7.21, S5–S8),
+     **Verbesserung vorschlagen** (7.24)
    - **V1.3:** **Durchführung mit Timer** und Nachfrage-Muster (7.11), **Abläufe**
      für Training (7.12), **Galaxy Watch** über Benachrichtigungen (7.14),
      **vorgezogen starten** (7.20)
