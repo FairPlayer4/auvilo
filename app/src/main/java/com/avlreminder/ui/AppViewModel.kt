@@ -115,6 +115,7 @@ class AppViewModel(app: Application) : AndroidViewModel(app) {
         viewModelScope.launch {
             val result = graph.withEngine { it.save(reminder, prep) }
             onResult(result)
+            if (result is SaveResult.Saved) result.ring?.let(graph::ring)
             // Already home when saving "wenn ich zuhause bin": the geofence would not report it.
             if (result is SaveResult.Saved && reminder.schedule == Schedule.OnArrival) {
                 graph.scope.launch { graph.checkPlacesAndRing() }

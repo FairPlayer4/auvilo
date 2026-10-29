@@ -63,17 +63,21 @@ fun RemindersScreen(
         }
         items(reminders, key = { it.id }) { r ->
             val next = openByReminder[r.id]?.currentAt
+            // A one-off that already happened rings again only with a new time.
+            val finished = r.schedule is Schedule.Once && next == null
             val detail = buildString {
                 append(Format.plan(r))
-                if (!r.active) append(" · pausiert")
+                if (finished) append(" · abgeschlossen – neue Zeit wählen, um ihn zu wiederholen")
+                else if (!r.active) append(" · pausiert")
                 else if (r.schedule == Schedule.OnArrival) append(if (next != null) " · wartet auf Ankunft" else " · erledigt")
                 else if (next != null) append(" · nächstes: ${Format.moment(next, zone, today)}")
             }
-            EntryCard(title = r.title, detail = detail, dimmed = !r.active, onClick = { onEdit(r) }) {
+            EntryCard(title = r.title, detail = detail, dimmed = !r.active || finished, onClick = { onEdit(r) }) {
                 Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                     StrictnessTag(r.strictness)
                 }
-                Switch(checked = r.active, onCheckedChange = { onSetActive(r, it) })
+                // Switching it on would plan nothing; the card opens the form for a new time.
+                if (!finished) Switch(checked = r.active, onCheckedChange = { onSetActive(r, it) })
             }
         }
         item { Spacer(Modifier.height(96.dp)) }

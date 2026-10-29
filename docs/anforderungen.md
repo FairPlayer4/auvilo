@@ -297,6 +297,19 @@ Erster Satz, wird mit der Nutzung angepasst: **[V1]**
   - *streng*: Vollbild-Alarm, Nachweis Pflicht, 1× Verschieben, Minimum max. 1×/Woche
 - UI wird sich mit der tatsächlichen Nutzung stark anpassen → früh benutzbare
   Version wichtiger als vollständige Planung.
+- **Reminder-Liste aufgeräumt halten** (aus der Nutzung, 2026-10-29): **[V1.2]**
+  - L1 **Abgeschlossen ausblenden**: Erledigte Einmal-Reminder (auch *Wenn ich
+    zuhause bin*) kommen automatisch in einen eingeklappten Bereich
+    *Abgeschlossen (n)* am Ende der Liste.
+  - L2 **Archivieren** von Hand, vor allem für wiederkehrende Reminder, die man
+    nicht mehr braucht, aber wegen des Verlaufs nicht löschen will. Archiviert
+    heißt pausiert und im Bereich *Abgeschlossen*.
+  - L3 **Wiederherstellen**: Ein wiederkehrender Reminder kommt pausiert zurück.
+    Ein Einmal-Reminder braucht eine neue Zeit; das Bearbeiten öffnet sich dafür.
+  - L4 **Gruppen**: aktiv, darunter *Pausiert*, ganz unten *Abgeschlossen*.
+  - L5 **Sortieren** innerhalb der Gruppen: *nächste Fälligkeit* (Standard),
+    *Name*, *zuletzt angelegt*. Die Wahl bleibt gespeichert. Weitere Optionen erst,
+    wenn sie fehlen.
 
 ### 7.10 Lebenszyklus eines Reminders (Entwurf)
 
@@ -793,6 +806,7 @@ früh am S24 Ultra testen (Spike, siehe Abschnitt 10).
 | 2026-10-25 | Sensible Daten grundsätzlich nur lokal auf dem Gerät |
 | 2026-10-25 | Mehrere Personen (V3) möglichst ohne Backend über lokale Synchronisation im Haushalt |
 | 2026-10-28 | "Verbesserung vorschlagen" in der App: von überall erreichbar, Kontext automatisch, lokal gespeichert, als Text teilbar (V1.2) |
+| 2026-10-29 | Reminder-Liste: abgeschlossene Einmal-Reminder automatisch eingeklappt, Archivieren von Hand, Gruppen und Sortierung (V1.2). Einmal-Reminder mit neuer Zeit wird wieder eingeplant und eingeschaltet (Bugfix, sofort) |
 
 ## 10. Nächste Schritte
 
@@ -811,7 +825,8 @@ früh am S24 Ultra testen (Spike, siehe Abschnitt 10).
      Nachweise (7.5)
    - **V1.2:** Wochenziele, Fristen mit Ausführungsfenstern, Serien/Joker,
      Statistik, Übersicht morgens/abends, Vorlagen, **Blocker als Aufgaben** (7.21, S5–S8),
-     **Verbesserung vorschlagen** (7.24)
+     **Verbesserung vorschlagen** (7.24), **Reminder-Liste aufräumen** (7.9, L1–L5)
+     – beides klein genug, um es bei Bedarf vorzuziehen
    - **V1.3:** **Durchführung mit Timer** und Nachfrage-Muster (7.11), **Abläufe**
      für Training (7.12), **Galaxy Watch** über Benachrichtigungen (7.14),
      **vorgezogen starten** (7.20)

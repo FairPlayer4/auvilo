@@ -88,6 +88,8 @@ class AppGraph(private val context: Context) {
     }
 
     /** Rebuilds all alarms and rings what was missed. */
+    fun ring(ring: com.avlreminder.core.usecases.Ring) = Ringer.ring(context, ring)
+
     suspend fun syncAndRing() {
         withEngine { it.sync() }.forEach { Ringer.ring(context, it) }
     }

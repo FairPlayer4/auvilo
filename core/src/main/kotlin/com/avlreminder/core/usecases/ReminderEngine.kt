@@ -52,7 +52,8 @@ data class Ring(
 )
 
 sealed interface SaveResult {
-    data class Saved(val id: Long) : SaveResult
+    /** [ring]: the reminder is due right away, e.g. a one-off moved to a passed time today. */
+    data class Saved(val id: Long, val ring: Ring? = null) : SaveResult
     data class Invalid(val problems: List<String>) : SaveResult
 }
 
@@ -78,11 +79,20 @@ class ReminderEngine(
      * [prep]: new or changed "Startklar" answers; unchanged ones are not stored again.
      * "Überwindung" needs all four answered (also when an older reminder is edited).
      */
-    suspend fun save(reminder: Reminder, prep: List<PrepAnswer> = emptyList()): SaveResult {
-        val problems = Validation.problems(reminder).toMutableList()
-        val schedule = reminder.schedule
-        if (reminder.id == 0L && schedule is Schedule.Once && schedule.at.atZone(zone).toInstant() <= now()) {
-            problems += "Zeitpunkt liegt in der Vergangenheit"
+    suspend fun save(edited: Reminder, prep: List<PrepAnswer> = emptyList()): SaveResult {
+        val problems = Validation.problems(edited).toMutableList()
+        val schedule = edited.schedule
+        // A one-off moved to another time is meant to happen again, also when it was paused.
+        val moved = schedule is Schedule.Once && edited.id != 0L && repo.reminder(edited.id)?.schedule != schedule
+        val reminder = if (moved) edited.copy(active = true) else edited
+        if (schedule is Schedule.Once) {
+            val past = when {
+                reminder.id == 0L -> schedule.at.atZone(zone).toInstant() <= now()
+                // Today still counts and rings right away, e.g. to do it again today.
+                moved -> schedule.at.toLocalDate() < now().atZone(zone).toLocalDate()
+                else -> false
+            }
+            if (past) problems += "Zeitpunkt liegt in der Vergangenheit"
         }
         val current = if (reminder.id == 0L) emptyMap() else prep(reminder.id)
         val changed = prep.filter { new ->
@@ -109,9 +119,9 @@ class ReminderEngine(
                 repo.saveOccurrence(open.copy(dueAt = due, currentAt = due))
             }
         }
-        syncReminder(saved)
+        val ring = syncReminder(saved)
         watchPlaces()
-        return SaveResult.Saved(id)
+        return SaveResult.Saved(id, ring)
     }
 
     suspend fun delete(reminderId: Long) {

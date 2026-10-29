@@ -25,6 +25,8 @@ class ScheduleRulesTest {
         val once = Schedule.Once(LocalDateTime.of(2026, 10, 28, 9, 0))
         assertEquals(at(28, 9), next(once, at(26, 8)))
         assertNull(next(once, at(28, 10), prev = at(28, 9)))
+        // Moved to another time after it happened: due again, also when that time has passed.
+        assertEquals(at(28, 9), next(once, at(28, 10), prev = at(27, 9)))
     }
 
     @Test
