@@ -1,4 +1,4 @@
-# Design – avlreminder V1.0 und V1.1
+# Design – avlreminder V1.0 bis V1.2
 
 > Stand: 2026-10-24 – erster Entwurf. Grundlage: [anforderungen.md](anforderungen.md),
 > Ergebnisse aus [spike.md](spike.md). Mocks: siehe Abschnitt 9.
@@ -455,3 +455,68 @@ Wie Abschnitt 8, zusätzlich:
   Entfernte Punkte nehmen ihren Fortschritt mit; ihre Nachweise bleiben.
 - **Migration 2→3** nur mit `ADD COLUMN` und neuen Tabellen. Das Backup
   `avlreminder-v2-<Zeit>.db` entsteht wie in 11.13.
+
+## 12. V1.2 – Schnitt und Entwurf
+
+### 12.1 Schnitt in drei Etappen
+V1.2 ist für einen Schritt zu groß und zum Teil noch offen. Deshalb (2026-10-29):
+
+| Etappe | Inhalt | Stand |
+|---|---|---|
+| **V1.2a – Alltag** | Verbesserung vorschlagen (Anf. 7.24), Reminder-Liste aufräumen (Anf. 7.9, L1–L5) | in Umsetzung |
+| **V1.2b – Ziele über die Zeit** | Wochenziele, Serien/Joker, Statistik, Übersicht morgens/abends | Entwurf 12.3, Prüfung durch Kevin offen |
+| **V1.2c – Fristen und Blocker** | Fristen mit Ausführungsfenstern, Vorab-Reminder (T6), Blocker als Aufgaben (S5–S8), eigene Vorlagen | Entwurf 12.4, Prüfung durch Kevin offen |
+
+Der Vorab-Reminder (T6) war bisher keiner Etappe zugeordnet; S6 braucht ihn, deshalb V1.2c.
+
+### 12.2 V1.2a – Design
+- **Archiv:** `reminder.archivedAt` (null = nicht archiviert). Archivieren pausiert den
+  Reminder und setzt `archivedAt`; Wiederherstellen löscht nur `archivedAt`, der Reminder
+  bleibt pausiert. Einschalten und das Verschieben eines Einmal-Reminders auf eine neue
+  Zeit heben das Archiv auf. Das Formular kennt `archivedAt` nicht; die Engine übernimmt
+  den gespeicherten Wert.
+- **Abgeschlossen** ist abgeleitet, nicht gespeichert: ein Einmal-Reminder oder *Wenn ich
+  zuhause bin* ohne offene Fälligkeit.
+- **Liste** (`ReminderList` in `:core`): Gruppen *aktiv*, *Pausiert*, *Abgeschlossen*
+  (archiviert oder abgeschlossen, eingeklappt). Sortierung *nächste Fälligkeit*
+  (Standard; ohne Fälligkeit ans Ende, dann nach Name), *Name*, *zuletzt angelegt*. Die
+  Wahl liegt in den Einstellungen (DataStore).
+- **Vorschläge:** Tabelle `suggestion` (Text, wichtig, Zeitpunkt, Bildschirm, Reminder-Id
+  und -Titel, App-Version, Status *offen / umgesetzt / verworfen* mit Zeitpunkt). Keine
+  Fremdschlüssel: Ein Vorschlag bleibt, wenn der Reminder gelöscht wird; der Titel ist
+  deshalb mitgespeichert. Vorschläge sind keine Reminder-Logik und liegen nur in `:app`.
+- **Einstieg:** Glühbirnen-Symbol oben rechts auf jedem Bildschirm (auf *Heute* neben den
+  Einstellungen, beim Bearbeiten vor *Speichern*). Im Alarm ein unauffälliger Textknopf
+  ganz unten; der Alarm läuft dabei weiter.
+- **Liste der Vorschläge:** aus den Einstellungen erreichbar; wichtige zuerst, dann die
+  neuesten; *Alle offenen kopieren* und *Teilen* als Markdown-Liste mit Kontext.
+- **Migration 3→4** nur mit `ADD COLUMN` und neuer Tabelle, Backup wie in 11.13.
+
+### 12.3 V1.2b – Entwurf zur Prüfung
+Vorschläge zu den offenen Fragen; Kevin bestätigt oder korrigiert vor der Umsetzung.
+1. **Wochenziel als Eigenschaft** eines wiederkehrenden Reminders (z. B. Training:
+   Mo–Fr angeboten, Ziel 3–4×, Minimum 1×), keine eigene Reminder-Art. Woche Mo–So.
+2. **"3–4×"**: Ab 3 ist das Ziel erreicht; weitere Angebote kommen nur noch still, ohne
+   Eskalation. Ab 4 wird für den Rest der Woche nichts mehr angeboten.
+3. **Minimum zählt mit** für das Wochenziel; die Statistik weist es getrennt aus.
+4. **Knapp:** Reichen die restlichen Angebotstage nur noch genau, eskaliert der Reminder
+   eine Stufe strenger.
+5. **Rettungs-Erinnerung:** Steht die Woche bei 0, kommt Samstag 10 Uhr eine strenge
+   Erinnerung, Sonntag 10 Uhr noch einmal.
+6. **Serien:** tägliche Reminder zählen Tage, Reminder mit Wochenziel Wochen mit
+   erreichtem Minimum, Intervall-Reminder Erledigungen, die höchstens einen Tag nach dem
+   Plan kamen (am unsichersten). Joker: 1 pro Woche bei täglichen, 1 pro Monat bei
+   wöchentlichen; Auslassen und *entfällt* zählen neutral.
+7. **Statistik** pro Reminder: erledigt, Minimum, ausgelassen, verpasst; aktuelle und beste
+   Serie; Woche, Monat, Jahr, gesamt. Zuerst als Liste, Diagramme später.
+8. **Übersicht** als stille Benachrichtigung um 7:30 und 20:30 (einstellbar); ein Tipp
+   öffnet die Übersicht in der App. Abends mit Stand der Wochenziele.
+
+### 12.4 V1.2c – Entwurf zur Prüfung
+9. **Fristen:** *Auf morgen* geht, solange danach noch mindestens ein Ausführungsfenster
+   vor der Frist liegt. Nach der Frist gilt die Fälligkeit als verpasst; der Reminder bleibt
+   sichtbar, bis er erledigt oder verworfen ist.
+10. **Vorlagen:** *Als Vorlage speichern* an einem Reminder; Widget und *+* bieten die
+    Vorlagen zur Auswahl an (z. B. "Arbeit" mit *+30 / +60*).
+11. **Vorab-Reminder (T6):** pro Reminder optional, *am Vorabend* (Uhrzeit einstellbar)
+    oder *x Minuten vorher*; eine stille Benachrichtigung, die offene Blocker nennt (S6).

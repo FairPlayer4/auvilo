@@ -806,6 +806,7 @@ früh am S24 Ultra testen (Spike, siehe Abschnitt 10).
 | 2026-10-25 | Sensible Daten grundsätzlich nur lokal auf dem Gerät |
 | 2026-10-25 | Mehrere Personen (V3) möglichst ohne Backend über lokale Synchronisation im Haushalt |
 | 2026-10-28 | "Verbesserung vorschlagen" in der App: von überall erreichbar, Kontext automatisch, lokal gespeichert, als Text teilbar (V1.2) |
+| 2026-10-29 | V1.2 in drei Etappen: a Alltag (Vorschläge, Liste), b Ziele über die Zeit, c Fristen und Blocker; Vorab-Reminder (T6) in V1.2c |
 | 2026-10-29 | Reminder-Liste: abgeschlossene Einmal-Reminder automatisch eingeklappt, Archivieren von Hand, Gruppen und Sortierung (V1.2). Einmal-Reminder mit neuer Zeit wird wieder eingeplant und eingeschaltet (Bugfix, sofort) |
 
 ## 10. Nächste Schritte
@@ -823,10 +824,12 @@ früh am S24 Ultra testen (Spike, siehe Abschnitt 10).
      und Tagesgrenze (7.3), **Verschiebe-Knöpfe pro Reminder** (7.4),
      **Alarm aus während des Nachweises**, **Text-Nachweis**, kombinierbare
      Nachweise (7.5)
-   - **V1.2:** Wochenziele, Fristen mit Ausführungsfenstern, Serien/Joker,
-     Statistik, Übersicht morgens/abends, Vorlagen, **Blocker als Aufgaben** (7.21, S5–S8),
-     **Verbesserung vorschlagen** (7.24), **Reminder-Liste aufräumen** (7.9, L1–L5)
-     – beides klein genug, um es bei Bedarf vorzuziehen
+   - **V1.2** in drei Etappen (Design 12):
+     - **V1.2a:** **Verbesserung vorschlagen** (7.24), **Reminder-Liste aufräumen**
+       (7.9, L1–L5)
+     - **V1.2b:** Wochenziele, Serien/Joker, Statistik, Übersicht morgens/abends
+     - **V1.2c:** Fristen mit Ausführungsfenstern, **Vorab-Reminder** (T6), **Blocker
+       als Aufgaben** (7.21, S5–S8), Vorlagen
    - **V1.3:** **Durchführung mit Timer** und Nachfrage-Muster (7.11), **Abläufe**
      für Training (7.12), **Galaxy Watch** über Benachrichtigungen (7.14),
      **vorgezogen starten** (7.20)
