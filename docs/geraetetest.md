@@ -1,4 +1,4 @@
-# Gerätetest – Prototyp V1.0 / V1.1a / V1.1b
+# Gerätetest – Prototyp V1.0 / V1.1a / V1.1b / V1.2a
 
 > Ergänzt die automatischen Tests (`:core` JUnit + Kover, `:app` Robolectric/Compose).
 > Alles hier braucht das echte Gerät. Reihenfolge so gewählt, dass nichts nachts klingelt.
@@ -79,3 +79,21 @@ Vorher: 1.1a mit echten Daten installiert lassen; 1.1b darüber installieren. Ei
 | 53 | Ein Punkt erledigt, Rest bis zur Tagesgrenze offen | nicht verpasst; Rest morgen zur gleichen Uhrzeit |
 | 54 | Letzten Punkt abhaken | erledigt; Verlauf zeigt die Uhrzeit jedes Punkts |
 | 55 | Punkte bearbeiten (umbenennen, umsortieren, einen löschen) | erledigte Punkte bleiben erledigt |
+
+## V1.2a
+
+Vorher: 1.1b mit echten Daten installiert lassen; 1.2a darüber installieren (nicht deinstallieren).
+
+| # | Test | Erwartung |
+|---|---|---|
+| 56 | Erster Start nach dem Update | Reminder, Verlauf und Nachweise sind da; Backup `avlreminder-v3-….db` (wie Test 21) |
+| 57 | Glühbirne auf Heute, Reminder, Verlauf, Einstellungen und beim Bearbeiten | Dialog "Verbesserung vorschlagen"; nach Speichern bleibt man auf dem Bildschirm |
+| 58 | Im Alarm ganz unten "Verbesserung vorschlagen" | Alarm läuft weiter; Vorschlag zeigt "Alarm · „Titel“" |
+| 59 | Einstellungen → Verbesserungen → "Vorschläge ansehen" | offene zuerst, wichtige oben, mit Bildschirm, Zeit und Version |
+| 60 | "Alle offenen kopieren" und "Teilen" | Markdown-Liste in der Zwischenablage bzw. im Teilen-Menü; nichts wird von selbst gesendet |
+| 61 | Vorschlag antippen → "Umgesetzt" | wandert unter "Umgesetzt und verworfen"; "Wieder öffnen" holt ihn zurück |
+| 62 | Reminder-Liste mit erledigtem Einmal-Reminder und pausiertem Reminder | Abschnitte aktiv, "Pausiert", eingeklappt "Abgeschlossen (n)" |
+| 63 | Sortierung "Name" wählen, App neu starten | Sortierung bleibt erhalten |
+| 64 | Reminder bearbeiten → "Archivieren" | pausiert, unter "Abgeschlossen"; keine Alarme mehr |
+| 65 | Archivierten "Wiederherstellen" | steht unter "Pausiert"; erst Einschalten plant ihn wieder ein |
+| 66 | Abgeschlossenen Einmal-Reminder auf später heute legen | wieder aktiv, steht unter "Heute", klingelt zur neuen Zeit |

@@ -65,6 +65,8 @@ fun SettingsScreen(
     onSetHome: (onResult: (Boolean) -> Unit) -> Unit = {},
     dwellMinutes: Int = Settings.DEFAULT_DWELL,
     onDwell: (Int) -> Unit = {},
+    openSuggestions: Int = 0,
+    onSuggestions: () -> Unit = {},
 ) {
     val c = Avl.colors
     var homeState by remember { mutableStateOf<String?>(null) }
@@ -74,6 +76,14 @@ fun SettingsScreen(
             Text("Einstellungen", color = c.text, fontSize = 20.sp, fontWeight = FontWeight.SemiBold)
         }
         Column(Modifier.verticalScroll(rememberScrollState()).padding(horizontal = 16.dp)) {
+            SectionTitle("Verbesserungen")
+            Card {
+                Column(Modifier.padding(16.dp)) {
+                    Text(if (openSuggestions == 0) "Keine offenen Vorschläge" else "$openSuggestions offen", color = c.text, fontSize = 15.sp)
+                    TextButton(onClick = onSuggestions) { Text("Vorschläge ansehen", color = c.accent) }
+                }
+            }
+
             SectionTitle("Darstellung")
             Card {
                 listOf(
@@ -153,7 +163,7 @@ fun SettingsScreen(
                     }
                 }
             }
-            Text("AVL-Reminder 1.1b-Prototyp", Modifier.padding(vertical = 24.dp, horizontal = 4.dp), color = c.muted, fontSize = 12.sp)
+            Text("AVL-Reminder 1.2a-Prototyp", Modifier.padding(vertical = 24.dp, horizontal = 4.dp), color = c.muted, fontSize = 12.sp)
         }
     }
 }

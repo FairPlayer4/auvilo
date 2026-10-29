@@ -152,6 +152,7 @@ fun ReminderEntity.toModel(items: List<ChecklistItemEntity> = emptyList()): Remi
     motivationAudio = motivationAudio,
     arrival = arrivalPlaceId?.let { Arrival(it, arrivalWhenAway ?: WhenAway.DROP) },
     checklist = items.sortedBy { it.position }.map { ChecklistItem(it.id, it.title) },
+    archivedAt = archivedAt,
 )
 
 fun Reminder.toEntity(): ReminderEntity {
@@ -198,6 +199,7 @@ fun Reminder.toEntity(): ReminderEntity {
         motivationAudio = motivationAudio,
         arrivalPlaceId = arrival?.placeId,
         arrivalWhenAway = arrival?.whenAway,
+        archivedAt = archivedAt,
     )
 }
 

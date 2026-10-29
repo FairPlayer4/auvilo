@@ -127,6 +127,8 @@ data class Reminder(
     val arrival: Arrival? = null,
     /** Empty = a single task. */
     val checklist: List<ChecklistItem> = emptyList(),
+    /** Put away by hand; an archived reminder is paused. null = not archived. */
+    val archivedAt: Instant? = null,
 )
 
 /** One concrete time a reminder is due. */

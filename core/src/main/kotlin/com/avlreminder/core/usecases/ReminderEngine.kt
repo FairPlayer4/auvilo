@@ -83,8 +83,10 @@ class ReminderEngine(
         val problems = Validation.problems(edited).toMutableList()
         val schedule = edited.schedule
         // A one-off moved to another time is meant to happen again, also when it was paused.
-        val moved = schedule is Schedule.Once && edited.id != 0L && repo.reminder(edited.id)?.schedule != schedule
-        val reminder = if (moved) edited.copy(active = true) else edited
+        val stored = if (edited.id == 0L) null else repo.reminder(edited.id)
+        val moved = schedule is Schedule.Once && stored != null && stored.schedule != schedule
+        // The form does not know the archive; moving a one-off brings it back.
+        val reminder = if (moved) edited.copy(active = true, archivedAt = null) else edited.copy(archivedAt = stored?.archivedAt)
         if (schedule is Schedule.Once) {
             val past = when {
                 reminder.id == 0L -> schedule.at.atZone(zone).toInstant() <= now()
@@ -130,9 +132,10 @@ class ReminderEngine(
         watchPlaces()
     }
 
+    /** Switching a reminder on also takes it out of the archive. */
     suspend fun setActive(reminderId: Long, active: Boolean) {
         val reminder = repo.reminder(reminderId) ?: return
-        repo.saveReminder(reminder.copy(active = active))
+        repo.saveReminder(reminder.copy(active = active, archivedAt = if (active) null else reminder.archivedAt))
         val open = repo.openOccurrence(reminderId)
         if (!active) {
             open?.let { alarms.cancel(it.id) }
@@ -147,6 +150,13 @@ class ReminderEngine(
         }
         syncReminder(reminder.copy(active = true))
         watchPlaces()
+    }
+
+    /** Archiving pauses the reminder; restoring keeps it paused until it is switched on. */
+    suspend fun setArchived(reminderId: Long, archived: Boolean) {
+        if (archived) setActive(reminderId, false)
+        val reminder = repo.reminder(reminderId) ?: return
+        repo.saveReminder(reminder.copy(archivedAt = if (archived) now() else null))
     }
 
     // --- Places ----------------------------------------------------------------------------

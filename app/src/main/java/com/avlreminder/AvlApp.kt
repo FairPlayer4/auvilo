@@ -8,12 +8,14 @@ import com.avlreminder.alarm.AndroidAlarmPort
 import com.avlreminder.alarm.Notifications
 import com.avlreminder.alarm.Ringer
 import com.avlreminder.core.model.Place
+import com.avlreminder.core.model.Reminder
 import com.avlreminder.core.ports.DeviceStatePort
 import com.avlreminder.core.rules.AlertSettings
 import com.avlreminder.core.usecases.ReminderEngine
 import com.avlreminder.data.AvlDatabase
 import com.avlreminder.data.RoomReminderRepository
 import com.avlreminder.data.Settings
+import com.avlreminder.data.SuggestionEntity
 import com.avlreminder.location.AndroidGeofences
 import com.avlreminder.location.AndroidLocation
 import com.avlreminder.widget.AvlWidget
@@ -74,6 +76,20 @@ class AppGraph(private val context: Context) {
         location = location,
     )
     private val mutex = Mutex()
+
+    val appVersion: String by lazy {
+        runCatching { context.packageManager.getPackageInfo(context.packageName, 0).versionName }.getOrNull() ?: "?"
+    }
+
+    /** Notes an improvement (Anf. 7.24) with where it came from; stays on the phone. */
+    suspend fun addSuggestion(text: String, important: Boolean, screen: String, reminder: Reminder? = null) {
+        db.suggestions().insert(
+            SuggestionEntity(
+                text = text.trim(), important = important, createdAt = Instant.now(), screen = screen,
+                reminderId = reminder?.id, reminderTitle = reminder?.title, appVersion = appVersion,
+            ),
+        )
+    }
 
     /** Runs use cases one at a time and refreshes the widget afterwards. */
     suspend fun <T> withEngine(block: suspend (ReminderEngine) -> T): T {

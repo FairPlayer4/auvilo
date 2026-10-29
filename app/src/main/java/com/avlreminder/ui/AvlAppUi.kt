@@ -5,6 +5,7 @@ import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
@@ -36,9 +37,12 @@ import com.avlreminder.core.model.Proof
 import com.avlreminder.core.model.Reminder
 import com.avlreminder.core.rules.AlertSettings
 import com.avlreminder.core.usecases.HistoryDay
+import com.avlreminder.core.usecases.ReminderSort
 import com.avlreminder.core.usecases.SaveResult
 import com.avlreminder.core.usecases.Today
 import com.avlreminder.data.Settings
+import com.avlreminder.data.SuggestionEntity
+import com.avlreminder.data.SuggestionStatus
 import com.avlreminder.data.ThemeMode
 import com.avlreminder.ui.screens.EditScreen
 import com.avlreminder.ui.screens.HistoryScreen
@@ -46,6 +50,9 @@ import com.avlreminder.ui.screens.PermissionItem
 import com.avlreminder.ui.screens.ReminderForm
 import com.avlreminder.ui.screens.RemindersScreen
 import com.avlreminder.ui.screens.SettingsScreen
+import com.avlreminder.ui.screens.SuggestButton
+import com.avlreminder.ui.screens.SuggestionDialog
+import com.avlreminder.ui.screens.SuggestionsScreen
 import com.avlreminder.ui.screens.TodayScreen
 import com.avlreminder.ui.theme.Avl
 import java.time.Instant
@@ -69,6 +76,9 @@ data class AppState(
     val dwellMinutes: Int = Settings.DEFAULT_DWELL,
     /** Done checklist items per occurrence. */
     val itemsDone: Map<Long, List<ItemDone>> = emptyMap(),
+    val reminderSort: ReminderSort = ReminderSort.NEXT_DUE,
+    /** Open ones first (Anf. 7.24). */
+    val suggestions: List<SuggestionEntity> = emptyList(),
 )
 
 interface AppActions {
@@ -84,6 +94,14 @@ interface AppActions {
     /** Sets "Zuhause" to the current position; false if there was none. */
     fun setHomeHere(onResult: (Boolean) -> Unit) {}
     fun setDwellMinutes(minutes: Int) {}
+    fun setReminderSort(sort: ReminderSort) {}
+    /** Archive pauses; restore keeps it paused. */
+    fun setArchived(reminderId: Long, archived: Boolean) {}
+    fun addSuggestion(text: String, important: Boolean, screen: String, reminderId: Long?) {}
+    fun updateSuggestion(suggestion: SuggestionEntity) {}
+    fun deleteSuggestion(id: Long) {}
+    /** Hands the text to another app of the user's choice. */
+    fun share(text: String) {}
 }
 
 /** Simple navigation without a library: one route string, back goes to "today". */
@@ -92,6 +110,7 @@ object Routes {
     const val HISTORY = "history"
     const val REMINDERS = "reminders"
     const val SETTINGS = "settings"
+    const val SUGGESTIONS = "suggestions"
     const val NEW = "edit:0"
     fun edit(id: Long) = "edit:$id"
 }
@@ -109,13 +128,16 @@ fun AvlAppUi(
     val c = Avl.colors
     var route by rememberSaveable { mutableStateOf(startRoute) }
     var problems by remember { mutableStateOf(emptyList<String>()) }
+    /** Screen name and reminder for the open suggestion dialog. */
+    var suggestFrom by remember { mutableStateOf<Pair<String, Long?>?>(null) }
     val date = now.atZone(zone).toLocalDate()
     val tab = route in listOf(Routes.TODAY, Routes.HISTORY, Routes.REMINDERS)
     fun go(to: String) {
         problems = emptyList()
         route = to
     }
-    BackHandler(enabled = route != Routes.TODAY) { go(Routes.TODAY) }
+    BackHandler(enabled = route != Routes.TODAY) { go(if (route == Routes.SUGGESTIONS) Routes.SETTINGS else Routes.TODAY) }
+    val suggestHere: (String) -> Unit = { screen -> suggestFrom = screen to null }
 
     Scaffold(
         containerColor = c.background,
@@ -156,23 +178,45 @@ fun AvlAppUi(
                         )
                     }
                 }
-                IconButton(onClick = { go(Routes.SETTINGS) }, Modifier.align(Alignment.TopEnd).padding(8.dp)) {
-                    Icon(AvlIcons.Settings, "Einstellungen", tint = c.text)
+                Row(Modifier.align(Alignment.TopEnd).padding(8.dp)) {
+                    SuggestButton({ suggestHere("Heute") })
+                    IconButton(onClick = { go(Routes.SETTINGS) }) {
+                        Icon(AvlIcons.Settings, "Einstellungen", tint = c.text)
+                    }
                 }
             }
-            route == Routes.HISTORY -> HistoryScreen(state.history, state.proofs, date, zone, m, onPlay = actions::play, itemsDone = state.itemsDone)
-            route == Routes.REMINDERS -> RemindersScreen(
-                reminders = state.reminders, openByReminder = state.openByReminder, today = date, zone = zone,
-                onEdit = { go(Routes.edit(it.id)) },
-                onSetActive = { r, active -> actions.setActive(r.id, active) },
-                modifier = m,
-            )
-            route == Routes.SETTINGS -> SettingsScreen(
-                theme = state.theme, onTheme = actions::setTheme, alert = state.alert, onAlert = actions::setAlert,
-                permissions = state.permissions, onBack = { go(Routes.TODAY) }, modifier = m,
-                home = state.home, onSetHome = actions::setHomeHere,
-                dwellMinutes = state.dwellMinutes, onDwell = actions::setDwellMinutes,
-            )
+            route == Routes.HISTORY -> Box(m) {
+                HistoryScreen(state.history, state.proofs, date, zone, onPlay = actions::play, itemsDone = state.itemsDone)
+                SuggestButton({ suggestHere("Verlauf") }, Modifier.align(Alignment.TopEnd).padding(8.dp))
+            }
+            route == Routes.REMINDERS -> Box(m) {
+                RemindersScreen(
+                    reminders = state.reminders, openByReminder = state.openByReminder, today = date, zone = zone,
+                    onEdit = { go(Routes.edit(it.id)) },
+                    onSetActive = { r, active -> actions.setActive(r.id, active) },
+                    sort = state.reminderSort, onSort = actions::setReminderSort,
+                    onRestore = { actions.setArchived(it.id, false) },
+                )
+                SuggestButton({ suggestHere("Reminder") }, Modifier.align(Alignment.TopEnd).padding(8.dp))
+            }
+            route == Routes.SETTINGS -> Box(m) {
+                SettingsScreen(
+                    theme = state.theme, onTheme = actions::setTheme, alert = state.alert, onAlert = actions::setAlert,
+                    permissions = state.permissions, onBack = { go(Routes.TODAY) },
+                    home = state.home, onSetHome = actions::setHomeHere,
+                    dwellMinutes = state.dwellMinutes, onDwell = actions::setDwellMinutes,
+                    openSuggestions = state.suggestions.count { it.status == SuggestionStatus.OPEN },
+                    onSuggestions = { go(Routes.SUGGESTIONS) },
+                )
+                SuggestButton({ suggestHere("Einstellungen") }, Modifier.align(Alignment.TopEnd).padding(4.dp))
+            }
+            route == Routes.SUGGESTIONS -> Box(m) {
+                SuggestionsScreen(
+                    state.suggestions, zone, onBack = { go(Routes.SETTINGS) },
+                    onUpdate = actions::updateSuggestion, onDelete = actions::deleteSuggestion, onShare = actions::share,
+                )
+                SuggestButton({ suggestHere("Verbesserungen") }, Modifier.align(Alignment.TopEnd).padding(4.dp))
+            }
             route.startsWith("edit:") -> {
                 val id = route.removePrefix("edit:").toLong()
                 val existing = state.reminders.firstOrNull { it.id == id }
@@ -201,9 +245,21 @@ fun AvlAppUi(
                     modifier = m,
                     recorder = recorder,
                     play = actions::play,
+                    onSuggest = { suggestFrom = (if (id == 0L) "Neuer Reminder" else "Bearbeiten") to existing?.id },
+                    onArchive = existing?.let { r -> { archived -> actions.setArchived(r.id, archived); go(Routes.REMINDERS) } },
+                    archived = existing?.archivedAt != null,
                 )
             }
         }
+    }
+    suggestFrom?.let { (screen, reminderId) ->
+        SuggestionDialog(
+            onSave = { text, important ->
+                actions.addSuggestion(text, important, screen, reminderId)
+                suggestFrom = null
+            },
+            onDismiss = { suggestFrom = null },
+        )
     }
 }
 

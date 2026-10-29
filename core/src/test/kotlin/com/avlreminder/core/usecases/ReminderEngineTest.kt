@@ -373,6 +373,40 @@ class ReminderEngineTest {
     }
 
     @Test
+    fun `archiving pauses, restoring keeps it paused, switching on unarchives`() = runTest {
+        val id = create()
+        val o = open(id)
+        engine.setArchived(id, true)
+        assertEquals(at(26, 8), repo.reminders[id]!!.archivedAt)
+        assertFalse(repo.reminders[id]!!.active)
+        assertFalse(alarms.set.containsKey(o.id))
+
+        // Editing keeps the archive, the form does not know it.
+        create(repo.reminders[id]!!.copy(archivedAt = null, title = "Neu"))
+        assertNotNull(repo.reminders[id]!!.archivedAt)
+
+        engine.setArchived(id, false)
+        assertNull(repo.reminders[id]!!.archivedAt)
+        assertFalse(repo.reminders[id]!!.active)
+
+        engine.setArchived(id, true)
+        engine.setActive(id, true)
+        assertNull(repo.reminders[id]!!.archivedAt)
+        assertEquals(at(26, 18), alarms.set[open(id).id]!!.first)
+        engine.setArchived(999, true) // unknown id is ignored
+    }
+
+    @Test
+    fun `moving an archived one-off brings it back`() = runTest {
+        val id = create(reminder(Schedule.Once(LocalDateTime.of(2026, 10, 26, 9, 0))))
+        engine.act(open(id).id, Action.Complete(false))
+        engine.setArchived(id, true)
+        create(repo.reminders[id]!!.copy(schedule = Schedule.Once(LocalDateTime.of(2026, 10, 27, 9, 0))))
+        assertNull(repo.reminders[id]!!.archivedAt)
+        assertEquals(at(27, 9), open(id).dueAt)
+    }
+
+    @Test
     fun `deleting removes data and alarm`() = runTest {
         val id = create()
         val o = open(id)

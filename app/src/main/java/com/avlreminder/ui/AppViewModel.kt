@@ -14,8 +14,11 @@ import com.avlreminder.core.rules.AlertSettings
 import com.avlreminder.core.rules.Prep
 import com.avlreminder.core.usecases.HistoryDay
 import com.avlreminder.core.usecases.Overview
+import com.avlreminder.core.usecases.ReminderSort
 import com.avlreminder.core.usecases.SaveResult
 import com.avlreminder.core.usecases.Today
+import com.avlreminder.data.SuggestionEntity
+import com.avlreminder.data.SuggestionStatus
 import com.avlreminder.data.ThemeMode
 import com.avlreminder.data.toModel
 import com.avlreminder.graph
@@ -97,6 +100,10 @@ class AppViewModel(app: Application) : AndroidViewModel(app) {
 
     val theme: StateFlow<ThemeMode> = state(ThemeMode.SYSTEM, graph.settings.theme)
 
+    val reminderSort: StateFlow<ReminderSort> = state(ReminderSort.NEXT_DUE, graph.settings.reminderSort)
+
+    val suggestions: StateFlow<List<SuggestionEntity>> = state(emptyList(), graph.db.suggestions().observe())
+
     val alert: StateFlow<AlertSettings> = state(AlertSettings(), graph.settings.alert)
 
     fun setTheme(mode: ThemeMode) {
@@ -141,6 +148,31 @@ class AppViewModel(app: Application) : AndroidViewModel(app) {
 
     fun setActive(reminderId: Long, active: Boolean) {
         viewModelScope.launch { graph.withEngine { it.setActive(reminderId, active) } }
+    }
+
+    fun setArchived(reminderId: Long, archived: Boolean) {
+        viewModelScope.launch { graph.withEngine { it.setArchived(reminderId, archived) } }
+    }
+
+    fun setReminderSort(sort: ReminderSort) {
+        viewModelScope.launch { graph.settings.setReminderSort(sort) }
+    }
+
+    fun addSuggestion(text: String, important: Boolean, screen: String, reminderId: Long?) {
+        val reminder = reminderId?.let { id -> reminders.value.firstOrNull { it.id == id } }
+        viewModelScope.launch { graph.addSuggestion(text, important, screen, reminder) }
+    }
+
+    /** Edits text and "wichtig", or marks it done / discarded / open again. */
+    fun updateSuggestion(suggestion: SuggestionEntity) {
+        val old = suggestions.value.firstOrNull { it.id == suggestion.id }
+        val statusAt = if (old?.status == suggestion.status) suggestion.statusAt
+        else if (suggestion.status == SuggestionStatus.OPEN) null else Instant.now()
+        viewModelScope.launch { graph.db.suggestions().update(suggestion.copy(text = suggestion.text.trim(), statusAt = statusAt)) }
+    }
+
+    fun deleteSuggestion(id: Long) {
+        viewModelScope.launch { graph.db.suggestions().delete(id) }
     }
 
     /** Also catches up on alarms that never fired while the app was not running. */

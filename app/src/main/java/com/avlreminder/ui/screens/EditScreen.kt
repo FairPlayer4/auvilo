@@ -68,6 +68,10 @@ fun EditScreen(
     modifier: Modifier = Modifier,
     recorder: @Composable (onRecorded: (String, Int) -> Unit) -> Unit = {},
     play: (String) -> Unit = {},
+    onSuggest: (() -> Unit)? = null,
+    /** Archive (true) or restore (false); null for a new reminder. */
+    onArchive: ((Boolean) -> Unit)? = null,
+    archived: Boolean = false,
 ) {
     val c = Avl.colors
     var form by remember(initial) { mutableStateOf(initial) }
@@ -80,6 +84,7 @@ fun EditScreen(
                 if (initial.id == 0L) "Neuer Reminder" else "Reminder bearbeiten",
                 Modifier.weight(1f), color = c.text, fontSize = 20.sp, fontWeight = FontWeight.SemiBold,
             )
+            onSuggest?.let { SuggestButton(it) }
             Button(onClick = { onSave(form) }, Modifier.padding(end = 8.dp)) { Text("Speichern") }
         }
         Column(Modifier.verticalScroll(rememberScrollState()).padding(horizontal = 16.dp)) {
@@ -148,8 +153,13 @@ fun EditScreen(
                 form = form.copy(character = it)
             }
 
+            if (onArchive != null) {
+                OutlinedButton(onClick = { onArchive(!archived) }, Modifier.fillMaxWidth().padding(top = 24.dp)) {
+                    Text(if (archived) "Wiederherstellen (bleibt pausiert)" else "Archivieren", color = c.text)
+                }
+            }
             if (onDelete != null) {
-                OutlinedButton(onClick = { confirmDelete = true }, Modifier.fillMaxWidth().padding(top = 24.dp)) {
+                OutlinedButton(onClick = { confirmDelete = true }, Modifier.fillMaxWidth().padding(top = if (onArchive != null) 8.dp else 24.dp)) {
                     Icon(AvlIcons.Delete, null, tint = c.strict)
                     Text("Löschen", color = c.strict)
                 }

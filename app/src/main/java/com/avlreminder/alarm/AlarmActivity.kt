@@ -116,6 +116,7 @@ class AlarmActivity : ComponentActivity() {
             onSkip = { act(id, Action.Skip(it)) },
             onCheckItem = { itemId, evidence -> act(id, Action.CheckItem(itemId, evidence), stay = true) },
             onDeferRest = { act(id, Action.DeferRest(it)) },
+            onSuggest = { text, important -> graph.scope.launch { graph.addSuggestion(text, important, "Alarm", current.reminder) } },
             onStartProof = { startProof(id) },
             onAbortProof = { abortProof(id) },
             devices = AlarmDevices(

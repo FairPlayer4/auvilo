@@ -6,6 +6,7 @@ import androidx.datastore.preferences.core.intPreferencesKey
 import androidx.datastore.preferences.core.stringPreferencesKey
 import androidx.datastore.preferences.preferencesDataStore
 import com.avlreminder.core.rules.AlertSettings
+import com.avlreminder.core.usecases.ReminderSort
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.map
 import java.time.LocalTime
@@ -20,6 +21,7 @@ class Settings(private val context: Context) {
     private val loudFromKey = intPreferencesKey("loudFrom")
     private val dayEndKey = intPreferencesKey("dayEnd")
     private val dwellKey = intPreferencesKey("dwellMinutes")
+    private val sortKey = stringPreferencesKey("reminderSort")
 
     val theme: Flow<ThemeMode> = context.dataStore.data.map { prefs ->
         prefs[themeKey]?.let { runCatching { ThemeMode.valueOf(it) }.getOrNull() } ?: ThemeMode.SYSTEM
@@ -37,6 +39,14 @@ class Settings(private val context: Context) {
 
     /** How long to stay at a place before it counts as arrived (driving past does not). */
     val dwellMinutes: Flow<Int> = context.dataStore.data.map { it[dwellKey] ?: DEFAULT_DWELL }
+
+    val reminderSort: Flow<ReminderSort> = context.dataStore.data.map { prefs ->
+        prefs[sortKey]?.let { runCatching { ReminderSort.valueOf(it) }.getOrNull() } ?: ReminderSort.NEXT_DUE
+    }
+
+    suspend fun setReminderSort(sort: ReminderSort) {
+        context.dataStore.edit { it[sortKey] = sort.name }
+    }
 
     suspend fun setDwellMinutes(minutes: Int) {
         context.dataStore.edit { it[dwellKey] = minutes }
