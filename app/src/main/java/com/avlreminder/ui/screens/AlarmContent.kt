@@ -42,6 +42,8 @@ import com.avlreminder.core.model.ChecklistItem
 import com.avlreminder.core.model.Occurrence
 import com.avlreminder.core.model.PrepAnswer
 import com.avlreminder.core.model.Reminder
+import com.avlreminder.core.rules.WeekStatus
+import com.avlreminder.core.usecases.Digests
 import com.avlreminder.core.rules.Evidence
 import com.avlreminder.core.rules.Prep
 import com.avlreminder.core.rules.ProofCheck
@@ -72,6 +74,8 @@ data class AlarmUi(
     /** Checklist items already done in this occurrence. */
     val done: Set<Long> = emptySet(),
     val canDeferRest: Boolean = false,
+    /** The week so far, for a reminder with a weekly goal. */
+    val week: WeekStatus? = null,
 )
 
 private enum class View { MAIN, PROOF, POSTPONE, SKIP }
@@ -153,6 +157,7 @@ fun AlarmContent(
                     }
                     Spacer(Modifier.height(20.dp))
                     PrepCards(ui.prep)
+                    ui.week?.let { InfoCard("Diese Woche", Digests.week(it)) }
                     r.goal?.let { InfoCard("Ziel", it) }
                     r.minimum?.let { min ->
                         val left = ui.minimumsLeft?.let { " · noch ${it}× diese Woche" } ?: ""

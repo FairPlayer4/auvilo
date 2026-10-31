@@ -33,6 +33,8 @@ import com.avlreminder.core.rules.ProofCheck
 import com.avlreminder.core.rules.ScheduleRules
 import com.avlreminder.core.rules.TransitionResult
 import com.avlreminder.core.rules.Validation
+import com.avlreminder.core.rules.WeekStatus
+import com.avlreminder.core.rules.WeeklyGoals
 import com.avlreminder.core.rules.Weeks
 import java.time.Clock
 import java.time.Duration
@@ -49,6 +51,8 @@ data class Ring(
     val level: AlarmLevel,
     val snooze: List<Int> = emptyList(),
     val nextItem: ChecklistItem? = null,
+    /** The week so far, for a reminder with a weekly goal. */
+    val week: WeekStatus? = null,
 )
 
 sealed interface SaveResult {
@@ -309,6 +313,19 @@ class ReminderEngine(
     /** Checklist items done in the occurrence. */
     suspend fun itemsDone(occurrenceId: Long): List<ItemDone> = repo.itemsDone(occurrenceId)
 
+    /** The week of [day] for a reminder with a weekly goal; offers counted from [day] on. */
+    suspend fun weekStatus(reminder: Reminder, day: LocalDate = now().atZone(zone).toLocalDate()): WeekStatus? {
+        val goal = reminder.weeklyGoal ?: return null
+        val (from, until) = Weeks.range(day, zone)
+        val goals = repo.countResolved(reminder.id, Resolution.GOAL, from, until)
+        val minimums = repo.countResolved(reminder.id, Resolution.MINIMUM, from, until)
+        return WeekStatus(goal, goals + minimums, minimums, WeeklyGoals.offersLeft(reminder.schedule, day))
+    }
+
+    /** All active reminders with a weekly goal and where they stand this week (overview, O1). */
+    suspend fun weekGoals(): List<Pair<Reminder, WeekStatus>> =
+        repo.reminders().filter { it.active && it.weeklyGoal != null }.mapNotNull { r -> weekStatus(r)?.let { r to it } }
+
     // --- Internals -------------------------------------------------------------------------
 
     private suspend fun syncReminder(reminder: Reminder): Ring? {
@@ -353,7 +370,8 @@ class ReminderEngine(
      */
     private suspend fun fire(reminder: Reminder, occurrence: Occurrence): Ring? {
         val arrival = reminder.arrival
-        if (arrival?.whenAway == WhenAway.DROP) {
+        // A rescue reminder rings wherever one is.
+        if (arrival?.whenAway == WhenAway.DROP && !isRescue(reminder, occurrence)) {
             val place = repo.places().firstOrNull { it.id == arrival.placeId }
             if (place != null && location.isAt(place) == false) {
                 close(reminder, occurrence, Action.Drop)
@@ -387,7 +405,9 @@ class ReminderEngine(
                 return
             }
         }
-        close(reminder, occurrence, Action.Miss)
+        // With the weekly target reached a further offer that was not taken up is no miss.
+        val reached = weekStatus(reminder, occurrence.dueAt.atZone(zone).toLocalDate())?.reached == true
+        close(reminder, occurrence, if (reached) Action.Skip(GOAL_REACHED) else Action.Miss)
         createNext(reminder)?.let { plan(reminder, it) }
     }
 
@@ -410,10 +430,13 @@ class ReminderEngine(
      * Sets the alarm for an open occurrence: its time if planned; else the end of a running proof
      * or the next round, at most the miss deadline.
      */
-    private fun plan(reminder: Reminder, occurrence: Occurrence) {
+    private suspend fun plan(reminder: Reminder, occurrence: Occurrence) {
         val now = now()
         val at = if (occurrence.state == OccurrenceState.PLANNED) {
             occurrence.currentAt
+        } else if (strictness(reminder, occurrence) == null) {
+            // Weekly target reached: no further rounds, only the end of the day.
+            missedAt(occurrence)
         } else {
             val paused = occurrence.pausedUntil
             val next = if (paused != null && paused > now) paused else Escalation.nextRound(now)
@@ -431,16 +454,38 @@ class ReminderEngine(
         return draft.copy(id = id)
     }
 
-    private suspend fun nextDue(reminder: Reminder, previous: Occurrence?): Instant? =
-        ScheduleRules.nextDue(
+    private suspend fun nextDue(reminder: Reminder, previous: Occurrence?): Instant? {
+        // A checklist counts from its first done item (C5b).
+        val lastDoneAt = repo.lastDone(reminder.id)?.let { it.firstProgressAt ?: it.resolvedAt }
+        fun next(after: Instant) = ScheduleRules.nextDue(
             schedule = reminder.schedule,
-            now = now(),
+            now = after,
             zone = zone,
             previousDueAt = previous?.dueAt,
-            // A checklist counts from its first done item (C5b).
-            lastDoneAt = repo.lastDone(reminder.id)?.let { it.firstProgressAt ?: it.resolvedAt },
+            lastDoneAt = lastDoneAt,
             previousWasDone = previous?.state == OccurrenceState.DONE,
         )
+        val now = now()
+        val due = next(now) ?: return null
+        val week = weekStatus(reminder) ?: return due
+        val nextMonday = Weeks.range(now, zone).second
+        return when {
+            // Done as often as allowed: the next offer comes next week.
+            week.full && due < nextMonday -> next(nextMonday.minusMillis(1))
+            // Still at 0 at the weekend: a rescue reminder before the next offer.
+            !week.minimumReached -> listOfNotNull(due, WeeklyGoals.nextRescue(reminder.schedule, now, zone, previous?.dueAt)).min()
+            else -> due
+        }
+    }
+
+    private fun isRescue(reminder: Reminder, occurrence: Occurrence): Boolean =
+        reminder.weeklyGoal != null && WeeklyGoals.isRescueDay(reminder.schedule, occurrence.dueAt.atZone(zone).toLocalDate())
+
+    /** How strict the occurrence rings with its weekly goal; null = silently, without rounds. */
+    private suspend fun strictness(reminder: Reminder, occurrence: Occurrence): Strictness? {
+        val week = weekStatus(reminder, occurrence.dueAt.atZone(zone).toLocalDate()) ?: return reminder.strictness
+        return WeeklyGoals.strictness(reminder.strictness, week, isRescue(reminder, occurrence))
+    }
 
     private suspend fun apply(
         reminder: Reminder,
@@ -462,22 +507,25 @@ class ReminderEngine(
 
     private suspend fun ring(reminder: Reminder, occurrence: Occurrence): Ring {
         val done = if (reminder.checklist.isEmpty()) emptySet() else repo.itemsDone(occurrence.id).map { it.itemId }.toSet()
+        val strictness = strictness(reminder, occurrence)
+        val level = if (strictness == null) AlarmLevel.SILENT else Escalation.level(
+            strictness, now().atZone(zone).toLocalTime(), settings(), device.isDoNotDisturb(), reminder.ignoreDnd,
+        )
         return Ring(
-            reminder, occurrence, level(reminder, now()), snoozeOptions(reminder, occurrence),
+            reminder, occurrence, level, snoozeOptions(reminder, occurrence),
             nextItem = reminder.checklist.firstOrNull { it.id !in done },
+            week = weekStatus(reminder, occurrence.dueAt.atZone(zone).toLocalDate()),
         )
     }
 
     private fun missedAt(occurrence: Occurrence) = Escalation.missedAt(occurrence.currentAt, zone, settings())
-
-    private fun level(reminder: Reminder, at: Instant) = Escalation.level(
-        reminder.strictness, at.atZone(zone).toLocalTime(), settings(), device.isDoNotDisturb(), reminder.ignoreDnd,
-    )
 
     companion object {
         /** A planned occurrence this far past its time without having fired counts as missed alarm. */
         val GRACE: Duration = Duration.ofMinutes(2)
         /** Alarms may fire slightly early. */
         val EARLY_TOLERANCE: Duration = Duration.ofMinutes(1)
+        /** Reason stored when an offer ends unused after the weekly target was reached. */
+        const val GOAL_REACHED = "Wochenziel erreicht"
     }
 }

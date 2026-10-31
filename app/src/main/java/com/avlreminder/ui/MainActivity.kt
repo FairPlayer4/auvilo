@@ -21,6 +21,7 @@ import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.setValue
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.avlreminder.core.usecases.ReminderSort
+import com.avlreminder.data.OverviewTimes
 import com.avlreminder.data.SuggestionEntity
 import com.avlreminder.AndroidDeviceState
 import com.avlreminder.alarm.AlarmActivity
@@ -80,6 +81,7 @@ class MainActivity : ComponentActivity() {
             val dwell by vm.dwellMinutes.collectAsStateWithLifecycle()
             val itemsDone by vm.itemsDone.collectAsStateWithLifecycle()
             val reminderSort by vm.reminderSort.collectAsStateWithLifecycle()
+            val overview by vm.overview.collectAsStateWithLifecycle()
             val suggestions by vm.suggestions.collectAsStateWithLifecycle()
             var now by androidx.compose.runtime.remember { mutableStateOf(Instant.now()) }
             var dnd by androidx.compose.runtime.remember { mutableStateOf(device.isDoNotDisturb()) }
@@ -99,7 +101,7 @@ class MainActivity : ComponentActivity() {
                         state = AppState(
                             today, reminders, openByReminder, history, proofs, theme, permissions, prep, alert, dnd,
                             home = home, dwellMinutes = dwell, itemsDone = itemsDone,
-                            reminderSort = reminderSort, suggestions = suggestions,
+                            reminderSort = reminderSort, suggestions = suggestions, overview = overview,
                         ),
                         actions = actions,
                         now = now,
@@ -149,6 +151,7 @@ class MainActivity : ComponentActivity() {
         override fun play(path: String) = AudioPlayer.play(this@MainActivity, path)
         override fun setDwellMinutes(minutes: Int) = vm.setDwellMinutes(minutes)
         override fun setReminderSort(sort: ReminderSort) = vm.setReminderSort(sort)
+        override fun setOverview(times: OverviewTimes) = vm.setOverview(times)
         override fun setArchived(reminderId: Long, archived: Boolean) = vm.setArchived(reminderId, archived)
         override fun addSuggestion(text: String, important: Boolean, screen: String, reminderId: Long?) =
             vm.addSuggestion(text, important, screen, reminderId)

@@ -1,6 +1,7 @@
 package com.avlreminder.data
 
 import android.content.Context
+import androidx.datastore.preferences.core.Preferences
 import androidx.datastore.preferences.core.edit
 import androidx.datastore.preferences.core.intPreferencesKey
 import androidx.datastore.preferences.core.stringPreferencesKey
@@ -13,6 +14,12 @@ import java.time.LocalTime
 
 enum class ThemeMode { SYSTEM, LIGHT, DARK }
 
+/** The silent overview in the morning and evening (Anf. O1); null = off. */
+data class OverviewTimes(
+    val morning: LocalTime? = LocalTime.of(7, 30),
+    val evening: LocalTime? = LocalTime.of(20, 30),
+)
+
 private val Context.dataStore by preferencesDataStore("settings")
 
 class Settings(private val context: Context) {
@@ -22,6 +29,9 @@ class Settings(private val context: Context) {
     private val dayEndKey = intPreferencesKey("dayEnd")
     private val dwellKey = intPreferencesKey("dwellMinutes")
     private val sortKey = stringPreferencesKey("reminderSort")
+    /** Minutes after midnight; -1 = off. */
+    private val morningKey = intPreferencesKey("overviewMorning")
+    private val eveningKey = intPreferencesKey("overviewEvening")
 
     val theme: Flow<ThemeMode> = context.dataStore.data.map { prefs ->
         prefs[themeKey]?.let { runCatching { ThemeMode.valueOf(it) }.getOrNull() } ?: ThemeMode.SYSTEM
@@ -42,6 +52,24 @@ class Settings(private val context: Context) {
 
     val reminderSort: Flow<ReminderSort> = context.dataStore.data.map { prefs ->
         prefs[sortKey]?.let { runCatching { ReminderSort.valueOf(it) }.getOrNull() } ?: ReminderSort.NEXT_DUE
+    }
+
+    val overview: Flow<OverviewTimes> = context.dataStore.data.map { prefs ->
+        val default = OverviewTimes()
+        fun read(key: Preferences.Key<Int>, fallback: LocalTime?) =
+            when (val v = prefs[key]) {
+                null -> fallback
+                -1 -> null
+                else -> v.toTime()
+            }
+        OverviewTimes(read(morningKey, default.morning), read(eveningKey, default.evening))
+    }
+
+    suspend fun setOverview(times: OverviewTimes) {
+        context.dataStore.edit {
+            it[morningKey] = times.morning?.toMinutes() ?: -1
+            it[eveningKey] = times.evening?.toMinutes() ?: -1
+        }
     }
 
     suspend fun setReminderSort(sort: ReminderSort) {

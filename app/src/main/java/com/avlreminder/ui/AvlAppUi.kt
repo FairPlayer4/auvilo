@@ -18,6 +18,7 @@ import androidx.compose.material3.NavigationBarItem
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
@@ -36,10 +37,13 @@ import com.avlreminder.core.model.PrepAnswer
 import com.avlreminder.core.model.Proof
 import com.avlreminder.core.model.Reminder
 import com.avlreminder.core.rules.AlertSettings
+import com.avlreminder.core.rules.Stats
+import com.avlreminder.core.rules.WeeklyGoals
 import com.avlreminder.core.usecases.HistoryDay
 import com.avlreminder.core.usecases.ReminderSort
 import com.avlreminder.core.usecases.SaveResult
 import com.avlreminder.core.usecases.Today
+import com.avlreminder.data.OverviewTimes
 import com.avlreminder.data.Settings
 import com.avlreminder.data.SuggestionEntity
 import com.avlreminder.data.SuggestionStatus
@@ -50,6 +54,7 @@ import com.avlreminder.ui.screens.PermissionItem
 import com.avlreminder.ui.screens.ReminderForm
 import com.avlreminder.ui.screens.RemindersScreen
 import com.avlreminder.ui.screens.SettingsScreen
+import com.avlreminder.ui.screens.StatsScreen
 import com.avlreminder.ui.screens.SuggestButton
 import com.avlreminder.ui.screens.SuggestionDialog
 import com.avlreminder.ui.screens.SuggestionsScreen
@@ -79,6 +84,7 @@ data class AppState(
     val reminderSort: ReminderSort = ReminderSort.NEXT_DUE,
     /** Open ones first (Anf. 7.24). */
     val suggestions: List<SuggestionEntity> = emptyList(),
+    val overview: OverviewTimes = OverviewTimes(),
 )
 
 interface AppActions {
@@ -102,6 +108,7 @@ interface AppActions {
     fun deleteSuggestion(id: Long) {}
     /** Hands the text to another app of the user's choice. */
     fun share(text: String) {}
+    fun setOverview(times: OverviewTimes) {}
 }
 
 /** Simple navigation without a library: one route string, back goes to "today". */
@@ -113,6 +120,7 @@ object Routes {
     const val SUGGESTIONS = "suggestions"
     const val NEW = "edit:0"
     fun edit(id: Long) = "edit:$id"
+    fun stats(id: Long) = "stats:$id"
 }
 
 @Composable
@@ -136,8 +144,17 @@ fun AvlAppUi(
         problems = emptyList()
         route = to
     }
-    BackHandler(enabled = route != Routes.TODAY) { go(if (route == Routes.SUGGESTIONS) Routes.SETTINGS else Routes.TODAY) }
+    BackHandler(enabled = route != Routes.TODAY) {
+        go(
+            when {
+                route == Routes.SUGGESTIONS -> Routes.SETTINGS
+                route.startsWith("stats:") -> "edit:" + route.removePrefix("stats:")
+                else -> Routes.TODAY
+            },
+        )
+    }
     val suggestHere: (String) -> Unit = { screen -> suggestFrom = screen to null }
+    val resolved = remember(state.history) { state.history.flatMap { d -> d.entries.map { it.occurrence } } }
 
     Scaffold(
         containerColor = c.background,
@@ -175,6 +192,7 @@ fun AvlAppUi(
                             onCompleteEarly = { actions.completeEarly(it.occurrence.id) },
                             doNotDisturb = state.doNotDisturb,
                             itemsDone = state.itemsDone,
+                            weeks = state.reminders.filter { it.active }.mapNotNull { r -> WeeklyGoals.status(r, resolved, date, zone)?.let { r to it } },
                         )
                     }
                 }
@@ -207,6 +225,7 @@ fun AvlAppUi(
                     dwellMinutes = state.dwellMinutes, onDwell = actions::setDwellMinutes,
                     openSuggestions = state.suggestions.count { it.status == SuggestionStatus.OPEN },
                     onSuggestions = { go(Routes.SUGGESTIONS) },
+                    overview = state.overview, onOverview = actions::setOverview,
                 )
                 SuggestButton({ suggestHere("Einstellungen") }, Modifier.align(Alignment.TopEnd).padding(4.dp))
             }
@@ -216,6 +235,21 @@ fun AvlAppUi(
                     onUpdate = actions::updateSuggestion, onDelete = actions::deleteSuggestion, onShare = actions::share,
                 )
                 SuggestButton({ suggestHere("Verbesserungen") }, Modifier.align(Alignment.TopEnd).padding(4.dp))
+            }
+            route.startsWith("stats:") -> {
+                val reminder = state.reminders.firstOrNull { it.id == route.removePrefix("stats:").toLong() }
+                if (reminder == null) {
+                    // Deleted meanwhile.
+                    LaunchedEffect(Unit) { go(Routes.REMINDERS) }
+                } else {
+                    Box(m) {
+                        StatsScreen(
+                            reminder, Stats.of(reminder, resolved, now, zone), WeeklyGoals.status(reminder, resolved, date, zone),
+                            onBack = { go(Routes.edit(reminder.id)) },
+                        )
+                        SuggestButton({ suggestFrom = "Statistik" to reminder.id }, Modifier.align(Alignment.TopEnd).padding(4.dp))
+                    }
+                }
             }
             route.startsWith("edit:") -> {
                 val id = route.removePrefix("edit:").toLong()
@@ -248,6 +282,7 @@ fun AvlAppUi(
                     onSuggest = { suggestFrom = (if (id == 0L) "Neuer Reminder" else "Bearbeiten") to existing?.id },
                     onArchive = existing?.let { r -> { archived -> actions.setArchived(r.id, archived); go(Routes.REMINDERS) } },
                     archived = existing?.archivedAt != null,
+                    onStats = existing?.let { r -> { go(Routes.stats(r.id)) } },
                 )
             }
         }

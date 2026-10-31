@@ -1,4 +1,4 @@
-# Gerätetest – Prototyp V1.0 / V1.1a / V1.1b / V1.2a
+# Gerätetest – Prototyp V1.0 / V1.1a / V1.1b / V1.2a / V1.2b
 
 > Ergänzt die automatischen Tests (`:core` JUnit + Kover, `:app` Robolectric/Compose).
 > Alles hier braucht das echte Gerät. Reihenfolge so gewählt, dass nichts nachts klingelt.
@@ -97,3 +97,23 @@ Vorher: 1.1b mit echten Daten installiert lassen; 1.2a darüber installieren (ni
 | 64 | Reminder bearbeiten → "Archivieren" | pausiert, unter "Abgeschlossen"; keine Alarme mehr |
 | 65 | Archivierten "Wiederherstellen" | steht unter "Pausiert"; erst Einschalten plant ihn wieder ein |
 | 66 | Abgeschlossenen Einmal-Reminder auf später heute legen | wieder aktiv, steht unter "Heute", klingelt zur neuen Zeit |
+
+## V1.2b
+
+Vorher: 1.2a mit echten Daten installiert lassen; 1.2b darüber installieren (nicht deinstallieren).
+Ablauf für eine Stunde am Stück: [testsession-v1.3.md](testsession-v1.3.md).
+
+| # | Test | Erwartung |
+|---|---|---|
+| 67 | Erster Start nach dem Update | Daten da; Backup `avlreminder-v4-….db`; `diag.log` beginnt mit "state app start 1.2b-prototyp" |
+| 68 | Täglichen Reminder bearbeiten → Zeile "Wochenziel" antippen, Ziel 3, höchstens 4, mindestens 1 | Auswahl bleibt stimmig (mindestens ≤ Ziel ≤ höchstens); Heute zeigt "Diese Woche" |
+| 69 | Ein Angebot erledigen | "Diese Woche": "1 von 3–4, Minimum erreicht" |
+| 70 | Knapp: Ziel = restliche Tage inkl. heute, noch nichts erledigt | Alarm eine Stufe strenger als eingestellt; "Diese Woche" rot hervorgehoben |
+| 71 | Ziel erreicht, weiteres Angebot am selben Tag oder später | kommt nur als stille Benachrichtigung; offen bis Tagesende → "ausgelassen – Wochenziel erreicht", nicht verpasst |
+| 72 | Höchstens erreicht | nächste Fälligkeit erst am Montag |
+| 73 | Mo–Fr-Reminder mit Minimum 1, bis Freitag nichts erledigt | Sa 10:00 strenger Alarm, So 10:00 noch einmal; nach Erledigung keine weitere Rettung |
+| 74 | Bearbeiten → "Statistik und Serie" | Woche/Monat/Jahr/Gesamt stimmen mit dem Verlauf; Serie und beste Serie plausibel |
+| 75 | Übersicht morgens (Einstellungen → Übersicht) | stille Benachrichtigung "Heute: n Reminder" mit Uhrzeiten; Tipp öffnet die App |
+| 76 | Übersicht abends | Rückblick (erledigt/verpasst/offen), Wochenziele, morgen |
+| 77 | Übersicht auf "aus" | kommt nicht mehr; nach Neustart weiterhin nicht |
+| 78 | Nach dem Test | Claude liest `AvlDiag` (logcat) und `files/diag/diag.log` per `run-as` |

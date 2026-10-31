@@ -13,6 +13,7 @@ import com.avlreminder.core.model.ProofSpec
 import com.avlreminder.core.model.Reminder
 import com.avlreminder.core.model.Resolution
 import com.avlreminder.core.model.Schedule
+import com.avlreminder.core.model.WeeklyGoal
 import com.avlreminder.core.model.WhenAway
 import com.avlreminder.core.ports.ReminderRepository
 import java.io.File
@@ -153,6 +154,7 @@ fun ReminderEntity.toModel(items: List<ChecklistItemEntity> = emptyList()): Remi
     arrival = arrivalPlaceId?.let { Arrival(it, arrivalWhenAway ?: WhenAway.DROP) },
     checklist = items.sortedBy { it.position }.map { ChecklistItem(it.id, it.title) },
     archivedAt = archivedAt,
+    weeklyGoal = weekTarget?.let { WeeklyGoal(it, weekMax ?: it, weekMinimum ?: 1) },
 )
 
 fun Reminder.toEntity(): ReminderEntity {
@@ -200,6 +202,9 @@ fun Reminder.toEntity(): ReminderEntity {
         arrivalPlaceId = arrival?.placeId,
         arrivalWhenAway = arrival?.whenAway,
         archivedAt = archivedAt,
+        weekTarget = weeklyGoal?.target,
+        weekMax = weeklyGoal?.max,
+        weekMinimum = weeklyGoal?.minimum,
     )
 }
 

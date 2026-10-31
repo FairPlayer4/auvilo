@@ -57,6 +57,14 @@ object Validation {
         if (reminder.schedule == Schedule.OnArrival && reminder.arrival == null) add("„Wenn ich zuhause bin“ braucht einen Ort")
         if (reminder.checklist.any { it.title.isBlank() }) add("Checklisten-Punkt ohne Text")
         if (reminder.checklist.size > MAX_ITEMS) add("Höchstens $MAX_ITEMS Checklisten-Punkte")
+        reminder.weeklyGoal?.let { g ->
+            val days = WeeklyGoals.offerDays(reminder.schedule)
+            when {
+                days == null -> add("Wochenziel nur bei täglich oder an Wochentagen")
+                g.minimum < 1 || g.minimum > g.target || g.target > g.max -> add("Wochenziel: mindestens ≤ Ziel ≤ höchstens")
+                g.max > days -> add("Wochenziel: höchstens $days× bei diesen Tagen")
+            }
+        }
     }
 
     const val MAX_ITEMS = 20
@@ -69,6 +77,12 @@ object Weeks {
     /** [from, to) of the week containing [now]. */
     fun range(now: Instant, zone: ZoneId): Pair<Instant, Instant> {
         val monday = start(now.atZone(zone).toLocalDate())
+        return range(monday, zone)
+    }
+
+    /** [from, to) of the week containing [date]. */
+    fun range(date: LocalDate, zone: ZoneId): Pair<Instant, Instant> {
+        val monday = start(date)
         return monday.atStartOfDay(zone).toInstant() to monday.plusWeeks(1).atStartOfDay(zone).toInstant()
     }
 }

@@ -33,6 +33,7 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import com.avlreminder.core.model.Place
 import com.avlreminder.core.rules.AlertSettings
+import com.avlreminder.data.OverviewTimes
 import com.avlreminder.data.Settings
 import com.avlreminder.data.ThemeMode
 import com.avlreminder.ui.AvlIcons
@@ -67,6 +68,8 @@ fun SettingsScreen(
     onDwell: (Int) -> Unit = {},
     openSuggestions: Int = 0,
     onSuggestions: () -> Unit = {},
+    overview: OverviewTimes = OverviewTimes(),
+    onOverview: (OverviewTimes) -> Unit = {},
 ) {
     val c = Avl.colors
     var homeState by remember { mutableStateOf<String?>(null) }
@@ -126,6 +129,17 @@ fun SettingsScreen(
                 Modifier.padding(4.dp), color = c.muted, fontSize = 13.sp,
             )
 
+            SectionTitle("Übersicht")
+            Card {
+                Column(Modifier.padding(16.dp)) {
+                    Text("Morgens: was heute ansteht", color = c.text, fontSize = 15.sp)
+                    Times(MORNING, overview.morning) { onOverview(overview.copy(morning = it)) }
+                    Text("Abends: Rückblick, Wochenziele, morgen", Modifier.padding(top = 12.dp), color = c.text, fontSize = 15.sp)
+                    Times(EVENING, overview.evening) { onOverview(overview.copy(evening = it)) }
+                }
+            }
+            Text("Eine stille Benachrichtigung ohne Ton; ein Tipp öffnet die App.", Modifier.padding(4.dp), color = c.muted, fontSize = 13.sp)
+
             SectionTitle("Zuhause")
             Card {
                 Column(Modifier.padding(16.dp)) {
@@ -163,7 +177,7 @@ fun SettingsScreen(
                     }
                 }
             }
-            Text("AVL-Reminder 1.2a-Prototyp", Modifier.padding(vertical = 24.dp, horizontal = 4.dp), color = c.muted, fontSize = 12.sp)
+            Text("AVL-Reminder 1.2b-Prototyp", Modifier.padding(vertical = 24.dp, horizontal = 4.dp), color = c.muted, fontSize = 12.sp)
         }
     }
 }
@@ -171,6 +185,20 @@ fun SettingsScreen(
 @Composable
 private fun Card(content: @Composable () -> Unit) {
     Column(Modifier.fillMaxWidth().clip(RoundedCornerShape(16.dp)).background(Avl.colors.surface)) { content() }
+}
+
+private val MORNING = listOf(LocalTime.of(6, 30), LocalTime.of(7, 0), LocalTime.of(7, 30), LocalTime.of(8, 0), LocalTime.of(9, 0))
+private val EVENING = listOf(LocalTime.of(19, 30), LocalTime.of(20, 0), LocalTime.of(20, 30), LocalTime.of(21, 0), LocalTime.of(21, 30))
+
+/** Time chips plus "aus" (null). */
+@OptIn(ExperimentalLayoutApi::class)
+@Composable
+private fun Times(choices: List<LocalTime>, selected: LocalTime?, onPick: (LocalTime?) -> Unit) {
+    val all = (choices + listOfNotNull(selected)).distinct().sorted()
+    FlowRow(Modifier.padding(top = 6.dp), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+        all.forEach { t -> FilterChip(t == selected, { onPick(t) }, label = { Text(Format.time(t)) }) }
+        FilterChip(selected == null, { onPick(null) }, label = { Text("aus") })
+    }
 }
 
 @OptIn(ExperimentalLayoutApi::class)

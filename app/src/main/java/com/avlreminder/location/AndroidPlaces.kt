@@ -14,6 +14,7 @@ import com.avlreminder.core.model.Place
 import com.avlreminder.core.ports.GeofencePort
 import com.avlreminder.core.ports.LocationPort
 import com.avlreminder.graph
+import com.avlreminder.system.Diag
 import com.google.android.gms.location.Geofence
 import com.google.android.gms.location.GeofencingEvent
 import com.google.android.gms.location.GeofencingRequest
@@ -51,6 +52,7 @@ class AndroidGeofences(private val context: Context, private val dwellMinutes: (
         if (places.isEmpty()) return
         if (!context.hasBackgroundLocation()) {
             Log.w(TAG, "Geofences nicht registriert: Standort „Immer erlauben“ fehlt")
+            Diag.log("geofences not registered: background location missing")
             return
         }
         val request = GeofencingRequest.Builder()
@@ -69,7 +71,10 @@ class AndroidGeofences(private val context: Context, private val dwellMinutes: (
             .build()
         client.addGeofences(request, pending(context))
             .addOnSuccessListener { registered = wanted }
-            .addOnFailureListener { Log.w(TAG, "Geofence-Registrierung fehlgeschlagen", it) }
+            .addOnFailureListener {
+                Log.w(TAG, "Geofence-Registrierung fehlgeschlagen", it)
+                Diag.log("geofence registration failed: ${it.message}")
+            }
     }
 
     private fun pending(context: Context): PendingIntent = PendingIntent.getBroadcast(
@@ -123,15 +128,21 @@ class GeofenceReceiver : BroadcastReceiver() {
         val event = GeofencingEvent.fromIntent(intent) ?: return
         if (event.hasError()) {
             Log.w(TAG, "Geofence-Fehler ${event.errorCode}")
+            Diag.log("geofence error ${event.errorCode}")
             return
         }
+        Diag.log("geofence transition=${event.geofenceTransition}")
         if (event.geofenceTransition != Geofence.GEOFENCE_TRANSITION_DWELL) return
         val ids = event.triggeringGeofences.orEmpty().mapNotNull { it.requestId.toLongOrNull() }
         val result = goAsync()
         val graph = context.graph
         graph.scope.launch {
             try {
-                ids.forEach { id -> graph.withEngine { it.onArrival(id) }.forEach { Ringer.ring(context, it) } }
+                ids.forEach { id ->
+                    val rings = graph.withEngine { it.onArrival(id) }
+                    Diag.log("arrival place=$id → ${rings.size} ring(s)")
+                    rings.forEach { Ringer.ring(context, it) }
+                }
             } finally {
                 result.finish()
             }

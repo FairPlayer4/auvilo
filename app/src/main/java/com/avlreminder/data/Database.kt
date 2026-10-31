@@ -69,6 +69,10 @@ data class ReminderEntity(
     val arrivalPlaceId: Long? = null,
     val arrivalWhenAway: WhenAway? = null,
     val archivedAt: Instant? = null,
+    /** Weekly goal; all three null = none. */
+    val weekTarget: Int? = null,
+    val weekMax: Int? = null,
+    val weekMinimum: Int? = null,
 )
 
 @Entity(tableName = "place")
@@ -348,6 +352,15 @@ val MIGRATION_3_4 = object : Migration(3, 4) {
     }
 }
 
+/** V1.2b: weekly goal. */
+val MIGRATION_4_5 = object : Migration(4, 5) {
+    override fun migrate(db: SupportSQLiteDatabase) {
+        db.execSQL("ALTER TABLE reminder ADD COLUMN weekTarget INTEGER")
+        db.execSQL("ALTER TABLE reminder ADD COLUMN weekMax INTEGER")
+        db.execSQL("ALTER TABLE reminder ADD COLUMN weekMinimum INTEGER")
+    }
+}
+
 /** The new tables of version 3, as Room generates them (see schemas/…/3.json). */
 private val CREATE_3 = listOf(
     "CREATE TABLE IF NOT EXISTS `place` (`id` INTEGER PRIMARY KEY AUTOINCREMENT NOT NULL, `name` TEXT NOT NULL, " +
@@ -369,7 +382,7 @@ private val CREATE_3 = listOf(
         ReminderEntity::class, OccurrenceEntity::class, EventEntity::class, ProofEntity::class, PrepAnswerEntity::class,
         PlaceEntity::class, ChecklistItemEntity::class, ItemDoneEntity::class, SuggestionEntity::class,
     ],
-    version = 4,
+    version = 5,
 )
 @TypeConverters(Converters::class)
 abstract class AvlDatabase : RoomDatabase() {
@@ -378,12 +391,12 @@ abstract class AvlDatabase : RoomDatabase() {
 
     companion object {
         const val NAME = "avlreminder.db"
-        const val VERSION = 4
+        const val VERSION = 5
 
         fun create(context: Context): AvlDatabase {
             backupBeforeMigration(context.getDatabasePath(NAME), File(context.filesDir, "backup"))
             return Room.databaseBuilder(context, AvlDatabase::class.java, NAME)
-                .addMigrations(MIGRATION_1_2, MIGRATION_2_3, MIGRATION_3_4)
+                .addMigrations(MIGRATION_1_2, MIGRATION_2_3, MIGRATION_3_4, MIGRATION_4_5)
                 .build()
         }
 

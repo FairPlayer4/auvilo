@@ -14,6 +14,7 @@ import android.os.VibrationAttributes
 import android.os.VibrationEffect
 import android.os.VibratorManager
 import android.util.Log
+import com.avlreminder.system.Diag
 import com.avlreminder.core.rules.Escalation
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
@@ -56,6 +57,7 @@ class AlarmService : Service() {
             } catch (e: Exception) {
                 // Spike finding: should not happen with USE_EXACT_ALARM, but never lose a reminder over it.
                 Log.w(TAG, "foreground service not startable, falling back to banner", e)
+                Diag.log("service not startable, banner instead: ${e.message}")
                 Notifications.show(context, info, quiet = false)
             }
         }
@@ -112,6 +114,7 @@ class AlarmService : Service() {
             )
         } catch (e: Exception) {
             Log.w(TAG, "startForeground failed, falling back to banner", e)
+            Diag.log("startForeground failed, banner instead: ${e.message}")
             Notifications.show(this, newInfo, quiet = false)
             info = null
             stopSelf()
@@ -150,7 +153,10 @@ class AlarmService : Service() {
                 prepare()
                 start()
             }
-        }.onFailure { Log.w(TAG, "alarm tone failed, vibration only", it) }.getOrNull()
+        }.onFailure {
+            Log.w(TAG, "alarm tone failed, vibration only", it)
+            Diag.log("alarm tone failed: ${it.message}")
+        }.getOrNull()
     }
 
     private fun stopSound() {

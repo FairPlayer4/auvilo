@@ -10,6 +10,7 @@ import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.selection.toggleable
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Button
@@ -36,6 +37,7 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.testTag
+import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
@@ -72,6 +74,8 @@ fun EditScreen(
     /** Archive (true) or restore (false); null for a new reminder. */
     onArchive: ((Boolean) -> Unit)? = null,
     archived: Boolean = false,
+    /** Opens the statistics; null for a new reminder. */
+    onStats: (() -> Unit)? = null,
 ) {
     val c = Avl.colors
     var form by remember(initial) { mutableStateOf(initial) }
@@ -89,6 +93,7 @@ fun EditScreen(
         }
         Column(Modifier.verticalScroll(rememberScrollState()).padding(horizontal = 16.dp)) {
             problems.forEach { Text(it, color = c.strict, fontWeight = FontWeight.SemiBold, modifier = Modifier.padding(top = 4.dp)) }
+            onStats?.let { TextButton(onClick = it, Modifier.testTag("stats")) { Text("Statistik und Serie ›", color = c.accent) } }
 
             SectionTitle("Was?")
             OutlinedTextField(
@@ -106,6 +111,7 @@ fun EditScreen(
             ) { form = form.copy(kind = it) }
             ScheduleDetail(form) { form = it }
             PlaceSection(form) { form = it }
+            if (form.weeklyPossible) WeeklyGoalSection(form) { form = it }
 
             SectionTitle("Wie streng?")
             Choice(
@@ -191,12 +197,16 @@ private val SNOOZE_SETS = listOf(listOf(10), listOf(15), listOf(30), listOf(10, 
 @Composable
 private fun SwitchLine(label: String, hint: String, checked: Boolean, onChange: (Boolean) -> Unit) {
     val c = Avl.colors
-    Row(Modifier.fillMaxWidth().padding(top = 8.dp), verticalAlignment = androidx.compose.ui.Alignment.CenterVertically) {
+    // The whole line toggles, not only the small switch.
+    Row(
+        Modifier.fillMaxWidth().padding(top = 8.dp).toggleable(checked, role = Role.Switch, onValueChange = onChange),
+        verticalAlignment = androidx.compose.ui.Alignment.CenterVertically,
+    ) {
         Column(Modifier.weight(1f)) {
             Text(label, color = c.text, fontSize = 15.sp)
             Text(hint, color = c.muted, fontSize = 13.sp)
         }
-        Switch(checked, onChange)
+        Switch(checked, null)
     }
 }
 
@@ -318,6 +328,36 @@ private fun PlaceSection(form: ReminderForm, onChange: (ReminderForm) -> Unit) {
     if ((form.atHome || form.kind == ScheduleKind.ON_ARRIVAL) && form.homeId == null) {
         Text("Zuhause ist noch nicht festgelegt – in den Einstellungen.", Modifier.padding(top = 6.dp), color = c.strict, fontSize = 13.sp)
     }
+}
+
+/** "3–4× pro Woche, mindestens 1×" (Anf. Z1c): the offers count over the week (design 12.3). */
+@Composable
+private fun WeeklyGoalSection(form: ReminderForm, onChange: (ReminderForm) -> Unit) {
+    val c = Avl.colors
+    SwitchLine("Wochenziel", "zählt über die Woche (Mo–So) statt jedes Angebot einzeln", form.weekly) { onChange(form.copy(weekly = it)) }
+    if (!form.weekly) return
+    val days = if (form.kind == ScheduleKind.DAILY) 7 else form.days.size.coerceAtLeast(1)
+    val range = (1..days).toList()
+    @Composable
+    fun line(label: String, value: Int, tag: String, pick: (Int) -> Unit) {
+        Text(label, Modifier.padding(top = 8.dp).testTag(tag), color = c.text, fontSize = 14.sp)
+        Choice(range.map { it to "$it×" }, value.coerceIn(1, days), onPick = pick)
+    }
+    // Keep minimum ≤ target ≤ at most while picking.
+    line("Ziel pro Woche", form.weekTarget, "weekTarget") { t ->
+        onChange(form.copy(weekTarget = t, weekMax = maxOf(form.weekMax, t), weekMinimum = minOf(form.weekMinimum, t)))
+    }
+    line("Höchstens (danach kein Angebot mehr)", form.weekMax, "weekMax") { m ->
+        onChange(form.copy(weekMax = m, weekTarget = minOf(form.weekTarget, m), weekMinimum = minOf(form.weekMinimum, m)))
+    }
+    line("Mindestens (sonst Rettung am Wochenende)", form.weekMinimum, "weekMinimum") { n ->
+        onChange(form.copy(weekMinimum = n, weekTarget = maxOf(form.weekTarget, n), weekMax = maxOf(form.weekMax, n)))
+    }
+    Text(
+        "Ab dem Ziel kommen weitere Angebote still. Reichen die restlichen Tage nur noch knapp, wird es eine Stufe strenger." +
+            if (form.kind == ScheduleKind.WEEKDAYS && form.days.none { it.value >= 6 }) " Steht die Woche am Samstag noch unter dem Minimum, erinnert die App Samstag und Sonntag um 10 Uhr streng." else "",
+        Modifier.padding(top = 6.dp), color = c.muted, fontSize = 13.sp,
+    )
 }
 
 /** Up to 20 items; each is done on its own in the alarm, the last one completes the reminder. */

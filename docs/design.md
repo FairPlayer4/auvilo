@@ -463,8 +463,8 @@ V1.2 ist für einen Schritt zu groß und zum Teil noch offen. Deshalb (2026-10-2
 
 | Etappe | Inhalt | Stand |
 |---|---|---|
-| **V1.2a – Alltag** | Verbesserung vorschlagen (Anf. 7.24), Reminder-Liste aufräumen (Anf. 7.9, L1–L5) | in Umsetzung |
-| **V1.2b – Ziele über die Zeit** | Wochenziele, Serien/Joker, Statistik, Übersicht morgens/abends | Entwurf 12.3, Prüfung durch Kevin offen |
+| **V1.2a – Alltag** | Verbesserung vorschlagen (Anf. 7.24), Reminder-Liste aufräumen (Anf. 7.9, L1–L5) | umgesetzt, installiert |
+| **V1.2b – Ziele über die Zeit** | Wochenziele, Serien/Joker, Statistik, Übersicht morgens/abends | Entwurf 12.3 bestätigt, umgesetzt (12.5) |
 | **V1.2c – Fristen und Blocker** | Fristen mit Ausführungsfenstern, Vorab-Reminder (T6), Blocker als Aufgaben (S5–S8), eigene Vorlagen | Entwurf 12.4, Prüfung durch Kevin offen |
 
 Der Vorab-Reminder (T6) war bisher keiner Etappe zugeordnet; S6 braucht ihn, deshalb V1.2c.
@@ -520,3 +520,35 @@ Vorschläge zu den offenen Fragen; Kevin bestätigt oder korrigiert vor der Umse
     Vorlagen zur Auswahl an (z. B. "Arbeit" mit *+30 / +60*).
 11. **Vorab-Reminder (T6):** pro Reminder optional, *am Vorabend* (Uhrzeit einstellbar)
     oder *x Minuten vorher*; eine stille Benachrichtigung, die offene Blocker nennt (S6).
+
+### 12.5 V1.2b – Umsetzung und Präzisierungen
+Kevin hat 12.3 am 2026-10-31 bestätigt. Präzisiert bei der Umsetzung:
+- **Modell:** `Reminder.weeklyGoal = WeeklyGoal(target, max = target, minimum = 1)`, nur
+  bei *täglich* oder *an Wochentagen*; `minimum ≤ target ≤ max ≤ Angebotstage`. Spalten
+  `weekTarget`, `weekMax`, `weekMinimum`; Migration 4→5 nur mit `ADD COLUMN`, Backup v4.
+- **Zählen:** *Ziel* und *Minimum* zählen, *ohne Nachweis* nicht. Maßgeblich ist der
+  Erledigungszeitpunkt (`resolvedAt`), Woche Mo–So in der Zone des Geräts.
+- **Ziel erreicht:** weitere Angebote kommen als stille Benachrichtigung ohne Runden; der
+  Alarm steht auf der Tagesgrenze. Bleibt das Angebot offen, wird es am Tagesende
+  *ausgelassen – Wochenziel erreicht* statt *verpasst*.
+- **Höchstens erreicht:** das nächste Angebot kommt erst in der nächsten Woche.
+- **Knapp:** `restliche Angebotstage (inkl. heute) ≤ Ziel − erledigt` und Ziel noch nicht
+  erreicht → eine Stufe strenger (locker → normal → streng; streng bleibt streng).
+- **Rettung:** solange das Minimum fehlt, Sa und So 10:00 *streng*, aber nur bei
+  Wochentags-Plänen, die diesen Tag nicht ohnehin anbieten. Die Rettung ignoriert
+  *entfällt* (Ankunft zuhause).
+- **Serien:** *Tage* bei täglich/Wochentagen ohne Wochenziel (Joker pro Kalenderwoche),
+  *Wochen* bei Wochenziel (eine Woche zählt mit erreichtem Minimum; eine Woche darunter
+  mit einem Verpasser bricht, sonst neutral; die laufende Woche zählt erst, wenn erreicht;
+  Joker pro Monat), *Mal* bei *nach Erledigung* (mehr als einen Tag zu spät = Verpasser;
+  Joker pro Monat). Ausgelassen, entfallen und ohne Nachweis halten die Serie.
+- **Statistik:** pro Reminder Ziel, Minimum, ohne Nachweis, vorab, ausgelassen, entfallen,
+  verpasst für Woche, Monat, Jahr, gesamt; erreichbar beim Bearbeiten über *Statistik und
+  Serie*. *Heute* zeigt einen Abschnitt *Diese Woche* (knappe Wochen hervorgehoben).
+- **Übersicht:** eigener stiller Kanal; Standard 7:30 und 20:30, in den Einstellungen
+  verschiebbar oder *aus*. Inexakter Alarm (`setWindow`, 10 min), nach jedem Auslösen,
+  Neustart und App-Start neu gesetzt; Inhalt wird beim Auslösen aus der Datenbank gebaut.
+- **Diagnose-Log** für Gerätetests (`Diag`): logcat-Tag `AvlDiag` und
+  `files/diag/diag.log` (rotiert bei 512 KB nach `diag.1.log`). Enthält Zeiten, IDs,
+  Titel, Zustände, Berechtigungen; keine Nachweis-Inhalte, keine Positionen. Bleibt im
+  App-Speicher und wird mit der App gelöscht.

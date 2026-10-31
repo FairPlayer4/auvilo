@@ -17,6 +17,7 @@ import com.avlreminder.core.usecases.Overview
 import com.avlreminder.core.usecases.ReminderSort
 import com.avlreminder.core.usecases.SaveResult
 import com.avlreminder.core.usecases.Today
+import com.avlreminder.data.OverviewTimes
 import com.avlreminder.data.SuggestionEntity
 import com.avlreminder.data.SuggestionStatus
 import com.avlreminder.data.ThemeMode
@@ -152,6 +153,15 @@ class AppViewModel(app: Application) : AndroidViewModel(app) {
 
     fun setArchived(reminderId: Long, archived: Boolean) {
         viewModelScope.launch { graph.withEngine { it.setArchived(reminderId, archived) } }
+    }
+
+    val overview: StateFlow<OverviewTimes> = state(OverviewTimes(), graph.settings.overview)
+
+    fun setOverview(times: OverviewTimes) {
+        viewModelScope.launch {
+            graph.settings.setOverview(times)
+            graph.scheduleOverview()
+        }
     }
 
     fun setReminderSort(sort: ReminderSort) {
