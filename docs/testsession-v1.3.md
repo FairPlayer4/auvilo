@@ -54,7 +54,7 @@ Prüfen: Heute zeigt alle unter „Später heute“ und „Diese Woche“ mit D 
 | T+21 | D kommt | eine Stufe strenger als „normal“: Vollbild mit Ton; „Diese Woche“ rot (70). Erledigen → „1 von …, Minimum erreicht“ (69) | Wochenziel-Stufe am echten Alarm |
 | T+24 | D bearbeiten → „Statistik und Serie“ | Woche 1 × Ziel; Serie plausibel (74) | |
 | T+26 | Auf Heute bei E „Erledigen“ (vorab) | E verschwindet aus „Später heute“; Reminder-Liste: E erst wieder am Montag (72); Statistik von E: „vorab 1“ | |
-| T+29 | „Nicht stören“ einschalten (ohne Ausnahme für die App) | | |
+| T+29 | „Nicht stören“ einschalten (die Ausnahme in den Berechtigungen bleibt erteilt) | | |
 | T+31 | F und G fällig | F klingelt trotz „Nicht stören“; G still, Heute: „1 Reminder wartet“ (22, 25). F erledigen | DND-Verhalten hängt am System |
 | T+34 | „Nicht stören“ ausschalten | G meldet sich spätestens zur nächsten Runde (23); erledigen | |
 | T+30–40 | Abend-Übersicht kommt nebenbei | stille Benachrichtigung mit Rückblick, Wochenzielen, morgen; Tipp öffnet die App (76) | inexakter Alarm, Zeitpunkt nur real |

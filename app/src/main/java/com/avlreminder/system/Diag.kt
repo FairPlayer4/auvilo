@@ -7,6 +7,7 @@ import android.content.Context
 import android.content.pm.PackageManager
 import android.os.PowerManager
 import android.util.Log
+import com.avlreminder.alarm.Notifications
 import java.io.File
 import java.time.LocalDateTime
 import java.time.format.DateTimeFormatter
@@ -54,7 +55,8 @@ object Diag {
                 "batteryExempt=${power.isIgnoringBatteryOptimizations(context.packageName)} " +
                 "location=${granted(Manifest.permission.ACCESS_FINE_LOCATION)} " +
                 "background=${granted(Manifest.permission.ACCESS_BACKGROUND_LOCATION)} " +
-                "dndAccess=${notifications.isNotificationPolicyAccessGranted} " +
+                // Same check as the settings screen: the alarm channels may bypass "Nicht stören".
+                "dndBlocked=${Notifications.channelsBlockedByDnd(context).ifEmpty { "none" }} " +
                 "interruptionFilter=${notifications.currentInterruptionFilter}",
         )
     }
