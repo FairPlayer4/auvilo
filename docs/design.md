@@ -1,4 +1,4 @@
-# Design – avlreminder V1.0 und V1.1
+# Design – avlreminder V1.0 bis V1.2
 
 > Stand: 2026-10-24 – erster Entwurf. Grundlage: [anforderungen.md](anforderungen.md),
 > Ergebnisse aus [spike.md](spike.md). Mocks: siehe Abschnitt 9.
@@ -455,3 +455,100 @@ Wie Abschnitt 8, zusätzlich:
   Entfernte Punkte nehmen ihren Fortschritt mit; ihre Nachweise bleiben.
 - **Migration 2→3** nur mit `ADD COLUMN` und neuen Tabellen. Das Backup
   `avlreminder-v2-<Zeit>.db` entsteht wie in 11.13.
+
+## 12. V1.2 – Schnitt und Entwurf
+
+### 12.1 Schnitt in drei Etappen
+V1.2 ist für einen Schritt zu groß und zum Teil noch offen. Deshalb (2026-10-29):
+
+| Etappe | Inhalt | Stand |
+|---|---|---|
+| **V1.2a – Alltag** | Verbesserung vorschlagen (Anf. 7.24), Reminder-Liste aufräumen (Anf. 7.9, L1–L5) | umgesetzt, installiert |
+| **V1.2b – Ziele über die Zeit** | Wochenziele, Serien/Joker, Statistik, Übersicht morgens/abends | Entwurf 12.3 bestätigt, umgesetzt (12.5) |
+| **V1.2c – Fristen und Blocker** | Fristen mit Ausführungsfenstern, Vorab-Reminder (T6), Blocker als Aufgaben (S5–S8), eigene Vorlagen | Entwurf 12.4, Prüfung durch Kevin offen |
+
+Der Vorab-Reminder (T6) war bisher keiner Etappe zugeordnet; S6 braucht ihn, deshalb V1.2c.
+
+### 12.2 V1.2a – Design
+- **Archiv:** `reminder.archivedAt` (null = nicht archiviert). Archivieren pausiert den
+  Reminder und setzt `archivedAt`; Wiederherstellen löscht nur `archivedAt`, der Reminder
+  bleibt pausiert. Einschalten und das Verschieben eines Einmal-Reminders auf eine neue
+  Zeit heben das Archiv auf. Das Formular kennt `archivedAt` nicht; die Engine übernimmt
+  den gespeicherten Wert.
+- **Abgeschlossen** ist abgeleitet, nicht gespeichert: ein Einmal-Reminder oder *Wenn ich
+  zuhause bin* ohne offene Fälligkeit.
+- **Liste** (`ReminderList` in `:core`): Gruppen *aktiv*, *Pausiert*, *Abgeschlossen*
+  (archiviert oder abgeschlossen, eingeklappt). Sortierung *nächste Fälligkeit*
+  (Standard; ohne Fälligkeit ans Ende, dann nach Name), *Name*, *zuletzt angelegt*. Die
+  Wahl liegt in den Einstellungen (DataStore).
+- **Vorschläge:** Tabelle `suggestion` (Text, wichtig, Zeitpunkt, Bildschirm, Reminder-Id
+  und -Titel, App-Version, Status *offen / umgesetzt / verworfen* mit Zeitpunkt). Keine
+  Fremdschlüssel: Ein Vorschlag bleibt, wenn der Reminder gelöscht wird; der Titel ist
+  deshalb mitgespeichert. Vorschläge sind keine Reminder-Logik und liegen nur in `:app`.
+- **Einstieg:** Glühbirnen-Symbol oben rechts auf jedem Bildschirm (auf *Heute* neben den
+  Einstellungen, beim Bearbeiten vor *Speichern*). Im Alarm ein unauffälliger Textknopf
+  ganz unten; der Alarm läuft dabei weiter.
+- **Liste der Vorschläge:** aus den Einstellungen erreichbar; wichtige zuerst, dann die
+  neuesten; *Alle offenen kopieren* und *Teilen* als Markdown-Liste mit Kontext.
+- **Migration 3→4** nur mit `ADD COLUMN` und neuer Tabelle, Backup wie in 11.13.
+
+### 12.3 V1.2b – Entwurf zur Prüfung
+Vorschläge zu den offenen Fragen; Kevin bestätigt oder korrigiert vor der Umsetzung.
+1. **Wochenziel als Eigenschaft** eines wiederkehrenden Reminders (z. B. Training:
+   Mo–Fr angeboten, Ziel 3–4×, Minimum 1×), keine eigene Reminder-Art. Woche Mo–So.
+2. **"3–4×"**: Ab 3 ist das Ziel erreicht; weitere Angebote kommen nur noch still, ohne
+   Eskalation. Ab 4 wird für den Rest der Woche nichts mehr angeboten.
+3. **Minimum zählt mit** für das Wochenziel; die Statistik weist es getrennt aus.
+4. **Knapp:** Reichen die restlichen Angebotstage nur noch genau, eskaliert der Reminder
+   eine Stufe strenger.
+5. **Rettungs-Erinnerung:** Steht die Woche bei 0, kommt Samstag 10 Uhr eine strenge
+   Erinnerung, Sonntag 10 Uhr noch einmal.
+6. **Serien:** tägliche Reminder zählen Tage, Reminder mit Wochenziel Wochen mit
+   erreichtem Minimum, Intervall-Reminder Erledigungen, die höchstens einen Tag nach dem
+   Plan kamen (am unsichersten). Joker: 1 pro Woche bei täglichen, 1 pro Monat bei
+   wöchentlichen; Auslassen und *entfällt* zählen neutral.
+7. **Statistik** pro Reminder: erledigt, Minimum, ausgelassen, verpasst; aktuelle und beste
+   Serie; Woche, Monat, Jahr, gesamt. Zuerst als Liste, Diagramme später.
+8. **Übersicht** als stille Benachrichtigung um 7:30 und 20:30 (einstellbar); ein Tipp
+   öffnet die Übersicht in der App. Abends mit Stand der Wochenziele.
+
+### 12.4 V1.2c – Entwurf zur Prüfung
+9. **Fristen:** *Auf morgen* geht, solange danach noch mindestens ein Ausführungsfenster
+   vor der Frist liegt. Nach der Frist gilt die Fälligkeit als verpasst; der Reminder bleibt
+   sichtbar, bis er erledigt oder verworfen ist.
+10. **Vorlagen:** *Als Vorlage speichern* an einem Reminder; Widget und *+* bieten die
+    Vorlagen zur Auswahl an (z. B. "Arbeit" mit *+30 / +60*).
+11. **Vorab-Reminder (T6):** pro Reminder optional, *am Vorabend* (Uhrzeit einstellbar)
+    oder *x Minuten vorher*; eine stille Benachrichtigung, die offene Blocker nennt (S6).
+
+### 12.5 V1.2b – Umsetzung und Präzisierungen
+Kevin hat 12.3 am 2026-10-31 bestätigt. Präzisiert bei der Umsetzung:
+- **Modell:** `Reminder.weeklyGoal = WeeklyGoal(target, max = target, minimum = 1)`, nur
+  bei *täglich* oder *an Wochentagen*; `minimum ≤ target ≤ max ≤ Angebotstage`. Spalten
+  `weekTarget`, `weekMax`, `weekMinimum`; Migration 4→5 nur mit `ADD COLUMN`, Backup v4.
+- **Zählen:** *Ziel* und *Minimum* zählen, *ohne Nachweis* nicht. Maßgeblich ist der
+  Erledigungszeitpunkt (`resolvedAt`), Woche Mo–So in der Zone des Geräts.
+- **Ziel erreicht:** weitere Angebote kommen als stille Benachrichtigung ohne Runden; der
+  Alarm steht auf der Tagesgrenze. Bleibt das Angebot offen, wird es am Tagesende
+  *ausgelassen – Wochenziel erreicht* statt *verpasst*.
+- **Höchstens erreicht:** das nächste Angebot kommt erst in der nächsten Woche.
+- **Knapp:** `restliche Angebotstage (inkl. heute) ≤ Ziel − erledigt` und Ziel noch nicht
+  erreicht → eine Stufe strenger (locker → normal → streng; streng bleibt streng).
+- **Rettung:** solange das Minimum fehlt, Sa und So 10:00 *streng*, aber nur bei
+  Wochentags-Plänen, die diesen Tag nicht ohnehin anbieten. Die Rettung ignoriert
+  *entfällt* (Ankunft zuhause).
+- **Serien:** *Tage* bei täglich/Wochentagen ohne Wochenziel (Joker pro Kalenderwoche),
+  *Wochen* bei Wochenziel (eine Woche zählt mit erreichtem Minimum; eine Woche darunter
+  mit einem Verpasser bricht, sonst neutral; die laufende Woche zählt erst, wenn erreicht;
+  Joker pro Monat), *Mal* bei *nach Erledigung* (mehr als einen Tag zu spät = Verpasser;
+  Joker pro Monat). Ausgelassen, entfallen und ohne Nachweis halten die Serie.
+- **Statistik:** pro Reminder Ziel, Minimum, ohne Nachweis, vorab, ausgelassen, entfallen,
+  verpasst für Woche, Monat, Jahr, gesamt; erreichbar beim Bearbeiten über *Statistik und
+  Serie*. *Heute* zeigt einen Abschnitt *Diese Woche* (knappe Wochen hervorgehoben).
+- **Übersicht:** eigener stiller Kanal; Standard 7:30 und 20:30, in den Einstellungen
+  verschiebbar oder *aus*. Inexakter Alarm (`setWindow`, 10 min), nach jedem Auslösen,
+  Neustart und App-Start neu gesetzt; Inhalt wird beim Auslösen aus der Datenbank gebaut.
+- **Diagnose-Log** für Gerätetests (`Diag`): logcat-Tag `AvlDiag` und
+  `files/diag/diag.log` (rotiert bei 512 KB nach `diag.1.log`). Enthält Zeiten, IDs,
+  Titel, Zustände, Berechtigungen; keine Nachweis-Inhalte, keine Positionen. Bleibt im
+  App-Speicher und wird mit der App gelöscht.

@@ -8,6 +8,7 @@ import com.avlreminder.core.model.ProofSpec
 import com.avlreminder.core.model.Reminder
 import com.avlreminder.core.model.Schedule
 import com.avlreminder.core.model.Strictness
+import com.avlreminder.core.model.WeeklyGoal
 import com.avlreminder.core.model.WhenAway
 import com.avlreminder.core.rules.Presets
 import java.time.DayOfWeek
@@ -32,7 +33,7 @@ data class ReminderForm(
     val active: Boolean = true,
     val title: String = "",
     val why: String = "",
-    val character: Character = Character.OVERCOME,
+    val character: Character = Character.DOCUMENT,
     val strictness: Strictness = Strictness.NORMAL,
     val kind: ScheduleKind = ScheduleKind.DAILY,
     val date: LocalDate,
@@ -56,7 +57,15 @@ data class ReminderForm(
     val homeId: Long? = null,
     /** Items keep their id while editing; empty ones are dropped on save. */
     val checklist: List<ChecklistItem> = emptyList(),
+    /** Weekly goal (only daily or on weekdays); the numbers are kept when it is switched off. */
+    val weekly: Boolean = false,
+    val weekTarget: Int = 3,
+    val weekMax: Int = 4,
+    val weekMinimum: Int = 1,
 ) {
+    /** A weekly goal fits only schedules with offer days. */
+    val weeklyPossible: Boolean get() = kind == ScheduleKind.DAILY || kind == ScheduleKind.WEEKDAYS
+
     /** Picking a strictness resets proof and limits to the preset; each can be changed afterwards. */
     fun withStrictness(s: Strictness): ReminderForm {
         val p = Presets.of(s)
@@ -105,6 +114,7 @@ data class ReminderForm(
             // Without a place the validation says what is missing.
             arrival = arrival?.takeIf { homeId != null },
             checklist = checklist.map { it.copy(title = it.title.trim()) }.filter { it.title.isNotEmpty() },
+            weeklyGoal = if (weekly && weeklyPossible) WeeklyGoal(weekTarget, weekMax, weekMinimum) else null,
         )
     }
 
@@ -134,6 +144,10 @@ data class ReminderForm(
                 whenAway = r.arrival?.whenAway ?: WhenAway.DROP,
                 homeId = r.arrival?.placeId ?: homeId,
                 checklist = r.checklist,
+                weekly = r.weeklyGoal != null,
+                weekTarget = r.weeklyGoal?.target ?: 3,
+                weekMax = r.weeklyGoal?.max ?: 4,
+                weekMinimum = r.weeklyGoal?.minimum ?: 1,
             )
             return when (val s = r.schedule) {
                 is Schedule.Once -> base.copy(kind = ScheduleKind.ONCE, date = s.at.toLocalDate(), time = s.at.toLocalTime())

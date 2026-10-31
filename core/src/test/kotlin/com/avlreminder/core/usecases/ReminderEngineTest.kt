@@ -300,6 +300,45 @@ class ReminderEngineTest {
     }
 
     @Test
+    fun `a finished one-off reminder moved to a later time today is planned again`() = runTest {
+        val id = create(reminder(Schedule.Once(LocalDateTime.of(2026, 10, 26, 9, 0))))
+        engine.act(open(id).id, Action.Complete(false))
+        create(repo.reminders[id]!!.copy(title = "Neuer Titel"))
+        assertNull(repo.openOccurrence(id))
+        engine.setActive(id, false)
+
+        // Moving it also switches it on again.
+        create(repo.reminders[id]!!.copy(schedule = Schedule.Once(LocalDateTime.of(2026, 10, 26, 15, 0))))
+        assertTrue(repo.reminders[id]!!.active)
+        val o = open(id)
+        assertEquals(at(26, 15), o.dueAt)
+        assertEquals(at(26, 15), alarms.set[o.id]!!.first)
+    }
+
+    @Test
+    fun `a skipped one-off reminder moved to a passed time today rings right away`() = runTest {
+        val id = create(reminder(Schedule.Once(LocalDateTime.of(2026, 10, 26, 9, 0))))
+        engine.act(open(id).id, Action.Skip("keine Zeit"))
+        clock.now = at(26, 12)
+        val result = engine.save(repo.reminders[id]!!.copy(schedule = Schedule.Once(LocalDateTime.of(2026, 10, 26, 10, 0))))
+        val o = open(id)
+        assertEquals(at(26, 10), o.dueAt)
+        assertEquals(OccurrenceState.DUE, o.state)
+        assertEquals(o.id, (result as SaveResult.Saved).ring!!.occurrence.id)
+    }
+
+    @Test
+    fun `a one-off reminder cannot be moved to an earlier day`() = runTest {
+        val id = create(reminder(Schedule.Once(LocalDateTime.of(2026, 10, 26, 9, 0))))
+        engine.act(open(id).id, Action.Complete(false))
+        clock.now = at(27, 8)
+        val result = engine.save(repo.reminders[id]!!.copy(schedule = Schedule.Once(LocalDateTime.of(2026, 10, 26, 20, 0))))
+        assertEquals(SaveResult.Invalid(listOf("Zeitpunkt liegt in der Vergangenheit")), result)
+        // Unchanged, the passed time does not block other edits.
+        assertTrue(engine.save(repo.reminders[id]!!.copy(title = "Neuer Titel")) is SaveResult.Saved)
+    }
+
+    @Test
     fun `pausing cancels the alarm and resuming plans anew without a miss`() = runTest {
         val id = create()
         val o = open(id)
@@ -331,6 +370,40 @@ class ReminderEngineTest {
         engine.setActive(id, true)
         assertEquals(o, open(id))
         assertEquals(at(26, 18), alarms.set[o.id]!!.first)
+    }
+
+    @Test
+    fun `archiving pauses, restoring keeps it paused, switching on unarchives`() = runTest {
+        val id = create()
+        val o = open(id)
+        engine.setArchived(id, true)
+        assertEquals(at(26, 8), repo.reminders[id]!!.archivedAt)
+        assertFalse(repo.reminders[id]!!.active)
+        assertFalse(alarms.set.containsKey(o.id))
+
+        // Editing keeps the archive, the form does not know it.
+        create(repo.reminders[id]!!.copy(archivedAt = null, title = "Neu"))
+        assertNotNull(repo.reminders[id]!!.archivedAt)
+
+        engine.setArchived(id, false)
+        assertNull(repo.reminders[id]!!.archivedAt)
+        assertFalse(repo.reminders[id]!!.active)
+
+        engine.setArchived(id, true)
+        engine.setActive(id, true)
+        assertNull(repo.reminders[id]!!.archivedAt)
+        assertEquals(at(26, 18), alarms.set[open(id).id]!!.first)
+        engine.setArchived(999, true) // unknown id is ignored
+    }
+
+    @Test
+    fun `moving an archived one-off brings it back`() = runTest {
+        val id = create(reminder(Schedule.Once(LocalDateTime.of(2026, 10, 26, 9, 0))))
+        engine.act(open(id).id, Action.Complete(false))
+        engine.setArchived(id, true)
+        create(repo.reminders[id]!!.copy(schedule = Schedule.Once(LocalDateTime.of(2026, 10, 27, 9, 0))))
+        assertNull(repo.reminders[id]!!.archivedAt)
+        assertEquals(at(27, 9), open(id).dueAt)
     }
 
     @Test

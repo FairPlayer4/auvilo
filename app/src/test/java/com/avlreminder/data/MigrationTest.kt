@@ -9,6 +9,7 @@ import com.avlreminder.core.model.ChecklistItem
 import com.avlreminder.core.model.ItemDone
 import com.avlreminder.core.model.ProofSpec
 import com.avlreminder.core.model.ProofType
+import com.avlreminder.core.model.WeeklyGoal
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.test.runTest
 import org.json.JSONObject
@@ -22,7 +23,7 @@ import java.io.File
 import java.time.Instant
 
 /**
- * Room 1 → 2 (V1.1a) and 2 → 3 (V1.1b): existing reminders, occurrences and proofs survive, the
+ * Room 1 → 2 (V1.1a), 2 → 3 (V1.1b), 3 → 4 (V1.2a) and 4 → 5 (V1.2b): existing reminders, occurrences and proofs survive, the
  * backup is taken first. The old database is built from the exported schema; Room checks the
  * migrated tables against the current version on open.
  */
@@ -63,6 +64,24 @@ class MigrationTest {
         db.execSQL("INSERT INTO proof (id, occurrenceId, type, takenAt, text) VALUES (3, 5, 'TEXT', 2000, 'erledigt')")
     }
 
+    private fun createV3() = create(3) { db ->
+        db.execSQL(
+            "INSERT INTO reminder (id, title, character, strictness, scheduleType, timeMinutes, weekdays, proof, active, createdAt, " +
+                "proofPhoto, ignoreDnd, snoozeMinutes, arrivalPlaceId, arrivalWhenAway) " +
+                "VALUES (1, 'Brunnen', 'DOCUMENT', 'NORMAL', 'DAILY', 1140, 0, 'CONFIRM', 1, 0, 0, 0, '10', 2, 'RING')",
+        )
+        db.execSQL("INSERT INTO place (id, name, lat, lon, radiusMeters) VALUES (2, 'Zuhause', 50.0, 8.0, 150)")
+        db.execSQL("INSERT INTO checklist_item (id, reminderId, position, title) VALUES (7, 1, 0, 'Brunnen 1')")
+    }
+
+    private fun createV4() = create(4) { db ->
+        db.execSQL(
+            "INSERT INTO reminder (id, title, character, strictness, scheduleType, timeMinutes, weekdays, proof, active, createdAt, " +
+                "proofPhoto, ignoreDnd, snoozeMinutes, archivedAt) " +
+                "VALUES (1, 'Training', 'OVERCOME', 'NORMAL', 'WEEKDAYS', 1140, 31, 'CONFIRM', 1, 0, 0, 0, '10', NULL)",
+        )
+    }
+
     private fun createV1() = create(1) { db ->
             db.execSQL(
                 "INSERT INTO reminder (id, title, why, character, strictness, scheduleType, timeMinutes, onceAt, weekdays, " +
@@ -79,7 +98,32 @@ class MigrationTest {
     }
 
     private fun open() = Room.databaseBuilder(context, AvlDatabase::class.java, file.path)
-        .addMigrations(MIGRATION_1_2, MIGRATION_2_3).allowMainThreadQueries().build()
+        .addMigrations(MIGRATION_1_2, MIGRATION_2_3, MIGRATION_3_4, MIGRATION_4_5).allowMainThreadQueries().build()
+
+    @Test
+    fun version4KeepsDataAndGetsWeeklyGoal() = runTest {
+        createV4()
+        val db = open()
+        try {
+            val repo = RoomReminderRepository(db)
+            val r = repo.reminder(1)!!
+            assertEquals("Training", r.title)
+            assertNull(r.weeklyGoal)
+            repo.saveReminder(r.copy(weeklyGoal = WeeklyGoal(target = 3, max = 4, minimum = 2)))
+            assertEquals(WeeklyGoal(3, 4, 2), repo.reminder(1)!!.weeklyGoal)
+            repo.saveReminder(repo.reminder(1)!!.copy(weeklyGoal = null))
+            assertNull(repo.reminder(1)!!.weeklyGoal)
+        } finally {
+            db.close()
+        }
+    }
+
+    @Test
+    fun backupIsTakenBeforeTheUpgradeFromVersion4() {
+        createV4()
+        val dir = File(context.filesDir, "backup-test-4").apply { deleteRecursively() }
+        assertTrue(AvlDatabase.backupBeforeMigration(file, dir)!!.name.startsWith("avlreminder-v4-"))
+    }
 
     @Test
     fun version2KeepsDataAndGetsPlacesAndChecklists() = runTest {
@@ -109,6 +153,37 @@ class MigrationTest {
         } finally {
             db.close()
         }
+    }
+
+    @Test
+    fun version3KeepsDataAndGetsArchiveAndSuggestions() = runTest {
+        createV3()
+        val db = open()
+        try {
+            val repo = RoomReminderRepository(db)
+            val r = repo.reminder(1)!!
+            assertNull(r.archivedAt)
+            assertEquals(2L, r.arrival!!.placeId)
+            assertEquals("Brunnen 1", r.checklist.single().title)
+            repo.saveReminder(r.copy(archivedAt = Instant.ofEpochMilli(5000)))
+            assertEquals(5000L, repo.reminder(1)!!.archivedAt!!.toEpochMilli())
+
+            val id = db.suggestions().insert(
+                SuggestionEntity(text = "Knopf größer", important = true, createdAt = Instant.ofEpochMilli(1), screen = "Heute", appVersion = "1.2a"),
+            )
+            val saved = db.suggestions().observe().first().single()
+            assertEquals(id, saved.id)
+            assertEquals(SuggestionStatus.OPEN, saved.status)
+        } finally {
+            db.close()
+        }
+    }
+
+    @Test
+    fun backupIsTakenBeforeTheUpgradeFromVersion3() {
+        createV3()
+        val dir = File(context.filesDir, "backup-test-3").apply { deleteRecursively() }
+        assertTrue(AvlDatabase.backupBeforeMigration(file, dir)!!.name.startsWith("avlreminder-v3-"))
     }
 
     @Test

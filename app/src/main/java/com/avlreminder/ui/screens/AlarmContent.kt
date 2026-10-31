@@ -42,6 +42,8 @@ import com.avlreminder.core.model.ChecklistItem
 import com.avlreminder.core.model.Occurrence
 import com.avlreminder.core.model.PrepAnswer
 import com.avlreminder.core.model.Reminder
+import com.avlreminder.core.rules.WeekStatus
+import com.avlreminder.core.usecases.Digests
 import com.avlreminder.core.rules.Evidence
 import com.avlreminder.core.rules.Prep
 import com.avlreminder.core.rules.ProofCheck
@@ -72,6 +74,8 @@ data class AlarmUi(
     /** Checklist items already done in this occurrence. */
     val done: Set<Long> = emptySet(),
     val canDeferRest: Boolean = false,
+    /** The week so far, for a reminder with a weekly goal. */
+    val week: WeekStatus? = null,
 )
 
 private enum class View { MAIN, PROOF, POSTPONE, SKIP }
@@ -101,9 +105,12 @@ fun AlarmContent(
     devices: AlarmDevices,
     onCheckItem: (itemId: Long, evidence: Evidence) -> Unit = { _, _ -> },
     onDeferRest: (Instant) -> Unit = {},
+    /** Notes an improvement; the alarm keeps going meanwhile. */
+    onSuggest: (text: String, important: Boolean) -> Unit = { _, _ -> },
 ) {
     val c = Avl.colors
     var view by remember { mutableStateOf(View.MAIN) }
+    var suggesting by remember { mutableStateOf(false) }
     var minimumOnly by remember { mutableStateOf(false) }
     /** The checklist item the proof is for; null = the whole reminder. */
     var proofItem by remember { mutableStateOf<ChecklistItem?>(null) }
@@ -131,6 +138,9 @@ fun AlarmContent(
         }
     }
 
+    if (suggesting) {
+        SuggestionDialog(onSave = { text, important -> onSuggest(text, important); suggesting = false }, onDismiss = { suggesting = false })
+    }
     Box(Modifier.fillMaxSize().background(c.background)) {
         Column(Modifier.fillMaxSize().verticalScroll(rememberScrollState()).imePadding().padding(24.dp)) {
             when (view) {
@@ -147,6 +157,7 @@ fun AlarmContent(
                     }
                     Spacer(Modifier.height(20.dp))
                     PrepCards(ui.prep)
+                    ui.week?.let { InfoCard("Diese Woche", Digests.week(it)) }
                     r.goal?.let { InfoCard("Ziel", it) }
                     r.minimum?.let { min ->
                         val left = ui.minimumsLeft?.let { " · noch ${it}× diese Woche" } ?: ""
@@ -187,6 +198,10 @@ fun AlarmContent(
                             }
                             OutlinedButton(onClick = { view = View.SKIP }, modifier = Modifier.weight(1f)) { Text("Auslassen\nmit Grund") }
                         }
+                    }
+                    // Unobtrusive at the very end, so it does not distract from reacting (Anf. 7.24, VV1).
+                    TextButton(onClick = { suggesting = true }, Modifier.padding(top = 24.dp).testTag("suggest")) {
+                        Text("Verbesserung vorschlagen", color = c.muted, fontSize = 13.sp)
                     }
                 }
                 View.PROOF -> ProofStep(

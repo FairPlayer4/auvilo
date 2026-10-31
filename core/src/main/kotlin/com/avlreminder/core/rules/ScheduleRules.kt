@@ -27,8 +27,11 @@ object ScheduleRules {
         // Never create a backlog: the next occurrence lies after both now and the previous one.
         val after = if (previousDueAt != null && previousDueAt > now) previousDueAt else now
         return when (schedule) {
-            is Schedule.Once ->
-                if (previousDueAt == null) schedule.at.atZone(zone).toInstant() else null
+            // Due again only when its time was changed after the last occurrence.
+            is Schedule.Once -> {
+                val at = schedule.at.atZone(zone).toInstant()
+                if (previousDueAt == null || at != previousDueAt) at else null
+            }
 
             // Waits for the arrival; the due time only orders it.
             Schedule.OnArrival -> if (previousDueAt == null) now else null

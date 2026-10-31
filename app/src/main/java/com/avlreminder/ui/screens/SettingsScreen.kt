@@ -17,6 +17,7 @@ import androidx.compose.material3.FilterChip
 import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
+import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.RadioButton
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
@@ -24,6 +25,7 @@ import androidx.compose.runtime.Composable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
@@ -33,11 +35,13 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import com.avlreminder.core.model.Place
 import com.avlreminder.core.rules.AlertSettings
+import com.avlreminder.data.OverviewTimes
 import com.avlreminder.data.Settings
 import com.avlreminder.data.ThemeMode
 import com.avlreminder.ui.AvlIcons
 import com.avlreminder.ui.Format
 import com.avlreminder.ui.SectionTitle
+import com.avlreminder.ui.TimeDialog
 import com.avlreminder.ui.theme.Avl
 import java.time.LocalTime
 
@@ -65,6 +69,10 @@ fun SettingsScreen(
     onSetHome: (onResult: (Boolean) -> Unit) -> Unit = {},
     dwellMinutes: Int = Settings.DEFAULT_DWELL,
     onDwell: (Int) -> Unit = {},
+    openSuggestions: Int = 0,
+    onSuggestions: () -> Unit = {},
+    overview: OverviewTimes = OverviewTimes(),
+    onOverview: (OverviewTimes) -> Unit = {},
 ) {
     val c = Avl.colors
     var homeState by remember { mutableStateOf<String?>(null) }
@@ -74,6 +82,14 @@ fun SettingsScreen(
             Text("Einstellungen", color = c.text, fontSize = 20.sp, fontWeight = FontWeight.SemiBold)
         }
         Column(Modifier.verticalScroll(rememberScrollState()).padding(horizontal = 16.dp)) {
+            SectionTitle("Verbesserungen")
+            Card {
+                Column(Modifier.padding(16.dp)) {
+                    Text(if (openSuggestions == 0) "Keine offenen Vorschläge" else "$openSuggestions offen", color = c.text, fontSize = 15.sp)
+                    TextButton(onClick = onSuggestions) { Text("Vorschläge ansehen", color = c.accent) }
+                }
+            }
+
             SectionTitle("Darstellung")
             Card {
                 listOf(
@@ -100,14 +116,14 @@ fun SettingsScreen(
             SectionTitle("Alarmzeiten")
             Card {
                 Column(Modifier.padding(16.dp)) {
-                    Text("Laut (mit Alarmton) ab", color = c.text, fontSize = 15.sp)
-                    Hours(listOf(16, 17, 18, 19, 20).filter { LocalTime.of(it, 0) < alert.dayEnd }, alert.loudFrom) {
-                        onAlert(alert.copy(loudFrom = it))
-                    }
-                    Text("Tagesgrenze", Modifier.padding(top = 12.dp), color = c.text, fontSize = 15.sp)
-                    Hours(listOf(21, 22, 23).filter { LocalTime.of(it, 0) > alert.loudFrom }, alert.dayEnd) {
-                        onAlert(alert.copy(dayEnd = it))
-                    }
+                    TimeSetting(
+                        "Laut (mit Alarmton) ab", alert.loudFrom, "loudFrom",
+                        error = { if (it >= alert.dayEnd) "muss vor der Tagesgrenze (${Format.time(alert.dayEnd)}) liegen" else null },
+                    ) { onAlert(alert.copy(loudFrom = it)) }
+                    TimeSetting(
+                        "Tagesgrenze", alert.dayEnd, "dayEnd",
+                        error = { if (it <= alert.loudFrom) "muss nach „laut ab“ (${Format.time(alert.loudFrom)}) liegen" else null },
+                    ) { onAlert(alert.copy(dayEnd = it)) }
                 }
             }
             Text(
@@ -115,6 +131,21 @@ fun SettingsScreen(
                     "außer bei Remindern mit „Auch bei Nicht stören“.",
                 Modifier.padding(4.dp), color = c.muted, fontSize = 13.sp,
             )
+
+            SectionTitle("Übersicht")
+            Card {
+                Column(Modifier.padding(16.dp)) {
+                    TimeSetting(
+                        "Morgens: was heute ansteht", overview.morning, "overviewMorning", fallback = LocalTime.of(7, 30),
+                        onOff = { onOverview(overview.copy(morning = null)) },
+                    ) { onOverview(overview.copy(morning = it)) }
+                    TimeSetting(
+                        "Abends: Rückblick, Wochenziele, morgen", overview.evening, "overviewEvening", fallback = LocalTime.of(20, 30),
+                        onOff = { onOverview(overview.copy(evening = null)) },
+                    ) { onOverview(overview.copy(evening = it)) }
+                }
+            }
+            Text("Eine stille Benachrichtigung ohne Ton; ein Tipp öffnet die App.", Modifier.padding(4.dp), color = c.muted, fontSize = 13.sp)
 
             SectionTitle("Zuhause")
             Card {
@@ -153,7 +184,7 @@ fun SettingsScreen(
                     }
                 }
             }
-            Text("AVL-Reminder 1.1b-Prototyp", Modifier.padding(vertical = 24.dp, horizontal = 4.dp), color = c.muted, fontSize = 12.sp)
+            Text("AVL-Reminder 1.2b-Prototyp", Modifier.padding(vertical = 24.dp, horizontal = 4.dp), color = c.muted, fontSize = 12.sp)
         }
     }
 }
@@ -163,11 +194,26 @@ private fun Card(content: @Composable () -> Unit) {
     Column(Modifier.fillMaxWidth().clip(RoundedCornerShape(16.dp)).background(Avl.colors.surface)) { content() }
 }
 
-@OptIn(ExperimentalLayoutApi::class)
+/**
+ * One line per time: label left, the time as a button right that opens a free entry
+ * (Vorschlag 1). With [onOff] the time can be switched off; null then shows "aus".
+ */
 @Composable
-private fun Hours(hours: List<Int>, selected: LocalTime, onPick: (LocalTime) -> Unit) {
-    val all = (hours.map { LocalTime.of(it, 0) } + selected).distinct().sorted()
-    FlowRow(Modifier.padding(top = 6.dp), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-        all.forEach { t -> FilterChip(t == selected, { onPick(t) }, label = { Text(Format.time(t)) }) }
+private fun TimeSetting(
+    label: String,
+    time: LocalTime?,
+    tag: String,
+    fallback: LocalTime = LocalTime.NOON,
+    error: (LocalTime) -> String? = { null },
+    onOff: (() -> Unit)? = null,
+    onPick: (LocalTime) -> Unit,
+) {
+    val c = Avl.colors
+    var pick by remember { mutableStateOf(false) }
+    Row(Modifier.fillMaxWidth().padding(vertical = 4.dp), verticalAlignment = Alignment.CenterVertically) {
+        Text(label, Modifier.weight(1f), color = c.text, fontSize = 15.sp)
+        if (onOff != null && time != null) TextButton(onClick = onOff, Modifier.testTag(tag + "Off")) { Text("aus", color = c.muted) }
+        OutlinedButton(onClick = { pick = true }, Modifier.testTag(tag)) { Text(time?.let { Format.time(it) } ?: "aus") }
     }
+    if (pick) TimeDialog(time ?: fallback, onDismiss = { pick = false }, error = error, onPick = onPick)
 }

@@ -97,6 +97,12 @@ enum class WhenAway {
  */
 data class Arrival(val placeId: Long, val whenAway: WhenAway = WhenAway.DROP)
 
+/**
+ * "3–4× pro Woche, mindestens 1×" (Anf. Z1c) on a daily or weekday reminder; weeks run Monday
+ * to Sunday. From [target] on further offers come silently, from [max] on none for the week.
+ */
+data class WeeklyGoal(val target: Int, val max: Int = target, val minimum: Int = 1)
+
 /** One point of a checklist; the list order is the order of the points. */
 data class ChecklistItem(val id: Long = 0, val title: String)
 
@@ -127,6 +133,10 @@ data class Reminder(
     val arrival: Arrival? = null,
     /** Empty = a single task. */
     val checklist: List<ChecklistItem> = emptyList(),
+    /** Put away by hand; an archived reminder is paused. null = not archived. */
+    val archivedAt: Instant? = null,
+    /** null = every offer counts on its own. */
+    val weeklyGoal: WeeklyGoal? = null,
 )
 
 /** One concrete time a reminder is due. */

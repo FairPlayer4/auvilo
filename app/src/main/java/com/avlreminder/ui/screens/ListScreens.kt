@@ -9,7 +9,6 @@ import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.LazyRow
 import androidx.compose.foundation.lazy.items
 import androidx.compose.material3.FilterChip
-import androidx.compose.material3.Switch
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
@@ -18,6 +17,7 @@ import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
@@ -30,6 +30,9 @@ import com.avlreminder.core.model.Reminder
 import com.avlreminder.core.model.Resolution
 import com.avlreminder.core.model.Schedule
 import com.avlreminder.core.usecases.HistoryDay
+import com.avlreminder.core.usecases.ReminderList
+import com.avlreminder.core.usecases.ReminderSort
+import com.avlreminder.ui.AvlSwitch
 import com.avlreminder.ui.EntryCard
 import com.avlreminder.ui.Format
 import com.avlreminder.ui.ResultBadge
@@ -44,7 +47,7 @@ fun ScreenTitle(text: String) {
     Text(text, Modifier.padding(top = 8.dp, bottom = 4.dp), color = Avl.colors.text, fontSize = 30.sp, fontWeight = FontWeight.Bold)
 }
 
-/** All reminders with their schedule, next time and an on/off switch. */
+/** All reminders in groups (L4), sortable (L5); finished and archived ones folded (L1–L3). */
 @Composable
 fun RemindersScreen(
     reminders: List<Reminder>,
@@ -54,29 +57,81 @@ fun RemindersScreen(
     onEdit: (Reminder) -> Unit,
     onSetActive: (Reminder, Boolean) -> Unit,
     modifier: Modifier = Modifier,
+    sort: ReminderSort = ReminderSort.NEXT_DUE,
+    onSort: (ReminderSort) -> Unit = {},
+    onRestore: (Reminder) -> Unit = {},
 ) {
     val c = Avl.colors
+    var showClosed by rememberSaveable { mutableStateOf(false) }
+    val groups = ReminderList.group(reminders, openByReminder, sort)
+    val card: @Composable (Reminder) -> Unit = { r ->
+        ReminderCard(r, openByReminder[r.id], today, zone, onEdit, onSetActive, onRestore)
+    }
     LazyColumn(modifier.padding(horizontal = 16.dp)) {
         item { ScreenTitle("Reminder") }
         if (reminders.isEmpty()) {
             item { Text("Noch keine Reminder.", Modifier.padding(top = 24.dp), color = c.muted) }
-        }
-        items(reminders, key = { it.id }) { r ->
-            val next = openByReminder[r.id]?.currentAt
-            val detail = buildString {
-                append(Format.plan(r))
-                if (!r.active) append(" · pausiert")
-                else if (r.schedule == Schedule.OnArrival) append(if (next != null) " · wartet auf Ankunft" else " · erledigt")
-                else if (next != null) append(" · nächstes: ${Format.moment(next, zone, today)}")
-            }
-            EntryCard(title = r.title, detail = detail, dimmed = !r.active, onClick = { onEdit(r) }) {
-                Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                    StrictnessTag(r.strictness)
+        } else {
+            item {
+                LazyRow(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                    items(listOf(ReminderSort.NEXT_DUE to "Nächste zuerst", ReminderSort.NAME to "Name", ReminderSort.NEWEST to "Neueste")) { (s, label) ->
+                        FilterChip(selected = sort == s, onClick = { onSort(s) }, label = { Text(label) })
+                    }
                 }
-                Switch(checked = r.active, onCheckedChange = { onSetActive(r, it) })
             }
+        }
+        items(groups.active, key = { it.id }) { card(it) }
+        if (groups.paused.isNotEmpty()) {
+            item { SectionTitle("Pausiert") }
+            items(groups.paused, key = { it.id }) { card(it) }
+        }
+        if (groups.closed.isNotEmpty()) {
+            item {
+                TextButton(onClick = { showClosed = !showClosed }, Modifier.padding(top = 8.dp).testTag("closed")) {
+                    Text((if (showClosed) "▾ " else "▸ ") + "Abgeschlossen (${groups.closed.size})", color = c.accent)
+                }
+            }
+            if (showClosed) items(groups.closed, key = { it.id }) { card(it) }
         }
         item { Spacer(Modifier.height(96.dp)) }
+    }
+}
+
+@Composable
+private fun ReminderCard(
+    r: Reminder,
+    open: Occurrence?,
+    today: LocalDate,
+    zone: ZoneId,
+    onEdit: (Reminder) -> Unit,
+    onSetActive: (Reminder, Boolean) -> Unit,
+    onRestore: (Reminder) -> Unit,
+) {
+    val c = Avl.colors
+    val next = open?.currentAt
+    val finished = ReminderList.finished(r, open)
+    val detail = buildString {
+        append(Format.plan(r))
+        when {
+            r.archivedAt != null -> append(" · archiviert")
+            // A one-off that already happened rings again only with a new time.
+            finished && r.schedule is Schedule.Once -> append(" · abgeschlossen – neue Zeit wählen, um ihn zu wiederholen")
+            finished -> append(" · erledigt")
+            !r.active -> append(" · pausiert")
+            r.schedule == Schedule.OnArrival -> append(" · wartet auf Ankunft")
+            next != null -> append(" · nächstes: ${Format.moment(next, zone, today)}")
+        }
+    }
+    EntryCard(title = r.title, detail = detail, dimmed = !r.active || finished, onClick = { onEdit(r) }) {
+        Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+            StrictnessTag(r.strictness)
+        }
+        when {
+            r.archivedAt != null -> TextButton(onClick = { onRestore(r) }) { Text("Wiederherstellen", color = c.accent) }
+            // Switching it on would plan nothing; the card opens the form for a new time.
+            finished -> {}
+            else -> AvlSwitch(r.active, { onSetActive(r, it) })
+        }
     }
 }
 

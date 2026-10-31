@@ -1,4 +1,4 @@
-# Gerätetest – Prototyp V1.0 / V1.1a / V1.1b
+# Gerätetest – Prototyp V1.0 / V1.1a / V1.1b / V1.2a / V1.2b
 
 > Ergänzt die automatischen Tests (`:core` JUnit + Kover, `:app` Robolectric/Compose).
 > Alles hier braucht das echte Gerät. Reihenfolge so gewählt, dass nichts nachts klingelt.
@@ -79,3 +79,47 @@ Vorher: 1.1a mit echten Daten installiert lassen; 1.1b darüber installieren. Ei
 | 53 | Ein Punkt erledigt, Rest bis zur Tagesgrenze offen | nicht verpasst; Rest morgen zur gleichen Uhrzeit |
 | 54 | Letzten Punkt abhaken | erledigt; Verlauf zeigt die Uhrzeit jedes Punkts |
 | 55 | Punkte bearbeiten (umbenennen, umsortieren, einen löschen) | erledigte Punkte bleiben erledigt |
+
+## V1.2a
+
+Vorher: 1.1b mit echten Daten installiert lassen; 1.2a darüber installieren (nicht deinstallieren).
+
+| # | Test | Erwartung |
+|---|---|---|
+| 56 | Erster Start nach dem Update | Reminder, Verlauf und Nachweise sind da; Backup `avlreminder-v3-….db` (wie Test 21) |
+| 57 | Glühbirne auf Heute, Reminder, Verlauf, Einstellungen und beim Bearbeiten | Dialog "Verbesserung vorschlagen"; nach Speichern bleibt man auf dem Bildschirm |
+| 58 | Im Alarm ganz unten "Verbesserung vorschlagen" | Alarm läuft weiter; Vorschlag zeigt "Alarm · „Titel“" |
+| 59 | Einstellungen → Verbesserungen → "Vorschläge ansehen" | offene zuerst, wichtige oben, mit Bildschirm, Zeit und Version |
+| 60 | "Alle offenen kopieren" und "Teilen" | Markdown-Liste in der Zwischenablage bzw. im Teilen-Menü; nichts wird von selbst gesendet |
+| 61 | Vorschlag antippen → "Umgesetzt" | wandert unter "Umgesetzt und verworfen"; "Wieder öffnen" holt ihn zurück |
+| 62 | Reminder-Liste mit erledigtem Einmal-Reminder und pausiertem Reminder | Abschnitte aktiv, "Pausiert", eingeklappt "Abgeschlossen (n)" |
+| 63 | Sortierung "Name" wählen, App neu starten | Sortierung bleibt erhalten |
+| 64 | Reminder bearbeiten → "Archivieren" | pausiert, unter "Abgeschlossen"; keine Alarme mehr |
+| 65 | Archivierten "Wiederherstellen" | steht unter "Pausiert"; erst Einschalten plant ihn wieder ein |
+| 66 | Abgeschlossenen Einmal-Reminder auf später heute legen | wieder aktiv, steht unter "Heute", klingelt zur neuen Zeit |
+
+## V1.2b
+
+Vorher: 1.2a mit echten Daten installiert lassen; 1.2b darüber installieren (nicht deinstallieren).
+Ablauf für eine Stunde am Stück: [testsession-v1.3.md](testsession-v1.3.md).
+
+| # | Test | Erwartung |
+|---|---|---|
+| 67 | Erster Start nach dem Update | Daten da; Backup `avlreminder-v4-….db`; `diag.log` beginnt mit "state app start 1.2b-prototyp" |
+| 68 | Täglichen Reminder bearbeiten → Bereich "Wochenziel" aufklappen, Zeile "Wochenziel" antippen, Ziel 3, höchstens 4, mindestens 1 | Auswahl bleibt stimmig (mindestens ≤ Ziel ≤ höchstens); Heute zeigt "Diese Woche" |
+| 69 | Ein Angebot erledigen | "Diese Woche": "1 von 3–4, Minimum erreicht" |
+| 70 | Knapp: Ziel = restliche Tage inkl. heute, noch nichts erledigt | Alarm eine Stufe strenger als eingestellt; "Diese Woche" rot hervorgehoben |
+| 71 | Ziel erreicht, weiteres Angebot am selben Tag oder später | kommt nur als stille Benachrichtigung; offen bis Tagesende → "ausgelassen – Wochenziel erreicht", nicht verpasst |
+| 72 | Höchstens erreicht | nächste Fälligkeit erst am Montag |
+| 73 | Mo–Fr-Reminder mit Minimum 1, bis Freitag nichts erledigt | Sa 10:00 strenger Alarm, So 10:00 noch einmal; nach Erledigung keine weitere Rettung |
+| 74 | Bearbeiten → "Statistik und Serie" | Woche/Monat/Jahr/Gesamt stimmen mit dem Verlauf; Serie und beste Serie plausibel |
+| 75 | Übersicht morgens (Einstellungen → Übersicht) | stille Benachrichtigung "Heute: n Reminder" mit Uhrzeiten; Tipp öffnet die App |
+| 76 | Übersicht abends | Rückblick (erledigt/verpasst/offen), Wochenziele, morgen |
+| 77 | Übersicht auf "aus" | kommt nicht mehr; nach Neustart weiterhin nicht |
+| 78 | Nach dem Test | Claude liest `AvlDiag` (logcat) und `files/diag/diag.log` per `run-as` |
+| 79 | Neuer Reminder | Charakter "Dokumentation" vorgewählt, direkt unter dem Titel; "Überwindung" klappt Startklar auf |
+| 80 | Bearbeiten: Bereiche zu | jede Kopfzeile fasst zusammen, was eingestellt ist; Tippen klappt auf und zu |
+| 81 | "andere…" bei Verschieben, Später-Knöpfen, Nachweis-Minimum | eigener Wert erscheint als gewählter Chip und wird gespeichert |
+| 82 | Einstellungen: Uhrzeit antippen, frei eingeben | "laut ab" nach der Tagesgrenze lässt sich nicht bestätigen |
+| 83 | Schalter aus, hell und dunkel | Aus-Zustand klar erkennbar, nicht wie deaktiviert |
+| 84 | Verlauf und Reminder-Liste | Zahnrad oben rechts öffnet die Einstellungen |

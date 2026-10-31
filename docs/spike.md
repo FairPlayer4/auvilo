@@ -22,7 +22,7 @@ melden sich oft so, dass Windows den Standardtreiber (WinUSB) selbst lädt. Wenn
 nicht, bräuchte der Samsung-USB-Treiber Adminrechte → dann Variante B.
 
 ### Variante B: WLAN (Wireless Debugging, ohne Treiber)
-1. Handy und PC im **selben Netz** (Alternative, falls das Firmen-WLAN Geräte
+1. Handy und PC im **selben Netz** (Alternative, falls das WLAN Geräte
    voneinander abschottet: PC mit dem Hotspot des Handys verbinden).
 2. Entwickleroptionen → **Drahtloses Debugging** einschalten → **Gerät mit
    Kopplungscode koppeln**. Das Handy zeigt IP:Port und einen 6-stelligen Code.

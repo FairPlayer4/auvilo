@@ -6,15 +6,19 @@ import android.content.Context
 import androidx.glance.appwidget.updateAll
 import com.avlreminder.alarm.AndroidAlarmPort
 import com.avlreminder.alarm.Notifications
+import com.avlreminder.alarm.OverviewNotifications
 import com.avlreminder.alarm.Ringer
 import com.avlreminder.core.model.Place
+import com.avlreminder.core.model.Reminder
 import com.avlreminder.core.ports.DeviceStatePort
 import com.avlreminder.core.rules.AlertSettings
 import com.avlreminder.core.usecases.ReminderEngine
 import com.avlreminder.data.AvlDatabase
 import com.avlreminder.data.RoomReminderRepository
 import com.avlreminder.data.Settings
+import com.avlreminder.data.SuggestionEntity
 import com.avlreminder.location.AndroidGeofences
+import com.avlreminder.system.Diag
 import com.avlreminder.location.AndroidLocation
 import com.avlreminder.widget.AvlWidget
 import kotlinx.coroutines.CoroutineScope
@@ -34,10 +38,16 @@ class AvlApp : Application() {
 
     override fun onCreate() {
         super.onCreate()
+        Diag.init(this)
+        Diag.state(this, "app start ${packageManager.getPackageInfo(packageName, 0).versionName}")
         graph = AppGraph(this)
         Notifications.createChannels(this)
+        OverviewNotifications.createChannel(this)
         // Alarms may have been lost (reboot, force-stop, update): rebuild them from the database.
-        graph.scope.launch { graph.syncAndRing() }
+        graph.scope.launch {
+            graph.syncAndRing()
+            graph.scheduleOverview()
+        }
     }
 }
 
@@ -75,6 +85,20 @@ class AppGraph(private val context: Context) {
     )
     private val mutex = Mutex()
 
+    val appVersion: String by lazy {
+        runCatching { context.packageManager.getPackageInfo(context.packageName, 0).versionName }.getOrNull() ?: "?"
+    }
+
+    /** Notes an improvement (Anf. 7.24) with where it came from; stays on the phone. */
+    suspend fun addSuggestion(text: String, important: Boolean, screen: String, reminder: Reminder? = null) {
+        db.suggestions().insert(
+            SuggestionEntity(
+                text = text.trim(), important = important, createdAt = Instant.now(), screen = screen,
+                reminderId = reminder?.id, reminderTitle = reminder?.title, appVersion = appVersion,
+            ),
+        )
+    }
+
     /** Runs use cases one at a time and refreshes the widget afterwards. */
     suspend fun <T> withEngine(block: suspend (ReminderEngine) -> T): T {
         val result = mutex.withLock {
@@ -88,9 +112,16 @@ class AppGraph(private val context: Context) {
     }
 
     /** Rebuilds all alarms and rings what was missed. */
+    fun ring(ring: com.avlreminder.core.usecases.Ring) = Ringer.ring(context, ring)
+
     suspend fun syncAndRing() {
-        withEngine { it.sync() }.forEach { Ringer.ring(context, it) }
+        val rings = withEngine { it.sync() }
+        if (rings.isNotEmpty()) Diag.log("sync: ${rings.size} missed alarm(s) ring now")
+        rings.forEach { Ringer.ring(context, it) }
     }
+
+    /** Sets the morning and evening overview from the settings. */
+    suspend fun scheduleOverview() = OverviewNotifications.schedule(context, settings.overview.first())
 
     /** Rings reminders that wait for an arrival when already there (geofences report only entering). */
     suspend fun checkPlacesAndRing() {

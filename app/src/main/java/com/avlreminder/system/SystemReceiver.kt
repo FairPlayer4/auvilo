@@ -18,12 +18,14 @@ class SystemReceiver : BroadcastReceiver() {
     override fun onReceive(context: Context, intent: Intent) {
         // The receiver is exported for the system broadcasts; ignore anything else.
         if (intent.action !in actions) return
+        Diag.state(context, intent.action.orEmpty().substringAfterLast('.'))
         val result = goAsync()
         val graph = context.graph
         graph.scope.launch {
             try {
                 graph.syncAndRing()
                 graph.checkPlacesAndRing()
+                graph.scheduleOverview()
             } finally {
                 result.finish()
             }

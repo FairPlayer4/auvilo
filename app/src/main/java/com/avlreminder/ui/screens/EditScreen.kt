@@ -10,6 +10,7 @@ import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.selection.toggleable
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Button
@@ -22,7 +23,6 @@ import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.OutlinedTextField
-import androidx.compose.material3.Switch
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.material3.TimeInput
@@ -30,12 +30,14 @@ import androidx.compose.material3.rememberDatePickerState
 import androidx.compose.material3.rememberTimePickerState
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.key
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.testTag
+import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
@@ -46,6 +48,9 @@ import com.avlreminder.core.model.Strictness
 import com.avlreminder.core.model.WhenAway
 import com.avlreminder.core.rules.Prep
 import com.avlreminder.ui.AvlIcons
+import com.avlreminder.ui.AvlSwitch
+import com.avlreminder.ui.Fold
+import com.avlreminder.ui.NumberDialog
 import com.avlreminder.ui.Format
 import com.avlreminder.ui.SectionTitle
 import com.avlreminder.ui.theme.Avl
@@ -68,6 +73,12 @@ fun EditScreen(
     modifier: Modifier = Modifier,
     recorder: @Composable (onRecorded: (String, Int) -> Unit) -> Unit = {},
     play: (String) -> Unit = {},
+    onSuggest: (() -> Unit)? = null,
+    /** Archive (true) or restore (false); null for a new reminder. */
+    onArchive: ((Boolean) -> Unit)? = null,
+    archived: Boolean = false,
+    /** Opens the statistics; null for a new reminder. */
+    onStats: (() -> Unit)? = null,
 ) {
     val c = Avl.colors
     var form by remember(initial) { mutableStateOf(initial) }
@@ -80,15 +91,26 @@ fun EditScreen(
                 if (initial.id == 0L) "Neuer Reminder" else "Reminder bearbeiten",
                 Modifier.weight(1f), color = c.text, fontSize = 20.sp, fontWeight = FontWeight.SemiBold,
             )
+            onSuggest?.let { SuggestButton(it) }
             Button(onClick = { onSave(form) }, Modifier.padding(end = 8.dp)) { Text("Speichern") }
         }
         Column(Modifier.verticalScroll(rememberScrollState()).padding(horizontal = 16.dp)) {
             problems.forEach { Text(it, color = c.strict, fontWeight = FontWeight.SemiBold, modifier = Modifier.padding(top = 4.dp)) }
+            onStats?.let { TextButton(onClick = it, Modifier.testTag("stats")) { Text("Statistik und Serie ›", color = c.accent) } }
 
             SectionTitle("Was?")
             OutlinedTextField(
                 form.title, { form = form.copy(title = it) }, Modifier.fillMaxWidth().testTag("title"),
                 placeholder = { Text("z. B. Katzenbrunnen reinigen") }, singleLine = true,
+            )
+
+            Text("Charakter", Modifier.padding(top = 12.dp), color = c.text, fontSize = 14.sp)
+            Choice(listOf(Character.DOCUMENT to "Dokumentation", Character.OVERCOME to "Überwindung"), form.character) {
+                form = form.copy(character = it)
+            }
+            Text(
+                if (form.character == Character.OVERCOME) "für Unangenehmes: mit Startklar-Fragen vor dem Speichern" else "festhalten, was erledigt ist",
+                Modifier.padding(top = 4.dp), color = c.muted, fontSize = 13.sp,
             )
 
             SectionTitle("Wann?")
@@ -109,47 +131,59 @@ fun EditScreen(
                 color = { if (it == Strictness.STRICT) c.strict else c.accentFill },
             ) { form = form.withStrictness(it) }
             Text(presetText(form.strictness), Modifier.padding(top = 6.dp), color = c.muted, fontSize = 13.sp)
-            SwitchLine(
-                "Auch bei „Nicht stören“",
-                "für besondere Ereignisse; braucht die Ausnahme in den Einstellungen",
-                form.ignoreDnd,
-            ) { form = form.copy(ignoreDnd = it) }
 
-            SectionTitle("Ziel")
-            OutlinedTextField(form.goal, { form = form.copy(goal = it) }, Modifier.fillMaxWidth(), placeholder = { Text("z. B. 45 min") }, singleLine = true)
-            SectionTitle("Minimum")
-            OutlinedTextField(form.minimum, { form = form.copy(minimum = it) }, Modifier.fillMaxWidth(), placeholder = { Text("leer = kein Minimum") }, singleLine = true)
-
-            SectionTitle("Checkliste")
-            ChecklistSection(form.checklist) { form = form.copy(checklist = it) }
-
-            SectionTitle("Nachweis")
-            ProofSection(form) { form = it }
-
-            SectionTitle("Warum ist mir das wichtig?")
-            OutlinedTextField(form.why, { form = form.copy(why = it) }, Modifier.fillMaxWidth(), minLines = 2)
-            MotivationAudio(form.motivationAudio, recorder, play) { form = form.copy(motivationAudio = it) }
-
-            SectionTitle(if (form.character == Character.OVERCOME) "Startklar (Pflicht bei Überwindung)" else "Startklar (optional)")
-            PrepSection(form) { form = it }
-
-            SectionTitle("Feineinstellungen")
-            Text("Verschieben max. pro Fälligkeit", color = c.text, fontSize = 14.sp)
-            LimitChoice(listOf(0, 1, 2, 3, 5), form.postponeLimit) { form = form.copy(postponeLimit = it) }
-            Text("Später-Knöpfe im Alarm", Modifier.padding(top = 12.dp), color = c.text, fontSize = 14.sp)
-            val snoozeSets = (SNOOZE_SETS + listOf(form.snoozeMinutes)).distinct()
-            Choice(snoozeSets.map { it to it.joinToString(" / ") { m -> "+$m" } }, form.snoozeMinutes) { form = form.copy(snoozeMinutes = it) }
-            if (form.minimum.isNotBlank()) {
-                Text("Minimum max. pro Woche", Modifier.padding(top = 12.dp), color = c.text, fontSize = 14.sp)
-                LimitChoice(listOf(1, 2, 3), form.minimumLimitPerWeek) { form = form.copy(minimumLimitPerWeek = it) }
+            // Everything else folds away; the summary says what is set (Vorschlag 6).
+            Spacer(Modifier.height(8.dp))
+            if (form.weeklyPossible) {
+                Fold("Wochenziel", weeklySummary(form), "foldWeek") { WeeklyGoalSection(form) { form = it } }
             }
-            Text("Charakter", Modifier.padding(top = 12.dp), color = c.text, fontSize = 14.sp)
-            Choice(listOf(Character.OVERCOME to "Überwindung", Character.DOCUMENT to "Dokumentation"), form.character) {
-                form = form.copy(character = it)
+            Fold("Ziel und Minimum", goalSummary(form), "foldGoal") {
+                Text("Ziel", color = c.text, fontSize = 14.sp)
+                OutlinedTextField(form.goal, { form = form.copy(goal = it) }, Modifier.fillMaxWidth(), placeholder = { Text("z. B. 45 min") }, singleLine = true)
+                Text("Minimum", Modifier.padding(top = 8.dp), color = c.text, fontSize = 14.sp)
+                OutlinedTextField(form.minimum, { form = form.copy(minimum = it) }, Modifier.fillMaxWidth(), placeholder = { Text("leer = kein Minimum") }, singleLine = true)
+                if (form.minimum.isNotBlank()) {
+                    Text("Minimum max. pro Woche", Modifier.padding(top = 12.dp), color = c.text, fontSize = 14.sp)
+                    NumberChoice(listOf(1, 2, 3), form.minimumLimitPerWeek, 1..7, "Minimum max. pro Woche", unit = "×", unlimited = "unbegrenzt") {
+                        form = form.copy(minimumLimitPerWeek = it)
+                    }
+                }
+            }
+            Fold("Checkliste", checklistSummary(form), "foldChecklist") { ChecklistSection(form.checklist) { form = form.copy(checklist = it) } }
+            Fold("Nachweis", proofSummary(form), "foldProof") { ProofSection(form) { form = it } }
+            Fold("Warum und Botschaft", whySummary(form), "foldWhy") {
+                Text("Warum ist mir das wichtig?", color = c.text, fontSize = 14.sp)
+                OutlinedTextField(form.why, { form = form.copy(why = it) }, Modifier.fillMaxWidth(), minLines = 2)
+                MotivationAudio(form.motivationAudio, recorder, play) { form = form.copy(motivationAudio = it) }
+            }
+            // Opens by itself when "Überwindung" makes the questions required.
+            val overcome = form.character == Character.OVERCOME
+            key(overcome) {
+                Fold(if (overcome) "Startklar (Pflicht)" else "Startklar (optional)", prepSummary(form), "foldPrep", initiallyOpen = overcome && prepAnswered(form) < Prep.QUESTIONS.count()) {
+                    PrepSection(form) { form = it }
+                }
+            }
+            Fold("Feineinstellungen", fineSummary(form), "foldFine") {
+                SwitchLine(
+                    "Auch bei „Nicht stören“",
+                    "für besondere Ereignisse; braucht die Ausnahme in den Einstellungen",
+                    form.ignoreDnd,
+                ) { form = form.copy(ignoreDnd = it) }
+                Text("Verschieben max. pro Fälligkeit", Modifier.padding(top = 12.dp), color = c.text, fontSize = 14.sp)
+                NumberChoice(listOf(0, 1, 2, 3, 5), form.postponeLimit, 0..20, "Verschieben max. pro Fälligkeit", unit = "×", unlimited = "unbegrenzt") {
+                    form = form.copy(postponeLimit = it)
+                }
+                Text("Später-Knöpfe im Alarm", Modifier.padding(top = 12.dp), color = c.text, fontSize = 14.sp)
+                SnoozeChoice(form.snoozeMinutes) { form = form.copy(snoozeMinutes = it) }
             }
 
+            if (onArchive != null) {
+                OutlinedButton(onClick = { onArchive(!archived) }, Modifier.fillMaxWidth().padding(top = 24.dp)) {
+                    Text(if (archived) "Wiederherstellen (bleibt pausiert)" else "Archivieren", color = c.text)
+                }
+            }
             if (onDelete != null) {
-                OutlinedButton(onClick = { confirmDelete = true }, Modifier.fillMaxWidth().padding(top = 24.dp)) {
+                OutlinedButton(onClick = { confirmDelete = true }, Modifier.fillMaxWidth().padding(top = if (onArchive != null) 8.dp else 24.dp)) {
                     Icon(AvlIcons.Delete, null, tint = c.strict)
                     Text("Löschen", color = c.strict)
                 }
@@ -181,12 +215,16 @@ private val SNOOZE_SETS = listOf(listOf(10), listOf(15), listOf(30), listOf(10, 
 @Composable
 private fun SwitchLine(label: String, hint: String, checked: Boolean, onChange: (Boolean) -> Unit) {
     val c = Avl.colors
-    Row(Modifier.fillMaxWidth().padding(top = 8.dp), verticalAlignment = androidx.compose.ui.Alignment.CenterVertically) {
+    // The whole line toggles, not only the small switch.
+    Row(
+        Modifier.fillMaxWidth().padding(top = 8.dp).toggleable(checked, role = Role.Switch, onValueChange = onChange),
+        verticalAlignment = androidx.compose.ui.Alignment.CenterVertically,
+    ) {
         Column(Modifier.weight(1f)) {
             Text(label, color = c.text, fontSize = 15.sp)
             Text(hint, color = c.muted, fontSize = 13.sp)
         }
-        Switch(checked, onChange)
+        AvlSwitch(checked, null)
     }
 }
 
@@ -217,18 +255,18 @@ private fun ProofSection(form: ReminderForm, onChange: (ReminderForm) -> Unit) {
         }
         p.textMinChars?.let { min ->
             Text("Text: mindestens Zeichen (ohne Leerzeichen)", Modifier.padding(top = 10.dp), color = c.text, fontSize = 14.sp)
-            Choice((listOf(20, 50, 100) + min).distinct().sorted().map { it to "$it" }, min) {
+            NumberChoice(listOf(20, 50, 100), min, 1..2000, "Text: mindestens Zeichen", unit = "") {
                 onChange(form.copy(proof = p.copy(textMinChars = it)))
             }
         }
         p.audioMinSeconds?.let { min ->
             Text("Audio: mindestens", Modifier.padding(top = 10.dp), color = c.text, fontSize = 14.sp)
-            Choice((listOf(5, 10, 30) + min).distinct().sorted().map { it to "$it s" }, min) {
+            NumberChoice(listOf(5, 10, 30), min, 1..600, "Audio: mindestens", unit = "s") {
                 onChange(form.copy(proof = p.copy(audioMinSeconds = it)))
             }
         }
         Text("Alarm pausiert während des Nachweises", Modifier.padding(top = 10.dp), color = c.text, fontSize = 14.sp)
-        Choice((listOf(5, 10, 15, 30) + p.windowMinutes).distinct().sorted().map { it to "$it min" }, p.windowMinutes) {
+        NumberChoice(listOf(5, 10, 15, 30), p.windowMinutes, 1..120, "Alarm pausiert während des Nachweises", unit = "min") {
             onChange(form.copy(proof = p.copy(windowMinutes = it)))
         }
     }
@@ -310,6 +348,36 @@ private fun PlaceSection(form: ReminderForm, onChange: (ReminderForm) -> Unit) {
     }
 }
 
+/** "3–4× pro Woche, mindestens 1×" (Anf. Z1c): the offers count over the week (design 12.3). */
+@Composable
+private fun WeeklyGoalSection(form: ReminderForm, onChange: (ReminderForm) -> Unit) {
+    val c = Avl.colors
+    SwitchLine("Wochenziel", "zählt über die Woche (Mo–So) statt jedes Angebot einzeln", form.weekly) { onChange(form.copy(weekly = it)) }
+    if (!form.weekly) return
+    val days = if (form.kind == ScheduleKind.DAILY) 7 else form.days.size.coerceAtLeast(1)
+    val range = (1..days).toList()
+    @Composable
+    fun line(label: String, value: Int, tag: String, pick: (Int) -> Unit) {
+        Text(label, Modifier.padding(top = 8.dp).testTag(tag), color = c.text, fontSize = 14.sp)
+        Choice(range.map { it to "$it×" }, value.coerceIn(1, days), onPick = pick)
+    }
+    // Keep minimum ≤ target ≤ at most while picking.
+    line("Ziel pro Woche", form.weekTarget, "weekTarget") { t ->
+        onChange(form.copy(weekTarget = t, weekMax = maxOf(form.weekMax, t), weekMinimum = minOf(form.weekMinimum, t)))
+    }
+    line("Höchstens (danach kein Angebot mehr)", form.weekMax, "weekMax") { m ->
+        onChange(form.copy(weekMax = m, weekTarget = minOf(form.weekTarget, m), weekMinimum = minOf(form.weekMinimum, m)))
+    }
+    line("Mindestens (sonst Rettung am Wochenende)", form.weekMinimum, "weekMinimum") { n ->
+        onChange(form.copy(weekMinimum = n, weekTarget = maxOf(form.weekTarget, n), weekMax = maxOf(form.weekMax, n)))
+    }
+    Text(
+        "Ab dem Ziel kommen weitere Angebote still. Reichen die restlichen Tage nur noch knapp, wird es eine Stufe strenger." +
+            if (form.kind == ScheduleKind.WEEKDAYS && form.days.none { it.value >= 6 }) " Steht die Woche am Samstag noch unter dem Minimum, erinnert die App Samstag und Sonntag um 10 Uhr streng." else "",
+        Modifier.padding(top = 6.dp), color = c.muted, fontSize = 13.sp,
+    )
+}
+
 /** Up to 20 items; each is done on its own in the alarm, the last one completes the reminder. */
 @Composable
 private fun ChecklistSection(items: List<ChecklistItem>, onChange: (List<ChecklistItem>) -> Unit) {
@@ -330,12 +398,105 @@ private fun ChecklistSection(items: List<ChecklistItem>, onChange: (List<Checkli
     }
 }
 
-/** Limit as chips; null means unlimited. */
+/** Offered values as chips plus "andere…" for a free one in [range] (Vorschlag 4). */
 @Composable
-private fun LimitChoice(values: List<Int>, selected: Int?, onPick: (Int?) -> Unit) {
-    val all = (values + listOfNotNull(selected)).distinct().sorted()
-    Choice(all.map<Int, Pair<Int?, String>> { it to "$it×" } + (null to "unbegrenzt"), selected, onPick = onPick)
+private fun NumberChoice(values: List<Int>, selected: Int, range: IntRange, title: String, unit: String, onPick: (Int) -> Unit) {
+    var other by remember { mutableStateOf(false) }
+    val all = (values + selected).distinct().sorted()
+    Choice(all.map { it to label(it, unit) } + (OTHER to "andere…"), selected) { if (it == OTHER) other = true else onPick(it) }
+    if (other) NumberDialog(title, selected, range, unit, onDismiss = { other = false }, onPick = onPick)
 }
+
+/** Like the above with null as [unlimited]. */
+@Composable
+private fun NumberChoice(values: List<Int>, selected: Int?, range: IntRange, title: String, unit: String, unlimited: String, onPick: (Int?) -> Unit) {
+    var other by remember { mutableStateOf(false) }
+    val all = (values + listOfNotNull(selected)).distinct().sorted()
+    Choice(all.map<Int, Pair<Int?, String>> { it to label(it, unit) } + (null to unlimited) + (OTHER to "andere…"), selected) {
+        if (it == OTHER) other = true else onPick(it)
+    }
+    if (other) NumberDialog(title, selected, range, unit, onDismiss = { other = false }, onPick = onPick)
+}
+
+private const val OTHER = Int.MIN_VALUE
+
+private fun label(value: Int, unit: String) = when (unit) {
+    "" -> "$value"
+    "×" -> "$value×"
+    else -> "$value $unit"
+}
+
+/** Snooze button sets, or one or two own minutes. */
+@Composable
+private fun SnoozeChoice(selected: List<Int>, onPick: (List<Int>) -> Unit) {
+    val c = Avl.colors
+    var other by remember { mutableStateOf(false) }
+    val sets = (SNOOZE_SETS + listOf(selected)).distinct()
+    Choice(sets.map<List<Int>, Pair<List<Int>?, String>> { it to it.joinToString(" / ") { m -> "+$m" } } + (null to "andere…"), selected) {
+        if (it == null) other = true else onPick(it)
+    }
+    if (other) {
+        var text by remember { mutableStateOf(selected.joinToString(", ")) }
+        val minutes = text.split(',', ' ', '/').mapNotNull { it.trim().toIntOrNull() }
+        val valid = minutes.size in 1..2 && minutes.all { it in 1..240 } && minutes.toSet().size == minutes.size
+        AlertDialog(
+            onDismissRequest = { other = false },
+            title = { Text("Später-Knöpfe", fontSize = 18.sp) },
+            text = {
+                Column {
+                    OutlinedTextField(text, { text = it }, Modifier.testTag("snoozeOwn"), singleLine = true, placeholder = { Text("z. B. 20, 45") })
+                    Text("ein oder zwei Minutenwerte, 1 bis 240", Modifier.padding(top = 4.dp), color = c.muted, fontSize = 13.sp)
+                }
+            },
+            confirmButton = {
+                TextButton(onClick = { onPick(minutes.sorted()); other = false }, Modifier.testTag("snoozeOk"), enabled = valid) { Text("OK") }
+            },
+            dismissButton = { TextButton(onClick = { other = false }) { Text("Abbrechen") } },
+        )
+    }
+}
+
+private fun prepAnswered(form: ReminderForm) = Prep.QUESTIONS.count { form.prep[it]?.answered == true }
+
+private fun weeklySummary(form: ReminderForm) = if (!form.weekly) "aus" else {
+    val goal = if (form.weekTarget == form.weekMax) "${form.weekTarget}×" else "${form.weekTarget}–${form.weekMax}×"
+    "$goal pro Woche, mindestens ${form.weekMinimum}×"
+}
+
+private fun goalSummary(form: ReminderForm) = listOfNotNull(
+    form.goal.trim().takeIf { it.isNotEmpty() }?.let { "Ziel: $it" },
+    form.minimum.trim().takeIf { it.isNotEmpty() }?.let { "Minimum: $it" },
+).joinToString(" · ").ifEmpty { "nicht festgelegt" }
+
+private fun checklistSummary(form: ReminderForm) = when (val n = form.checklist.count { it.title.isNotBlank() }) {
+    0 -> "keine"
+    1 -> "1 Punkt"
+    else -> "$n Punkte"
+}
+
+private fun proofSummary(form: ReminderForm): String {
+    val p = form.proof
+    return when (p.kind) {
+        ProofKind.NONE -> "keiner"
+        ProofKind.CONFIRM -> "quittieren"
+        ProofKind.EVIDENCE -> "Nachweis: " + listOfNotNull(
+            "Foto".takeIf { p.photo }, p.textMinChars?.let { "Text" }, p.audioMinSeconds?.let { "Audio" },
+        ).joinToString(", ")
+    }
+}
+
+private fun whySummary(form: ReminderForm) = listOfNotNull(
+    form.why.trim().takeIf { it.isNotEmpty() },
+    "Botschaft aufgenommen".takeIf { form.motivationAudio != null },
+).joinToString(" · ").ifEmpty { "nichts hinterlegt" }
+
+private fun prepSummary(form: ReminderForm) = "${prepAnswered(form)} von ${Prep.QUESTIONS.count()} beantwortet"
+
+private fun fineSummary(form: ReminderForm) = listOfNotNull(
+    "Verschieben " + (form.postponeLimit?.let { "$it×" } ?: "unbegrenzt"),
+    "Später " + form.snoozeMinutes.joinToString(" / ") { "+$it" },
+    "auch bei Nicht stören".takeIf { form.ignoreDnd },
+).joinToString(" · ")
 
 @OptIn(ExperimentalMaterial3Api::class, ExperimentalLayoutApi::class)
 @Composable

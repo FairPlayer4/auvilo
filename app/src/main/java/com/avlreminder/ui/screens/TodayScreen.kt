@@ -15,6 +15,8 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.avlreminder.core.model.ItemDone
 import com.avlreminder.core.model.Reminder
+import com.avlreminder.core.rules.WeekStatus
+import com.avlreminder.core.usecases.Digests
 import com.avlreminder.core.usecases.Entry
 import com.avlreminder.core.usecases.Today
 import com.avlreminder.ui.EntryCard
@@ -38,6 +40,8 @@ fun TodayScreen(
     onCompleteEarly: (Entry) -> Unit = {},
     doNotDisturb: Boolean = false,
     itemsDone: Map<Long, List<ItemDone>> = emptyMap(),
+    /** Reminders with a weekly goal and their week so far. */
+    weeks: List<Pair<Reminder, WeekStatus>> = emptyList(),
 ) {
     fun progress(e: Entry): String {
         val items = e.reminder.checklist
@@ -105,6 +109,12 @@ fun TodayScreen(
                     StrictnessTag(e.reminder.strictness)
                     TextButton(onClick = { onCompleteEarly(e) }) { Text("Erledigen", color = c.accent) }
                 }
+            }
+        }
+        if (weeks.isNotEmpty()) {
+            item { SectionTitle("Diese Woche") }
+            items(weeks, key = { "week" + it.first.id }) { (r, w) ->
+                EntryCard(title = r.title, detail = Digests.week(w), highlight = if (w.tight) c.strict else null, onClick = { onEdit(r) })
             }
         }
         if (today.resolved.isNotEmpty()) {

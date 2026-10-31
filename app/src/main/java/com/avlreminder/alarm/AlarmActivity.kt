@@ -20,6 +20,7 @@ import com.avlreminder.core.rules.Action
 import com.avlreminder.core.rules.Lifecycle
 import com.avlreminder.core.rules.TransitionResult
 import com.avlreminder.graph
+import com.avlreminder.system.Diag
 import com.avlreminder.ui.screens.AlarmContent
 import com.avlreminder.ui.screens.AlarmDevices
 import com.avlreminder.ui.screens.AlarmUi
@@ -116,6 +117,7 @@ class AlarmActivity : ComponentActivity() {
             onSkip = { act(id, Action.Skip(it)) },
             onCheckItem = { itemId, evidence -> act(id, Action.CheckItem(itemId, evidence), stay = true) },
             onDeferRest = { act(id, Action.DeferRest(it)) },
+            onSuggest = { text, important -> graph.scope.launch { graph.addSuggestion(text, important, "Alarm", current.reminder) } },
             onStartProof = { startProof(id) },
             onAbortProof = { abortProof(id) },
             devices = AlarmDevices(
@@ -146,6 +148,7 @@ class AlarmActivity : ComponentActivity() {
                 done = limits.itemsDone.keys,
                 // Doing an item today makes "Rest auf morgen" free; otherwise it is a postponement.
                 canDeferRest = reminder.checklist.isNotEmpty() && (limits.itemDoneToday || Lifecycle.canPostpone(reminder, occurrence)),
+                week = engine.weekStatus(reminder, occurrence.dueAt.atZone(ZoneId.systemDefault()).toLocalDate()),
             )
         }
     }
@@ -171,6 +174,7 @@ class AlarmActivity : ComponentActivity() {
         proofRunning = false
         lifecycleScope.launch {
             val result = graph.withEngine { it.act(id, action) }
+            Diag.log("alarm screen occ=$id ${action::class.simpleName} → ${if (result is TransitionResult.Ok) "${result.occurrence.state} ${result.occurrence.resolution ?: ""}" else result}")
             if (result !is TransitionResult.Ok) {
                 Toast.makeText(this@AlarmActivity, "Nicht möglich: ${(result as TransitionResult.Rejected).reason}", Toast.LENGTH_LONG).show()
                 return@launch
