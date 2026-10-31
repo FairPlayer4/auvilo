@@ -9,7 +9,6 @@ import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.LazyRow
 import androidx.compose.foundation.lazy.items
 import androidx.compose.material3.FilterChip
-import androidx.compose.material3.Switch
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
@@ -33,6 +32,7 @@ import com.avlreminder.core.model.Schedule
 import com.avlreminder.core.usecases.HistoryDay
 import com.avlreminder.core.usecases.ReminderList
 import com.avlreminder.core.usecases.ReminderSort
+import com.avlreminder.ui.AvlSwitch
 import com.avlreminder.ui.EntryCard
 import com.avlreminder.ui.Format
 import com.avlreminder.ui.ResultBadge
@@ -130,7 +130,7 @@ private fun ReminderCard(
             r.archivedAt != null -> TextButton(onClick = { onRestore(r) }) { Text("Wiederherstellen", color = c.accent) }
             // Switching it on would plan nothing; the card opens the form for a new time.
             finished -> {}
-            else -> Switch(checked = r.active, onCheckedChange = { onSetActive(r, it) })
+            else -> AvlSwitch(r.active, { onSetActive(r, it) })
         }
     }
 }

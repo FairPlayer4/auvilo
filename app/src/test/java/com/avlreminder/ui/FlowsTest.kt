@@ -8,7 +8,9 @@ import androidx.compose.ui.test.junit4.createComposeRule
 import androidx.compose.ui.test.onNodeWithContentDescription
 import androidx.compose.ui.test.onNodeWithTag
 import androidx.compose.ui.test.onNodeWithText
+import androidx.compose.ui.test.hasSetTextAction
 import androidx.compose.ui.test.performClick
+import androidx.compose.ui.test.performTextReplacement
 import androidx.compose.ui.test.performScrollTo
 import androidx.compose.ui.test.performTextInput
 import androidx.test.ext.junit.runners.AndroidJUnit4
@@ -282,6 +284,8 @@ class FlowsTest {
         compose.setContent { AvlTheme(dark = false) { AvlAppUi(emptyState, actions, now, zone) } }
         compose.onNodeWithContentDescription("Neuer Reminder").performClick()
         compose.onNodeWithTag("title").performTextInput("Steuererklärung")
+        // "Überwindung" makes the questions required and opens them.
+        compose.onNodeWithText("Überwindung").performClick()
         compose.onNodeWithTag("prep1").performScrollTo().performTextInput("Ruhe im Kopf")
         compose.onNodeWithText("Ja, sofort").performScrollTo().performClick()
         compose.onNodeWithText("Speichern").performClick()
@@ -314,7 +318,9 @@ class FlowsTest {
         compose.onNodeWithContentDescription("Einstellungen").performClick()
         compose.onNodeWithText("Dunkel").performClick()
         assertEquals(ThemeMode.DARK, actions.chosenTheme)
-        compose.onNodeWithText("19:00").performScrollTo().performClick()
+        compose.onNodeWithTag("loudFrom").performScrollTo().performClick()
+        compose.onAllNodes(hasSetTextAction())[0].performTextReplacement("19")
+        compose.onNodeWithTag("timeOk").performClick()
         assertEquals(AlertSettings(loudFrom = LocalTime.of(19, 0)), actions.chosenAlert)
         assertTrue(actions.saved.isEmpty())
     }

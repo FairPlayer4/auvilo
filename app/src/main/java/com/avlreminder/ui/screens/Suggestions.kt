@@ -52,6 +52,15 @@ fun SuggestButton(onClick: () -> Unit, modifier: Modifier = Modifier) {
     }
 }
 
+/** Light bulb and settings, top right on the three tabs (Vorschlag 9). */
+@Composable
+fun TopActions(modifier: Modifier, onSuggest: () -> Unit, onSettings: () -> Unit) {
+    Row(modifier.padding(8.dp)) {
+        SuggestButton(onSuggest)
+        IconButton(onClick = onSettings) { Icon(AvlIcons.Settings, "Einstellungen", tint = Avl.colors.text) }
+    }
+}
+
 /** Quick note of an improvement (VV2): one text field, optionally important. */
 @Composable
 fun SuggestionDialog(onSave: (text: String, important: Boolean) -> Unit, onDismiss: () -> Unit) {

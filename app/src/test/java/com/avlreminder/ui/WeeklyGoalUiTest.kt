@@ -1,6 +1,8 @@
 package com.avlreminder.ui
 
+import androidx.compose.ui.test.assertIsNotEnabled
 import androidx.compose.ui.test.assertTextContains
+import androidx.compose.ui.test.hasSetTextAction
 import androidx.compose.ui.test.hasScrollToNodeAction
 import androidx.compose.ui.test.hasText
 import androidx.compose.ui.test.junit4.createComposeRule
@@ -10,6 +12,7 @@ import androidx.compose.ui.test.onNodeWithText
 import androidx.compose.ui.test.performClick
 import androidx.compose.ui.test.performScrollTo
 import androidx.compose.ui.test.performScrollToNode
+import androidx.compose.ui.test.performTextReplacement
 import androidx.test.ext.junit.runners.AndroidJUnit4
 import com.avlreminder.alarm.OverviewNotifications
 import com.avlreminder.core.model.Occurrence
@@ -106,6 +109,7 @@ class WeeklyGoalUiTest {
         val plain = training.copy(weeklyGoal = null)
         compose.setContent { AvlTheme(dark = false) { AvlAppUi(state(plain), actions, now, zone, startRoute = Routes.edit(1)) } }
 
+        compose.onNodeWithTag("foldWeek").performScrollTo().performClick()
         compose.onNodeWithText("Wochenziel").performScrollTo().performClick()
         // Second row is "Höchstens": 2× pulls the target down with it.
         compose.onAllNodesWithText("2×")[1].performScrollTo().performClick()
@@ -136,11 +140,54 @@ class WeeklyGoalUiTest {
         val actions = FakeActions()
         compose.setContent { AvlTheme(dark = false) { AvlAppUi(state(), actions, now, zone, startRoute = Routes.SETTINGS) } }
 
-        compose.onNodeWithText("08:00").performScrollTo().performClick()
-        assertEquals(OverviewTimes(morning = LocalTime.of(8, 0)), actions.chosen)
-        // The second "aus" belongs to the evening.
-        compose.onAllNodesWithText("aus")[1].performScrollTo().performClick()
+        compose.onNodeWithTag("overviewMorning").performScrollTo().performClick()
+        val fields = compose.onAllNodes(hasSetTextAction())
+        fields[0].performTextReplacement("8")
+        fields[1].performTextReplacement("05")
+        compose.onNodeWithTag("timeOk").performClick()
+        assertEquals(OverviewTimes(morning = LocalTime.of(8, 5)), actions.chosen)
+        compose.onNodeWithTag("overviewEveningOff").performScrollTo().performClick()
         assertEquals(OverviewTimes(evening = null), actions.chosen)
+    }
+
+    @Test
+    fun alarmTimesCannotCross() {
+        compose.setContent { AvlTheme(dark = false) { AvlAppUi(state(), FakeActions(), now, zone, startRoute = Routes.SETTINGS) } }
+        compose.onNodeWithTag("dayEnd").performScrollTo().performClick()
+        compose.onAllNodes(hasSetTextAction())[0].performTextReplacement("17")
+        compose.onNodeWithTag("timeOk").assertIsNotEnabled()
+        compose.onNodeWithText("muss nach", substring = true).assertExists()
+    }
+
+    @Test
+    fun foldsSummarizeAndOwnValuesCanBeEntered() {
+        val actions = FakeActions()
+        val r = training.copy(weeklyGoal = null, goal = "45 min", postponeLimit = 3, snoozeMinutes = listOf(10))
+        compose.setContent { AvlTheme(dark = false) { AvlAppUi(state(r), actions, now, zone, startRoute = Routes.edit(1)) } }
+
+        compose.onNodeWithText("Ziel: 45 min").assertExists()
+        compose.onNodeWithText("Verschieben 3× · Später +10").assertExists()
+        compose.onNodeWithTag("foldFine").performScrollTo().performClick()
+        // Postpone first, then the snooze buttons.
+        compose.onAllNodesWithText("andere…")[0].performScrollTo().performClick()
+        compose.onNodeWithTag("number").performTextReplacement("7")
+        compose.onNodeWithTag("numberOk").performClick()
+        compose.onAllNodesWithText("andere…")[1].performScrollTo().performClick()
+        compose.onNodeWithTag("snoozeOwn").performTextReplacement("45, 20")
+        compose.onNodeWithTag("snoozeOk").performClick()
+        compose.onNodeWithText("Speichern").performClick()
+
+        val saved = actions.saved.single()
+        assertEquals(7, saved.postponeLimit)
+        assertEquals(listOf(20, 45), saved.snoozeMinutes)
+    }
+
+    @Test
+    fun newReminderDocumentsByDefault() {
+        compose.setContent { AvlTheme(dark = false) { AvlAppUi(state(), FakeActions(), now, zone, startRoute = Routes.NEW) } }
+        compose.onNodeWithText("festhalten, was erledigt ist").assertExists()
+        compose.onNodeWithText("Startklar (optional)".uppercase()).performScrollTo().assertExists()
+        compose.onNodeWithTag("prep1").assertDoesNotExist()
     }
 
     @Test

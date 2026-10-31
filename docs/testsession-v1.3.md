@@ -41,7 +41,7 @@ Alle Uhrzeiten relativ zu T; einmalig, wenn nicht anders angegeben.
 | Test I | T+50 | normal |
 | Test J | T+58 | normal |
 
-Prüfen: Heute zeigt alle unter „Später heute“ und „Diese Woche“ mit D und E (68).
+Prüfen: Heute zeigt alle unter „Später heute“ und „Diese Woche“ mit D und E (68). Beim Anlegen nebenbei 79–83 ansehen (Charakter, Bereiche, „andere…“, Schalter).
 
 ## Block 2: Ablauf
 

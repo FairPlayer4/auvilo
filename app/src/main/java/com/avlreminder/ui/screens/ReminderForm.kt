@@ -33,7 +33,7 @@ data class ReminderForm(
     val active: Boolean = true,
     val title: String = "",
     val why: String = "",
-    val character: Character = Character.OVERCOME,
+    val character: Character = Character.DOCUMENT,
     val strictness: Strictness = Strictness.NORMAL,
     val kind: ScheduleKind = ScheduleKind.DAILY,
     val date: LocalDate,

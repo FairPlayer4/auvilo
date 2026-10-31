@@ -106,7 +106,7 @@ Ablauf für eine Stunde am Stück: [testsession-v1.3.md](testsession-v1.3.md).
 | # | Test | Erwartung |
 |---|---|---|
 | 67 | Erster Start nach dem Update | Daten da; Backup `avlreminder-v4-….db`; `diag.log` beginnt mit "state app start 1.2b-prototyp" |
-| 68 | Täglichen Reminder bearbeiten → Zeile "Wochenziel" antippen, Ziel 3, höchstens 4, mindestens 1 | Auswahl bleibt stimmig (mindestens ≤ Ziel ≤ höchstens); Heute zeigt "Diese Woche" |
+| 68 | Täglichen Reminder bearbeiten → Bereich "Wochenziel" aufklappen, Zeile "Wochenziel" antippen, Ziel 3, höchstens 4, mindestens 1 | Auswahl bleibt stimmig (mindestens ≤ Ziel ≤ höchstens); Heute zeigt "Diese Woche" |
 | 69 | Ein Angebot erledigen | "Diese Woche": "1 von 3–4, Minimum erreicht" |
 | 70 | Knapp: Ziel = restliche Tage inkl. heute, noch nichts erledigt | Alarm eine Stufe strenger als eingestellt; "Diese Woche" rot hervorgehoben |
 | 71 | Ziel erreicht, weiteres Angebot am selben Tag oder später | kommt nur als stille Benachrichtigung; offen bis Tagesende → "ausgelassen – Wochenziel erreicht", nicht verpasst |
@@ -117,3 +117,9 @@ Ablauf für eine Stunde am Stück: [testsession-v1.3.md](testsession-v1.3.md).
 | 76 | Übersicht abends | Rückblick (erledigt/verpasst/offen), Wochenziele, morgen |
 | 77 | Übersicht auf "aus" | kommt nicht mehr; nach Neustart weiterhin nicht |
 | 78 | Nach dem Test | Claude liest `AvlDiag` (logcat) und `files/diag/diag.log` per `run-as` |
+| 79 | Neuer Reminder | Charakter "Dokumentation" vorgewählt, direkt unter dem Titel; "Überwindung" klappt Startklar auf |
+| 80 | Bearbeiten: Bereiche zu | jede Kopfzeile fasst zusammen, was eingestellt ist; Tippen klappt auf und zu |
+| 81 | "andere…" bei Verschieben, Später-Knöpfen, Nachweis-Minimum | eigener Wert erscheint als gewählter Chip und wird gespeichert |
+| 82 | Einstellungen: Uhrzeit antippen, frei eingeben | "laut ab" nach der Tagesgrenze lässt sich nicht bestätigen |
+| 83 | Schalter aus, hell und dunkel | Aus-Zustand klar erkennbar, nicht wie deaktiviert |
+| 84 | Verlauf und Reminder-Liste | Zahnrad oben rechts öffnet die Einstellungen |

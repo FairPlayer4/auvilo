@@ -56,6 +56,7 @@ import com.avlreminder.ui.screens.RemindersScreen
 import com.avlreminder.ui.screens.SettingsScreen
 import com.avlreminder.ui.screens.StatsScreen
 import com.avlreminder.ui.screens.SuggestButton
+import com.avlreminder.ui.screens.TopActions
 import com.avlreminder.ui.screens.SuggestionDialog
 import com.avlreminder.ui.screens.SuggestionsScreen
 import com.avlreminder.ui.screens.TodayScreen
@@ -196,16 +197,11 @@ fun AvlAppUi(
                         )
                     }
                 }
-                Row(Modifier.align(Alignment.TopEnd).padding(8.dp)) {
-                    SuggestButton({ suggestHere("Heute") })
-                    IconButton(onClick = { go(Routes.SETTINGS) }) {
-                        Icon(AvlIcons.Settings, "Einstellungen", tint = c.text)
-                    }
-                }
+                TopActions(Modifier.align(Alignment.TopEnd), { suggestHere("Heute") }) { go(Routes.SETTINGS) }
             }
             route == Routes.HISTORY -> Box(m) {
                 HistoryScreen(state.history, state.proofs, date, zone, onPlay = actions::play, itemsDone = state.itemsDone)
-                SuggestButton({ suggestHere("Verlauf") }, Modifier.align(Alignment.TopEnd).padding(8.dp))
+                TopActions(Modifier.align(Alignment.TopEnd), { suggestHere("Verlauf") }) { go(Routes.SETTINGS) }
             }
             route == Routes.REMINDERS -> Box(m) {
                 RemindersScreen(
@@ -215,7 +211,7 @@ fun AvlAppUi(
                     sort = state.reminderSort, onSort = actions::setReminderSort,
                     onRestore = { actions.setArchived(it.id, false) },
                 )
-                SuggestButton({ suggestHere("Reminder") }, Modifier.align(Alignment.TopEnd).padding(8.dp))
+                TopActions(Modifier.align(Alignment.TopEnd), { suggestHere("Reminder") }) { go(Routes.SETTINGS) }
             }
             route == Routes.SETTINGS -> Box(m) {
                 SettingsScreen(
