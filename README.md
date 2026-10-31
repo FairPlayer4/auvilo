@@ -5,4 +5,5 @@ dass Erinnerungen tatsächlich wahrgenommen und erledigt werden ("Alignment").
 
 ## Status
 
-Konzeptphase – Anforderungen werden in [`docs/anforderungen.md`](docs/anforderungen.md) gesammelt.
+Prototyp V1.2b im Einsatz auf dem eigenen Gerät. Aktueller Stand: [`docs/stand.md`](docs/stand.md),
+Anforderungen: [`docs/anforderungen.md`](docs/anforderungen.md).
