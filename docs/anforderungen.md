@@ -692,12 +692,13 @@ Einstellungen frei wählbar, eigene Werte neben der Vorauswahl (*andere…*), Sc
 mit gut sichtbarem Aus-Zustand, Einstellungen von allen Tabs erreichbar, Bearbeiten in
 klappbaren Bereichen, Charakter oben mit *Dokumentation* als Standard. Offen:
 - VS1 **Mehrmals täglich**: ein Reminder mit mehreren Uhrzeiten am Tag (z. B. 8, 13,
-  19 Uhr) statt mehrerer Reminder, mit einer gemeinsamen Statistik. Zu klären: Zählt
-  ein Tag für die Serie erst mit allen Terminen oder schon mit einem, wie zählt das
-  Wochenziel, gilt Auslassen pro Termin? **[V1.3]**
-- VS2 **Andere Zeiten am Wochenende**: Übersicht und *laut ab* getrennt für Mo–Fr und
-  Sa–So einstellbar. Einzelne Tage erst, wenn zwei Gruppen nicht reichen. Zu klären:
-  auch die Tagesgrenze? **[V1.3]**
+  19 Uhr) statt mehrerer Reminder, mit einer gemeinsamen Statistik. Ein Tag zählt für
+  die Serie, sobald **mindestens ein** Termin eingehalten wurde (Standard; strenger nur,
+  falls es sich in der Nutzung als nötig zeigt). Im Design zu klären: wie das
+  Wochenziel zählt und ob Auslassen pro Termin gilt. **[V1.3]**
+- VS2 **Andere Zeiten am Wochenende**: Übersicht, *laut ab* und Tagesgrenze getrennt
+  für Mo–Fr und Sa–So einstellbar. Einzelne Tage erst, wenn zwei Gruppen nicht reichen.
+  **[V1.3]**
 - VS3 **Statistik schöner**: Wochenverlauf als kleines Balkendiagramm, Serie
   hervorgehoben. Die Liste reicht vorerst. **[später]**
 
@@ -824,6 +825,7 @@ früh am S24 Ultra testen (Spike, siehe Abschnitt 10).
 | 2026-10-29 | V1.2 in drei Etappen: a Alltag (Vorschläge, Liste), b Ziele über die Zeit, c Fristen und Blocker; Vorab-Reminder (T6) in V1.2c |
 | 2026-10-29 | Reminder-Liste: abgeschlossene Einmal-Reminder automatisch eingeklappt, Archivieren von Hand, Gruppen und Sortierung (V1.2). Einmal-Reminder mit neuer Zeit wird wieder eingeplant und eingeschaltet (Bugfix, sofort) |
 | 2026-10-31 | V1.2b bestätigt wie Entwurf. UI-Feinschliff aus den ersten Vorschlägen noch vor der Testsession; mehrmals täglich und Wochenend-Zeiten nach V1.3 (7.25) |
+| 2026-10-31 | Mehrmals täglich: Serie hält mit mindestens einem eingehaltenen Termin pro Tag. Wochenend-Zeiten gelten auch für die Tagesgrenze (7.25) |
 
 ## 10. Nächste Schritte
 
