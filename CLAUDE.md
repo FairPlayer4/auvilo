@@ -47,8 +47,10 @@ export JAVA_TOOL_OPTIONS='-Djdk.net.unixdomain.tmpdir=%USERPROFILE%.Bartik\.jt'
   Logs schreiben, nicht an externe Dienste geben.
 
 ## Git
-- Remote: Bitbucket `dg-ds/avlreminder`. Arbeit auf `develop` oder Feature-Branches
-  (`feature/v1.x`); dort nach eigenem Ermessen committen und pushen.
+- Remote `origin`: GitHub `FairPlayer4/avlreminder` (privat, seit 2026-10-31; vorher
+  Bitbucket `dg-ds/avlreminder`, nur noch Archiv). Arbeit auf `develop` oder
+  Feature-Branches (`feature/v1.x`); dort nach eigenem Ermessen committen und pushen.
 - `main` nur per Pull Request, nie direkt pushen. Nach einer abgeschlossenen Etappe
-  einen PR anbieten.
+  einen PR anbieten (`gh pr create`, Basis `main`; ohne `gh` die Compare-URL
+  `https://github.com/FairPlayer4/avlreminder/compare/main...<branch>` nennen).
 - Commit-Nachrichten auf Deutsch, Präfix mit Version (z. B. `V1.2b: …`).
