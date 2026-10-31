@@ -749,7 +749,7 @@ früh am S24 Ultra testen (Spike, siehe Abschnitt 10).
 - Kotlin, Jetpack Compose, Room (lokale DB), AlarmManager + WorkManager, Glance (Widget)
 - minSdk/targetSdk 37 (Android 17); AGP-Version mit API-37-Unterstützung nötig
 - Build: Gradle (Wrapper), Entwicklung in Android Studio oder VS Code
-- Entwicklungsumgebung: ✅ ohne Adminrechte möglich – siehe
+- Entwicklungsumgebung: siehe
   [entwicklungsumgebung.md](entwicklungsumgebung.md)
 
 ### 8.4 Daten
