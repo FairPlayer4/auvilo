@@ -3,7 +3,7 @@
 Stand: 2026-10-31. Bei jedem größeren Schritt aktualisieren.
 
 ## Auf dem Gerät
-- **V1.2b** (`versionName` 1.2b-prototyp, `versionCode` 5), Branch `feature/v1.2b`,
+- **V1.2b** (`versionName` 1.2b-prototyp, `versionCode` 5), Branch `develop`,
   installiert am 2026-10-31. Enthält Wochenziele, Serien, Statistik, Übersicht morgens
   und abends, Diagnose-Log und den UI-Feinschliff aus Kevins ersten Vorschlägen
   (klappbare Bereiche beim Bearbeiten, eigene Werte mit *andere…*, freie Uhrzeiten
@@ -17,7 +17,7 @@ Stand: 2026-10-31. Bei jedem größeren Schritt aktualisieren.
    aus und gleicht das Ergebnis mit den Vorschlägen in der App ab.
 2. **Vorschläge in der App:** 1, 4, 5, 6, 7 und 9 sind umgesetzt; Kevin markiert sie dort
    als „umgesetzt“. Offen sind VS1–VS3 (anforderungen.md 7.25).
-3. **Pull Request** `feature/v1.2b` → `main` steht noch aus.
+3. **Pull Request** `develop` → `main` geöffnet (2026-10-31), wartet auf Kevins Review.
 4. **Doku straffen**, am besten nach der Testsession und vor dem V1.3-Design:
    - design.md nach Themen statt nach Versionen gliedern und nur den aktuellen Stand
      beschreiben (überholte Entwürfe streichen, Historie steht in Git).
