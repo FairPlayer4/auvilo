@@ -51,4 +51,6 @@ Strenge und invasive Mechanismen sind gewollt. Kommunikation auf **Deutsch, mit 
 - `main` nur per Pull Request, nie direkt pushen. Nach einer abgeschlossenen Etappe
   einen PR anbieten (`gh pr create`, Basis `main`; ohne `gh` die Compare-URL
   `https://github.com/FairPlayer4/avlreminder/compare/main...<branch>` nennen).
+- PRs nach `main` baut und testet GitHub Actions (`.github/workflows/build.yml`, gleicher
+  Befehl wie lokal; Debug-APK als Artefakt am Lauf).
 - Commit-Nachrichten auf Deutsch, Präfix mit Version (z. B. `V1.2b: …`).
