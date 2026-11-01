@@ -61,7 +61,7 @@ als eigenständige Verwaltungs-App.
 | Stufe | Inhalt | Technik |
 |---|---|---|
 | **V1** | Einzelnutzer, komplett lokal, Kernmechanismen | Kein Backend, Sideload-APK |
-| V2 | Abgleich mit Zielen, lokale KI, Zahlenwerte, Backup, **Forschung Bewegungsdaten** (7.16), **Räume und Taster über Home Assistant** (7.19), ggf. GPS-Routen (7.17) | lokal bzw. im Heimnetz |
+| V2 | Abgleich mit Zielen, lokale KI, Zahlenwerte, Backup, **Forschung Bewegungsdaten** (7.16), **Räume und Taster über Home Assistant** (7.19), ggf. GPS-Routen (7.17), **Schnittstelle für KI-Agenten** (7.26) | lokal bzw. im Heimnetz |
 | V3 | Mehrere Personen im Haushalt, gemeinsame Reminder (7.18), KI über Backend, ggf. NFC-Kontrollpunkte (7.15), ggf. **Haushaltsinventar und Einkaufsliste** (7.23) | Lokale Synchronisation zwischen den Handys – Backend nur, wenn nötig |
 
 "Alignment" umfasst langfristig: **Erledigung erzwingen** (V1), **Abgleich mit
@@ -702,6 +702,49 @@ klappbaren Bereichen, Charakter oben mit *Dokumentation* als Standard. Offen:
 - VS3 **Statistik schöner**: Wochenverlauf als kleines Balkendiagramm, Serie
   hervorgehoben. Die Liste reicht vorerst. **[später]**
 
+### 7.26 Schnittstelle für KI-Agenten
+Persönliche KI-Agenten werden voraussichtlich immer mehr übernehmen. Die App soll
+deshalb vollständig über eine Schnittstelle für Agenten bedienbar sein, und ein Agent
+soll helfen, die Reminder einzuhalten: planen, Vorarbeit erledigen, motivieren.
+**[V2]**
+- AG1 **Nur lokal auf dem Gerät.** Kein Zugang aus dem Netz, kein Backend.
+- AG2 **Für alle persönlichen Agenten**, nicht nur einen (z. B. Gemini und die
+  KI-Assistenten-Apps anderer Anbieter). Deshalb über offene bzw. System-Standards:
+  Android *App Functions* (vom System geregelter Zugriff) und ein lokaler MCP-Server.
+  Beide nutzen dieselben Befehle aus `core` wie die Oberfläche der App.
+- AG3 **Freiwillig, Standard aus.** Wer seine Reminder komplett selbst verwalten
+  will, braucht keinen Agenten. Freigabe **pro Agent** (Kopplung mit Bestätigung in
+  der App), jederzeit widerrufbar, dazu ein Notschalter für die ganze Schnittstelle.
+  Ein localhost-Port ist für jede App auf dem Gerät erreichbar, darum ist die
+  Kopplung Pflicht. Wie die Freigabe im Detail aussieht, wird im Design geklärt.
+- AG4 **Rechte in Stufen:** lesen (Reminder, Stand, Statistik, Übersicht);
+  vorschlagen (anlegen, verschieben, erster Schritt – der Nutzer bestätigt in der
+  App); ändern (Reminder anlegen und bearbeiten). Der Nutzer wählt die Stufe pro
+  Agent.
+- AG5 **Kein Schlupfloch** (Leitprinzip 4): Ein Agent darf keinen Reminder als
+  erledigt markieren, keinen Alarm und keine Eskalation beenden und keinen Nachweis
+  ersetzen.
+- AG6 **Delegierbar** als Markierung pro Reminder: Nur dann darf ein Agent ihn
+  erledigen, mit einem Beleg als Nachweis. Beispiel: Termin vereinbaren oder ein
+  Meeting vorbereiten ja, Training nein. Beim Training kann der Agent aber den
+  Trainingstag planen, den Fortschritt verfolgen und motivieren.
+- AG7 **Ehrlich sichtbar** (Leitprinzip 6): Was ein Agent tut, steht im Verlauf als
+  *durch Agent*. Vom Agenten Erledigtes wird in der Statistik getrennt ausgewiesen.
+- AG8 **Coaching im Sinne der App:** Die Schnittstelle liefert neben den Daten auch
+  Vorlagen (z. B. „Hilf mir, mit X anzufangen“, „Wochenrückblick“) mit den Regeln der
+  App: positiv vor negativ, Minimum zählt, Joker, Warum (P3), Startklar-Fragen und
+  Blocker (7.21). So motiviert jeder Agent auf dieselbe Art.
+- AG9 **Die App stößt den Agenten an:** bei Eskalation, Verpasst, wiederholtem
+  Verschieben und zum Abendrückblick. Dazu ein Knopf *Mit Agent besprechen* im Alarm
+  und bei den Startklar-Fragen, der Reminder, Warum und Blocker mitgibt.
+- AG10 **Deutlicher Datenschutzhinweis** bei der Freigabe: Was der Agent sieht, kann
+  das Gerät verlassen; das verantwortet der Nutzer (wie I7). Sensible Kategorien
+  aus 8.4 (Fotos, Audio, Standorte, Bewegungsdaten, Inventar) sind einzeln
+  freizugeben und standardmäßig aus. Ein Zugriffsprotokoll zeigt, welcher Agent wann
+  was gelesen oder geändert hat.
+- Vorbereitung bis dahin: neue Logik weiter als saubere Befehle in `core`, damit
+  Oberfläche und Agent später dieselben Wege nutzen.
+
 ## 8. Zielplattform und Technik
 
 ### 8.1 Zielgerät
@@ -738,6 +781,7 @@ vom Nutzer in den Systemeinstellungen erteilt werden.
 | GPS-Routen | ✅ | Fused Location im Foreground-Service | Nur während Sitzungen, sonst zu akkuintensiv |
 | M2 Lokale Synchronisation | ✅ | Nearby Connections (Bluetooth/WLAN ohne Internet) oder WLAN im Haushalt | Konfliktauflösung ist der eigentliche Aufwand |
 | N8 / KI lokal | ⚠️ zu prüfen | On-Device-Modelle (z. B. Gemini Nano / ML Kit GenAI, Speech-to-Text) | Verfügbarkeit auf S24 Ultra mit Android 17 prüfen |
+| AG KI-Agenten | ⚠️ zu prüfen | Android App Functions (Jetpack `androidx.appfunctions`), lokaler MCP-Server mit Kopplung | Welche Agenten App Functions aufrufen dürfen und wie Agenten-Apps einen lokalen MCP-Server erreichen, auf Android 17 prüfen |
 | P2 Apps sperren | ✅ / ⚠️ | Accessibility-Service oder Overlay-Blocker | |
 | Zuverlässigkeit | ⚠️ | Akku-Optimierung deaktivieren | **Samsung "Schlafende Apps"/Geräteschutz ist das größte Risiko** |
 
@@ -826,6 +870,7 @@ früh am S24 Ultra testen (Spike, siehe Abschnitt 10).
 | 2026-10-29 | Reminder-Liste: abgeschlossene Einmal-Reminder automatisch eingeklappt, Archivieren von Hand, Gruppen und Sortierung (V1.2). Einmal-Reminder mit neuer Zeit wird wieder eingeplant und eingeschaltet (Bugfix, sofort) |
 | 2026-10-31 | V1.2b bestätigt wie Entwurf. UI-Feinschliff aus den ersten Vorschlägen noch vor der Testsession; mehrmals täglich und Wochenend-Zeiten nach V1.3 (7.25) |
 | 2026-10-31 | Mehrmals täglich: Serie hält mit mindestens einem eingehaltenen Termin pro Tag. Wochenend-Zeiten gelten auch für die Tagesgrenze (7.25) |
+| 2026-11-01 | Schnittstelle für KI-Agenten in V2: nur lokal, für alle persönlichen Agenten, freiwillig mit Freigabe pro Agent; Agent erledigt nur als *delegierbar* markierte Reminder, nie Nachweis oder Alarm; App stößt den Agenten an; Datenschutz verantwortet der Nutzer, mit deutlichem Hinweis (7.26) |
 
 ## 10. Nächste Schritte
 
@@ -877,3 +922,6 @@ Für später:
   welche Konfliktregel gilt bei gleichzeitigen Änderungen (7.18)?
 - V3: Wie wird die geteilte Einkaufsliste aus der Ferne abgeglichen – Home
   Assistant oder eigenes Backend (7.23, E4)?
+- V2: Wie genau funktioniert die Freigabe für Agenten (Kopplung, Stufen, sensible
+  Kategorien), und welche Agenten-Apps erreichen App Functions bzw. einen lokalen
+  MCP-Server tatsächlich (7.26)?
