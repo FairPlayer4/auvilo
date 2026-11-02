@@ -8,7 +8,7 @@ Strenge und invasive Mechanismen sind gewollt. Kommunikation auf **Deutsch, mit 
 - [docs/stand.md](docs/stand.md) – aktueller Stand, offene Punkte, nächste Schritte (zuerst lesen)
 - [docs/anforderungen.md](docs/anforderungen.md) – Kevins Anforderungen, Entscheidungen (Kap. 9), Planung (Kap. 10)
 - [docs/design.md](docs/design.md) – technisches Design je Version
-- [docs/geraetetest.md](docs/geraetetest.md) – Tests auf dem echten Gerät
+- [docs/geraetetest.md](docs/geraetetest.md) – Kerntests auf dem echten Gerät (Archiv pro Version: `geraetetest-archiv.md`)
 - [docs/entwicklungsumgebung.md](docs/entwicklungsumgebung.md) – Toolchain und Pfade auf Kevins Rechner
 - Module: `core` (reine Kotlin-Logik, Kover-Abdeckung), `app` (Android, Compose, Room)
 

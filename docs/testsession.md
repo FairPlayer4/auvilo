@@ -6,7 +6,7 @@
 > Fokussierter Gerätetest mit V1.2b auf dem S24 Ultra. Ziel: alles, was die automatischen
 > Tests nicht abdecken (echte Alarme, Sperrbildschirm, „Nicht stören“, Neustart, Doze,
 > Benachrichtigungsknöpfe, Zeitpunkte), einmal bewusst durchspielen. Danach wertet Claude
-> das Diagnose-Log aus. Nummern in Klammern verweisen auf [geraetetest.md](geraetetest.md).
+> das Diagnose-Log aus. Nummern in Klammern verweisen auf [geraetetest-archiv.md](geraetetest-archiv.md).
 
 ## Rahmen
 

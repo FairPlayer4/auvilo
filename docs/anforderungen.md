@@ -1,7 +1,8 @@
 # Anforderungen – avlreminder
 
 > Arbeitsname. AVL = **A**udio / **V**isual / **L**ocation.
-> Stand: 2026-10-25 – sechzehnter Entwurf (Nachweis ohne Alarm, Text- und Audionachweis), wird iterativ verfeinert.
+> Stand: 2026-11-02 – umgesetzt bis V1.2c (Übersicht in Kap. 10). Entscheidungen mit Datum in
+> Kap. 9, technisches Design nach Themen in [design.md](design.md). Wird iterativ verfeinert.
 
 ## 1. Vision
 
@@ -60,7 +61,7 @@ als eigenständige Verwaltungs-App.
 
 | Stufe | Inhalt | Technik |
 |---|---|---|
-| **V1** | Einzelnutzer, komplett lokal, Kernmechanismen | Kein Backend, Sideload-APK |
+| **V1** | Einzelnutzer, komplett lokal, Kernmechanismen | Kein Backend, Sideload-APK; später Play-Store-Release mit Backend (7.28) |
 | V2 | Abgleich mit Zielen, lokale KI, Zahlenwerte, Backup, **Forschung Bewegungsdaten** (7.16), **Räume und Taster über Home Assistant** (7.19), ggf. GPS-Routen (7.17), **Schnittstelle für KI-Agenten** (7.26) | lokal bzw. im Heimnetz |
 | V3 | Mehrere Personen im Haushalt, gemeinsame Reminder (7.18), KI über Backend, ggf. NFC-Kontrollpunkte (7.15), ggf. **Haushaltsinventar und Einkaufsliste** (7.23) | Lokale Synchronisation zwischen den Handys – Backend nur, wenn nötig |
 
@@ -745,6 +746,31 @@ soll helfen, die Reminder einzuhalten: planen, Vorarbeit erledigen, motivieren.
 - Vorbereitung bis dahin: neue Logik weiter als saubere Befehle in `core`, damit
   Oberfläche und Agent später dieselben Wege nutzen.
 
+### 7.27 Nutzung beobachten, Funktionen trimmen, Schlupflöcher bremsen
+Stand 2026-11-02: Die App funktioniert im Alltag sehr gut. Mit V1.2c ist aber viel
+dazugekommen; Kevin sammelt jetzt erst einmal mit aktiver Nutzung.
+- NT1 **Funktionen trimmen:** herausfinden, welche Funktionen wirklich genutzt werden.
+  Was ungenutzt bleibt, wird vereinfacht oder entfernt, statt neue hinzuzufügen.
+- NT2 **Zu streng geplant:** Reminder werden manchmal strenger angelegt als
+  durchhaltbar und dann x-mal um 10 Minuten geschoben. Die App soll das erkennen und
+  helfen, realistischer zu planen (Zeit, Strenge, Minimum), statt nur lauter zu werden.
+- NT3 **Schlupflöcher (Cheats) bleiben vorerst**, bekommen aber sinnvolle Rückfragen
+  („Willst du wirklich …?“). Welche Stellen das sind und wie stark die Bremse sein
+  soll, ergibt sich aus der Nutzung.
+- Ergebnisse fließen als Vorschläge (7.24) oder hier ein; danach Entwurf.
+
+### 7.28 Play-Store-Release und Backend
+Ziel ist, einmal den kompletten Weg zu gehen: eine offizielle App im Play Store mit
+sehr kleiner Zielgruppe, mit Backend und vollem EU-Datenschutz. Lernen steht im
+Vordergrund, nicht Reichweite.
+- PS1 **Play Store** statt nur Sideload. **Android 17 bleibt Minimum** (8.1).
+- PS2 **Backend** entsteht parallel in einem eigenen Repository (Entscheidung vom
+  2026-11-01) und dient später als **Backup** und **Sync** mit anderen (7.18).
+- PS3 **EU-Datenschutz (DSGVO)** vollständig: Datenschutzerklärung, Hosting in der EU,
+  Export und Löschen auf Wunsch, Datensicherheits-Angaben im Play Store.
+- PS4 Die eingeschränkten Berechtigungen, die beim Sideload egal waren (8.2), müssen
+  für den Play Store begründet und deklariert werden.
+
 ## 8. Zielplattform und Technik
 
 ### 8.1 Zielgerät
@@ -755,8 +781,9 @@ soll helfen, die Reminder einzuhalten: planen, Vorarbeit erledigen, motivieren.
 
 ### 8.2 Technische Machbarkeit
 
-Großer Vorteil: **Sideload statt Play Store** → die meisten Play-Richtlinien
-(eingeschränkte Berechtigungen) gelten nicht. Berechtigungen müssen aber trotzdem
+Bisher **Sideload statt Play Store** → die meisten Play-Richtlinien
+(eingeschränkte Berechtigungen) gelten nicht. Mit dem geplanten Play-Store-Release
+(7.28) ändert sich das. Berechtigungen müssen aber trotzdem
 vom Nutzer in den Systemeinstellungen erteilt werden.
 
 | Mechanismus | Machbar? | Android-Mittel | Anmerkung |
@@ -873,13 +900,29 @@ früh am S24 Ultra testen (Spike, siehe Abschnitt 10).
 | 2026-11-01 | Schnittstelle für KI-Agenten in V2: nur lokal, für alle persönlichen Agenten, freiwillig mit Freigabe pro Agent; Agent erledigt nur als *delegierbar* markierte Reminder, nie Nachweis oder Alarm; App stößt den Agenten an; Datenschutz verantwortet der Nutzer, mit deutlichem Hinweis (7.26) |
 | 2026-11-02 | Testsession erst vor V2 statt vor V1.3 – die App läuft im Alltag gut |
 | 2026-11-02 | V1.2c-Entwurf (design.md 12.4) bestätigt und umgesetzt: Fristen mit Ausführungsfenstern, Vorlagen, Vorab-Reminder, Blocker als Liste mit Vorbereitungsaufgaben, *Blocker gelöst* als Minimum, Nachfragen wenn es hakt |
+| 2026-11-02 | Vor V1.3 erst Nutzung beobachten: Funktionen trimmen statt erweitern, Rückfragen bei Schlupflöchern (7.27) |
+| 2026-11-02 | Ziel offizieller Play-Store-Release für eine sehr kleine Zielgruppe, mit Backend (Backup, Sync) und vollem EU-Datenschutz; Android 17 bleibt Minimum (7.28) |
 
 ## 10. Nächste Schritte
 
-1. **Technischer Spike auf dem S24 Ultra** (Plan: [spike.md](spike.md)): exakter
-   Alarm, Vollbild über Sperrbildschirm, Vibrationsmuster, Alarmton, Geofence
-   "Ankunft zuhause", Überleben von Neustart und Samsung-Akkumanagement über mehrere Tage
-2. **V1 in Etappen**, damit früh echte Nutzung möglich ist:
+### 10.1 Was ist wo umgesetzt
+
+| Version | auf dem Gerät | Inhalt (Anforderungen) |
+|---|---|---|
+| Spike | 2026-10 | Machbarkeit auf dem S24 Ultra ([spike.md](spike.md)) |
+| V1.0 | 2026-10-24 | Zeit-Reminder, Eskalation, Aktionen, Quittieren/Foto, Ziel/Minimum, Verlauf, Widget, *nach Erledigung* |
+| V1.1a | ✅ | Nicht stören und Tagesgrenze (7.3), Später-Knöpfe (7.4), Nachweis ohne Alarm, Text, Audio (7.5), vorab erledigen (7.20), Startklar (7.21 S1–S4), Uhr (7.14 G1b), Motivations-Audio |
+| V1.1b | ✅ | Ankunft zuhause (7.1), Checklisten (7.13) |
+| V1.2a | ✅ | Verbesserung vorschlagen (7.24), Reminder-Liste (7.9 L1–L5) |
+| V1.2b | 2026-10-31 | Wochenziele, Serien/Joker, Statistik, Übersicht morgens/abends, Diagnose-Log, UI aus Kevins Vorschlägen |
+| V1.2c | 2026-11-02 | Fristen mit Fenstern (7.2), Vorlagen, Vorab-Reminder (T6), Blocker als Aufgaben (7.21 S5–S8) |
+
+Details zum Verhalten: [design.md](design.md), Gerätetests: [geraetetest.md](geraetetest.md).
+
+### 10.2 Plan
+
+1. ✅ **Technischer Spike auf dem S24 Ultra** (Plan: [spike.md](spike.md))
+2. **V1 in Etappen**, damit früh echte Nutzung möglich ist (umgesetzt bis V1.2c, siehe 10.1):
    - **V1.0 (benutzbar):** Zeit-Reminder, Eskalation, Aktionen, Quittieren/Foto,
      Ziel/Minimum, einfache Liste der Erledigungen, Widget
      – ✅ seit 2026-10-24 auf dem Gerät, inkl. Intervall ab letzter Erledigung
@@ -889,12 +932,15 @@ früh am S24 Ultra testen (Spike, siehe Abschnitt 10).
      und Tagesgrenze (7.3), **Verschiebe-Knöpfe pro Reminder** (7.4),
      **Alarm aus während des Nachweises**, **Text-Nachweis**, kombinierbare
      Nachweise (7.5)
-   - **V1.2** in drei Etappen (Design 12):
+   - **V1.2** in drei Etappen:
      - **V1.2a:** **Verbesserung vorschlagen** (7.24), **Reminder-Liste aufräumen**
        (7.9, L1–L5)
      - **V1.2b:** Wochenziele, Serien/Joker, Statistik, Übersicht morgens/abends
      - **V1.2c:** Fristen mit Ausführungsfenstern, **Vorab-Reminder** (T6), **Blocker
        als Aufgaben** (7.21, S5–S8), Vorlagen
+   - **Jetzt (seit 2026-11-02): Nutzung beobachten und trimmen** (7.27): welche
+     Funktionen Kevin wirklich nutzt, Rückfragen bei Schlupflöchern, Hinweis bei
+     wiederholtem *Später*. Fehler aus dem Alltag als Fix auf `develop`.
    - **V1.3:** **Durchführung mit Timer** und Nachfrage-Muster (7.11), **Abläufe**
      für Training (7.12), **Galaxy Watch** über Benachrichtigungen (7.14),
      **vorgezogen starten** (7.20)
@@ -904,7 +950,9 @@ früh am S24 Ultra testen (Spike, siehe Abschnitt 10).
    - **Möglicher Kandidat zum Vorziehen:** Einkaufsliste nur für einen selbst mit
      Geschäfts-Trigger (7.23, E1–E3) – ohne Inventar, KI und Abgleich; Technik
      ab V1.1 vorhanden. Nicht festgelegt.
-3. Weitere Anforderungen ergeben sich aus der Nutzung.
+3. **Play-Store-Release** mit Backend für Backup und Sync, EU-Datenschutz (7.28);
+   Reihenfolge zu V1.3/V2 noch offen.
+4. Weitere Anforderungen ergeben sich aus der Nutzung.
 
 ## 11. Offene Fragen
 
@@ -924,6 +972,13 @@ Für später:
   welche Konfliktregel gilt bei gleichzeitigen Änderungen (7.18)?
 - V3: Wie wird die geteilte Einkaufsliste aus der Ferne abgeglichen – Home
   Assistant oder eigenes Backend (7.23, E4)?
+- Play Store (7.28): Welche Berechtigungen lassen sich dort begründen (Vollbild-Alarm,
+  exakte Alarme, Standort im Hintergrund, Foreground-Service), und welche Testphase
+  verlangt Google vor dem ersten Release? Vor dem Start an den aktuellen Richtlinien
+  prüfen.
+- Backend (7.28): Wie passen Backup und Sync zu 8.4 (sensible Daten nur auf dem Gerät)?
+  Empfehlung: Backup Ende-zu-Ende verschlüsselt, sodass das Backend nur verschlüsselte
+  Daten sieht.
 - V2: Wie genau funktioniert die Freigabe für Agenten (Kopplung, Stufen, sensible
   Kategorien), und welche Agenten-Apps erreichen App Functions bzw. einen lokalen
   MCP-Server tatsächlich (7.26)?
