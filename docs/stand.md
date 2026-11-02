@@ -9,6 +9,14 @@ Stand: 2026-11-02. Bei jedem größeren Schritt aktualisieren.
   (klappbare Bereiche beim Bearbeiten, eigene Werte mit *andere…*, freie Uhrzeiten
   in den Einstellungen, Zahnrad auf allen Tabs).
 - Build grün: 224 Tests, Kover-Abdeckung in `core` 99,37 %.
+
+## Fertig, noch nicht auf dem Gerät
+- **V1.2c** (`versionName` 1.2c-prototyp, `versionCode` 6), Branch `feature/v1.2c`:
+  Fristen mit Ausführungsfenstern und *Überfällig*, Vorlagen, Vorab-Reminder, Blocker als
+  Liste mit Vorbereitungsaufgaben, *Blocker gelöst* als Minimum, Nachfragen wenn es hakt
+  (design.md 12.4 und 12.6). Migration 5→6 mit Backup v5.
+- Build grün: 260 Tests, Kover-Abdeckung in `core` 99,41 %.
+- Installation erst nach Kevins Go; danach Gerätetests 85–96 (geraetetest.md).
 - Diagnose-Log zuletzt geprüft: Berechtigungen ok, `dndBlocked=none`.
 
 ## Offen
@@ -25,8 +33,7 @@ Stand: 2026-11-02. Bei jedem größeren Schritt aktualisieren.
    - anforderungen.md nur leicht: Übersicht „was ist in welcher Version umgesetzt“,
      Kap. 10 aktualisieren, Doppeltes zusammenführen. Inhaltlich nichts ohne Kevin streichen.
    - geraetetest.md in Kerntests (nach jedem Update) und versionsspezifisches Archiv teilen.
-5. **V1.2c** (Fristen, Vorab-Reminder, Blocker als Aufgaben, Vorlagen): vollständiger
-   Entwurf in design.md 12.4, wartet auf Kevins Prüfung. Danach **V1.3**
+5. **V1.2c** installieren (nach Kevins Go), Gerätetests, Merge nach `develop`. Danach **V1.3**
    (Timer, Abläufe, Watch, mehrmals täglich, Wochenend-Zeiten) laut anforderungen.md Kap. 10.
 
 ## Beobachtungen aus der echten Nutzung

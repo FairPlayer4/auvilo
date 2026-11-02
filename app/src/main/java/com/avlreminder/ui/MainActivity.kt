@@ -45,10 +45,17 @@ import java.time.ZoneId
 class MainActivity : ComponentActivity() {
     companion object {
         private const val EXTRA_NEW = "new"
+        private const val EXTRA_EDIT = "edit"
 
         /** Opens "Neuer Reminder" directly (widget). */
         fun newReminder(context: Context): Intent =
             Intent(context, MainActivity::class.java).putExtra(EXTRA_NEW, true)
+                .addFlags(Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_CLEAR_TOP)
+
+        /** Opens a reminder's form (tap on the notice before it). */
+        fun editReminder(context: Context, reminderId: Long): Intent =
+            Intent(context, MainActivity::class.java).putExtra(EXTRA_EDIT, reminderId)
+                .setData("avl://edit/$reminderId".toUri())
                 .addFlags(Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_CLEAR_TOP)
     }
 
@@ -83,6 +90,8 @@ class MainActivity : ComponentActivity() {
             val reminderSort by vm.reminderSort.collectAsStateWithLifecycle()
             val overview by vm.overview.collectAsStateWithLifecycle()
             val suggestions by vm.suggestions.collectAsStateWithLifecycle()
+            val blockers by vm.blockers.collectAsStateWithLifecycle()
+            val templates by vm.templates.collectAsStateWithLifecycle()
             var now by androidx.compose.runtime.remember { mutableStateOf(Instant.now()) }
             var dnd by androidx.compose.runtime.remember { mutableStateOf(device.isDoNotDisturb()) }
             LaunchedEffect(Unit) {
@@ -102,6 +111,7 @@ class MainActivity : ComponentActivity() {
                             today, reminders, openByReminder, history, proofs, theme, permissions, prep, alert, dnd,
                             home = home, dwellMinutes = dwell, itemsDone = itemsDone,
                             reminderSort = reminderSort, suggestions = suggestions, overview = overview,
+                            blockers = blockers, templates = templates,
                         ),
                         actions = actions,
                         now = now,
@@ -135,7 +145,13 @@ class MainActivity : ComponentActivity() {
     private fun handle(intent: Intent?) {
         if (intent?.getBooleanExtra(EXTRA_NEW, false) == true) {
             intent.removeExtra(EXTRA_NEW)
-            startRoute = Routes.NEW
+            startRoute = Routes.CHOOSE
+            launch++
+        }
+        val edit = intent?.getLongExtra(EXTRA_EDIT, 0L) ?: 0L
+        if (edit != 0L) {
+            intent?.removeExtra(EXTRA_EDIT)
+            startRoute = Routes.edit(edit)
             launch++
         }
     }
@@ -157,6 +173,14 @@ class MainActivity : ComponentActivity() {
             vm.addSuggestion(text, important, screen, reminderId)
         override fun updateSuggestion(suggestion: SuggestionEntity) = vm.updateSuggestion(suggestion)
         override fun deleteSuggestion(id: Long) = vm.deleteSuggestion(id)
+        override fun discard(occurrenceId: Long) = vm.discard(occurrenceId)
+        override fun addBlocker(reminderId: Long, text: String) = vm.addBlocker(reminderId, text)
+        override fun solveBlocker(blockerId: Long) = vm.solveBlocker(blockerId)
+        override fun planTask(blockerId: Long, at: java.time.LocalDateTime) = vm.planTask(blockerId, at)
+        override fun saveTemplate(template: com.avlreminder.data.TemplateEntity) = vm.saveTemplate(template)
+        override fun templateUsed(id: Long) = vm.templateUsed(id)
+        override fun renameTemplate(id: Long, name: String) = vm.renameTemplate(id, name)
+        override fun deleteTemplate(id: Long) = vm.deleteTemplate(id)
         /** The user picks the app in the share sheet; nothing is sent by itself. */
         override fun share(text: String) {
             val send = Intent(Intent.ACTION_SEND).setType("text/plain").putExtra(Intent.EXTRA_TEXT, text)

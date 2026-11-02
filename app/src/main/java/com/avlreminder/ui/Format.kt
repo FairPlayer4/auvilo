@@ -68,6 +68,17 @@ object Format {
         }
         is Schedule.AfterDone -> "alle ${s.intervalDays} Tage nach Erledigung, ${time(s.time)}"
         Schedule.OnArrival -> "wenn ich zuhause bin"
+        is Schedule.Deadline -> "bis ${shortDay(s.due.toLocalDate())} ${time(s.due.toLocalTime())} · ${days(s.days)} ${time(s.from)}–${time(s.until)}"
+    }
+
+    /** "Mo–Fr", "Mo, Mi, Fr", "täglich". */
+    fun days(days: Set<DayOfWeek>): String {
+        val sorted = days.sorted()
+        return when {
+            sorted.size == 7 -> "täglich"
+            sorted.size >= 3 && sorted.last().value - sorted.first().value == sorted.size - 1 -> "${weekday(sorted.first())}–${weekday(sorted.last())}"
+            else -> sorted.joinToString(", ") { weekday(it) }
+        }
     }
 
     /** Schedule plus the arrival trigger, e.g. "täglich 19:00 · bei Ankunft zuhause". */

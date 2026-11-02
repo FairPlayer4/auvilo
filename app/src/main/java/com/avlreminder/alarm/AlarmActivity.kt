@@ -19,6 +19,7 @@ import com.avlreminder.core.model.OccurrenceState
 import com.avlreminder.core.rules.Action
 import com.avlreminder.core.rules.Lifecycle
 import com.avlreminder.core.rules.TransitionResult
+import com.avlreminder.core.usecases.SaveResult
 import com.avlreminder.graph
 import com.avlreminder.system.Diag
 import com.avlreminder.ui.screens.AlarmContent
@@ -117,6 +118,9 @@ class AlarmActivity : ComponentActivity() {
             onSkip = { act(id, Action.Skip(it)) },
             onCheckItem = { itemId, evidence -> act(id, Action.CheckItem(itemId, evidence), stay = true) },
             onDeferRest = { act(id, Action.DeferRest(it)) },
+            onBlockerSolved = { act(id, Action.Complete(minimumOnly = false, blockerSolved = true)) },
+            onTomorrow = { act(id, Action.CloseWindow(it)) },
+            onAnswerAsk = { text, plan -> answerAsk(id, text, plan) },
             onSuggest = { text, important -> graph.scope.launch { graph.addSuggestion(text, important, "Alarm", current.reminder) } },
             onStartProof = { startProof(id) },
             onAbortProof = { abortProof(id) },
@@ -149,7 +153,30 @@ class AlarmActivity : ComponentActivity() {
                 // Doing an item today makes "Rest auf morgen" free; otherwise it is a postponement.
                 canDeferRest = reminder.checklist.isNotEmpty() && (limits.itemDoneToday || Lifecycle.canPostpone(reminder, occurrence)),
                 week = engine.weekStatus(reminder, occurrence.dueAt.atZone(ZoneId.systemDefault()).toLocalDate()),
+                blockerSolved = Lifecycle.canUseSolvedBlocker(reminder, limits),
+                askBlocker = !early && engine.askBlocker(reminder, occurrence),
+                tomorrow = if (early) null else engine.tomorrow(reminder, occurrence),
+                deadline = limits.deadline,
+                blockers = engine.blockers(reminder.id).filter { it.isOpen },
             )
+        }
+    }
+
+    /** Saves the answer as a blocker; [plan] makes it a task for the suggested time. Stays on the alarm. */
+    private fun answerAsk(id: Long, text: String?, plan: Boolean) {
+        lifecycleScope.launch {
+            val ring = graph.withEngine { engine ->
+                val blockerId = engine.answerAsk(id, text)
+                val reminderId = graph.repository.occurrence(id)?.reminderId
+                if (plan && blockerId != null && reminderId != null) {
+                    (engine.planTask(blockerId, engine.suggestTaskTime(reminderId)) as? SaveResult.Saved)?.ring
+                } else {
+                    null
+                }
+            }
+            ring?.let(graph::ring)
+            Diag.log("alarm screen occ=$id asked → ${if (text.isNullOrBlank()) "skipped" else if (plan) "blocker + task" else "blocker"}")
+            version++
         }
     }
 

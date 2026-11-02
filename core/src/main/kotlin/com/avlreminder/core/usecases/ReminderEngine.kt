@@ -679,7 +679,8 @@ class ReminderEngine(
         )
     }
 
-    private suspend fun askBlocker(reminder: Reminder, occurrence: Occurrence): Boolean {
+    /** It got stuck [AlertSettings.askBlockerAfter] times in a row and was not asked yet (S8). */
+    suspend fun askBlocker(reminder: Reminder, occurrence: Occurrence): Boolean {
         if (reminder.character != Character.OVERCOME || reminder.prepFor != null) return false
         if (repo.events(occurrence.id).any { it.type == EventType.BLOCKER_ASKED }) return false
         val history = listOf(occurrence) + repo.recentResolved(reminder.id, ASK_HISTORY)

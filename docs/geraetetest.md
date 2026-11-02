@@ -123,3 +123,22 @@ Ablauf für eine Stunde am Stück: [testsession.md](testsession.md) (vor V2).
 | 82 | Einstellungen: Uhrzeit antippen, frei eingeben | "laut ab" nach der Tagesgrenze lässt sich nicht bestätigen |
 | 83 | Schalter aus, hell und dunkel | Aus-Zustand klar erkennbar, nicht wie deaktiviert |
 | 84 | Verlauf und Reminder-Liste | Zahnrad oben rechts öffnet die Einstellungen |
+
+## V1.2c
+
+Vorher: 1.2b mit echten Daten installiert lassen; 1.2c darüber installieren (nicht deinstallieren).
+
+| # | Test | Erwartung |
+|---|---|---|
+| 85 | Erster Start nach dem Update | Daten da; Backup `avlreminder-v5-….db`; `diag.log` beginnt mit "state app start 1.2c-prototyp" |
+| 86 | Reminder mit Antwort auf "Was fehlt?" bearbeiten → "Blocker" aufklappen | die Antwort steht als offener Blocker da |
+| 87 | Neuer Reminder → "Frist", Frist in zwei Tagen 12:00, Fenster heute bis in 30 min, alle 30 min | klingelt sofort bzw. zu Fensterbeginn, dann alle 30 min; nach Fensterende Ruhe |
+| 88 | Alarm der Frist → "Auf morgen" | still bis morgen zum Fensterbeginn; zählt nicht als Verschiebung |
+| 89 | Frist verstrichen, nicht erledigt | "Heute" zeigt sie unter "Überfällig"; "Verwerfen" fragt nach und entfernt sie |
+| 90 | Reminder → "Als Vorlage speichern", dann + | Auswahl zeigt die Vorlage oben; Formular übernimmt Einstellungen, aber keinen Titel |
+| 91 | Einstellungen → Vorlagen umbenennen, löschen | wirkt sofort; letzte gelöscht → + öffnet wieder das leere Formular |
+| 92 | Vorab-Reminder "kurz vorher 15 min" | stille Benachrichtigung ca. 15 min vorher mit erstem Schritt und offenen Blockern; Tipp öffnet den Reminder |
+| 93 | Vorab erledigen, bevor der Vorab-Reminder kommt | er kommt nicht |
+| 94 | Blocker → "Als Aufgabe planen" | lockerer Einmal-Reminder am Vorabend 19:00; erledigt → Blocker gelöst |
+| 95 | Schalter "Gelöster Blocker zählt als Minimum", Blocker lösen, nächster Alarm | Knopf "Blocker gelöst – zählt als Minimum"; zählt im Verlauf als Minimum |
+| 96 | Überwindungs-Reminder zweimal hintereinander verschieben oder verpassen | der nächste Alarm fragt "Was hält dich gerade ab?"; Antwort wird ein Blocker; Überspringen geht |
