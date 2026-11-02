@@ -38,6 +38,7 @@ import androidx.compose.ui.text.font.FontStyle
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import com.avlreminder.core.model.Blocker
 import com.avlreminder.core.model.ChecklistItem
 import com.avlreminder.core.model.Occurrence
 import com.avlreminder.core.model.PrepAnswer
@@ -76,6 +77,16 @@ data class AlarmUi(
     val canDeferRest: Boolean = false,
     /** The week so far, for a reminder with a weekly goal. */
     val week: WeekStatus? = null,
+    /** "Blocker gelöst" may close it as the minimum (S7). */
+    val blockerSolved: Boolean = false,
+    /** It got stuck several times in a row: ask "Was hält dich gerade ab?" (S8). */
+    val askBlocker: Boolean = false,
+    /** A deadline's next window from tomorrow on ("Auf morgen", not a postponement). */
+    val tomorrow: Instant? = null,
+    /** A deadline not yet passed: postponing must stay before it. */
+    val deadline: Instant? = null,
+    /** Open blockers of the reminder. */
+    val blockers: List<Blocker> = emptyList(),
 )
 
 private enum class View { MAIN, PROOF, POSTPONE, SKIP }
@@ -107,10 +118,17 @@ fun AlarmContent(
     onDeferRest: (Instant) -> Unit = {},
     /** Notes an improvement; the alarm keeps going meanwhile. */
     onSuggest: (text: String, important: Boolean) -> Unit = { _, _ -> },
+    /** "Blocker gelöst – zählt als Minimum". */
+    onBlockerSolved: () -> Unit = {},
+    /** The answer to "Was hält dich gerade ab?"; null = skipped. [plan]: also plan it as a task. */
+    onAnswerAsk: (text: String?, plan: Boolean) -> Unit = { _, _ -> },
+    /** "Auf morgen" for a deadline. */
+    onTomorrow: (Instant) -> Unit = {},
 ) {
     val c = Avl.colors
     var view by remember { mutableStateOf(View.MAIN) }
     var suggesting by remember { mutableStateOf(false) }
+    var asked by remember { mutableStateOf(false) }
     var minimumOnly by remember { mutableStateOf(false) }
     /** The checklist item the proof is for; null = the whole reminder. */
     var proofItem by remember { mutableStateOf<ChecklistItem?>(null) }
@@ -138,6 +156,12 @@ fun AlarmContent(
         }
     }
 
+    if (ui.askBlocker && !asked && !ui.early) {
+        AskDialog { text, plan ->
+            asked = true
+            onAnswerAsk(text, plan)
+        }
+    }
     if (suggesting) {
         SuggestionDialog(onSave = { text, important -> onSuggest(text, important); suggesting = false }, onDismiss = { suggesting = false })
     }
@@ -157,6 +181,7 @@ fun AlarmContent(
                     }
                     Spacer(Modifier.height(20.dp))
                     PrepCards(ui.prep)
+                    if (ui.blockers.isNotEmpty()) InfoCard("Noch offen", ui.blockers.joinToString("\n") { it.text })
                     ui.week?.let { InfoCard("Diese Woche", Digests.week(it)) }
                     r.goal?.let { InfoCard("Ziel", it) }
                     r.minimum?.let { min ->
@@ -175,6 +200,11 @@ fun AlarmContent(
                             modifier = Modifier.fillMaxWidth().padding(top = 8.dp),
                         ) { Text(if (ui.minimumAllowed) "Nur Minimum geschafft" else "Minimum diese Woche aufgebraucht") }
                     }
+                    if (ui.blockerSolved) {
+                        OutlinedButton(onClick = onBlockerSolved, Modifier.fillMaxWidth().padding(top = 8.dp).testTag("blockerSolved")) {
+                            Text("Blocker gelöst – zählt als Minimum")
+                        }
+                    }
                     if (!ui.early) {
                         if (checklist) {
                             val time = ui.occurrence.dueAt.atZone(zone).toLocalTime()
@@ -184,6 +214,11 @@ fun AlarmContent(
                                 enabled = ui.canDeferRest,
                                 modifier = Modifier.fillMaxWidth().padding(top = 8.dp),
                             ) { Text("Rest auf morgen ${Format.time(tomorrow, zone)}") }
+                        }
+                        ui.tomorrow?.let { at ->
+                            OutlinedButton(onClick = { onTomorrow(at) }, Modifier.fillMaxWidth().padding(top = 8.dp).testTag("tomorrow")) {
+                                Text("Auf morgen ${Format.moment(at, zone, now.atZone(zone).toLocalDate())}")
+                            }
                         }
                         if (ui.snooze.isNotEmpty()) {
                             Row(Modifier.fillMaxWidth().padding(top = 8.dp), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
@@ -376,6 +411,9 @@ private fun PostponeStep(ui: AlarmUi, now: Instant, zone: ZoneId, onPostpone: (I
         add("In 1 Stunde" to now.plusSeconds(3600))
         if (evening > now.plusSeconds(1800)) add("Heute Abend" to evening)
         add("Morgen" to tomorrow)
+    }.filter { (_, at) -> ui.deadline == null || at < ui.deadline }
+    ui.deadline?.let {
+        Text("Nur bis zur Frist ${Format.moment(it, zone, today)}.", Modifier.padding(bottom = 8.dp), color = c.muted, fontSize = 13.sp)
     }
     options.forEach { (label, at) ->
         OutlinedButton(onClick = { onPostpone(at) }, Modifier.fillMaxWidth().padding(vertical = 4.dp)) {
@@ -429,4 +467,26 @@ private fun SkipStep(onSkip: (String) -> Unit, onBack: () -> Unit) {
         Text("Auslassen")
     }
     TextButton(onClick = onBack, Modifier.padding(top = 8.dp)) { Text("Abbrechen", color = c.muted) }
+}
+
+/** "Was hält dich gerade ab?" (S8): the answer becomes a blocker, optionally a task right away. */
+@Composable
+private fun AskDialog(onAnswer: (text: String?, plan: Boolean) -> Unit) {
+    val c = Avl.colors
+    var text by remember { mutableStateOf("") }
+    AlertDialog(
+        onDismissRequest = {},
+        title = { Text("Was hält dich gerade ab?", fontSize = 20.sp) },
+        text = {
+            Column {
+                Text("Das hängt jetzt mehrmals. Was fehlt oder stört?", color = c.muted, fontSize = 14.sp)
+                OutlinedTextField(text, { text = it }, Modifier.fillMaxWidth().padding(top = 8.dp).testTag("askText"), minLines = 2)
+                TextButton(onClick = { onAnswer(text, true) }, enabled = text.isNotBlank(), modifier = Modifier.testTag("askPlan")) {
+                    Text("Speichern und als Aufgabe planen")
+                }
+            }
+        },
+        confirmButton = { TextButton(onClick = { onAnswer(text, false) }, Modifier.testTag("askSave"), enabled = text.isNotBlank()) { Text("Speichern") } },
+        dismissButton = { TextButton(onClick = { onAnswer(null, false) }, Modifier.testTag("askSkip")) { Text("Überspringen", color = c.muted) } },
+    )
 }

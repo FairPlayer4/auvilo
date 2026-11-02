@@ -600,3 +600,35 @@ Kevin hat 12.3 am 2026-10-31 bestätigt. Präzisiert bei der Umsetzung:
   `files/diag/diag.log` (rotiert bei 512 KB nach `diag.1.log`). Enthält Zeiten, IDs,
   Titel, Zustände, Berechtigungen; keine Nachweis-Inhalte, keine Positionen. Bleibt im
   App-Speicher und wird mit der App gelöscht.
+
+### 12.6 V1.2c – Umsetzung und Präzisierungen
+Kevin hat 12.4 am 2026-11-02 bestätigt. Präzisiert bei der Umsetzung:
+- **Frist:** Datum und Uhrzeit sind immer gesetzt (Formular: *Frist am …*, *Frist um …*).
+  `Schedule.Deadline(due, days, from, until, intervalMinutes)`; gespeichert in `onceAt`,
+  `timeMinutes` (Fensterbeginn), `windowUntilMinutes`, `weekdays`, `remindEveryMinutes`.
+  Neu oder mit verschobener Frist braucht sie mindestens ein Fenster vor der Frist.
+  Ankunft zuhause gibt es für Fristen nicht.
+- **Fensterende:** Die Fälligkeit geht still bis zum nächsten Fenster (`WINDOW_CLOSED`),
+  das zählt nicht als Verschieben. **Auf morgen** im Alarm macht dasselbe ab morgen.
+  *Verschieben* bleibt vor der Frist (Optionen danach werden ausgeblendet).
+- **Nach der Frist** bleibt die Fälligkeit offen, steht in *Heute* unter *Überfällig*
+  und klingelt in den folgenden Fenstern weiter, bis sie erledigt (*Erledigen*) oder
+  verworfen ist (*Verwerfen* = ausgelassen mit Grund *verworfen*, mit Rückfrage).
+- **Vorlagen:** eigene Tabelle `template`. *+* und Widget zeigen die Auswahl nur, wenn es
+  Vorlagen gibt; sonst gleich das leere Formular. Auswählen setzt *zuletzt benutzt*.
+- **Vorab-Reminder:** nicht bei *wenn ich zuhause bin*. Inexakter Alarm (`setWindow`,
+  5 min), gesetzt beim Planen der Fälligkeit; Inhalt beim Auslösen aus der Datenbank.
+  Kanal *Vorab-Reminder*, still. Tipp öffnet das Formular des Reminders.
+- **Blocker:** im Formular unter *Blocker*: offene Blocker mit *Als Aufgabe planen*
+  (Datum und Uhrzeit, vorgeschlagen Vorabend 19:00 der nächsten Fälligkeit) und *gelöst*,
+  dazu ein Feld für neue. Eine geplante Aufgabe steht dort mit ihrem Termin (statt unter
+  *Startklar*). *Gelöst* von Hand löscht die geplante Aufgabe. *Ja, sofort* bei Frage 3
+  löst die Startklar-Blocker. Der Alarm zeigt offene Blocker als *Noch offen*.
+- **Blocker gelöst als Minimum:** Schalter unter *Blocker*; gilt für Blocker, die seit der
+  letzten erledigten Fälligkeit gelöst wurden, und unterliegt dem Wochenlimit des Minimums.
+- **Nachfragen:** höchstens einmal pro Fälligkeit (Ereignis `BLOCKER_ASKED`), nicht bei
+  Vorbereitungsaufgaben und nicht bei *vorab erledigen*. Die Schwelle steht in den
+  Einstellungen unter *Nachfragen*.
+- **Migration 5→6:** übernimmt pro Reminder die neueste Antwort auf Frage 3 als offenen
+  Blocker, wenn sie etwas nennt (nicht leer, nicht *Ja, sofort*, nicht *weiß ich noch
+  nicht*). Backup v5 wie bisher.

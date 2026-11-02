@@ -68,9 +68,12 @@ object Prep {
         if (reminder.character != Character.OVERCOME) emptyList()
         else QUESTIONS.filter { !isAnswered(current[it]) }
 
-    /** Open points for the alarm: "don't know yet", obstacles and what is missing to start. */
+    /**
+     * Open points for the alarm: "don't know yet" and obstacles. What is missing to start is a
+     * [com.avlreminder.core.model.Blocker] since V1.2c and shown from there.
+     */
     fun open(current: Map<Int, PrepAnswer>): List<PrepAnswer> =
         QUESTIONS.mapNotNull { current[it] }.filter {
-            it.unknown || (it.question in OBSTACLES..READY && !it.text.isNullOrBlank() && it.text != READY_YES)
+            it.unknown || (it.question == OBSTACLES && !it.text.isNullOrBlank())
         }
 }

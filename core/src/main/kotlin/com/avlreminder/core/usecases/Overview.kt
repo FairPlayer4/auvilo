@@ -4,6 +4,7 @@ import com.avlreminder.core.model.Occurrence
 import com.avlreminder.core.model.OccurrenceState
 import com.avlreminder.core.model.Reminder
 import com.avlreminder.core.model.Schedule
+import com.avlreminder.core.rules.Deadlines
 import java.time.Instant
 import java.time.LocalDate
 import java.time.ZoneId
@@ -22,6 +23,8 @@ data class Today(
     val upcoming: List<Entry>,
     /** Waiting for an arrival without a time ("wenn ich zuhause bin"), oldest first. */
     val waiting: List<Entry> = emptyList(),
+    /** Deadlines passed but not done yet, oldest first; they ring in their next window. */
+    val overdue: List<Entry> = emptyList(),
 )
 
 /** One day in the history. */
@@ -37,8 +40,11 @@ object Overview {
 
         val open = entries.filter { it.occurrence.isOpen && it.reminder.active }
         val fired = open.filter { it.occurrence.state != OccurrenceState.PLANNED }
-        val (waiting, planned) = open.filter { it.occurrence.state == OccurrenceState.PLANNED }
+        val (waiting, timed) = open.filter { it.occurrence.state == OccurrenceState.PLANNED }
             .partition { it.reminder.schedule == Schedule.OnArrival }
+        val (overdue, planned) = timed.partition { e ->
+            (e.reminder.schedule as? Schedule.Deadline)?.let { Deadlines.isOverdue(it, e.occurrence, zone) } == true
+        }
         return Today(
             dueNow = fired.sortedBy { it.occurrence.currentAt },
             laterToday = planned.filter { it.occurrence.currentAt.isToday() }.sortedBy { it.occurrence.currentAt },
@@ -47,6 +53,7 @@ object Overview {
                 .sortedByDescending { it.occurrence.resolvedAt },
             upcoming = planned.filter { !it.occurrence.currentAt.isToday() }.sortedBy { it.occurrence.currentAt },
             waiting = waiting.sortedBy { it.occurrence.currentAt },
+            overdue = overdue.sortedBy { it.occurrence.dueAt },
         )
     }
 

@@ -7,6 +7,7 @@ import androidx.glance.appwidget.updateAll
 import com.avlreminder.alarm.AndroidAlarmPort
 import com.avlreminder.alarm.Notifications
 import com.avlreminder.alarm.OverviewNotifications
+import com.avlreminder.alarm.PreNotices
 import com.avlreminder.alarm.Ringer
 import com.avlreminder.core.model.Place
 import com.avlreminder.core.model.Reminder
@@ -43,6 +44,7 @@ class AvlApp : Application() {
         graph = AppGraph(this)
         Notifications.createChannels(this)
         OverviewNotifications.createChannel(this)
+        PreNotices.createChannel(this)
         // Alarms may have been lost (reboot, force-stop, update): rebuild them from the database.
         graph.scope.launch {
             graph.syncAndRing()
@@ -82,6 +84,7 @@ class AppGraph(private val context: Context) {
         settings = { alert },
         geofences = AndroidGeofences(context) { dwell },
         location = location,
+        preNotices = PreNotices.Port(context),
     )
     private val mutex = Mutex()
 

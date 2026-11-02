@@ -17,6 +17,7 @@ object Digests {
     /** What is still due today. */
     fun morning(today: Today, zone: ZoneId): Digest {
         val lines = today.dueNow.map { "jetzt: ${it.reminder.title}" } +
+            today.overdue.map { "überfällig: ${it.reminder.title}" } +
             today.laterToday.map { "${time.format(it.occurrence.currentAt.atZone(zone))} ${it.reminder.title}" } +
             today.waiting.map { "zuhause: ${it.reminder.title}" }
         val title = when (val n = lines.size) {

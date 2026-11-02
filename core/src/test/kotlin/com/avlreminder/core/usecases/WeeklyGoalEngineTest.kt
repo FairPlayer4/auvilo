@@ -14,6 +14,7 @@ import com.avlreminder.core.rules.AlarmLevel
 import java.time.DayOfWeek
 import java.time.LocalTime
 import kotlinx.coroutines.test.runTest
+import com.avlreminder.core.rules.SkipReasons
 import org.junit.jupiter.api.Assertions.assertEquals
 import org.junit.jupiter.api.Assertions.assertTrue
 import org.junit.jupiter.api.Test
@@ -59,7 +60,7 @@ class WeeklyGoalEngineTest {
         engine.onAlarm(thursday.id)
         val ended = repo.occurrences.getValue(thursday.id)
         assertEquals(Resolution.SKIPPED, ended.resolution)
-        assertEquals(ReminderEngine.GOAL_REACHED, ended.note)
+        assertEquals(SkipReasons.GOAL_REACHED, ended.note)
 
         // Friday the fourth: then nothing more this week.
         doTraining(id)

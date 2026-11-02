@@ -6,9 +6,15 @@ import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
+import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.setValue
+import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
@@ -38,6 +44,8 @@ fun TodayScreen(
     onEdit: (Reminder) -> Unit,
     modifier: Modifier = Modifier,
     onCompleteEarly: (Entry) -> Unit = {},
+    /** "Verwerfen" for an overdue deadline. */
+    onDiscard: (Entry) -> Unit = {},
     doNotDisturb: Boolean = false,
     itemsDone: Map<Long, List<ItemDone>> = emptyMap(),
     /** Reminders with a weekly goal and their week so far. */
@@ -49,6 +57,7 @@ fun TodayScreen(
     }
 
     val c = Avl.colors
+    var discarding by remember { mutableStateOf<Entry?>(null) }
     val waiting = if (doNotDisturb) today.dueNow.count { !it.reminder.ignoreDnd } else 0
     LazyColumn(modifier.padding(horizontal = 16.dp)) {
         item {
@@ -65,7 +74,7 @@ fun TodayScreen(
                 )
             }
         }
-        if (today.dueNow.isEmpty() && today.laterToday.isEmpty() && today.resolved.isEmpty() && today.waiting.isEmpty()) {
+        if (today.dueNow.isEmpty() && today.laterToday.isEmpty() && today.resolved.isEmpty() && today.waiting.isEmpty() && today.overdue.isEmpty()) {
             item {
                 Text(
                     "Heute steht nichts mehr an. Mit + legst du einen Reminder an.",
@@ -82,6 +91,23 @@ fun TodayScreen(
                     highlight = c.strict,
                     onClick = { onOpenDue(e) },
                 ) { StrictnessTag(e.reminder.strictness) }
+            }
+        }
+        if (today.overdue.isNotEmpty()) {
+            // Passed deadlines stay until done or discarded (design 12.4 point 9).
+            item { SectionTitle("Überfällig") }
+            items(today.overdue, key = { "over" + it.occurrence.id }) { e ->
+                EntryCard(
+                    title = e.reminder.title,
+                    detail = Format.plan(e.reminder) + progress(e),
+                    highlight = c.strict,
+                    onClick = { onEdit(e.reminder) },
+                ) {
+                    Column {
+                        TextButton(onClick = { onCompleteEarly(e) }) { Text("Erledigen", color = c.accent) }
+                        TextButton(onClick = { discarding = e }, Modifier.testTag("discard${e.occurrence.id}")) { Text("Verwerfen", color = c.muted) }
+                    }
+                }
             }
         }
         if (today.laterToday.isNotEmpty()) {
@@ -128,6 +154,17 @@ fun TodayScreen(
             }
         }
         item { Spacer(Modifier.height(96.dp)) }
+    }
+    discarding?.let { e ->
+        AlertDialog(
+            onDismissRequest = { discarding = null },
+            title = { Text("„${e.reminder.title}“ verwerfen?") },
+            text = { Text("Die Frist ist vorbei. Verworfen erinnert die App nicht mehr daran; im Verlauf steht es als übersprungen.") },
+            confirmButton = {
+                TextButton(onClick = { onDiscard(e); discarding = null }, Modifier.testTag("discardOk")) { Text("Verwerfen", color = c.strict) }
+            },
+            dismissButton = { TextButton(onClick = { discarding = null }) { Text("Abbrechen") } },
+        )
     }
 }
 

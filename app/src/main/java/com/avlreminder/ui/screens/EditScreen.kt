@@ -41,6 +41,7 @@ import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import com.avlreminder.core.model.Blocker
 import com.avlreminder.core.model.Character
 import com.avlreminder.core.model.ChecklistItem
 import com.avlreminder.core.model.ProofKind
@@ -53,11 +54,25 @@ import com.avlreminder.ui.Fold
 import com.avlreminder.ui.NumberDialog
 import com.avlreminder.ui.Format
 import com.avlreminder.ui.SectionTitle
+import com.avlreminder.ui.TimeDialog
 import com.avlreminder.ui.theme.Avl
 import java.time.DayOfWeek
 import java.time.Instant
+import java.time.LocalDateTime
 import java.time.LocalTime
+import java.time.ZoneId
 import java.time.ZoneOffset
+
+/** What the blocker list in the form can do; only for a saved reminder (S5). */
+class BlockerActions(
+    val add: (String) -> Unit,
+    val solve: (Long) -> Unit,
+    val plan: (Long, LocalDateTime) -> Unit,
+    /** The evening before the reminder is due next. */
+    val suggestedTime: LocalDateTime,
+    /** When a planned task is due; null when it is done or gone. */
+    val taskAt: (Long) -> Instant?,
+)
 
 /**
  * "Reminder anlegen / bearbeiten". Holds the form state itself; [onSave] gets the finished form,
@@ -79,10 +94,16 @@ fun EditScreen(
     archived: Boolean = false,
     /** Opens the statistics; null for a new reminder. */
     onStats: (() -> Unit)? = null,
+    /** "Als Vorlage speichern" with the name. */
+    onSaveTemplate: ((String, ReminderForm) -> Unit)? = null,
+    blockers: List<Blocker> = emptyList(),
+    blockerActions: BlockerActions? = null,
 ) {
     val c = Avl.colors
     var form by remember(initial) { mutableStateOf(initial) }
     var confirmDelete by remember { mutableStateOf(false) }
+    var namingTemplate by remember { mutableStateOf(false) }
+    var templateSaved by remember { mutableStateOf(false) }
 
     Column(modifier) {
         Row(Modifier.fillMaxWidth().padding(horizontal = 4.dp, vertical = 4.dp), verticalAlignment = androidx.compose.ui.Alignment.CenterVertically) {
@@ -118,6 +139,7 @@ fun EditScreen(
                 listOf(
                     ScheduleKind.ONCE to "Einmalig", ScheduleKind.DAILY to "Täglich", ScheduleKind.WEEKDAYS to "Wochentage",
                     ScheduleKind.AFTER_DONE to "Nach Erledigung", ScheduleKind.ON_ARRIVAL to "Wenn ich zuhause bin",
+                    ScheduleKind.DEADLINE to "Frist",
                 ),
                 form.kind,
             ) { form = form.copy(kind = it) }
@@ -149,6 +171,12 @@ fun EditScreen(
                     }
                 }
             }
+            if (form.kind != ScheduleKind.ON_ARRIVAL) {
+                Fold("Vorab-Reminder", preNoticeSummary(form), "foldPreNotice") { PreNoticeSection(form) { form = it } }
+            }
+            Fold("Blocker", blockerSummary(form, blockers), "foldBlocker") {
+                BlockerSection(form, blockers, blockerActions) { form = it }
+            }
             Fold("Checkliste", checklistSummary(form), "foldChecklist") { ChecklistSection(form.checklist) { form = form.copy(checklist = it) } }
             Fold("Nachweis", proofSummary(form), "foldProof") { ProofSection(form) { form = it } }
             Fold("Warum und Botschaft", whySummary(form), "foldWhy") {
@@ -177,8 +205,13 @@ fun EditScreen(
                 SnoozeChoice(form.snoozeMinutes) { form = form.copy(snoozeMinutes = it) }
             }
 
+            if (onSaveTemplate != null && form.prepFor == null) {
+                OutlinedButton(onClick = { namingTemplate = true }, Modifier.fillMaxWidth().padding(top = 24.dp).testTag("saveTemplate")) {
+                    Text(if (templateSaved) "✓ Als Vorlage gespeichert" else "Als Vorlage speichern", color = c.text)
+                }
+            }
             if (onArchive != null) {
-                OutlinedButton(onClick = { onArchive(!archived) }, Modifier.fillMaxWidth().padding(top = 24.dp)) {
+                OutlinedButton(onClick = { onArchive(!archived) }, Modifier.fillMaxWidth().padding(top = if (onSaveTemplate != null) 8.dp else 24.dp)) {
                     Text(if (archived) "Wiederherstellen (bleibt pausiert)" else "Archivieren", color = c.text)
                 }
             }
@@ -192,6 +225,12 @@ fun EditScreen(
         }
     }
 
+    if (namingTemplate && onSaveTemplate != null) {
+        TemplateNameDialog(form.title.trim(), "Als Vorlage speichern", onDismiss = { namingTemplate = false }) {
+            onSaveTemplate(it, form)
+            templateSaved = true
+        }
+    }
     if (confirmDelete && onDelete != null) {
         AlertDialog(
             onDismissRequest = { confirmDelete = false },
@@ -334,6 +373,7 @@ private fun <T> Choice(options: List<Pair<T, String>>, selected: T, color: @Comp
 @Composable
 private fun PlaceSection(form: ReminderForm, onChange: (ReminderForm) -> Unit) {
     val c = Avl.colors
+    if (!form.placePossible) return
     if (form.kind != ScheduleKind.ON_ARRIVAL) {
         Choice(listOf(false to "Nur Uhrzeit", true to "Bei Ankunft zuhause"), form.atHome) {
             onChange(form.copy(atHome = it))
@@ -504,19 +544,13 @@ private fun ScheduleDetail(form: ReminderForm, onChange: (ReminderForm) -> Unit)
     val c = Avl.colors
     var pickTime by remember { mutableStateOf(false) }
     var pickDate by remember { mutableStateOf(false) }
+    var pickFrom by remember { mutableStateOf(false) }
+    var pickUntil by remember { mutableStateOf(false) }
 
     Column(Modifier.padding(top = 8.dp)) {
         when (form.kind) {
             ScheduleKind.ONCE -> OutlinedButton(onClick = { pickDate = true }) { Text("am ${Format.date(form.date)}") }
-            ScheduleKind.WEEKDAYS -> FlowRow(horizontalArrangement = Arrangement.spacedBy(4.dp)) {
-                DayOfWeek.entries.forEach { d ->
-                    FilterChip(
-                        selected = d in form.days,
-                        onClick = { onChange(form.copy(days = if (d in form.days) form.days - d else form.days + d)) },
-                        label = { Text(Format.weekday(d)) },
-                    )
-                }
-            }
+            ScheduleKind.WEEKDAYS -> DayChips(form, onChange)
             ScheduleKind.AFTER_DONE -> Column {
                 // Number between the buttons only, the long explanation below: fits narrow screens.
                 Row(verticalAlignment = androidx.compose.ui.Alignment.CenterVertically) {
@@ -530,6 +564,25 @@ private fun ScheduleDetail(form: ReminderForm, onChange: (ReminderForm) -> Unit)
                 Text("nach letzter Erledigung", Modifier.padding(top = 4.dp), color = c.muted, fontSize = 13.sp)
                 OutlinedButton(onClick = { pickDate = true }, Modifier.padding(top = 8.dp)) { Text("erstmals am ${Format.date(form.date)}") }
             }
+            ScheduleKind.DEADLINE -> Column {
+                OutlinedButton(onClick = { pickDate = true }, Modifier.testTag("deadlineDate")) { Text("Frist ${Format.date(form.date)}") }
+                Text("Ausführungsfenster", Modifier.padding(top = 8.dp), color = c.text, fontSize = 14.sp)
+                DayChips(form) { onChange(it) }
+                Row(verticalAlignment = androidx.compose.ui.Alignment.CenterVertically) {
+                    OutlinedButton(onClick = { pickFrom = true }, Modifier.testTag("windowFrom")) { Text("von ${Format.time(form.windowFrom)}") }
+                    Spacer(Modifier.padding(4.dp))
+                    OutlinedButton(onClick = { pickUntil = true }, Modifier.testTag("windowUntil")) { Text("bis ${Format.time(form.windowUntil)}") }
+                }
+                Text("Erinnert im Fenster alle", Modifier.padding(top = 8.dp), color = c.text, fontSize = 14.sp)
+                NumberChoice(listOf(30, 60, 120), form.remindEvery, 5..480, "Erinnert im Fenster alle", unit = "min") {
+                    onChange(form.copy(remindEvery = it))
+                }
+                Text(
+                    "Klingelt nur in den Fenstern bis zur Frist; außerhalb ist Ruhe. Am letzten Tag eine Stufe strenger. " +
+                        "Danach steht es unter „Überfällig“, bis du es erledigst oder verwirfst.",
+                    Modifier.padding(top = 4.dp), color = c.muted, fontSize = 13.sp,
+                )
+            }
             ScheduleKind.DAILY -> {}
             ScheduleKind.ON_ARRIVAL -> Text(
                 "Klingelt, sobald du ein paar Minuten zuhause bist – einmalig. Bist du beim Speichern schon da, sofort.",
@@ -537,9 +590,12 @@ private fun ScheduleDetail(form: ReminderForm, onChange: (ReminderForm) -> Unit)
             )
         }
         if (form.kind != ScheduleKind.ON_ARRIVAL) {
-            OutlinedButton(onClick = { pickTime = true }, Modifier.padding(top = 4.dp).testTag("time")) { Text("um ${Format.time(form.time)}") }
+            val label = if (form.kind == ScheduleKind.DEADLINE) "Frist um" else "um"
+            OutlinedButton(onClick = { pickTime = true }, Modifier.padding(top = 4.dp).testTag("time")) { Text("$label ${Format.time(form.time)}") }
         }
     }
+    if (pickFrom) TimeDialog(form.windowFrom, onDismiss = { pickFrom = false }) { onChange(form.copy(windowFrom = it)) }
+    if (pickUntil) TimeDialog(form.windowUntil, onDismiss = { pickUntil = false }) { onChange(form.copy(windowUntil = it)) }
 
     if (pickTime) {
         val state = rememberTimePickerState(form.time.hour, form.time.minute, is24Hour = true)
@@ -568,3 +624,141 @@ private fun ScheduleDetail(form: ReminderForm, onChange: (ReminderForm) -> Unit)
         ) { DatePicker(state) }
     }
 }
+
+@OptIn(ExperimentalLayoutApi::class)
+@Composable
+private fun DayChips(form: ReminderForm, onChange: (ReminderForm) -> Unit) {
+    FlowRow(horizontalArrangement = Arrangement.spacedBy(4.dp)) {
+        DayOfWeek.entries.forEach { d ->
+            FilterChip(
+                selected = d in form.days,
+                onClick = { onChange(form.copy(days = if (d in form.days) form.days - d else form.days + d)) },
+                label = { Text(Format.weekday(d)) },
+            )
+        }
+    }
+}
+
+/** A silent notice the evening before or some minutes before (T6, S6). */
+@Composable
+private fun PreNoticeSection(form: ReminderForm, onChange: (ReminderForm) -> Unit) {
+    val c = Avl.colors
+    var pickEvening by remember { mutableStateOf(false) }
+    Choice(
+        listOf(PreNoticeKind.NONE to "aus", PreNoticeKind.EVENING to "am Vorabend", PreNoticeKind.BEFORE to "kurz vorher"),
+        form.preNotice,
+    ) { onChange(form.copy(preNotice = it)) }
+    when (form.preNotice) {
+        PreNoticeKind.NONE -> {}
+        PreNoticeKind.EVENING ->
+            OutlinedButton(onClick = { pickEvening = true }, Modifier.padding(top = 8.dp).testTag("preNoticeEvening")) {
+                Text("um ${Format.time(form.preNoticeEvening)}")
+            }
+        PreNoticeKind.BEFORE ->
+            NumberChoice(listOf(15, 30, 60, 120), form.preNoticeBefore, 5..1440, "Vorab-Reminder", unit = "min") {
+                onChange(form.copy(preNoticeBefore = it))
+            }
+    }
+    Text(
+        "Eine stille Benachrichtigung mit dem ersten Schritt und offenen Blockern. Ist es schon erledigt, kommt sie nicht.",
+        Modifier.padding(top = 6.dp), color = c.muted, fontSize = 13.sp,
+    )
+    if (pickEvening) TimeDialog(form.preNoticeEvening, onDismiss = { pickEvening = false }) { onChange(form.copy(preNoticeEvening = it)) }
+}
+
+/** Open blockers as a list with "Als Aufgabe planen" and "gelöst" (S5, S7). */
+@Composable
+private fun BlockerSection(form: ReminderForm, blockers: List<Blocker>, actions: BlockerActions?, onChange: (ReminderForm) -> Unit) {
+    val c = Avl.colors
+    var planning by remember { mutableStateOf<Blocker?>(null) }
+    var text by remember { mutableStateOf("") }
+    SwitchLine(
+        "Gelöster Blocker zählt als Minimum",
+        "hast du seit dem letzten Mal einen Blocker gelöst, darfst du damit abschließen",
+        form.solvedBlockerIsMinimum,
+    ) { onChange(form.copy(solvedBlockerIsMinimum = it)) }
+    if (actions == null) {
+        Text("Blocker kommen aus „Startklar“ oder lassen sich nach dem Speichern eintragen.", Modifier.padding(top = 8.dp), color = c.muted, fontSize = 13.sp)
+        return
+    }
+    val open = blockers.filter { it.isOpen }
+    if (open.isEmpty()) Text("Keine offenen Blocker.", Modifier.padding(top = 8.dp), color = c.muted, fontSize = 13.sp)
+    open.forEach { b ->
+        Column(Modifier.fillMaxWidth().padding(top = 8.dp).testTag("blocker${b.id}")) {
+            Text(b.text, color = c.text, fontSize = 15.sp)
+            b.taskReminderId?.let { id ->
+                val at = actions.taskAt(id)
+                Text(
+                    if (at != null) "Aufgabe geplant: ${Format.shortDay(at.atZone(ZoneId.systemDefault()).toLocalDate())} ${Format.time(at, ZoneId.systemDefault())}" else "Aufgabe geplant",
+                    color = c.muted, fontSize = 13.sp,
+                )
+            }
+            Row {
+                TextButton(onClick = { planning = b }, Modifier.testTag("planTask${b.id}")) {
+                    Text(if (b.taskReminderId == null) "Als Aufgabe planen" else "Neu planen", color = c.accent)
+                }
+                TextButton(onClick = { actions.solve(b.id) }, Modifier.testTag("solve${b.id}")) { Text("gelöst", color = c.accent) }
+            }
+        }
+    }
+    Row(verticalAlignment = androidx.compose.ui.Alignment.CenterVertically) {
+        OutlinedTextField(
+            text, { text = it }, Modifier.weight(1f).padding(top = 8.dp).testTag("newBlocker"), singleLine = true,
+            placeholder = { Text("Was fehlt noch?") },
+        )
+        TextButton(onClick = { actions.add(text); text = "" }, enabled = text.isNotBlank()) { Text("+", fontSize = 20.sp, color = c.accent) }
+    }
+    planning?.let { b ->
+        DateTimeDialog("Aufgabe: ${b.text}", actions.suggestedTime, onDismiss = { planning = null }) { at ->
+            actions.plan(b.id, at)
+            planning = null
+        }
+    }
+}
+
+/** Date and time, prefilled; for planning a task. */
+@OptIn(ExperimentalMaterial3Api::class)
+@Composable
+private fun DateTimeDialog(title: String, initial: LocalDateTime, onDismiss: () -> Unit, onPick: (LocalDateTime) -> Unit) {
+    var at by remember { mutableStateOf(initial) }
+    var pickDate by remember { mutableStateOf(false) }
+    var pickTime by remember { mutableStateOf(false) }
+    AlertDialog(
+        onDismissRequest = onDismiss,
+        title = { Text(title, fontSize = 18.sp) },
+        text = {
+            Column {
+                OutlinedButton(onClick = { pickDate = true }) { Text("am ${Format.date(at.toLocalDate())}") }
+                OutlinedButton(onClick = { pickTime = true }, Modifier.padding(top = 4.dp)) { Text("um ${Format.time(at.toLocalTime())}") }
+                Text("Locker, einmalig; erledigt löst sie den Blocker.", Modifier.padding(top = 6.dp), color = Avl.colors.muted, fontSize = 13.sp)
+            }
+        },
+        confirmButton = { TextButton(onClick = { onPick(at) }, Modifier.testTag("planOk")) { Text("Planen") } },
+        dismissButton = { TextButton(onClick = onDismiss) { Text("Abbrechen") } },
+    )
+    if (pickTime) TimeDialog(at.toLocalTime(), onDismiss = { pickTime = false }) { at = at.with(it) }
+    if (pickDate) {
+        val state = rememberDatePickerState(at.toLocalDate().atStartOfDay(ZoneOffset.UTC).toInstant().toEpochMilli())
+        DatePickerDialog(
+            onDismissRequest = { pickDate = false },
+            confirmButton = {
+                TextButton(onClick = {
+                    state.selectedDateMillis?.let { at = at.with(Instant.ofEpochMilli(it).atZone(ZoneOffset.UTC).toLocalDate()) }
+                    pickDate = false
+                }) { Text("OK") }
+            },
+            dismissButton = { TextButton(onClick = { pickDate = false }) { Text("Abbrechen") } },
+        ) { DatePicker(state) }
+    }
+}
+
+private fun preNoticeSummary(form: ReminderForm) = when (form.preNotice) {
+    PreNoticeKind.NONE -> "aus"
+    PreNoticeKind.EVENING -> "am Vorabend um ${Format.time(form.preNoticeEvening)}"
+    PreNoticeKind.BEFORE -> "${form.preNoticeBefore} min vorher"
+}
+
+private fun blockerSummary(form: ReminderForm, blockers: List<Blocker>) = listOfNotNull(
+    blockers.count { it.isOpen }.let { if (it == 0) "keine offen" else "$it offen" },
+    "gelöst zählt als Minimum".takeIf { form.solvedBlockerIsMinimum },
+).joinToString(" · ")

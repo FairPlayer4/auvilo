@@ -3,6 +3,7 @@ package com.avlreminder.ui
 import android.app.Application
 import androidx.lifecycle.AndroidViewModel
 import androidx.lifecycle.viewModelScope
+import com.avlreminder.core.model.Blocker
 import com.avlreminder.core.model.ItemDone
 import com.avlreminder.core.model.Occurrence
 import com.avlreminder.core.model.Place
@@ -10,8 +11,10 @@ import com.avlreminder.core.model.PrepAnswer
 import com.avlreminder.core.model.Proof
 import com.avlreminder.core.model.Reminder
 import com.avlreminder.core.model.Schedule
+import com.avlreminder.core.rules.Action
 import com.avlreminder.core.rules.AlertSettings
 import com.avlreminder.core.rules.Prep
+import com.avlreminder.core.rules.SkipReasons
 import com.avlreminder.core.usecases.HistoryDay
 import com.avlreminder.core.usecases.Overview
 import com.avlreminder.core.usecases.ReminderSort
@@ -20,6 +23,7 @@ import com.avlreminder.core.usecases.Today
 import com.avlreminder.data.OverviewTimes
 import com.avlreminder.data.SuggestionEntity
 import com.avlreminder.data.SuggestionStatus
+import com.avlreminder.data.TemplateEntity
 import com.avlreminder.data.ThemeMode
 import com.avlreminder.data.toModel
 import com.avlreminder.graph
@@ -33,6 +37,7 @@ import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.launch
 import java.time.Instant
+import java.time.LocalDateTime
 import java.time.ZoneId
 
 /** Screen state straight from the database flows; all changes go through the engine. */
@@ -106,6 +111,51 @@ class AppViewModel(app: Application) : AndroidViewModel(app) {
     val suggestions: StateFlow<List<SuggestionEntity>> = state(emptyList(), graph.db.suggestions().observe())
 
     val alert: StateFlow<AlertSettings> = state(AlertSettings(), graph.settings.alert)
+
+    /** Blockers per reminder, open and solved. */
+    val blockers: StateFlow<Map<Long, List<Blocker>>> = state(
+        emptyMap(),
+        dao.observeBlockers().map { l -> l.map { it.toModel() }.groupBy { it.reminderId } },
+    )
+
+    /** Most recently used first; null until loaded. */
+    val templates: StateFlow<List<TemplateEntity>?> = state(null, dao.observeTemplates())
+
+    /** "Verwerfen" for an overdue deadline. */
+    fun discard(occurrenceId: Long) {
+        viewModelScope.launch { graph.withEngine { it.act(occurrenceId, Action.Skip(SkipReasons.DISCARDED)) } }
+    }
+
+    fun addBlocker(reminderId: Long, text: String) {
+        viewModelScope.launch { graph.withEngine { it.addBlocker(reminderId, text) } }
+    }
+
+    fun solveBlocker(blockerId: Long) {
+        viewModelScope.launch { graph.withEngine { it.solveBlocker(blockerId) } }
+    }
+
+    fun planTask(blockerId: Long, at: LocalDateTime) {
+        viewModelScope.launch {
+            val result = graph.withEngine { it.planTask(blockerId, at) }
+            if (result is SaveResult.Saved) result.ring?.let(graph::ring)
+        }
+    }
+
+    fun saveTemplate(template: TemplateEntity) {
+        viewModelScope.launch { dao.insert(template) }
+    }
+
+    fun templateUsed(id: Long) {
+        viewModelScope.launch { dao.templateUsed(id, Instant.now()) }
+    }
+
+    fun renameTemplate(id: Long, name: String) {
+        viewModelScope.launch { dao.renameTemplate(id, name.trim()) }
+    }
+
+    fun deleteTemplate(id: Long) {
+        viewModelScope.launch { dao.deleteTemplate(id) }
+    }
 
     fun setTheme(mode: ThemeMode) {
         viewModelScope.launch { graph.settings.setTheme(mode) }

@@ -18,9 +18,11 @@ object ReminderList {
 
     /** A one-off ("einmalig", "wenn ich zuhause bin") that already happened. Derived, not stored. */
     fun finished(reminder: Reminder, open: Occurrence?): Boolean =
-        open == null && (reminder.schedule is Schedule.Once || reminder.schedule == Schedule.OnArrival)
+        open == null && (reminder.schedule is Schedule.Once || reminder.schedule is Schedule.Deadline || reminder.schedule == Schedule.OnArrival)
 
-    fun group(reminders: List<Reminder>, openByReminder: Map<Long, Occurrence>, sort: ReminderSort): ReminderGroups {
+    /** Preparation tasks (S5) are shown with their reminder, not in the list. */
+    fun group(all: List<Reminder>, openByReminder: Map<Long, Occurrence>, sort: ReminderSort): ReminderGroups {
+        val reminders = all.filter { it.prepFor == null }
         val byName = compareBy<Reminder, String>(String.CASE_INSENSITIVE_ORDER) { it.title }.thenBy { it.id }
         val order = when (sort) {
             // Without an open occurrence there is no next time: to the end.

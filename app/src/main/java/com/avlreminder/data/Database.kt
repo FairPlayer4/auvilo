@@ -19,6 +19,7 @@ import androidx.room.TypeConverters
 import androidx.room.Update
 import androidx.room.migration.Migration
 import androidx.sqlite.db.SupportSQLiteDatabase
+import com.avlreminder.core.model.BlockerOrigin
 import com.avlreminder.core.model.Character
 import com.avlreminder.core.model.EventType
 import com.avlreminder.core.model.OccurrenceState
@@ -33,7 +34,7 @@ import java.time.Instant
 import java.time.LocalDateTime
 import java.time.format.DateTimeFormatter
 
-enum class ScheduleType { ONCE, DAILY, WEEKDAYS, AFTER_DONE, ON_ARRIVAL }
+enum class ScheduleType { ONCE, DAILY, WEEKDAYS, AFTER_DONE, ON_ARRIVAL, DEADLINE }
 
 @Entity(tableName = "reminder")
 data class ReminderEntity(
@@ -43,8 +44,9 @@ data class ReminderEntity(
     val character: Character,
     val strictness: Strictness,
     val scheduleType: ScheduleType,
-    /** Minutes after midnight; null for ONCE. */
+    /** Minutes after midnight; null for ONCE. For DEADLINE the start of the window. */
     val timeMinutes: Int?,
+    /** ONCE: the time; AFTER_DONE: the first day; DEADLINE: the deadline. */
     val onceAt: LocalDateTime?,
     /** Bit 0 = Monday … bit 6 = Sunday. */
     val weekdays: Int,
@@ -73,6 +75,60 @@ data class ReminderEntity(
     val weekTarget: Int? = null,
     val weekMax: Int? = null,
     val weekMinimum: Int? = null,
+    /** DEADLINE: end of the window (minutes after midnight) and the interval. */
+    val windowUntilMinutes: Int? = null,
+    val remindEveryMinutes: Int? = null,
+    /** Notice before: the evening before at this time, or so many minutes before; both null = none. */
+    val preNoticeEveningMinutes: Int? = null,
+    val preNoticeBeforeMinutes: Int? = null,
+    /** A preparation task for this reminder; no foreign key, the engine deletes tasks with it. */
+    val prepFor: Long? = null,
+    @ColumnInfo(defaultValue = "0") val solvedBlockerIsMinimum: Boolean = false,
+)
+
+@Entity(
+    tableName = "blocker",
+    foreignKeys = [ForeignKey(ReminderEntity::class, ["id"], ["reminderId"], onDelete = ForeignKey.CASCADE)],
+    indices = [Index("reminderId")],
+)
+data class BlockerEntity(
+    @PrimaryKey(autoGenerate = true) val id: Long = 0,
+    val reminderId: Long,
+    val text: String,
+    val createdAt: Instant,
+    val solvedAt: Instant?,
+    val origin: BlockerOrigin,
+    /** The task reminder; no foreign key, the engine unlinks it. */
+    val taskReminderId: Long?,
+)
+
+/**
+ * A template (design 12.4 point 11): the settings of a reminder without title, why, answers,
+ * audio and a concrete date. Same column meaning as in [ReminderEntity].
+ */
+@Entity(tableName = "template")
+data class TemplateEntity(
+    @PrimaryKey(autoGenerate = true) val id: Long = 0,
+    val name: String,
+    val usedAt: Instant,
+    val character: Character,
+    val strictness: Strictness,
+    val scheduleType: ScheduleType,
+    val timeMinutes: Int?,
+    val weekdays: Int,
+    val intervalDays: Int?,
+    val windowUntilMinutes: Int?,
+    val remindEveryMinutes: Int?,
+    val minimum: String?,
+    val minimumLimitPerWeek: Int?,
+    val proofKind: ProofKind,
+    val proofPhoto: Boolean,
+    val proofTextMinChars: Int?,
+    val proofAudioMinSeconds: Int?,
+    val proofWindowMinutes: Int,
+    val postponeLimit: Int?,
+    val ignoreDnd: Boolean,
+    val snoozeMinutes: String,
 )
 
 @Entity(tableName = "place")
@@ -214,6 +270,9 @@ interface AvlDao {
     @Query("SELECT * FROM occurrence WHERE reminderId = :reminderId AND state = 'DONE' ORDER BY resolvedAt DESC LIMIT 1")
     suspend fun lastDone(reminderId: Long): OccurrenceEntity?
 
+    @Query("SELECT * FROM occurrence WHERE reminderId = :reminderId AND state IN ('DONE','CLOSED') ORDER BY resolvedAt DESC LIMIT :limit")
+    suspend fun recentResolved(reminderId: Long, limit: Int): List<OccurrenceEntity>
+
     @Query(
         "SELECT COUNT(*) FROM occurrence WHERE reminderId = :reminderId AND resolution = :resolution " +
             "AND resolvedAt >= :from AND resolvedAt < :until",
@@ -297,6 +356,42 @@ interface AvlDao {
 
     @Insert
     suspend fun insert(done: ItemDoneEntity)
+
+    @Query("SELECT * FROM blocker WHERE reminderId = :reminderId ORDER BY createdAt, id")
+    suspend fun blockers(reminderId: Long): List<BlockerEntity>
+
+    @Query("SELECT * FROM blocker ORDER BY createdAt, id")
+    fun observeBlockers(): Flow<List<BlockerEntity>>
+
+    @Query("SELECT * FROM blocker WHERE id = :id")
+    suspend fun blocker(id: Long): BlockerEntity?
+
+    @Insert
+    suspend fun insert(blocker: BlockerEntity): Long
+
+    @Update
+    suspend fun update(blocker: BlockerEntity)
+
+    @Query("SELECT * FROM template ORDER BY usedAt DESC, id DESC")
+    fun observeTemplates(): Flow<List<TemplateEntity>>
+
+    @Query("SELECT * FROM template WHERE id = :id")
+    suspend fun template(id: Long): TemplateEntity?
+
+    @Insert
+    suspend fun insert(template: TemplateEntity): Long
+
+    @Update
+    suspend fun update(template: TemplateEntity)
+
+    @Query("UPDATE template SET usedAt = :at WHERE id = :id")
+    suspend fun templateUsed(id: Long, at: Instant)
+
+    @Query("UPDATE template SET name = :name WHERE id = :id")
+    suspend fun renameTemplate(id: Long, name: String)
+
+    @Query("DELETE FROM template WHERE id = :id")
+    suspend fun deleteTemplate(id: Long)
 }
 
 class Converters {
@@ -361,6 +456,43 @@ val MIGRATION_4_5 = object : Migration(4, 5) {
     }
 }
 
+/**
+ * V1.2c: deadlines, notice before, blockers as tasks, templates. The newest answer to "Was
+ * fehlt?" that names something becomes an open blocker.
+ */
+val MIGRATION_5_6 = object : Migration(5, 6) {
+    override fun migrate(db: SupportSQLiteDatabase) {
+        db.execSQL("ALTER TABLE reminder ADD COLUMN windowUntilMinutes INTEGER")
+        db.execSQL("ALTER TABLE reminder ADD COLUMN remindEveryMinutes INTEGER")
+        db.execSQL("ALTER TABLE reminder ADD COLUMN preNoticeEveningMinutes INTEGER")
+        db.execSQL("ALTER TABLE reminder ADD COLUMN preNoticeBeforeMinutes INTEGER")
+        db.execSQL("ALTER TABLE reminder ADD COLUMN prepFor INTEGER")
+        db.execSQL("ALTER TABLE reminder ADD COLUMN solvedBlockerIsMinimum INTEGER NOT NULL DEFAULT 0")
+        CREATE_6.forEach(db::execSQL)
+        db.execSQL(
+            "INSERT INTO blocker (reminderId, text, createdAt, solvedAt, origin, taskReminderId) " +
+                "SELECT p.reminderId, trim(p.text), p.at, NULL, 'STARTKLAR', NULL FROM prep_answer p " +
+                "WHERE p.question = 3 AND p.unknown = 0 AND p.text IS NOT NULL AND trim(p.text) NOT IN ('', 'Ja, sofort') " +
+                "AND p.id = (SELECT q.id FROM prep_answer q WHERE q.reminderId = p.reminderId AND q.question = 3 " +
+                "ORDER BY q.at DESC, q.id DESC LIMIT 1)",
+        )
+    }
+}
+
+/** The new tables of version 6, as Room generates them (see schemas/…/6.json). */
+private val CREATE_6 = listOf(
+    "CREATE TABLE IF NOT EXISTS `blocker` (`id` INTEGER PRIMARY KEY AUTOINCREMENT NOT NULL, `reminderId` INTEGER NOT NULL, " +
+        "`text` TEXT NOT NULL, `createdAt` INTEGER NOT NULL, `solvedAt` INTEGER, `origin` TEXT NOT NULL, `taskReminderId` INTEGER, " +
+        "FOREIGN KEY(`reminderId`) REFERENCES `reminder`(`id`) ON UPDATE NO ACTION ON DELETE CASCADE )",
+    "CREATE INDEX IF NOT EXISTS `index_blocker_reminderId` ON `blocker` (`reminderId`)",
+    "CREATE TABLE IF NOT EXISTS `template` (`id` INTEGER PRIMARY KEY AUTOINCREMENT NOT NULL, `name` TEXT NOT NULL, " +
+        "`usedAt` INTEGER NOT NULL, `character` TEXT NOT NULL, `strictness` TEXT NOT NULL, `scheduleType` TEXT NOT NULL, " +
+        "`timeMinutes` INTEGER, `weekdays` INTEGER NOT NULL, `intervalDays` INTEGER, `windowUntilMinutes` INTEGER, " +
+        "`remindEveryMinutes` INTEGER, `minimum` TEXT, `minimumLimitPerWeek` INTEGER, `proofKind` TEXT NOT NULL, " +
+        "`proofPhoto` INTEGER NOT NULL, `proofTextMinChars` INTEGER, `proofAudioMinSeconds` INTEGER, " +
+        "`proofWindowMinutes` INTEGER NOT NULL, `postponeLimit` INTEGER, `ignoreDnd` INTEGER NOT NULL, `snoozeMinutes` TEXT NOT NULL)",
+)
+
 /** The new tables of version 3, as Room generates them (see schemas/…/3.json). */
 private val CREATE_3 = listOf(
     "CREATE TABLE IF NOT EXISTS `place` (`id` INTEGER PRIMARY KEY AUTOINCREMENT NOT NULL, `name` TEXT NOT NULL, " +
@@ -381,8 +513,9 @@ private val CREATE_3 = listOf(
     entities = [
         ReminderEntity::class, OccurrenceEntity::class, EventEntity::class, ProofEntity::class, PrepAnswerEntity::class,
         PlaceEntity::class, ChecklistItemEntity::class, ItemDoneEntity::class, SuggestionEntity::class,
+        BlockerEntity::class, TemplateEntity::class,
     ],
-    version = 5,
+    version = 6,
 )
 @TypeConverters(Converters::class)
 abstract class AvlDatabase : RoomDatabase() {
@@ -391,12 +524,12 @@ abstract class AvlDatabase : RoomDatabase() {
 
     companion object {
         const val NAME = "avlreminder.db"
-        const val VERSION = 5
+        const val VERSION = 6
 
         fun create(context: Context): AvlDatabase {
             backupBeforeMigration(context.getDatabasePath(NAME), File(context.filesDir, "backup"))
             return Room.databaseBuilder(context, AvlDatabase::class.java, NAME)
-                .addMigrations(MIGRATION_1_2, MIGRATION_2_3, MIGRATION_3_4, MIGRATION_4_5)
+                .addMigrations(MIGRATION_1_2, MIGRATION_2_3, MIGRATION_3_4, MIGRATION_4_5, MIGRATION_5_6)
                 .build()
         }
 

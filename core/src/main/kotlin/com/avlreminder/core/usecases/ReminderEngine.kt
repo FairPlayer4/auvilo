@@ -1,5 +1,8 @@
 package com.avlreminder.core.usecases
 
+import com.avlreminder.core.model.Blocker
+import com.avlreminder.core.model.BlockerOrigin
+import com.avlreminder.core.model.Character
 import com.avlreminder.core.model.ChecklistItem
 import com.avlreminder.core.model.Event
 import com.avlreminder.core.model.ItemDone
@@ -20,17 +23,23 @@ import com.avlreminder.core.ports.AlarmPort
 import com.avlreminder.core.ports.DeviceStatePort
 import com.avlreminder.core.ports.GeofencePort
 import com.avlreminder.core.ports.LocationPort
+import com.avlreminder.core.ports.PreNoticePort
 import com.avlreminder.core.ports.ReminderRepository
 import com.avlreminder.core.rules.Action
 import com.avlreminder.core.rules.AlarmLevel
 import com.avlreminder.core.rules.AlertSettings
+import com.avlreminder.core.rules.Blockers
+import com.avlreminder.core.rules.Deadlines
 import com.avlreminder.core.rules.Escalation
 import com.avlreminder.core.rules.Evidence
 import com.avlreminder.core.rules.Lifecycle
 import com.avlreminder.core.rules.Limits
 import com.avlreminder.core.rules.Prep
+import com.avlreminder.core.rules.PreNotices
+import com.avlreminder.core.rules.Presets
 import com.avlreminder.core.rules.ProofCheck
 import com.avlreminder.core.rules.ScheduleRules
+import com.avlreminder.core.rules.SkipReasons
 import com.avlreminder.core.rules.TransitionResult
 import com.avlreminder.core.rules.Validation
 import com.avlreminder.core.rules.WeekStatus
@@ -40,6 +49,7 @@ import java.time.Clock
 import java.time.Duration
 import java.time.Instant
 import java.time.LocalDate
+import java.time.LocalDateTime
 
 /**
  * Something that has to ring now; [snooze] are the buttons that stay before the end of the day,
@@ -53,6 +63,12 @@ data class Ring(
     val nextItem: ChecklistItem? = null,
     /** The week so far, for a reminder with a weekly goal. */
     val week: WeekStatus? = null,
+    /** A solved blocker may close it as the minimum (S7). */
+    val blockerSolved: Boolean = false,
+    /** It got stuck several times: ask what keeps one from it (S8). */
+    val askBlocker: Boolean = false,
+    /** "Auf morgen" of a deadline: the next window on a later day; null = not offered. */
+    val tomorrow: Instant? = null,
 )
 
 sealed interface SaveResult {
@@ -73,6 +89,7 @@ class ReminderEngine(
     private val settings: () -> AlertSettings = { AlertSettings() },
     private val geofences: GeofencePort = GeofencePort {},
     private val location: LocationPort = LocationPort { null },
+    private val preNotices: PreNoticePort = PreNoticePort.NONE,
 ) {
     private val zone get() = clock.zone
     private fun now(): Instant = clock.instant()
@@ -88,7 +105,7 @@ class ReminderEngine(
         val schedule = edited.schedule
         // A one-off moved to another time is meant to happen again, also when it was paused.
         val stored = if (edited.id == 0L) null else repo.reminder(edited.id)
-        val moved = schedule is Schedule.Once && stored != null && stored.schedule != schedule
+        val moved = (schedule is Schedule.Once || schedule is Schedule.Deadline) && stored != null && stored.schedule != schedule
         // The form does not know the archive; moving a one-off brings it back.
         val reminder = if (moved) edited.copy(active = true, archivedAt = null) else edited.copy(archivedAt = stored?.archivedAt)
         if (schedule is Schedule.Once) {
@@ -99,6 +116,9 @@ class ReminderEngine(
                 else -> false
             }
             if (past) problems += "Zeitpunkt liegt in der Vergangenheit"
+        }
+        if (schedule is Schedule.Deadline && (stored == null || moved) && !Deadlines.hasWindowBefore(schedule, now(), zone)) {
+            problems += "Kein Ausführungsfenster vor der Frist"
         }
         val current = if (reminder.id == 0L) emptyMap() else prep(reminder.id)
         val changed = prep.filter { new ->
@@ -115,12 +135,20 @@ class ReminderEngine(
         val id = repo.saveReminder(reminder)
         val saved = reminder.copy(id = id)
         changed.forEach { repo.addPrepAnswer(it.copy(id = 0, reminderId = id, text = it.text?.trim(), at = now())) }
+        changed.firstOrNull { it.question == Prep.READY }?.let { readyChanged(id, it) }
+        // A moved deadline starts anew in its windows, also when it was overdue or done.
+        if (moved && schedule is Schedule.Deadline) {
+            repo.openOccurrence(id)?.let { close(saved, it, Action.Skip(SkipReasons.SCHEDULE_CHANGED)) }
+            val due = Deadlines.firstDue(schedule, now(), zone)
+            val created = repo.saveOccurrence(Occurrence(reminderId = id, dueAt = due))
+            repo.addEvent(Event(occurrenceId = created, at = now(), type = EventType.CREATED))
+        }
         val open = repo.openOccurrence(id)
         // A changed schedule moves an occurrence that has not started yet.
-        if (open != null && open.state == OccurrenceState.PLANNED && open.postponeCount == 0 && schedule != Schedule.OnArrival) {
+        if (open != null && open.state == OccurrenceState.PLANNED && open.postponeCount == 0 && schedule != Schedule.OnArrival && schedule !is Schedule.Deadline) {
             val due = nextDue(saved, repo.lastResolved(id))
             if (due == null) {
-                close(saved, open, Action.Skip("Zeitplan geändert"))
+                close(saved, open, Action.Skip(SkipReasons.SCHEDULE_CHANGED))
             } else if (due != open.dueAt) {
                 repo.saveOccurrence(open.copy(dueAt = due, currentAt = due))
             }
@@ -130,8 +158,17 @@ class ReminderEngine(
         return SaveResult.Saved(id, ring)
     }
 
+    /** Also deletes its preparation tasks; deleting a task leaves its blocker open. */
     suspend fun delete(reminderId: Long) {
-        repo.openOccurrence(reminderId)?.let { alarms.cancel(it.id) }
+        val reminder = repo.reminder(reminderId)
+        repo.reminders().filter { it.prepFor == reminderId }.forEach { delete(it.id) }
+        reminder?.prepFor?.let { main ->
+            repo.blockers(main).filter { it.taskReminderId == reminderId }.forEach { repo.saveBlocker(it.copy(taskReminderId = null)) }
+        }
+        repo.openOccurrence(reminderId)?.let {
+            alarms.cancel(it.id)
+            preNotices.cancel(it.id)
+        }
         repo.deleteReminder(reminderId)
         watchPlaces()
     }
@@ -142,14 +179,17 @@ class ReminderEngine(
         repo.saveReminder(reminder.copy(active = active, archivedAt = if (active) null else reminder.archivedAt))
         val open = repo.openOccurrence(reminderId)
         if (!active) {
-            open?.let { alarms.cancel(it.id) }
+            open?.let {
+                alarms.cancel(it.id)
+                preNotices.cancel(it.id)
+            }
             watchPlaces()
             return
         }
         // Resuming must not report the paused time as missed: plan the open occurrence anew.
         if (open != null && open.currentAt < now()) {
             val due = nextDue(reminder, repo.lastResolved(reminderId))
-            if (due == null || due <= now()) close(reminder, open, Action.Skip("pausiert"))
+            if (due == null || due <= now()) close(reminder, open, Action.Skip(SkipReasons.PAUSED))
             else repo.saveOccurrence(open.copy(state = OccurrenceState.PLANNED, dueAt = due, currentAt = due))
         }
         syncReminder(reminder.copy(active = true))
@@ -211,7 +251,7 @@ class ReminderEngine(
     suspend fun act(occurrenceId: Long, action: Action): TransitionResult {
         val occurrence = repo.occurrence(occurrenceId) ?: return TransitionResult.Rejected("unknown occurrence")
         val reminder = repo.reminder(occurrence.reminderId) ?: return TransitionResult.Rejected("unknown reminder")
-        if (action is Action.Snooze && now().plus(action.duration) >= missedAt(occurrence)) {
+        if (action is Action.Snooze && now().plus(action.duration) >= missedAt(reminder, occurrence)) {
             return TransitionResult.Rejected("snooze would pass the end of the day")
         }
         val limits = limits(reminder, occurrence)
@@ -236,7 +276,13 @@ class ReminderEngine(
             }
             else -> {}
         }
+        // Doing a preparation task solves its blocker (S5).
+        if (result.occurrence.state == OccurrenceState.DONE && reminder.prepFor != null) {
+            repo.blockers(reminder.prepFor).filter { it.isOpen && it.taskReminderId == reminder.id }
+                .forEach { repo.saveBlocker(it.copy(solvedAt = now())) }
+        }
         alarms.cancel(occurrence.id)
+        preNotices.cancel(occurrence.id)
         syncReminder(reminder)
         return result
     }
@@ -246,7 +292,7 @@ class ReminderEngine(
         val occurrence = repo.occurrence(occurrenceId) ?: return TransitionResult.Rejected("unknown occurrence")
         val reminder = repo.reminder(occurrence.reminderId) ?: return TransitionResult.Rejected("unknown reminder")
         val window = now().plus(Duration.ofMinutes(reminder.proof.windowMinutes.toLong()))
-        return act(occurrenceId, Action.StartProof(minOf(window, missedAt(occurrence))))
+        return act(occurrenceId, Action.StartProof(minOf(window, missedAt(reminder, occurrence))))
     }
 
     /** The proof screen was left: after a short grace the escalation goes on. */
@@ -255,7 +301,7 @@ class ReminderEngine(
 
     /** The reminder's snooze buttons that do not pass the end of the day. */
     fun snoozeOptions(reminder: Reminder, occurrence: Occurrence): List<Int> =
-        Escalation.snoozeOptions(reminder.snoozeMinutes, now(), missedAt(occurrence))
+        Escalation.snoozeOptions(reminder.snoozeMinutes, now(), missedAt(reminder, occurrence))
 
     /** Current "Startklar" answers, the newest per question. */
     suspend fun prep(reminderId: Long): Map<Int, PrepAnswer> = Prep.latest(repo.prepAnswers(reminderId))
@@ -279,7 +325,7 @@ class ReminderEngine(
             plan(reminder, occurrence)
             return null
         }
-        if (now >= missedAt(occurrence)) {
+        if (now >= missedAt(reminder, occurrence)) {
             endDay(reminder, occurrence)
             return null
         }
@@ -302,11 +348,17 @@ class ReminderEngine(
     suspend fun limits(reminder: Reminder, occurrence: Occurrence? = null, day: LocalDate = now().atZone(zone).toLocalDate()): Limits {
         val (from, until) = Weeks.range(now(), zone)
         val done = occurrence?.let { repo.itemsDone(it.id) }.orEmpty()
+        val deadline = (reminder.schedule as? Schedule.Deadline)
+            ?.takeIf { d -> occurrence == null || !Deadlines.isOverdue(d, occurrence, zone) }
+            ?.let { Deadlines.dueAt(it, zone) }
+        val since = repo.lastResolved(reminder.id)?.resolvedAt ?: reminder.createdAt
         return Limits(
             minimumsThisWeek = repo.countResolved(reminder.id, Resolution.MINIMUM, from, until),
             lastProofText = repo.lastProofText(reminder.id),
             itemsDone = done.associate { it.itemId to it.withProof },
             itemDoneToday = done.any { it.doneAt.atZone(zone).toLocalDate() == day },
+            deadline = deadline,
+            blockerSolved = reminder.solvedBlockerIsMinimum && Blockers.solvedSince(repo.blockers(reminder.id), since),
         )
     }
 
@@ -326,12 +378,90 @@ class ReminderEngine(
     suspend fun weekGoals(): List<Pair<Reminder, WeekStatus>> =
         repo.reminders().filter { it.active && it.weeklyGoal != null }.mapNotNull { r -> weekStatus(r)?.let { r to it } }
 
+    // --- Blockers, preparation tasks and the notice before (S5–S8, T6) ------------------------
+
+    suspend fun blockers(reminderId: Long): List<Blocker> = repo.blockers(reminderId)
+
+    /** Adds an open blocker unless the same one is open already; returns its id. */
+    suspend fun addBlocker(reminderId: Long, text: String, origin: BlockerOrigin = BlockerOrigin.STARTKLAR): Long {
+        val clean = text.trim()
+        require(clean.isNotEmpty()) { "blocker without text" }
+        repo.blockers(reminderId).firstOrNull { it.isOpen && it.text.equals(clean, ignoreCase = true) }?.let { return it.id }
+        return repo.saveBlocker(Blocker(reminderId = reminderId, text = clean, createdAt = now(), origin = origin))
+    }
+
+    /** Solved by hand; a planned task for it is not needed any more. */
+    suspend fun solveBlocker(blockerId: Long) {
+        val blocker = repo.blocker(blockerId)?.takeIf { it.isOpen } ?: return
+        repo.saveBlocker(blocker.copy(solvedAt = now(), taskReminderId = null))
+        blocker.taskReminderId?.let { delete(it) }
+    }
+
+    /** When to do the task for a blocker: the evening before the reminder is due next. */
+    suspend fun suggestTaskTime(reminderId: Long): LocalDateTime =
+        Blockers.suggestTaskTime(repo.openOccurrence(reminderId)?.currentAt, now(), zone)
+
+    /** "Als Aufgabe planen": a relaxed one-off at [at]; doing it solves the blocker. */
+    suspend fun planTask(blockerId: Long, at: LocalDateTime): SaveResult {
+        val blocker = repo.blocker(blockerId)?.takeIf { it.isOpen } ?: return SaveResult.Invalid(listOf("Blocker nicht gefunden"))
+        val task = Presets.apply(
+            Reminder(
+                title = blocker.text, character = Character.DOCUMENT, schedule = Schedule.Once(at),
+                createdAt = now(), prepFor = blocker.reminderId,
+            ),
+            Strictness.RELAXED,
+        )
+        val result = save(task)
+        if (result is SaveResult.Saved) {
+            val old = blocker.taskReminderId
+            repo.saveBlocker(blocker.copy(taskReminderId = result.id))
+            old?.let { delete(it) }
+        }
+        return result
+    }
+
+    /** The answer to "Was hält dich gerade ab?" (S8); null or blank = skipped. Returns the blocker's id. */
+    suspend fun answerAsk(occurrenceId: Long, text: String?): Long? {
+        val occurrence = repo.occurrence(occurrenceId) ?: return null
+        repo.addEvent(Event(occurrenceId = occurrenceId, at = now(), type = EventType.BLOCKER_ASKED))
+        return text?.takeIf { it.isNotBlank() }?.let { addBlocker(occurrence.reminderId, it, BlockerOrigin.ASKED) }
+    }
+
+    /** What the silent notice before the occurrence shows; null if it is no longer planned. */
+    suspend fun preNotice(occurrenceId: Long): Digest? {
+        val occurrence = repo.occurrence(occurrenceId)?.takeIf { it.state == OccurrenceState.PLANNED } ?: return null
+        val reminder = repo.reminder(occurrence.reminderId)?.takeIf { it.active } ?: return null
+        val firstStep = prep(reminder.id)[Prep.FIRST_STEP]?.takeIf { !it.unknown }?.text
+        val (title, lines) = PreNotices.text(reminder, occurrence, firstStep, repo.blockers(reminder.id), now(), zone)
+        return Digest(title, lines)
+    }
+
+    /** "Auf morgen" for a deadline; null if it is no deadline or no window before it is left. */
+    fun tomorrow(reminder: Reminder, occurrence: Occurrence): Instant? {
+        val d = reminder.schedule as? Schedule.Deadline ?: return null
+        return Deadlines.tomorrow(d, now(), zone, Deadlines.isOverdue(d, occurrence, zone))
+    }
+
+    /** "Startklar" question 3 changed: a missing thing is a blocker, "Ja, sofort" solves them. */
+    private suspend fun readyChanged(reminderId: Long, answer: PrepAnswer) {
+        val text = Blockers.fromReady(answer)
+        if (text != null) {
+            addBlocker(reminderId, text)
+        } else if (answer.text?.trim() == Prep.READY_YES) {
+            repo.blockers(reminderId).filter { it.isOpen && it.origin == BlockerOrigin.STARTKLAR }
+                .forEach { repo.saveBlocker(it.copy(solvedAt = now())) }
+        }
+    }
+
     // --- Internals -------------------------------------------------------------------------
 
     private suspend fun syncReminder(reminder: Reminder): Ring? {
         var open = repo.openOccurrence(reminder.id)
         if (!reminder.active) {
-            open?.let { alarms.cancel(it.id) }
+            open?.let {
+                alarms.cancel(it.id)
+                preNotices.cancel(it.id)
+            }
             return null
         }
         if (open == null) {
@@ -342,18 +472,19 @@ class ReminderEngine(
             // Waits for the arrival, has no alarm of its own.
             open.state == OccurrenceState.PLANNED && reminder.schedule == Schedule.OnArrival -> {
                 alarms.cancel(open.id)
+                preNotices.cancel(open.id)
                 null
             }
             open.state == OccurrenceState.PLANNED && open.currentAt < now.minus(GRACE) -> {
                 repo.addEvent(Event(occurrenceId = open.id, at = now, type = EventType.MISSED_DETECTED, detail = open.currentAt.toString()))
-                if (now >= missedAt(open)) {
+                if (now >= missedAt(reminder, open)) {
                     endDay(reminder, open)
                     null
                 } else {
                     fire(reminder, open)
                 }
             }
-            open.state != OccurrenceState.PLANNED && now >= missedAt(open) -> {
+            open.state != OccurrenceState.PLANNED && now >= missedAt(reminder, open) -> {
                 endDay(reminder, open)
                 null
             }
@@ -395,7 +526,21 @@ class ReminderEngine(
      * back the next day with the rest (C3, does not count as postponing); anything else is missed.
      */
     private suspend fun endDay(reminder: Reminder, occurrence: Occurrence) {
-        val day = missedAt(occurrence).atZone(zone).toLocalDate()
+        val schedule = reminder.schedule
+        if (schedule is Schedule.Deadline) {
+            // A window ended: quiet until the next one before the deadline, an overdue one until done.
+            // Found late inside a running window (phone off), it rings there after the interval.
+            val next = Deadlines.firstDue(schedule, now(), zone)
+            if (Deadlines.isOverdue(schedule, occurrence, zone) || next < Deadlines.dueAt(schedule, zone)) {
+                plan(reminder, apply(reminder, occurrence, Action.CloseWindow(next)))
+                return
+            }
+            // The deadline passed: missed, and it stays to be done as overdue.
+            close(reminder, occurrence, Action.Miss)
+            createNext(reminder)?.let { plan(reminder, it) }
+            return
+        }
+        val day = missedAt(reminder, occurrence).atZone(zone).toLocalDate()
         if (reminder.checklist.isNotEmpty()) {
             val limits = limits(reminder, occurrence, day)
             if (limits.itemDoneToday) {
@@ -407,7 +552,7 @@ class ReminderEngine(
         }
         // With the weekly target reached a further offer that was not taken up is no miss.
         val reached = weekStatus(reminder, occurrence.dueAt.atZone(zone).toLocalDate())?.reached == true
-        close(reminder, occurrence, if (reached) Action.Skip(GOAL_REACHED) else Action.Miss)
+        close(reminder, occurrence, if (reached) Action.Skip(SkipReasons.GOAL_REACHED) else Action.Miss)
         createNext(reminder)?.let { plan(reminder, it) }
     }
 
@@ -436,14 +581,19 @@ class ReminderEngine(
             occurrence.currentAt
         } else if (strictness(reminder, occurrence) == null) {
             // Weekly target reached: no further rounds, only the end of the day.
-            missedAt(occurrence)
+            missedAt(reminder, occurrence)
         } else {
             val paused = occurrence.pausedUntil
-            val next = if (paused != null && paused > now) paused else Escalation.nextRound(now)
-            minOf(next, missedAt(occurrence))
+            // A deadline rings again after its interval.
+            val round = (reminder.schedule as? Schedule.Deadline)?.let { now.plus(Duration.ofMinutes(it.intervalMinutes.toLong())) }
+            val next = if (paused != null && paused > now) paused else round ?: Escalation.nextRound(now)
+            minOf(next, missedAt(reminder, occurrence))
         }
         val kind = if (reminder.strictness == Strictness.RELAXED) AlarmKind.EXACT else AlarmKind.ALARM_CLOCK
         alarms.set(occurrence.id, at, kind)
+        val notice = PreNotices.at(reminder, occurrence, zone)
+        if (notice != null && notice > now && notice < occurrence.currentAt) preNotices.set(occurrence.id, notice)
+        else preNotices.cancel(occurrence.id)
     }
 
     private suspend fun createNext(reminder: Reminder): Occurrence? {
@@ -464,6 +614,7 @@ class ReminderEngine(
             previousDueAt = previous?.dueAt,
             lastDoneAt = lastDoneAt,
             previousWasDone = previous?.state == OccurrenceState.DONE,
+            previousMissed = previous?.resolution == Resolution.MISSED,
         )
         val now = now()
         val due = next(now) ?: return null
@@ -483,6 +634,12 @@ class ReminderEngine(
 
     /** How strict the occurrence rings with its weekly goal; null = silently, without rounds. */
     private suspend fun strictness(reminder: Reminder, occurrence: Occurrence): Strictness? {
+        (reminder.schedule as? Schedule.Deadline)?.let { d ->
+            // The last window day and overdue ring one step stricter.
+            val last = Deadlines.isOverdue(d, occurrence, zone) ||
+                occurrence.currentAt.atZone(zone).toLocalDate() == Deadlines.lastWindowDay(d, zone)
+            return if (last) stricter(reminder.strictness) else reminder.strictness
+        }
         val week = weekStatus(reminder, occurrence.dueAt.atZone(zone).toLocalDate()) ?: return reminder.strictness
         return WeeklyGoals.strictness(reminder.strictness, week, isRescue(reminder, occurrence))
     }
@@ -503,6 +660,7 @@ class ReminderEngine(
     private suspend fun close(reminder: Reminder, occurrence: Occurrence, action: Action) {
         apply(reminder, occurrence, action)
         alarms.cancel(occurrence.id)
+        preNotices.cancel(occurrence.id)
     }
 
     private suspend fun ring(reminder: Reminder, occurrence: Occurrence): Ring {
@@ -515,17 +673,39 @@ class ReminderEngine(
             reminder, occurrence, level, snoozeOptions(reminder, occurrence),
             nextItem = reminder.checklist.firstOrNull { it.id !in done },
             week = weekStatus(reminder, occurrence.dueAt.atZone(zone).toLocalDate()),
+            blockerSolved = Lifecycle.canUseSolvedBlocker(reminder, limits(reminder, occurrence)),
+            askBlocker = askBlocker(reminder, occurrence),
+            tomorrow = tomorrow(reminder, occurrence),
         )
     }
 
-    private fun missedAt(occurrence: Occurrence) = Escalation.missedAt(occurrence.currentAt, zone, settings())
+    /** It got stuck [AlertSettings.askBlockerAfter] times in a row and was not asked yet (S8). */
+    suspend fun askBlocker(reminder: Reminder, occurrence: Occurrence): Boolean {
+        if (reminder.character != Character.OVERCOME || reminder.prepFor != null) return false
+        if (repo.events(occurrence.id).any { it.type == EventType.BLOCKER_ASKED }) return false
+        val history = listOf(occurrence) + repo.recentResolved(reminder.id, ASK_HISTORY)
+        val streak = Blockers.stuckStreak(history.map { o -> o to repo.events(o.id).count { it.type == EventType.SNOOZED } })
+        return streak >= settings().askBlockerAfter
+    }
+
+    private fun stricter(s: Strictness) = when (s) {
+        Strictness.RELAXED -> Strictness.NORMAL
+        Strictness.NORMAL, Strictness.STRICT -> Strictness.STRICT
+    }
+
+    /** When an unanswered occurrence counts as missed: the end of the day, or of a deadline's window. */
+    private fun missedAt(reminder: Reminder, occurrence: Occurrence): Instant {
+        val d = reminder.schedule as? Schedule.Deadline ?: return Escalation.missedAt(occurrence.currentAt, zone, settings())
+        val end = Deadlines.windowEnd(d, occurrence.currentAt, zone)
+        return if (Deadlines.isOverdue(d, occurrence, zone)) end else minOf(end, Deadlines.dueAt(d, zone))
+    }
 
     companion object {
         /** A planned occurrence this far past its time without having fired counts as missed alarm. */
         val GRACE: Duration = Duration.ofMinutes(2)
         /** Alarms may fire slightly early. */
         val EARLY_TOLERANCE: Duration = Duration.ofMinutes(1)
-        /** Reason stored when an offer ends unused after the weekly target was reached. */
-        const val GOAL_REACHED = "Wochenziel erreicht"
+        /** Resolved occurrences looked at for the stuck streak (S8). */
+        private const val ASK_HISTORY = 10
     }
 }

@@ -27,6 +27,7 @@ class Settings(private val context: Context) {
     /** Minutes after midnight. */
     private val loudFromKey = intPreferencesKey("loudFrom")
     private val dayEndKey = intPreferencesKey("dayEnd")
+    private val askBlockerKey = intPreferencesKey("askBlockerAfter")
     private val dwellKey = intPreferencesKey("dwellMinutes")
     private val sortKey = stringPreferencesKey("reminderSort")
     /** Minutes after midnight; -1 = off. */
@@ -43,6 +44,7 @@ class Settings(private val context: Context) {
             AlertSettings(
                 loudFrom = prefs[loudFromKey]?.toTime() ?: default.loudFrom,
                 dayEnd = prefs[dayEndKey]?.toTime() ?: default.dayEnd,
+                askBlockerAfter = prefs[askBlockerKey] ?: default.askBlockerAfter,
             )
         }.getOrDefault(default)
     }
@@ -88,6 +90,7 @@ class Settings(private val context: Context) {
         context.dataStore.edit {
             it[loudFromKey] = settings.loudFrom.toMinutes()
             it[dayEndKey] = settings.dayEnd.toMinutes()
+            it[askBlockerKey] = settings.askBlockerAfter
         }
     }
 

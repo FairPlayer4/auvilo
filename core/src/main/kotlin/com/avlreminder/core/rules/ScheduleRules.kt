@@ -14,6 +14,7 @@ object ScheduleRules {
      * @param previousDueAt due time of the last occurrence; null if there was none yet.
      * @param lastDoneAt when the reminder was last actually done (for [Schedule.AfterDone]).
      * @param previousWasDone whether the last occurrence was done (not skipped or missed).
+     * @param previousMissed whether the last occurrence was missed (a deadline then stays to be done).
      * @return null if there is no further occurrence (a one-off reminder that already happened).
      */
     fun nextDue(
@@ -23,6 +24,7 @@ object ScheduleRules {
         previousDueAt: Instant? = null,
         lastDoneAt: Instant? = null,
         previousWasDone: Boolean = true,
+        previousMissed: Boolean = false,
     ): Instant? {
         // Never create a backlog: the next occurrence lies after both now and the previous one.
         val after = if (previousDueAt != null && previousDueAt > now) previousDueAt else now
@@ -35,6 +37,13 @@ object ScheduleRules {
 
             // Waits for the arrival; the due time only orders it.
             Schedule.OnArrival -> if (previousDueAt == null) now else null
+
+            // Once; a missed deadline keeps ringing in the windows until done or discarded.
+            is Schedule.Deadline -> when {
+                previousDueAt == null -> Deadlines.firstDue(schedule, now, zone)
+                previousMissed -> Deadlines.nextWindowStart(schedule, now, zone)
+                else -> null
+            }
 
             is Schedule.Daily -> nextAtTime(schedule.time, after, zone) { true }
 

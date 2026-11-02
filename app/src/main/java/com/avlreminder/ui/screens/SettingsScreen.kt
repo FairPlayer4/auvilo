@@ -37,6 +37,7 @@ import com.avlreminder.core.model.Place
 import com.avlreminder.core.rules.AlertSettings
 import com.avlreminder.data.OverviewTimes
 import com.avlreminder.data.Settings
+import com.avlreminder.data.TemplateEntity
 import com.avlreminder.data.ThemeMode
 import com.avlreminder.ui.AvlIcons
 import com.avlreminder.ui.Format
@@ -73,6 +74,9 @@ fun SettingsScreen(
     onSuggestions: () -> Unit = {},
     overview: OverviewTimes = OverviewTimes(),
     onOverview: (OverviewTimes) -> Unit = {},
+    templates: List<TemplateEntity> = emptyList(),
+    onRenameTemplate: (Long, String) -> Unit = { _, _ -> },
+    onDeleteTemplate: (Long) -> Unit = {},
 ) {
     val c = Avl.colors
     var homeState by remember { mutableStateOf<String?>(null) }
@@ -132,6 +136,28 @@ fun SettingsScreen(
                 Modifier.padding(4.dp), color = c.muted, fontSize = 13.sp,
             )
 
+            SectionTitle("Nachfragen")
+            Card {
+                Column(Modifier.padding(16.dp)) {
+                    Text("„Was hält dich ab?“ nach", color = c.text, fontSize = 15.sp)
+                    FlowRow(Modifier.padding(top = 6.dp), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                        (1..5).forEach { n ->
+                            FilterChip(
+                                n == alert.askBlockerAfter, { onAlert(alert.copy(askBlockerAfter = n)) },
+                                label = { Text(if (n == 1) "1× hängen" else "$n× hängen") }, modifier = Modifier.testTag("askAfter$n"),
+                            )
+                        }
+                    }
+                }
+            }
+            Text(
+                "Hängen heißt: verpasst, 3× „Später“ oder verschoben, mehrmals in Folge. Die Antwort wird ein Blocker.",
+                Modifier.padding(4.dp), color = c.muted, fontSize = 13.sp,
+            )
+
+            SectionTitle("Vorlagen")
+            Card { TemplateList(templates, onRenameTemplate, onDeleteTemplate) }
+
             SectionTitle("Übersicht")
             Card {
                 Column(Modifier.padding(16.dp)) {
@@ -184,7 +210,7 @@ fun SettingsScreen(
                     }
                 }
             }
-            Text("AVL-Reminder 1.2b-Prototyp", Modifier.padding(vertical = 24.dp, horizontal = 4.dp), color = c.muted, fontSize = 12.sp)
+            Text("AVL-Reminder 1.2c-Prototyp", Modifier.padding(vertical = 24.dp, horizontal = 4.dp), color = c.muted, fontSize = 12.sp)
         }
     }
 }
