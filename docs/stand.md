@@ -9,6 +9,7 @@ Stand: 2026-11-02. Bei jedem größeren Schritt aktualisieren.
   (klappbare Bereiche beim Bearbeiten, eigene Werte mit *andere…*, freie Uhrzeiten
   in den Einstellungen, Zahnrad auf allen Tabs).
 - Build grün: 224 Tests, Kover-Abdeckung in `core` 99,37 %.
+- Diagnose-Log zuletzt geprüft: Berechtigungen ok, `dndBlocked=none`.
 
 ## Fertig, noch nicht auf dem Gerät
 - **V1.2c** (`versionName` 1.2c-prototyp, `versionCode` 6), Branch `feature/v1.2c`:
@@ -17,7 +18,6 @@ Stand: 2026-11-02. Bei jedem größeren Schritt aktualisieren.
   (design.md 12.4 und 12.6). Migration 5→6 mit Backup v5.
 - Build grün: 260 Tests, Kover-Abdeckung in `core` 99,41 %.
 - Installation erst nach Kevins Go; danach Gerätetests 85–96 (geraetetest.md).
-- Diagnose-Log zuletzt geprüft: Berechtigungen ok, `dndBlocked=none`.
 
 ## Offen
 1. **Testsession vor V2** (Plan: [testsession.md](testsession.md); am 2026-11-02 von
