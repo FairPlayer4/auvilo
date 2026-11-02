@@ -16,9 +16,12 @@ Stand: 2026-11-02. Bei jedem größeren Schritt aktualisieren.
    welche Funktionen er wirklich nutzt. Auffällig bisher: Reminder werden manchmal zu
    streng angelegt und dann mehrfach um 10 min geschoben. Cheats bleiben vorerst, sollen
    aber sinnvolle Rückfragen („Willst du wirklich …?“) bekommen.
-2. **Backend** (Kevin, parallel): lehrreich, später Backup und Sync mit anderen (7.28).
-3. **Play-Store-Release** für eine sehr kleine Zielgruppe, Android 17 bleibt Minimum,
-   voller EU-Datenschutz (7.28).
+   Bestätigt: Hinweis bei wiederholtem *Später* (NT2). Gezählt wird erst vor V2 mit der
+   Testsession (NT4).
+2. **Backend** (Kevin, parallel, `../avlreminder-backend`): B0–B2 fertig, B2b
+   (Daten-Backup) als Nächstes. Überblick: [backend.md](backend.md).
+3. **Play-Store-Release** ohne Eile, erst wenn die App „fertig“ ist (mindestens bis V2);
+   dafür Transparenz, Notausschalter, Backend nur nach Einschalten (7.28 PS5–PS9).
 
 ## Offen
 1. **Testsession vor V2** (Plan: [testsession.md](testsession.md)): Kevin führt sie durch,
@@ -26,8 +29,8 @@ Stand: 2026-11-02. Bei jedem größeren Schritt aktualisieren.
    das Ergebnis mit den Vorschlägen in der App ab.
 2. **Vorschläge in der App:** 1, 4, 5, 6, 7 und 9 sind umgesetzt; Kevin markiert sie dort
    als „umgesetzt“. Offen sind VS1–VS3 (anforderungen.md 7.25).
-3. **CI:** PRs nach `main` laufen über GitHub Actions. Offen: `upload-artifact` auf eine
-   Version mit Node 24 heben; Branch-Regel für `main` setzt Kevin.
+3. **CI:** PRs nach `main` laufen über GitHub Actions (`upload-artifact@v6`, Node 24,
+   seit 2026-11-02). Branch-Regel für `main` setzt Kevin.
 4. **V1.3** (Timer, Abläufe, Watch, mehrmals täglich, Wochenend-Zeiten) laut
    anforderungen.md Kap. 10, nach der Beobachtungsphase.
 

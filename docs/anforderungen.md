@@ -754,10 +754,17 @@ dazugekommen; Kevin sammelt jetzt erst einmal mit aktiver Nutzung.
 - NT2 **Zu streng geplant:** Reminder werden manchmal strenger angelegt als
   durchhaltbar und dann x-mal um 10 Minuten geschoben. Die App soll das erkennen und
   helfen, realistischer zu planen (Zeit, Strenge, Minimum), statt nur lauter zu werden.
+  **Bestätigt (2026-11-02):** Wird ein Reminder über mehrere Fälligkeiten hintereinander
+  jeweils mehrfach mit *Später* geschoben (etwa ab dem dritten Mal), fragt die App
+  einmal, ob Uhrzeit, Strenge oder Minimum angepasst werden sollen – ähnlich der
+  Nachfrage aus 7.21 (S8), keine harte Sperre.
 - NT3 **Schlupflöcher (Cheats) bleiben vorerst**, bekommen aber sinnvolle Rückfragen
   („Willst du wirklich …?“). Welche Stellen das sind und wie stark die Bremse sein
   soll, ergibt sich aus der Nutzung.
 - Ergebnisse fließen als Vorschläge (7.24) oder hier ein; danach Entwurf.
+- NT4 **Nutzung zählen erst vor V2**, zusammen mit der Testsession: nur Anzahlen aus der
+  Datenbank (welche Funktionen eingestellt sind, wie oft Später, Verschieben, Minimum),
+  keine Titel oder Inhalte. Bis dahin nutzt Kevin V1.2c weiter.
 
 ### 7.28 Play-Store-Release und Backend
 Ziel ist, einmal den kompletten Weg zu gehen: eine offizielle App im Play Store mit
@@ -770,6 +777,18 @@ Vordergrund, nicht Reichweite.
   Export und Löschen auf Wunsch, Datensicherheits-Angaben im Play Store.
 - PS4 Die eingeschränkten Berechtigungen, die beim Sideload egal waren (8.2), müssen
   für den Play Store begründet und deklariert werden.
+- PS5 **Keine Eile (2026-11-02):** Die App soll erst „fertig“ sein – mindestens alles bis
+  V2, eventuell Teile aus V2 und das Backend. Erst dann Play Store.
+- PS6 **Mehr Transparenz** für Tester: Die App zeigt verständlich, was sie speichert,
+  welche Berechtigungen sie wofür nutzt und warum ein Alarm kam bzw. nicht kam.
+- PS7 **Bewusster Notausschalter:** ein klar erreichbarer Weg, alle Alarme sofort
+  abzuschalten (z. B. wenn die App sich falsch verhält), mit Rückfrage und Anzeige, dass
+  er aktiv ist. Wichtig, weil die Mechanismen absichtlich invasiv sind.
+- PS8 **Backend nur nach ausdrücklichem Einschalten.** Ohne Zustimmung keine Anmeldung,
+  keine Verbindung; die App bleibt vollständig lokal nutzbar.
+- PS9 **Verschlüsselung auf dem Gerät** (nur die App kann die Daten lesen) – noch zu
+  bewerten (Kap. 11).
+- Backend-Stand und was es für die App bedeutet: [backend.md](backend.md).
 
 ## 8. Zielplattform und Technik
 
@@ -832,7 +851,9 @@ früh am S24 Ultra testen (Spike, siehe Abschnitt 10).
   Cloud-KI für den Import vorbereitet wird, verantwortet der Nutzer selbst.
 - Rohdaten der Bewegungssensoren (7.16) nach einer einstellbaren Frist löschen;
   das Ergebnis (Dauer, erkanntes Muster) bleibt.
-- Kein Backup in V1 (später nachrüstbar, z. B. Export als ZIP).
+- Kein Backup in V1 (später nachrüstbar, z. B. Export als ZIP). Das Cloud-Backup des
+  Backends (B2b, [backend.md](backend.md)) ist Ende-zu-Ende verschlüsselt, enthält
+  keine Fotos und kein Audio und läuft nur nach ausdrücklichem Einschalten (7.28 PS8).
 - Aufbewahrung: vorerst unbegrenzt.
 
 ## 9. Entscheidungen
@@ -901,6 +922,8 @@ früh am S24 Ultra testen (Spike, siehe Abschnitt 10).
 | 2026-11-02 | Testsession erst vor V2 statt vor V1.3 – die App läuft im Alltag gut |
 | 2026-11-02 | V1.2c-Entwurf (design.md 12.4) bestätigt und umgesetzt: Fristen mit Ausführungsfenstern, Vorlagen, Vorab-Reminder, Blocker als Liste mit Vorbereitungsaufgaben, *Blocker gelöst* als Minimum, Nachfragen wenn es hakt |
 | 2026-11-02 | Vor V1.3 erst Nutzung beobachten: Funktionen trimmen statt erweitern, Rückfragen bei Schlupflöchern (7.27) |
+| 2026-11-02 | Hinweis bei wiederholtem *Später* bestätigt (7.27 NT2); Nutzung erst vor V2 mit der Testsession zählen (NT4) |
+| 2026-11-02 | Play Store ohne Eile: erst „fertig“ (mindestens bis V2, ggf. Backend); dafür Transparenz, Notausschalter, Backend nur nach Einschalten; Verschlüsselung auf dem Gerät wird bewertet (7.28 PS5–PS9) |
 | 2026-11-02 | Ziel offizieller Play-Store-Release für eine sehr kleine Zielgruppe, mit Backend (Backup, Sync) und vollem EU-Datenschutz; Android 17 bleibt Minimum (7.28) |
 
 ## 10. Nächste Schritte
@@ -978,7 +1001,14 @@ Für später:
   prüfen.
 - Backend (7.28): Wie passen Backup und Sync zu 8.4 (sensible Daten nur auf dem Gerät)?
   Empfehlung: Backup Ende-zu-Ende verschlüsselt, sodass das Backend nur verschlüsselte
-  Daten sieht.
+  Daten sieht. **Geklärt:** Das Backend ist genau so gebaut ([backend.md](backend.md)).
+- Verschlüsselung auf dem Gerät (7.28 PS9): Android trennt App-Daten schon heute
+  (Sandbox, dateibasierte Verschlüsselung, `allowBackup=false`). Lesbar sind sie nur
+  über `run-as` in Debug-Builds und auf gerooteten Geräten. **Empfehlung:** Für den
+  Play Store ein Release-Build (nicht debuggable) – das schließt `run-as` aus.
+  Zusätzlich SQLCipher mit Schlüssel im Keystore nur, wenn ein konkreter Fall übrig
+  bleibt; es kostet Leistung, erschwert Diagnose und Migrationen. Fotos und Audio
+  lägen weiterhin als Dateien vor. Bewertung vor dem Play-Store-Release.
 - V2: Wie genau funktioniert die Freigabe für Agenten (Kopplung, Stufen, sensible
   Kategorien), und welche Agenten-Apps erreichen App Functions bzw. einen lokalen
   MCP-Server tatsächlich (7.26)?
