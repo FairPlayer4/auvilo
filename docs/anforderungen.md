@@ -745,6 +745,25 @@ soll helfen, die Reminder einzuhalten: planen, Vorarbeit erledigen, motivieren.
   was gelesen oder geändert hat.
 - Vorbereitung bis dahin: neue Logik weiter als saubere Befehle in `core`, damit
   Oberfläche und Agent später dieselben Wege nutzen.
+- AG11 **Vorstufe für Claude über adb (vorgezogen, 2026-11-02, Entwurf):** Kevin möchte,
+  dass Claude in der Entwicklung Reminder lesen und schreiben kann (z. B. Test-Reminder
+  einrichten, Stand prüfen). Datenschutz ist für ihn als Entwickler kein Hindernis, die
+  Schnittstelle muss aber **ausdrücklich in der App freigegeben** werden. Empfehlung:
+  - **Weg:** `adb shell content call` an einen ContentProvider der App, geschützt mit
+    der Berechtigung `android.permission.DUMP` – die hat nur die adb-Shell, keine andere
+    App. Kein Netz, kein Port; geht per USB und kabellosem Debugging. Antworten als JSON
+    mit Versionsnummer.
+  - **Freigabe:** Schalter in den Einstellungen, Standard aus, mit Rückfrage. Solange er
+    an ist, steht das sichtbar in den Einstellungen; ohne Freigabe antwortet die
+    Schnittstelle nur „nicht freigegeben“.
+  - **Lesen:** Reminder, offene Fälligkeiten, Verlauf, Statistik, Blocker, Einstellungen.
+  - **Schreiben:** Reminder anlegen, bearbeiten, pausieren, archivieren; Blocker anlegen.
+    Immer über dieselben Befehle wie die Oberfläche (Prüfung, Alarme neu planen).
+  - **Nicht (AG5):** nichts erledigen oder auslassen, keinen Alarm beenden, keine
+    Nachweise, nicht löschen (archivieren statt löschen).
+  - **Protokoll:** jeder Zugriff im Diagnose-Log mit Methode und ID, ohne Inhalte.
+  - **Nur im Debug-Build** (Sideload); der Play-Store-Release bekommt stattdessen die
+    Agenten-Schnittstelle aus AG1–AG10.
 
 ### 7.27 Nutzung beobachten, Funktionen trimmen, Schlupflöcher bremsen
 Stand 2026-11-02: Die App funktioniert im Alltag sehr gut. Mit V1.2c ist aber viel
@@ -930,6 +949,7 @@ früh am S24 Ultra testen (Spike, siehe Abschnitt 10).
 | 2026-11-02 | Ziel offizieller Play-Store-Release für eine sehr kleine Zielgruppe, mit Backend (Backup, Sync) und vollem EU-Datenschutz; Android 17 bleibt Minimum (7.28) |
 | 2026-11-02 | V1.3-Entwurf bestätigt (design.md E.5): Aufteilung a/b/c; mehrere Uhrzeiten – verpasst beim nächsten Termin, kein Wochenziel und keine Ankunft; NT2-Schwelle 3×2 (oder einmal 4×), Karte auf *Heute*, *Nein danke* 14 Tage; *Notaus* bricht keine Serie; für V1.3b: *abgebrochen* bricht die Serie, Nachfragen *locker*, max. 90 min. V1.3a gestartet |
 | 2026-11-02 | V1.3a umgesetzt: höchstens 6 Uhrzeiten am Tag; Notaus mit 1 Stunde, bis morgen 06:00 oder bis zum Einschalten; Wochenend-Schalter gilt für Alarmzeiten und Übersicht zusammen |
+| 2026-11-02 | Schnittstelle für Claude vorgezogen (vor V1.3b): Reminder lesen und schreiben über adb, ausdrücklich in der App freizugeben; Entwurf in 7.26 AG11 |
 
 ## 10. Nächste Schritte
 
