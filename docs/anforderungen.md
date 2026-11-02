@@ -871,6 +871,7 @@ früh am S24 Ultra testen (Spike, siehe Abschnitt 10).
 | 2026-10-31 | V1.2b bestätigt wie Entwurf. UI-Feinschliff aus den ersten Vorschlägen noch vor der Testsession; mehrmals täglich und Wochenend-Zeiten nach V1.3 (7.25) |
 | 2026-10-31 | Mehrmals täglich: Serie hält mit mindestens einem eingehaltenen Termin pro Tag. Wochenend-Zeiten gelten auch für die Tagesgrenze (7.25) |
 | 2026-11-01 | Schnittstelle für KI-Agenten in V2: nur lokal, für alle persönlichen Agenten, freiwillig mit Freigabe pro Agent; Agent erledigt nur als *delegierbar* markierte Reminder, nie Nachweis oder Alarm; App stößt den Agenten an; Datenschutz verantwortet der Nutzer, mit deutlichem Hinweis (7.26) |
+| 2026-11-02 | Testsession erst vor V2 statt vor V1.3 – die App läuft im Alltag gut |
 
 ## 10. Nächste Schritte
 

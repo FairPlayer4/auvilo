@@ -1,5 +1,8 @@
-# Testsession vor V1.3 (eine Stunde)
+# Testsession vor V2 (eine Stunde)
 
+> Verschoben am 2026-11-02 von „vor V1.3“ auf „vor V2“, weil die App im Alltag gut läuft.
+> Vor der Session an den dann aktuellen Stand anpassen (Version, neue Funktionen).
+>
 > Fokussierter Gerätetest mit V1.2b auf dem S24 Ultra. Ziel: alles, was die automatischen
 > Tests nicht abdecken (echte Alarme, Sperrbildschirm, „Nicht stören“, Neustart, Doze,
 > Benachrichtigungsknöpfe, Zeitpunkte), einmal bewusst durchspielen. Danach wertet Claude

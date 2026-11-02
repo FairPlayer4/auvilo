@@ -465,7 +465,7 @@ V1.2 ist für einen Schritt zu groß und zum Teil noch offen. Deshalb (2026-10-2
 |---|---|---|
 | **V1.2a – Alltag** | Verbesserung vorschlagen (Anf. 7.24), Reminder-Liste aufräumen (Anf. 7.9, L1–L5) | umgesetzt, installiert |
 | **V1.2b – Ziele über die Zeit** | Wochenziele, Serien/Joker, Statistik, Übersicht morgens/abends | Entwurf 12.3 bestätigt, umgesetzt (12.5) |
-| **V1.2c – Fristen und Blocker** | Fristen mit Ausführungsfenstern, Vorab-Reminder (T6), Blocker als Aufgaben (S5–S8), eigene Vorlagen | Entwurf 12.4, Prüfung durch Kevin offen |
+| **V1.2c – Fristen und Blocker** | Fristen mit Ausführungsfenstern, Vorab-Reminder (T6), Blocker als Aufgaben (S5–S8), eigene Vorlagen | Entwurf 12.4 vollständig (2026-11-02), Prüfung durch Kevin offen |
 
 Der Vorab-Reminder (T6) war bisher keiner Etappe zugeordnet; S6 braucht ihn, deshalb V1.2c.
 
@@ -513,13 +513,61 @@ Vorschläge zu den offenen Fragen; Kevin bestätigt oder korrigiert vor der Umse
    öffnet die Übersicht in der App. Abends mit Stand der Wochenziele.
 
 ### 12.4 V1.2c – Entwurf zur Prüfung
-9. **Fristen:** *Auf morgen* geht, solange danach noch mindestens ein Ausführungsfenster
-   vor der Frist liegt. Nach der Frist gilt die Fälligkeit als verpasst; der Reminder bleibt
-   sichtbar, bis er erledigt oder verworfen ist.
-10. **Vorlagen:** *Als Vorlage speichern* an einem Reminder; Widget und *+* bieten die
-    Vorlagen zur Auswahl an (z. B. "Arbeit" mit *+30 / +60*).
-11. **Vorab-Reminder (T6):** pro Reminder optional, *am Vorabend* (Uhrzeit einstellbar)
-    oder *x Minuten vorher*; eine stille Benachrichtigung, die offene Blocker nennt (S6).
+Vollständig seit 2026-11-02 (9–11 vom 2026-10-29, 12–16 neu). Kevin bestätigt oder
+korrigiert vor der Umsetzung.
+
+**Fristen (T1d, 7.2)**
+9. **Neuer Takt `Deadline`:** Frist (Datum, optional Uhrzeit, sonst Tagesende) plus
+   **Ausführungsfenster**: Wochentage und *ein* Zeitfenster von–bis für alle gewählten Tage
+   (Standard Mo–Fr 9–17), dazu ein **Erinnerungsintervall** (Standard 60 min). Es gibt
+   eine einzige Fälligkeit: Sie klingelt zu Beginn jedes Fensters und dann im Intervall,
+   bis sie erledigt ist. Außerhalb der Fenster ist Ruhe.
+10. **Auf morgen** geht, solange danach noch mindestens ein Fenster vor der Frist liegt.
+    **Letzter Fenstertag:** eine Stufe strenger (wie *knapp* bei Wochenzielen). **Nach der
+    Frist** gilt die Fälligkeit als verpasst, bleibt aber in *Heute* als *überfällig*
+    sichtbar, bis sie erledigt oder verworfen ist (Leitprinzip 1).
+
+**Vorlagen (7.9)**
+11. *Als Vorlage speichern* an einem Reminder. Eine Vorlage übernimmt Charakter, Strenge,
+    Nachweis, Minimum mit Limit, Verschiebe-Knöpfe, *Nicht stören*-Ausnahme und die Art
+    des Takts mit Zeiten (z. B. Fenster Mo–Fr 9–17). **Nicht** übernommen: Titel, Warum,
+    Startklar-Antworten, Motivations-Audio, konkretes Datum. Widget und *+* zeigen zuerst
+    die Vorlagenauswahl (zuletzt benutzte oben, dazu *Leer*). Vorlagen lassen sich in den
+    Einstellungen umbenennen und löschen.
+
+**Vorab-Reminder (T6, S6)**
+12. Pro Reminder optional: *am Vorabend* (Uhrzeit, Standard 19:00) oder *x Minuten
+    vorher*. Eine **stille Benachrichtigung** mit Titel, erstem Schritt und **offenen
+    Blockern** („Morgen Training – Bereich ist noch nicht aufgeräumt“). Tipp öffnet den
+    Reminder. Entfällt, wenn die Fälligkeit vorab erledigt wurde (7.20).
+
+**Blocker (S5, S7, S8)**
+13. **Blocker als eigene Liste** pro Reminder statt nur als Antwort auf Frage 3: neue
+    Tabelle `blocker` (Text, angelegt, gelöst am, Herkunft *Startklar / Nachfrage*,
+    Vorbereitungsaufgabe). Die Antwort „was fehlt“ (Frage 3) wird beim Speichern zu einem
+    Blocker; bestehende Antworten werden bei der Migration übernommen. Der Verlauf der
+    Startklar-Antworten bleibt wie in 11.8.
+14. **Vorbereitungsaufgabe (S5):** Am Blocker *Als Aufgabe planen* legt einen
+    Einmal-Reminder an (Charakter *Dokumentation*, Strenge *locker*, Termin vorgeschlagen:
+    Vorabend der nächsten Fälligkeit 19:00), verknüpft über `reminder.prepFor`.
+    Erledigen = Blocker gelöst. Die Aufgabe steht in *Heute* zu ihrem Termin und beim
+    Hauptreminder unter *Startklar*, nicht als eigener Eintrag in der Reminder-Liste.
+15. **Blocker gelöst als Minimum (S7):** pro Reminder einschaltbar. Wurde seit der
+    letzten Fälligkeit ein Blocker gelöst, bietet der Alarm unter *Minimum* zusätzlich
+    *Blocker gelöst* an. Zählt wie ein Minimum (Limit, Wochenziel, Serie) und steht so
+    in der Statistik.
+16. **Nachfragen, wenn es hakt (S8):** Nur bei *Überwindung*. Zählen über aufeinander
+    folgende Fälligkeiten: verschoben (*Verschieben auf …*), ausgelassen, verpasst; drei
+    kurze Verschiebungen (+x min) in einer Fälligkeit zählen als eins. Ab der Schwelle
+    (Standard 2, in den Einstellungen 1–5) fragt der nächste Alarm zuerst *Was hält dich
+    gerade ab?* – überspringbar, der Alarm läuft weiter. Die Antwort wird ein Blocker mit
+    Herkunft *Nachfrage*, auf Wunsch gleich mit Vorbereitungsaufgabe. Eine Erledigung
+    setzt den Zähler zurück.
+
+**Technik:** Migration 5→6 mit neuer Tabelle `blocker`, `template` und `ADD COLUMN` für
+Frist, Fenster, Intervall, Vorab-Reminder, `prepFor`, S7-Schalter; Backup v5 wie bisher.
+Fristen-, Blocker- und Nachfrage-Logik in `core` (Kover), Vorab-Reminder als eigener
+stiller Kanal wie die Übersicht.
 
 ### 12.5 V1.2b – Umsetzung und Präzisierungen
 Kevin hat 12.3 am 2026-10-31 bestätigt. Präzisiert bei der Umsetzung:
