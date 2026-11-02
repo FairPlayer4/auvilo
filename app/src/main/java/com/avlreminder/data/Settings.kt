@@ -4,21 +4,33 @@ import android.content.Context
 import androidx.datastore.preferences.core.Preferences
 import androidx.datastore.preferences.core.edit
 import androidx.datastore.preferences.core.intPreferencesKey
+import androidx.datastore.preferences.core.longPreferencesKey
 import androidx.datastore.preferences.core.stringPreferencesKey
 import androidx.datastore.preferences.preferencesDataStore
 import com.avlreminder.core.rules.AlertSettings
+import com.avlreminder.core.rules.DayTimes
 import com.avlreminder.core.usecases.ReminderSort
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.map
+import java.time.Instant
+import java.time.LocalDate
 import java.time.LocalTime
 
 enum class ThemeMode { SYSTEM, LIGHT, DARK }
 
-/** The silent overview in the morning and evening (Anf. O1); null = off. */
+/**
+ * The silent overview in the morning and evening (Anf. O1); null = off. [weekend]: other times
+ * on Saturday and Sunday (VS2), null = the same.
+ */
 data class OverviewTimes(
     val morning: LocalTime? = LocalTime.of(7, 30),
     val evening: LocalTime? = LocalTime.of(20, 30),
-)
+    val weekend: OverviewTimes? = null,
+) {
+    /** The times that apply on [date]. */
+    fun on(date: LocalDate): OverviewTimes =
+        if (weekend != null && date.dayOfWeek in AlertSettings.WEEKEND) weekend else this
+}
 
 private val Context.dataStore by preferencesDataStore("settings")
 
@@ -33,6 +45,14 @@ class Settings(private val context: Context) {
     /** Minutes after midnight; -1 = off. */
     private val morningKey = intPreferencesKey("overviewMorning")
     private val eveningKey = intPreferencesKey("overviewEvening")
+    /** Weekend (VS2): absent = the same as on weekdays; overview -1 = off, -2 = absent. */
+    private val weekendLoudKey = intPreferencesKey("weekendLoudFrom")
+    private val weekendEndKey = intPreferencesKey("weekendDayEnd")
+    private val weekendOnKey = intPreferencesKey("weekendOverview")
+    private val weekendMorningKey = intPreferencesKey("weekendOverviewMorning")
+    private val weekendEveningKey = intPreferencesKey("weekendOverviewEvening")
+    /** Epoch milliseconds; absent = alarms not paused (PS7). */
+    private val pausedUntilKey = longPreferencesKey("alarmsPausedUntil")
 
     val theme: Flow<ThemeMode> = context.dataStore.data.map { prefs ->
         prefs[themeKey]?.let { runCatching { ThemeMode.valueOf(it) }.getOrNull() } ?: ThemeMode.SYSTEM
@@ -45,6 +65,10 @@ class Settings(private val context: Context) {
                 loudFrom = prefs[loudFromKey]?.toTime() ?: default.loudFrom,
                 dayEnd = prefs[dayEndKey]?.toTime() ?: default.dayEnd,
                 askBlockerAfter = prefs[askBlockerKey] ?: default.askBlockerAfter,
+                weekend = runCatching {
+                    DayTimes(requireNotNull(prefs[weekendLoudKey]).toTime(), requireNotNull(prefs[weekendEndKey]).toTime())
+                }.getOrNull(),
+                alarmsPausedUntil = prefs[pausedUntilKey]?.let(Instant::ofEpochMilli),
             )
         }.getOrDefault(default)
     }
@@ -64,13 +88,32 @@ class Settings(private val context: Context) {
                 -1 -> null
                 else -> v.toTime()
             }
-        OverviewTimes(read(morningKey, default.morning), read(eveningKey, default.evening))
+        val weekdays = OverviewTimes(read(morningKey, default.morning), read(eveningKey, default.evening))
+        val weekend = if (prefs[weekendOnKey] == 1) {
+            OverviewTimes(read(weekendMorningKey, weekdays.morning), read(weekendEveningKey, weekdays.evening))
+        } else {
+            null
+        }
+        weekdays.copy(weekend = weekend)
     }
 
     suspend fun setOverview(times: OverviewTimes) {
         context.dataStore.edit {
             it[morningKey] = times.morning?.toMinutes() ?: -1
             it[eveningKey] = times.evening?.toMinutes() ?: -1
+            val weekend = times.weekend
+            it[weekendOnKey] = if (weekend == null) 0 else 1
+            if (weekend != null) {
+                it[weekendMorningKey] = weekend.morning?.toMinutes() ?: -1
+                it[weekendEveningKey] = weekend.evening?.toMinutes() ?: -1
+            }
+        }
+    }
+
+    /** "Alle Alarme pausieren" (PS7); null switches the alarms on again. */
+    suspend fun setAlarmsPaused(until: Instant?) {
+        context.dataStore.edit {
+            if (until == null) it.remove(pausedUntilKey) else it[pausedUntilKey] = until.toEpochMilli()
         }
     }
 
@@ -91,6 +134,15 @@ class Settings(private val context: Context) {
             it[loudFromKey] = settings.loudFrom.toMinutes()
             it[dayEndKey] = settings.dayEnd.toMinutes()
             it[askBlockerKey] = settings.askBlockerAfter
+            val weekend = settings.weekend
+            if (weekend == null) {
+                it.remove(weekendLoudKey)
+                it.remove(weekendEndKey)
+            } else {
+                it[weekendLoudKey] = weekend.loudFrom.toMinutes()
+                it[weekendEndKey] = weekend.dayEnd.toMinutes()
+            }
+            // The pause has its own switch, setAlarmsPaused.
         }
     }
 

@@ -14,8 +14,8 @@ android {
         applicationId = "com.avlreminder"
         minSdk = 37
         targetSdk = 37
-        versionCode = 6
-        versionName = "1.2c-prototyp"
+        versionCode = 7
+        versionName = "1.3a-prototyp"
     }
 
     buildFeatures {

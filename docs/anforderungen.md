@@ -1,7 +1,7 @@
 # Anforderungen – avlreminder
 
 > Arbeitsname. AVL = **A**udio / **V**isual / **L**ocation.
-> Stand: 2026-11-02 – umgesetzt bis V1.2c (Übersicht in Kap. 10). Entscheidungen mit Datum in
+> Stand: 2026-11-02 – umgesetzt bis V1.2c, V1.3a gebaut (Übersicht in Kap. 10). Entscheidungen mit Datum in
 > Kap. 9, technisches Design nach Themen in [design.md](design.md). Wird iterativ verfeinert.
 
 ## 1. Vision
@@ -928,6 +928,8 @@ früh am S24 Ultra testen (Spike, siehe Abschnitt 10).
 | 2026-11-02 | Play Store ohne Eile: erst „fertig“ (mindestens bis V2, ggf. Backend); dafür Transparenz, Notausschalter, Backend nur nach Einschalten; Verschlüsselung auf dem Gerät wird bewertet (7.28 PS5–PS9) |
 | 2026-11-02 | Verschlüsselung auf dem Gerät geklärt: Sandbox + Release-Build reichen, kein SQLCipher (7.28 PS9) |
 | 2026-11-02 | Ziel offizieller Play-Store-Release für eine sehr kleine Zielgruppe, mit Backend (Backup, Sync) und vollem EU-Datenschutz; Android 17 bleibt Minimum (7.28) |
+| 2026-11-02 | V1.3-Entwurf bestätigt (design.md E.5): Aufteilung a/b/c; mehrere Uhrzeiten – verpasst beim nächsten Termin, kein Wochenziel und keine Ankunft; NT2-Schwelle 3×2 (oder einmal 4×), Karte auf *Heute*, *Nein danke* 14 Tage; *Notaus* bricht keine Serie; für V1.3b: *abgebrochen* bricht die Serie, Nachfragen *locker*, max. 90 min. V1.3a gestartet |
+| 2026-11-02 | V1.3a umgesetzt: höchstens 6 Uhrzeiten am Tag; Notaus mit 1 Stunde, bis morgen 06:00 oder bis zum Einschalten; Wochenend-Schalter gilt für Alarmzeiten und Übersicht zusammen |
 
 ## 10. Nächste Schritte
 
@@ -942,6 +944,7 @@ früh am S24 Ultra testen (Spike, siehe Abschnitt 10).
 | V1.2a | ✅ | Verbesserung vorschlagen (7.24), Reminder-Liste (7.9 L1–L5) |
 | V1.2b | 2026-10-31 | Wochenziele, Serien/Joker, Statistik, Übersicht morgens/abends, Diagnose-Log, UI aus Kevins Vorschlägen |
 | V1.2c | 2026-11-02 | Fristen mit Fenstern (7.2), Vorlagen, Vorab-Reminder (T6), Blocker als Aufgaben (7.21 S5–S8) |
+| V1.3a | gebaut | Mehrmals täglich, Wochenend-Zeiten (7.25 VS1, VS2), Hinweis bei ständigem *Später* (7.27 NT2), Notausschalter (7.28 PS7) |
 
 Details zum Verhalten: [design.md](design.md), Gerätetests: [geraetetest.md](geraetetest.md).
 

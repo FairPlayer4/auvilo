@@ -84,6 +84,10 @@ data class ReminderEntity(
     /** A preparation task for this reminder; no foreign key, the engine deletes tasks with it. */
     val prepFor: Long? = null,
     @ColumnInfo(defaultValue = "0") val solvedBlockerIsMinimum: Boolean = false,
+    /** DAILY/WEEKDAYS: the times after [timeMinutes], e.g. "780,1140"; null = one time a day (VS1). */
+    val moreTimes: String? = null,
+    /** The snoozing hint (NT2) counts only occurrences due from here on. */
+    val hintQuietUntil: Instant? = null,
 )
 
 @Entity(
@@ -129,6 +133,7 @@ data class TemplateEntity(
     val postponeLimit: Int?,
     val ignoreDnd: Boolean,
     val snoozeMinutes: String,
+    val moreTimes: String? = null,
 )
 
 @Entity(tableName = "place")
@@ -479,6 +484,15 @@ val MIGRATION_5_6 = object : Migration(5, 6) {
     }
 }
 
+/** V1.3a: several times a day, the snoozing hint. Only new nullable columns. */
+val MIGRATION_6_7 = object : Migration(6, 7) {
+    override fun migrate(db: SupportSQLiteDatabase) {
+        db.execSQL("ALTER TABLE reminder ADD COLUMN moreTimes TEXT")
+        db.execSQL("ALTER TABLE reminder ADD COLUMN hintQuietUntil INTEGER")
+        db.execSQL("ALTER TABLE template ADD COLUMN moreTimes TEXT")
+    }
+}
+
 /** The new tables of version 6, as Room generates them (see schemas/…/6.json). */
 private val CREATE_6 = listOf(
     "CREATE TABLE IF NOT EXISTS `blocker` (`id` INTEGER PRIMARY KEY AUTOINCREMENT NOT NULL, `reminderId` INTEGER NOT NULL, " +
@@ -515,7 +529,7 @@ private val CREATE_3 = listOf(
         PlaceEntity::class, ChecklistItemEntity::class, ItemDoneEntity::class, SuggestionEntity::class,
         BlockerEntity::class, TemplateEntity::class,
     ],
-    version = 6,
+    version = AvlDatabase.VERSION,
 )
 @TypeConverters(Converters::class)
 abstract class AvlDatabase : RoomDatabase() {
@@ -524,12 +538,12 @@ abstract class AvlDatabase : RoomDatabase() {
 
     companion object {
         const val NAME = "avlreminder.db"
-        const val VERSION = 6
+        const val VERSION = 7
 
         fun create(context: Context): AvlDatabase {
             backupBeforeMigration(context.getDatabasePath(NAME), File(context.filesDir, "backup"))
             return Room.databaseBuilder(context, AvlDatabase::class.java, NAME)
-                .addMigrations(MIGRATION_1_2, MIGRATION_2_3, MIGRATION_3_4, MIGRATION_4_5, MIGRATION_5_6)
+                .addMigrations(MIGRATION_1_2, MIGRATION_2_3, MIGRATION_3_4, MIGRATION_4_5, MIGRATION_5_6, MIGRATION_6_7)
                 .build()
         }
 

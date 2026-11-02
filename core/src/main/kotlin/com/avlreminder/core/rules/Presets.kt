@@ -1,5 +1,6 @@
 package com.avlreminder.core.rules
 
+import com.avlreminder.core.model.AtTimes
 import com.avlreminder.core.model.Character
 import com.avlreminder.core.model.PreNotice
 import com.avlreminder.core.model.ProofKind
@@ -65,6 +66,11 @@ object Validation {
             if (reminder.schedule == Schedule.OnArrival) add("Vorab-Reminder braucht eine Uhrzeit")
             if (n is PreNotice.Before && n.minutes !in 5..1440) add("Vorab 5 bis 1440 min vorher")
         }
+        (reminder.schedule as? AtTimes)?.let { s ->
+            if (s.times.size > MAX_TIMES) add("Höchstens $MAX_TIMES Uhrzeiten am Tag")
+            if (s.severalADay && reminder.weeklyGoal != null) add("Wochenziel nur mit einer Uhrzeit am Tag")
+            if (s.severalADay && reminder.arrival != null) add("Ankunft nur mit einer Uhrzeit am Tag")
+        }
         if (reminder.checklist.any { it.title.isBlank() }) add("Checklisten-Punkt ohne Text")
         if (reminder.checklist.size > MAX_ITEMS) add("Höchstens $MAX_ITEMS Checklisten-Punkte")
         reminder.weeklyGoal?.let { g ->
@@ -78,6 +84,7 @@ object Validation {
     }
 
     const val MAX_ITEMS = 20
+    const val MAX_TIMES = 6
 }
 
 /** Weeks run Monday to Sunday. */

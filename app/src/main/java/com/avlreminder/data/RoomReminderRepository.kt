@@ -2,6 +2,7 @@ package com.avlreminder.data
 
 import androidx.room.withTransaction
 import com.avlreminder.core.model.Arrival
+import com.avlreminder.core.model.AtTimes
 import com.avlreminder.core.model.Blocker
 import com.avlreminder.core.model.ChecklistItem
 import com.avlreminder.core.model.Event
@@ -151,8 +152,8 @@ fun ReminderEntity.toModel(items: List<ChecklistItemEntity> = emptyList()): Remi
     strictness = strictness,
     schedule = when (scheduleType) {
         ScheduleType.ONCE -> Schedule.Once(requireNotNull(onceAt))
-        ScheduleType.DAILY -> Schedule.Daily(requireNotNull(timeMinutes).toTime())
-        ScheduleType.WEEKDAYS -> Schedule.Weekdays(requireNotNull(timeMinutes).toTime(), weekdays.toDays())
+        ScheduleType.DAILY -> Schedule.Daily(times(timeMinutes, moreTimes))
+        ScheduleType.WEEKDAYS -> Schedule.Weekdays(times(timeMinutes, moreTimes), weekdays.toDays())
         // For AFTER_DONE, onceAt holds the first due day (no schema change needed).
         ScheduleType.AFTER_DONE -> Schedule.AfterDone(requireNotNull(intervalDays), requireNotNull(timeMinutes).toTime(), onceAt?.toLocalDate())
         ScheduleType.ON_ARRIVAL -> Schedule.OnArrival
@@ -178,7 +179,16 @@ fun ReminderEntity.toModel(items: List<ChecklistItemEntity> = emptyList()): Remi
     preNotice = preNoticeEveningMinutes?.let { PreNotice.Evening(it.toTime()) } ?: preNoticeBeforeMinutes?.let { PreNotice.Before(it) },
     prepFor = prepFor,
     solvedBlockerIsMinimum = solvedBlockerIsMinimum,
+    hintQuietUntil = hintQuietUntil,
 )
+
+/** The first time plus the further ones of several a day (VS1). */
+internal fun times(first: Int?, more: String?): List<LocalTime> =
+    listOf(requireNotNull(first).toTime()) + more.orEmpty().split(',').mapNotNull { it.trim().toIntOrNull()?.toTime() }
+
+/** The times after the first, or null for one time a day. */
+internal fun Schedule.moreTimes(): String? =
+    (this as? AtTimes)?.times?.drop(1)?.takeIf { it.isNotEmpty() }?.joinToString(",") { it.toMinutes().toString() }
 
 fun Reminder.toEntity(): ReminderEntity {
     val s = schedule
@@ -241,6 +251,8 @@ fun Reminder.toEntity(): ReminderEntity {
         preNoticeBeforeMinutes = (preNotice as? PreNotice.Before)?.minutes,
         prepFor = prepFor,
         solvedBlockerIsMinimum = solvedBlockerIsMinimum,
+        moreTimes = s.moreTimes(),
+        hintQuietUntil = hintQuietUntil,
     )
 }
 

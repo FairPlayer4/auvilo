@@ -38,6 +38,17 @@
 | K19 | Frist | Fenster, *Auf morgen*, Überfällig (87–89) | Ruhe außerhalb der Fenster; *Überfällig* auf *Heute* |
 | K20 | Blocker | *Als Aufgabe planen*, Nachfrage (94, 96) | Aufgabe am Vorabend; Nachfrage ab der Schwelle |
 
+## Neu in V1.3a
+
+| # | Test | Erwartung |
+|---|---|---|
+| N1 | Reminder täglich mit zwei Uhrzeiten in 3 und 8 min anlegen; ersten Alarm nicht beantworten | ab der zweiten Uhrzeit ist der erste *verpasst*, der zweite klingelt sofort; *Später*/*Verschieben* bieten nichts über die zweite Uhrzeit hinaus |
+| N2 | Formular: zweite Uhrzeit hinzufügen, entfernen; mit Wochenziel bzw. Ankunft | Hinweis „Jede Uhrzeit gilt als verpasst …“; mit Wochenziel/Ankunft kein *+ weitere Uhrzeit* |
+| N3 | Einstellungen: *Am Wochenende andere Zeiten* an, Sa–So-Felder ändern, wieder aus | Felder erscheinen mit den Mo–Fr-Werten; `diag.log` zeigt die Übersicht mit der Wochenend-Zeit geplant |
+| N4 | Notaus *1 Stunde* bei einem gerade klingelnden Reminder; dann *Wieder einschalten* in der Benachrichtigung | Rückfrage; Alarm stoppt, rotes Banner auf *Heute*, stille Benachrichtigung; nach dem Einschalten Banner weg, nächste Runde normal |
+| N5 | Notaus *bis ich einschalte*, Gerät neu starten | Pause und Benachrichtigung bleiben; Fälligkeiten nur still |
+| N6 | Hinweiskarte (nur, wenn ein Reminder 3× in Folge mind. 2× geschoben wurde) | Karte auf *Heute* mit Uhrzeit/Strenge/*Nein danke*; nach einer Antwort weg |
+
 ## C. Nach dem Test
 - Claude liest `adb logcat -d -s AvlDiag` und `files/diag/diag.log` (per `run-as`) und
   gleicht sie mit den Erwartungen ab. Simulationen (DND, Standort, Zeit) zurücksetzen.

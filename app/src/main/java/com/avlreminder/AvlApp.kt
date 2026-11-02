@@ -4,6 +4,8 @@ import android.app.Application
 import android.app.NotificationManager
 import android.content.Context
 import androidx.glance.appwidget.updateAll
+import com.avlreminder.alarm.AlarmPause
+import com.avlreminder.alarm.AlarmService
 import com.avlreminder.alarm.AndroidAlarmPort
 import com.avlreminder.alarm.Notifications
 import com.avlreminder.alarm.OverviewNotifications
@@ -45,6 +47,7 @@ class AvlApp : Application() {
         Notifications.createChannels(this)
         OverviewNotifications.createChannel(this)
         PreNotices.createChannel(this)
+        AlarmPause.createChannel(this)
         // Alarms may have been lost (reboot, force-stop, update): rebuild them from the database.
         graph.scope.launch {
             graph.syncAndRing()
@@ -121,6 +124,18 @@ class AppGraph(private val context: Context) {
         val rings = withEngine { it.sync() }
         if (rings.isNotEmpty()) Diag.log("sync: ${rings.size} missed alarm(s) ring now")
         rings.forEach { Ringer.ring(context, it) }
+        AlarmPause.update(context, settings.alert.first().alarmsPausedUntil)
+    }
+
+    /**
+     * "Alle Alarme pausieren" (PS7) until [until], or on again with null. A ringing alarm stops;
+     * [sync] plans the open occurrences for the end of the pause.
+     */
+    suspend fun setAlarmsPaused(until: Instant?) {
+        settings.setAlarmsPaused(until)
+        Diag.log(if (until == null) "alarms on again" else "alarms paused until $until")
+        if (until != null) AlarmService.ringing.value?.let { AlarmService.stop(context, it) }
+        syncAndRing()
     }
 
     /** Sets the morning and evening overview from the settings. */

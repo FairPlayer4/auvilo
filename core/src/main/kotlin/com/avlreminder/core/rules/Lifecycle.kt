@@ -61,6 +61,8 @@ data class Limits(
     val deadline: Instant? = null,
     /** A blocker was solved since the last occurrence and may count as the minimum (S7). */
     val blockerSolved: Boolean = false,
+    /** Several times a day: the next time; postponing must stay before it (VS1). */
+    val nextTime: Instant? = null,
 )
 
 sealed interface TransitionResult {
@@ -132,6 +134,7 @@ object Lifecycle {
                 !canPostpone(reminder, occurrence) -> TransitionResult.Rejected("postpone limit reached")
                 action.to <= now -> TransitionResult.Rejected("postpone target must lie in the future")
                 limits.deadline != null && action.to >= limits.deadline -> TransitionResult.Rejected("postpone target after the deadline")
+                limits.nextTime != null && action.to >= limits.nextTime -> TransitionResult.Rejected("postpone target after the next time")
                 else -> ok(
                     occurrence.copy(
                         state = PLANNED, currentAt = action.to, postponeCount = occurrence.postponeCount + 1, pausedUntil = null,
@@ -196,6 +199,7 @@ object Lifecycle {
                 val counts = !limits.itemDoneToday
                 when {
                     reminder.checklist.isEmpty() -> TransitionResult.Rejected("no checklist")
+                    limits.nextTime != null -> TransitionResult.Rejected("no rest for tomorrow several times a day")
                     action.to <= now -> TransitionResult.Rejected("defer target must lie in the future")
                     counts && !canPostpone(reminder, occurrence) -> TransitionResult.Rejected("postpone limit reached")
                     else -> ok(

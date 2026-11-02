@@ -62,11 +62,19 @@ Paket `com.avlreminder`.
 | Art | Felder | Beispiel |
 |---|---|---|
 | `Once` | Zeitpunkt | Arzt anrufen am 28.10. 09:00 |
-| `Daily` | Uhrzeit | täglich 08:00 |
-| `Weekdays` | Uhrzeit, Tage | Mo–Fr 18:30 |
+| `Daily` | Uhrzeiten (1–6) | täglich 08:00; täglich 08:00, 13:00, 20:00 |
+| `Weekdays` | Uhrzeiten (1–6), Tage | Mo–Fr 18:30 |
 | `AfterDone` | Tage, Uhrzeit, erstmals am | 14 Tage nach letzter Erledigung, 19:00 |
 | `OnArrival` | – | einmalig, wenn ich zuhause bin |
 | `Deadline` | Frist, Tage, Fenster von–bis, Intervall | bis Fr 12:00, Mo–Fr 9–17, alle 60 min |
+
+**Mehrmals täglich (VS1, V1.3a):** Weiterhin eine offene Fälligkeit pro Reminder; nach
+dem Abschluss folgt die nächste Uhrzeit desselben Tages, sonst der nächste Tag. Ein
+Termin gilt als **verpasst, sobald der nächste beginnt** (spätestens an der
+Tagesgrenze); ein Alarm bis 2 min zu spät klingelt noch den gerade begonnenen Termin.
+*Später* und *Verschieben* nur bis vor den nächsten Termin, kein *Rest auf morgen* bei
+Checklisten. Nicht kombinierbar mit Wochenziel und Ankunft (Validierung, das Formular
+blendet beides aus). Vorab erledigen betrifft nur den nächsten Termin.
 
 ### 2.3 Fälligkeit (`Occurrence`)
 `dueAt` (geplant), `currentAt` (aktuell, nach Später/Verschieben), `state`,
@@ -121,7 +129,16 @@ PLANNED ──(Zeit/Ankunft)──► DUE ──(keine Reaktion)──► ESCALA
 - **Runden:** 3 min klingeln, dann 10 min Pause, bis zur Reaktion; während „Nicht stören“
   laufen die Runden still weiter.
 - **Tagesgrenze:** Ohne Reaktion gilt die Fälligkeit an `dayEnd` ihres Tages als verpasst
-  (liegt sie danach, am Folgetag). Fristen haben eigene Regeln (7.).
+  (liegt sie danach, am Folgetag). Fristen haben eigene Regeln (7.), mehrere Uhrzeiten
+  am Tag auch (2.2).
+- **Wochenende (VS2):** `AlertSettings.weekend` (`DayTimes`: *laut ab*, Tagesgrenze) gilt
+  Sa–So; `AlertSettings.on(date)` liefert die Werte des Tages, die Tagesgrenze kommt vom
+  Tag, auf den sie fällt. Ohne Schalter wie Mo–Fr.
+- **Notaus (PS7):** `alarmsPausedUntil` (1 Stunde, bis morgen 06:00 oder bis zum
+  Einschalten, `PAUSED_FOR_GOOD`). Während der Pause klingelt alles still (`SILENT`), der
+  nächste Alarm liegt am Pausenende (bzw. an der Tagesgrenze). Bleibt eine Fälligkeit
+  bis zur Tagesgrenze offen, wird sie *ausgelassen* mit System-Grund *Notaus* (bricht
+  keine Serie, zählt nicht als *hängen*). Ein laufender Alarm stoppt beim Pausieren.
 - **Später** (+x min): Knöpfe pro Reminder; Knöpfe über die Tagesgrenze werden
   ausgeblendet; ohne Limit, jedes ist ein `SNOOZED`.
 - **Verschieben** auf einen Zeitpunkt: zählt gegen `postponeLimit`. Ist es erreicht,
@@ -238,7 +255,16 @@ Fälligkeit *Was hält dich gerade ab?* (`BLOCKER_ASKED`). Antwort → Blocker (
 - **Serien:** *Tage* bei täglich/Wochentagen ohne Wochenziel (Joker pro Kalenderwoche),
   *Wochen* mit Wochenziel (Woche zählt mit erreichtem Minimum; Joker pro Monat), *Mal* bei
   *nach Erledigung* (mehr als einen Tag zu spät = Verpasser; Joker pro Monat).
-  Ausgelassen, entfallen und ohne Nachweis halten die Serie.
+  Ausgelassen, entfallen und ohne Nachweis halten die Serie. Mit mehreren Uhrzeiten
+  zählt ein Tag, sobald ein Termin *Ziel* oder *Minimum* hat (sonst verpasst, wenn einer
+  verpasst ist); die Statistik zählt Termine.
+- **Hinweis bei ständigem *Später* (NT2, `Snoozing`):** Hatten die letzten 3 abgeschlossenen
+  Fälligkeiten je mindestens 2× *Später* (oder eine 4×), zeigt *Heute* eine Karte: neue
+  Uhrzeit (Median der Erledigungszeiten, auf 15 min gerundet, nur wenn später als jetzt),
+  Strenge eine Stufe senken, *Nein danke* (14 Tage Ruhe). Jede Antwort setzt
+  `hintQuietUntil`, ab dann wird neu gezählt. Nur eine Uhrzeit am Tag (täglich,
+  Wochentage, nach Erledigung), aktiv, keine Vorbereitungsaufgabe. *Verschieben* zählt
+  nicht mit.
 - **Statistik** pro Reminder (beim Bearbeiten *Statistik und Serie*): Ziel, Minimum, ohne
   Nachweis, vorab, ausgelassen, entfallen, verpasst für Woche, Monat, Jahr, gesamt;
   aktuelle und beste Serie.
@@ -270,8 +296,12 @@ Klickbare Mocks (Stand V1.0): https://claude.ai/artifact/PXA9YgWi8XoHupYnN7Z3cS
   Benachrichtigung mit denselben Aktionen für die Uhr (Kanal *Alarm auf der Uhr*, ohne
   Ton), die laufende ist `setLocalOnly`.
 - **Übersicht:** stille Benachrichtigung morgens (heute) und abends (Rückblick,
-  Wochenziele, morgen), Standard 7:30 und 20:30, einzeln *aus*. Inexakter Alarm
+  Wochenziele, morgen), Standard 7:30 und 20:30, einzeln *aus*, Sa–So mit eigenen
+  Zeiten (VS2, derselbe Schalter wie bei den Alarmzeiten). Inexakter Alarm
   (`setWindow`, 10 min), Inhalt beim Auslösen aus der DB.
+- **Notaus (PS7):** dauerhafte stille Benachrichtigung *Alle Alarme pausiert …* mit
+  *Wieder einschalten*, verschwindet am Pausenende (`setTimeoutAfter`); dazu ein rotes
+  Banner auf *Heute*. Einschalten in den Einstellungen ganz oben, mit Rückfrage.
 - **Vorab-Reminder (T6, S6):** *am Vorabend* (Uhrzeit) oder *x min vorher*, nicht bei
   *wenn ich zuhause bin*. Stiller Kanal, inexakt (`setWindow`, 5 min), mit erstem Schritt
   und offenen Blockern; entfällt, wenn schon erledigt. Tipp öffnet den Reminder.
@@ -279,7 +309,8 @@ Klickbare Mocks (Stand V1.0): https://claude.ai/artifact/PXA9YgWi8XoHupYnN7Z3cS
 
 ### 11.3 Vorlagen
 Übernehmen Charakter, Strenge, Nachweis, Minimum mit Limit, Später-Knöpfe,
-Verschiebe-Limit, *Nicht stören*-Ausnahme und die Art des Takts mit Zeiten. Nicht: Titel,
+Verschiebe-Limit, *Nicht stören*-Ausnahme und die Art des Takts mit Zeiten (auch
+mehrere Uhrzeiten). Nicht: Titel,
 Warum, Startklar, Botschaft, Datum. *+* und Widget zeigen die Auswahl (zuletzt benutzte
 oben, dazu *Leer*), sofern es Vorlagen gibt. Umbenennen und Löschen in den Einstellungen.
 
@@ -317,10 +348,14 @@ umgesetzt / verworfen. Liste in den Einstellungen, *Teilen* als Markdown.
 
 ## 13. Daten, Migration, Diagnose
 
-- **Room** mit exportierten Schemas (`app/schemas/`), aktuell Version 6. Jede Version hat
+- **Room** mit exportierten Schemas (`app/schemas/`), aktuell Version 7. Jede Version hat
   eine explizite Migration, kein destruktiver Fallback; Migrationen möglichst nur mit
   `ADD COLUMN` und neuen Tabellen (keine Fremdschlüssel-Kaskaden). Migration 5→6 übernimmt
-  die neueste Antwort auf Frage 3 als Blocker.
+  die neueste Antwort auf Frage 3 als Blocker. Migration 6→7: `reminder.moreTimes` und
+  `template.moreTimes` (weitere Uhrzeiten als Minuten, z. B. `780,1200`; die erste bleibt
+  in `timeMinutes`), `reminder.hintQuietUntil`.
+- **Einstellungen** (DataStore): Wochenend-Zeiten als eigene Schlüssel (fehlen = wie
+  Mo–Fr), `alarmsPausedUntil` in Millisekunden (fehlt = keine Pause).
 - **Backup vor jeder Migration** per `VACUUM INTO` nach
   `filesDir/backup/avlreminder-v<alt>-<Zeit>.db`; scheitert es, startet die App trotzdem.
 - **Diagnose-Log** (`Diag`): logcat-Tag `AvlDiag` und `files/diag/diag.log` (rotiert bei
@@ -343,7 +378,7 @@ umgesetzt / verworfen. Liste in den Einstellungen, *Teilen* als Markdown.
 
 ---
 
-## Entwurf V1.3 (2026-11-02, noch nicht bestätigt)
+## Entwurf V1.3 (2026-11-02, bestätigt; V1.3a umgesetzt)
 
 > Grundlage: anforderungen.md 7.11 (Timer), 7.12 (Abläufe), 7.14 G2/G3 (Uhr über
 > Benachrichtigungen), 7.20 V2 (vorgezogen starten), 7.25 VS1/VS2, 7.27 NT2 und 7.28 PS7.
@@ -363,50 +398,9 @@ Woche Training mit Timer, bevor die Abläufe festgelegt werden – die Erfahrung
 Nachfragen zeigt, wie viel Ablauf wirklich nötig ist (passt zu NT1, *trimmen*).
 
 ### E.2 V1.3a – Alltag
-
-**Mehrmals täglich (VS1)**
-- `Schedule.Daily` und `Schedule.Weekdays` bekommen statt einer Uhrzeit eine **Liste
-  von Uhrzeiten** (1–6, sortiert). Eine Uhrzeit = Verhalten wie bisher. **[E]**
-- Weiterhin **eine offene Fälligkeit** pro Reminder: Nach dem Abschluss folgt die
-  nächste Uhrzeit desselben Tages, sonst der nächste Tag.
-- **Verpasst** wird ein Termin, wenn der nächste Termin beginnt (spätestens an der
-  Tagesgrenze) – sonst würden sich Termine überlappen. **[E]**
-- *Später* und *Verschieben* nur bis vor den nächsten Termin (wie bei der Tagesgrenze).
-- **Vorab erledigen** erledigt nur den nächsten Termin (7.20 V4).
-- **Serie:** Ein Tag zählt, sobald mindestens ein Termin *Ziel* oder *Minimum* hat
-  (in VS1 so entschieden). Die Statistik zählt Termine.
-- **Wochenziel:** **[E]** nicht kombinierbar mit mehreren Uhrzeiten (das Formular
-  blendet es aus). Beides zusammen ergibt keine klare Regel; bei Bedarf später.
-- **Ort** (*bei Ankunft*): **[E]** nur mit einer Uhrzeit – die Ankunft ist ein Moment
-  pro Tag.
-- Migration: neue Spalte `times` (Text, z. B. `480,780,1140`), aus `timeMinutes` befüllt.
-
-**Wochenend-Zeiten (VS2)**
-- `AlertSettings` und Übersicht bekommen eine zweite Gruppe für **Sa–So**: *laut ab*,
-  Tagesgrenze, Übersicht morgens/abends. Standard „wie Mo–Fr“. **[E]**
-- Einstellungen: Schalter *Am Wochenende andere Zeiten*, darunter dieselben Felder.
-- Regel in `:core`: `AlertSettings.forDate(date)` liefert die passende Gruppe; alle
-  Stellen, die heute `loudFrom`/`dayEnd` lesen, gehen darüber.
-
-**Hinweis bei ständigem *Später* (NT2)**
-- Regel in `:core`: Wurden die **letzten 3 Fälligkeiten jeweils mindestens 2×
-  geschoben** (oder eine 4×), schlägt die App eine neue Uhrzeit vor: den Median der
-  tatsächlichen Erledigungszeiten, auf 15 min gerundet. **[E]**
-- Ort: eine **Karte auf *Heute*** („Training schiebst du oft – lieber um 19:30?“) mit
-  *Uhrzeit ändern*, *Strenge senken*, *Nein danke*. Nicht im Alarm – der soll beim
-  Handeln bleiben. *Nein danke* ruht 14 Tage. **[E]**
-- Gezählt wird nur *Später* (`SNOOZED`), nicht *Verschieben* (das hat schon ein Limit).
-
-**Notausschalter (PS7)**
-- Einstellungen, ganz oben: *Alle Alarme pausieren* mit Dauer **1 Stunde**, **bis
-  morgen früh** oder **bis ich es wieder einschalte**; mit Rückfrage. **[E]**
-- Während der Pause: kein Vollbild, kein Ton, keine Vibration; fällige Reminder
-  erscheinen nur als stille Benachrichtigung. Was bis zur Tagesgrenze offen bleibt,
-  gilt als **ausgelassen mit Grund *Notaus*** (System-Grund: bricht keine Serie, zählt
-  nicht als *hängen*). **[E]**
-- Sichtbar: rotes Banner auf *Heute*, dauerhafte stille Benachrichtigung mit
-  *Wieder einschalten*, Eintrag im Diagnose-Log.
-- Später (Play Store, PS6) zusätzlich als Schnelleinstellungs-Kachel.
+Umgesetzt (2026-11-02) und in die Themen oben übernommen: mehrmals täglich (2.2, 10.2),
+Wochenend-Zeiten (4., 11.2), Notaus (4., 11.2), Hinweis bei ständigem *Später* (10.2),
+Migration und Einstellungen (13.).
 
 ### E.3 V1.3b – Sitzung mit Timer
 

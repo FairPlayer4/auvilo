@@ -151,12 +151,13 @@ class AlarmActivity : ComponentActivity() {
                 early = early,
                 done = limits.itemsDone.keys,
                 // Doing an item today makes "Rest auf morgen" free; otherwise it is a postponement.
-                canDeferRest = reminder.checklist.isNotEmpty() && (limits.itemDoneToday || Lifecycle.canPostpone(reminder, occurrence)),
+                canDeferRest = reminder.checklist.isNotEmpty() && limits.nextTime == null && (limits.itemDoneToday || Lifecycle.canPostpone(reminder, occurrence)),
                 week = engine.weekStatus(reminder, occurrence.dueAt.atZone(ZoneId.systemDefault()).toLocalDate()),
                 blockerSolved = Lifecycle.canUseSolvedBlocker(reminder, limits),
                 askBlocker = !early && engine.askBlocker(reminder, occurrence),
                 tomorrow = if (early) null else engine.tomorrow(reminder, occurrence),
                 deadline = limits.deadline,
+                nextTime = limits.nextTime,
                 blockers = engine.blockers(reminder.id).filter { it.isOpen },
             )
         }

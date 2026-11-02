@@ -13,7 +13,9 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
+import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.FilterChip
+import androidx.compose.material3.Switch
 import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
@@ -34,7 +36,9 @@ import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import com.avlreminder.core.model.Place
+import com.avlreminder.alarm.AlarmPause
 import com.avlreminder.core.rules.AlertSettings
+import com.avlreminder.core.rules.DayTimes
 import com.avlreminder.data.OverviewTimes
 import com.avlreminder.data.Settings
 import com.avlreminder.data.TemplateEntity
@@ -44,7 +48,10 @@ import com.avlreminder.ui.Format
 import com.avlreminder.ui.SectionTitle
 import com.avlreminder.ui.TimeDialog
 import com.avlreminder.ui.theme.Avl
+import java.time.Duration
+import java.time.Instant
 import java.time.LocalTime
+import java.time.ZoneId
 
 /** A permission the app needs, with its state and how to ask for it. */
 data class PermissionItem(
@@ -77,6 +84,9 @@ fun SettingsScreen(
     templates: List<TemplateEntity> = emptyList(),
     onRenameTemplate: (Long, String) -> Unit = { _, _ -> },
     onDeleteTemplate: (Long) -> Unit = {},
+    onPause: (Instant?) -> Unit = {},
+    now: Instant = Instant.now(),
+    zone: ZoneId = ZoneId.systemDefault(),
 ) {
     val c = Avl.colors
     var homeState by remember { mutableStateOf<String?>(null) }
@@ -86,6 +96,9 @@ fun SettingsScreen(
             Text("Einstellungen", color = c.text, fontSize = 20.sp, fontWeight = FontWeight.SemiBold)
         }
         Column(Modifier.verticalScroll(rememberScrollState()).padding(horizontal = 16.dp)) {
+            SectionTitle("Notaus")
+            Card { PauseSetting(alert, onPause, now, zone) }
+
             SectionTitle("Verbesserungen")
             Card {
                 Column(Modifier.padding(16.dp)) {
@@ -128,6 +141,20 @@ fun SettingsScreen(
                         "Tagesgrenze", alert.dayEnd, "dayEnd",
                         error = { if (it <= alert.loudFrom) "muss nach „laut ab“ (${Format.time(alert.loudFrom)}) liegen" else null },
                     ) { onAlert(alert.copy(dayEnd = it)) }
+                    WeekendSwitch(alert.weekend != null) { on ->
+                        onAlert(alert.copy(weekend = if (on) DayTimes(alert.loudFrom, alert.dayEnd) else null))
+                        onOverview(overview.copy(weekend = if (on) overview.copy(weekend = null) else null))
+                    }
+                    alert.weekend?.let { w ->
+                        TimeSetting(
+                            "Sa–So laut ab", w.loudFrom, "weekendLoudFrom",
+                            error = { if (it >= w.dayEnd) "muss vor der Tagesgrenze (${Format.time(w.dayEnd)}) liegen" else null },
+                        ) { onAlert(alert.copy(weekend = w.copy(loudFrom = it))) }
+                        TimeSetting(
+                            "Sa–So Tagesgrenze", w.dayEnd, "weekendDayEnd",
+                            error = { if (it <= w.loudFrom) "muss nach „laut ab“ (${Format.time(w.loudFrom)}) liegen" else null },
+                        ) { onAlert(alert.copy(weekend = w.copy(dayEnd = it))) }
+                    }
                 }
             }
             Text(
@@ -169,6 +196,16 @@ fun SettingsScreen(
                         "Abends: Rückblick, Wochenziele, morgen", overview.evening, "overviewEvening", fallback = LocalTime.of(20, 30),
                         onOff = { onOverview(overview.copy(evening = null)) },
                     ) { onOverview(overview.copy(evening = it)) }
+                    overview.weekend?.let { w ->
+                        TimeSetting(
+                            "Sa–So morgens", w.morning, "weekendOverviewMorning", fallback = LocalTime.of(9, 0),
+                            onOff = { onOverview(overview.copy(weekend = w.copy(morning = null))) },
+                        ) { onOverview(overview.copy(weekend = w.copy(morning = it))) }
+                        TimeSetting(
+                            "Sa–So abends", w.evening, "weekendOverviewEvening", fallback = LocalTime.of(20, 30),
+                            onOff = { onOverview(overview.copy(weekend = w.copy(evening = null))) },
+                        ) { onOverview(overview.copy(weekend = w.copy(evening = it))) }
+                    }
                 }
             }
             Text("Eine stille Benachrichtigung ohne Ton; ein Tipp öffnet die App.", Modifier.padding(4.dp), color = c.muted, fontSize = 13.sp)
@@ -210,7 +247,7 @@ fun SettingsScreen(
                     }
                 }
             }
-            Text("AVL-Reminder 1.2c-Prototyp", Modifier.padding(vertical = 24.dp, horizontal = 4.dp), color = c.muted, fontSize = 12.sp)
+            Text("AVL-Reminder 1.3a-Prototyp", Modifier.padding(vertical = 24.dp, horizontal = 4.dp), color = c.muted, fontSize = 12.sp)
         }
     }
 }
@@ -224,6 +261,59 @@ private fun Card(content: @Composable () -> Unit) {
  * One line per time: label left, the time as a button right that opens a free entry
  * (Vorschlag 1). With [onOff] the time can be switched off; null then shows "aus".
  */
+/** "Am Wochenende andere Zeiten" (VS2): alarm times and overview together. */
+@Composable
+private fun WeekendSwitch(on: Boolean, onChange: (Boolean) -> Unit) {
+    val c = Avl.colors
+    Row(Modifier.fillMaxWidth().padding(top = 8.dp), verticalAlignment = Alignment.CenterVertically) {
+        Column(Modifier.weight(1f)) {
+            Text("Am Wochenende andere Zeiten", color = c.text, fontSize = 15.sp)
+            Text("Sa–So: laut ab, Tagesgrenze und Übersicht", color = c.muted, fontSize = 13.sp)
+        }
+        Switch(on, onChange, Modifier.testTag("weekend"))
+    }
+}
+
+@OptIn(ExperimentalLayoutApi::class)
+/** "Alle Alarme pausieren" (PS7), with a question first; while paused, one button to switch them on again. */
+@Composable
+private fun PauseSetting(alert: AlertSettings, onPause: (Instant?) -> Unit, now: Instant, zone: ZoneId) {
+    val c = Avl.colors
+    var asking by remember { mutableStateOf<Pair<String, Instant>?>(null) }
+    Column(Modifier.padding(16.dp)) {
+        val until = alert.alarmsPausedUntil
+        if (until != null && alert.alarmsPaused(now)) {
+            Text("Alle Alarme pausiert ${AlarmPause.untilText(until, now, zone)}", color = c.strict, fontSize = 15.sp, fontWeight = FontWeight.SemiBold)
+            TextButton(onClick = { onPause(null) }, Modifier.testTag("resume")) { Text("Wieder einschalten", color = c.accent) }
+        } else {
+            Text("Alle Alarme pausieren", color = c.text, fontSize = 15.sp)
+            FlowRow(Modifier.padding(top = 6.dp), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                listOf(
+                    Triple("1 Stunde", "pause1h", { n: Instant -> n.plus(Duration.ofHours(1)) }),
+                    Triple("bis morgen früh", "pauseMorning", { n: Instant -> AlarmPause.untilMorning(n, zone) }),
+                    Triple("bis ich einschalte", "pauseForGood", { _: Instant -> AlertSettings.PAUSED_FOR_GOOD }),
+                ).forEach { (label, tag, end) ->
+                    OutlinedButton(onClick = { asking = label to end(Instant.now()) }, Modifier.testTag(tag)) { Text(label) }
+                }
+            }
+            Text(
+                "Für Notfälle: kein Vollbild, kein Ton. Fällige Reminder kommen nur still; was bis zur Tagesgrenze offen bleibt, " +
+                    "zählt als ausgelassen (Notaus) und bricht keine Serie.",
+                Modifier.padding(top = 6.dp), color = c.muted, fontSize = 13.sp,
+            )
+        }
+    }
+    asking?.let { (label, end) ->
+        AlertDialog(
+            onDismissRequest = { asking = null },
+            title = { Text("Alle Alarme pausieren?") },
+            text = { Text("${AlarmPause.untilText(end, now, zone).replaceFirstChar { it.uppercase() }} klingelt nichts – auch nicht, was ansteht.") },
+            confirmButton = { TextButton(onClick = { onPause(end); asking = null }, Modifier.testTag("pauseOk")) { Text("Pausieren ($label)") } },
+            dismissButton = { TextButton(onClick = { asking = null }) { Text("Abbrechen") } },
+        )
+    }
+}
+
 @Composable
 private fun TimeSetting(
     label: String,

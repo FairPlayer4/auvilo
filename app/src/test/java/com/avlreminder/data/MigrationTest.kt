@@ -28,7 +28,7 @@ import java.time.LocalDateTime
 import java.time.LocalTime
 
 /**
- * Room 1 → 2 (V1.1a), 2 → 3 (V1.1b), 3 → 4 (V1.2a), 4 → 5 (V1.2b) and 5 → 6 (V1.2c): existing reminders, occurrences and proofs survive, the
+ * Room 1 → 2 (V1.1a), 2 → 3 (V1.1b), 3 → 4 (V1.2a), 4 → 5 (V1.2b), 5 → 6 (V1.2c) and 6 → 7 (V1.3a): existing reminders, occurrences and proofs survive, the
  * backup is taken first. The old database is built from the exported schema; Room checks the
  * migrated tables against the current version on open.
  */
@@ -104,6 +104,19 @@ class MigrationTest {
         )
     }
 
+    private fun createV6() = create(6) { db ->
+        db.execSQL(
+            "INSERT INTO reminder (id, title, character, strictness, scheduleType, timeMinutes, weekdays, proof, active, createdAt, " +
+                "proofPhoto, ignoreDnd, snoozeMinutes, solvedBlockerIsMinimum) " +
+                "VALUES (1, 'Training', 'OVERCOME', 'NORMAL', 'WEEKDAYS', 1140, 31, 'CONFIRM', 1, 0, 0, 0, '10', 0)",
+        )
+        db.execSQL(
+            "INSERT INTO template (id, name, usedAt, character, strictness, scheduleType, timeMinutes, weekdays, proofKind, " +
+                "proofPhoto, proofWindowMinutes, ignoreDnd, snoozeMinutes) " +
+                "VALUES (2, 'Tabletten', 0, 'DOCUMENT', 'NORMAL', 'DAILY', 480, 0, 'CONFIRM', 0, 10, 0, '10')",
+        )
+    }
+
     private fun createV1() = create(1) { db ->
             db.execSQL(
                 "INSERT INTO reminder (id, title, why, character, strictness, scheduleType, timeMinutes, onceAt, weekdays, " +
@@ -120,7 +133,40 @@ class MigrationTest {
     }
 
     private fun open() = Room.databaseBuilder(context, AvlDatabase::class.java, file.path)
-        .addMigrations(MIGRATION_1_2, MIGRATION_2_3, MIGRATION_3_4, MIGRATION_4_5, MIGRATION_5_6).allowMainThreadQueries().build()
+        .addMigrations(MIGRATION_1_2, MIGRATION_2_3, MIGRATION_3_4, MIGRATION_4_5, MIGRATION_5_6, MIGRATION_6_7)
+        .allowMainThreadQueries().build()
+
+    @Test
+    fun version6KeepsDataAndGetsSeveralTimesADay() = runTest {
+        createV6()
+        val db = open()
+        try {
+            val repo = RoomReminderRepository(db)
+            val r = repo.reminder(1)!!
+            val weekdays = (1..5).map { DayOfWeek.of(it) }.toSet()
+            assertEquals(Schedule.Weekdays(LocalTime.of(19, 0), weekdays), r.schedule)
+            assertNull(r.hintQuietUntil)
+            val template = db.dao().observeTemplates().first().single()
+            assertNull(template.moreTimes)
+
+            val three = Schedule.Weekdays(listOf(LocalTime.of(8, 0), LocalTime.of(13, 0), LocalTime.of(19, 0)), weekdays)
+            repo.saveReminder(r.copy(schedule = three, hintQuietUntil = Instant.ofEpochMilli(5000)))
+            assertEquals(three, repo.reminder(1)!!.schedule)
+            assertEquals(Instant.ofEpochMilli(5000), repo.reminder(1)!!.hintQuietUntil)
+            // Back to one time: the further times are gone.
+            repo.saveReminder(r)
+            assertEquals(r.schedule, repo.reminder(1)!!.schedule)
+        } finally {
+            db.close()
+        }
+    }
+
+    @Test
+    fun backupIsTakenBeforeTheUpgradeFromVersion6() {
+        createV6()
+        val dir = File(context.filesDir, "backup-test-6").apply { deleteRecursively() }
+        assertTrue(AvlDatabase.backupBeforeMigration(file, dir)!!.name.startsWith("avlreminder-v6-"))
+    }
 
     @Test
     fun version5KeepsDataAndTurnsTheMissingThingIntoABlocker() = runTest {

@@ -316,7 +316,7 @@ class FlowsTest {
         val actions = FakeActions()
         compose.setContent { AvlTheme(dark = false) { AvlAppUi(emptyState, actions, now, zone) } }
         compose.onNodeWithContentDescription("Einstellungen").performClick()
-        compose.onNodeWithText("Dunkel").performClick()
+        compose.onNodeWithText("Dunkel").performScrollTo().performClick()
         assertEquals(ThemeMode.DARK, actions.chosenTheme)
         compose.onNodeWithTag("loudFrom").performScrollTo().performClick()
         compose.onAllNodes(hasSetTextAction())[0].performTextReplacement("19")
