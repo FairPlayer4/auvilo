@@ -13,9 +13,12 @@ import java.time.ZoneId
 data class AlertSettings(
     val loudFrom: LocalTime = LocalTime.of(18, 0),
     val dayEnd: LocalTime = LocalTime.of(23, 0),
+    /** After this many stuck occurrences in a row the alarm asks what keeps one from it (S8). */
+    val askBlockerAfter: Int = 2,
 ) {
     init {
         require(loudFrom < dayEnd) { "loud must start before the end of the day" }
+        require(askBlockerAfter in 1..5) { "ask after 1..5 stuck occurrences" }
     }
 
     fun isLoud(time: LocalTime) = time >= loudFrom

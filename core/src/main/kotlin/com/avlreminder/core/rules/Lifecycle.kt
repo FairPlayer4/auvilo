@@ -28,14 +28,24 @@ sealed interface Action {
     data class StartProof(val until: Instant) : Action
     /** The proof screen was left without completing: the escalation goes on at [until]. */
     data class AbortProof(val until: Instant) : Action
-    /** Incomplete [evidence] for a reminder that asks for proof resolves as [Resolution.NO_PROOF]. */
-    data class Complete(val minimumOnly: Boolean, val evidence: Evidence = Evidence(), val note: String? = null) : Action
+    /**
+     * Incomplete [evidence] for a reminder that asks for proof resolves as [Resolution.NO_PROOF].
+     * [blockerSolved]: a solved blocker counts as the minimum (S7), without proof.
+     */
+    data class Complete(
+        val minimumOnly: Boolean,
+        val evidence: Evidence = Evidence(),
+        val note: String? = null,
+        val blockerSolved: Boolean = false,
+    ) : Action
     data class Skip(val reason: String?) : Action
     data object Miss : Action
     /** One checklist item done; the last one completes the occurrence. */
     data class CheckItem(val itemId: Long, val evidence: Evidence = Evidence()) : Action
     /** The open checklist items come back at [to]. */
     data class DeferRest(val to: Instant) : Action
+    /** A deadline's window ended: quiet until the next window at [to]; not a postponement. */
+    data class CloseWindow(val to: Instant) : Action
 }
 
 /** Facts beyond the occurrence itself that limit what is allowed. */
@@ -47,6 +57,10 @@ data class Limits(
     val itemsDone: Map<Long, Boolean> = emptyMap(),
     /** An item was done today: deferring the rest then does not count as postponing (C5c). */
     val itemDoneToday: Boolean = false,
+    /** A deadline not yet passed: postponing must stay before it. */
+    val deadline: Instant? = null,
+    /** A blocker was solved since the last occurrence and may count as the minimum (S7). */
+    val blockerSolved: Boolean = false,
 )
 
 sealed interface TransitionResult {
@@ -55,6 +69,8 @@ sealed interface TransitionResult {
 }
 
 object Lifecycle {
+    /** Note of an occurrence closed with a solved blocker as the minimum. */
+    const val BLOCKER_SOLVED = "Blocker gelöst"
 
     fun canPostpone(reminder: Reminder, occurrence: Occurrence): Boolean =
         reminder.postponeLimit == null || occurrence.postponeCount < reminder.postponeLimit
@@ -64,6 +80,11 @@ object Lifecycle {
 
     fun canUseMinimum(reminder: Reminder, limits: Limits): Boolean =
         reminder.minimum != null &&
+            (reminder.minimumLimitPerWeek == null || limits.minimumsThisWeek < reminder.minimumLimitPerWeek)
+
+    /** A solved blocker as the minimum (S7); the weekly limit for the minimum applies. */
+    fun canUseSolvedBlocker(reminder: Reminder, limits: Limits): Boolean =
+        reminder.solvedBlockerIsMinimum && limits.blockerSolved &&
             (reminder.minimumLimitPerWeek == null || limits.minimumsThisWeek < reminder.minimumLimitPerWeek)
 
     fun minimumsLeft(reminder: Reminder, limits: Limits): Int? =
@@ -110,6 +131,7 @@ object Lifecycle {
             is Action.Postpone -> when {
                 !canPostpone(reminder, occurrence) -> TransitionResult.Rejected("postpone limit reached")
                 action.to <= now -> TransitionResult.Rejected("postpone target must lie in the future")
+                limits.deadline != null && action.to >= limits.deadline -> TransitionResult.Rejected("postpone target after the deadline")
                 else -> ok(
                     occurrence.copy(
                         state = PLANNED, currentAt = action.to, postponeCount = occurrence.postponeCount + 1, pausedUntil = null,
@@ -132,6 +154,13 @@ object Lifecycle {
                 }
 
             is Action.Complete -> {
+                if (action.blockerSolved) {
+                    if (!canUseSolvedBlocker(reminder, limits)) return TransitionResult.Rejected("no solved blocker")
+                    return ok(
+                        occurrence.copy(state = DONE, resolution = Resolution.MINIMUM, resolvedAt = now, note = action.note ?: BLOCKER_SOLVED),
+                        EventType.COMPLETED, Resolution.MINIMUM.name,
+                    )
+                }
                 if (action.minimumOnly && !canUseMinimum(reminder, limits)) {
                     return TransitionResult.Rejected("minimum not available")
                 }
@@ -178,6 +207,10 @@ object Lifecycle {
                     )
                 }
             }
+
+            is Action.CloseWindow ->
+                if (action.to <= now) TransitionResult.Rejected("next window must lie in the future")
+                else ok(occurrence.copy(state = PLANNED, currentAt = action.to, pausedUntil = null), EventType.WINDOW_CLOSED, action.to.toString())
 
             is Action.Skip -> ok(
                 occurrence.copy(state = CLOSED, resolution = Resolution.SKIPPED, resolvedAt = now, note = action.reason),

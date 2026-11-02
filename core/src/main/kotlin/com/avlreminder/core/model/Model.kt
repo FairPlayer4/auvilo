@@ -54,6 +54,10 @@ enum class EventType {
     CREATED, DUE, ESCALATED, SNOOZED, POSTPONED, COMPLETED, SKIPPED, MISSED, MISSED_DETECTED,
     PROOF_STARTED, PROOF_ABORTED,
     DROPPED, ITEM_DONE, DEFERRED,
+    /** A deadline's window ended without completion; it rings again in the next window. */
+    WINDOW_CLOSED,
+    /** "Was hält dich gerade ab?" was asked (answered or skipped) for the occurrence. */
+    BLOCKER_ASKED,
 }
 
 /** When a reminder is due. */
@@ -72,6 +76,50 @@ sealed interface Schedule {
     }
     /** Once, without a time: due only through its [Arrival] ("wenn ich zuhause bin"). */
     data object OnArrival : Schedule
+    /**
+     * Once, by [due] (T1d): rings only in its windows – on [days] from [from] to [until] – at the
+     * start of each window and then every [intervalMinutes] until it is done.
+     */
+    data class Deadline(
+        val due: LocalDateTime,
+        val days: Set<DayOfWeek>,
+        val from: LocalTime,
+        val until: LocalTime,
+        val intervalMinutes: Int = 60,
+    ) : Schedule {
+        init {
+            require(days.isNotEmpty()) { "at least one weekday" }
+            require(intervalMinutes >= 1) { "interval must be at least one minute" }
+        }
+    }
+}
+
+/** A silent notice before the reminder is due (T6), naming its open blockers (S6). */
+sealed interface PreNotice {
+    /** The evening before the due day, at [time]. */
+    data class Evening(val time: LocalTime) : PreNotice
+    data class Before(val minutes: Int) : PreNotice
+}
+
+enum class BlockerOrigin {
+    /** "Was fehlt?" of the "Startklar" questions (question 3). */
+    STARTKLAR,
+    /** "Was hält dich gerade ab?" after it got stuck (S8). */
+    ASKED,
+}
+
+/** Something that keeps one from starting (S5); solved by hand or by doing its [taskReminderId]. */
+data class Blocker(
+    val id: Long = 0,
+    val reminderId: Long,
+    val text: String,
+    val createdAt: Instant,
+    val solvedAt: Instant? = null,
+    val origin: BlockerOrigin = BlockerOrigin.STARTKLAR,
+    /** The preparation task planned for it, a one-off with [Reminder.prepFor]. */
+    val taskReminderId: Long? = null,
+) {
+    val isOpen: Boolean get() = solvedAt == null
 }
 
 /** A place for arrival triggers; V1.1b knows only "Zuhause". */
@@ -137,6 +185,11 @@ data class Reminder(
     val archivedAt: Instant? = null,
     /** null = every offer counts on its own. */
     val weeklyGoal: WeeklyGoal? = null,
+    val preNotice: PreNotice? = null,
+    /** A preparation task (S5) for this reminder; doing it solves its blocker. */
+    val prepFor: Long? = null,
+    /** A blocker solved since the last occurrence may be used as the minimum (S7). */
+    val solvedBlockerIsMinimum: Boolean = false,
 )
 
 /** One concrete time a reminder is due. */
