@@ -361,6 +361,7 @@ umgesetzt / verworfen. Liste in den Einstellungen, *Teilen* als Markdown.
 - **Diagnose-Log** (`Diag`): logcat-Tag `AvlDiag` und `files/diag/diag.log` (rotiert bei
   512 KB). Zeiten, IDs, Titel, Zustände, Berechtigungen; keine Nachweis-Inhalte, keine
   Positionen.
+- **Einstellungen** außerdem: `claudeAccess` (1 = Schnittstelle für Claude an, 15).
 - Alle Daten bleiben auf dem Gerät (Anf. 8.4).
 
 ## 14. Tests und Qualität
@@ -375,6 +376,35 @@ umgesetzt / verworfen. Liste in den Einstellungen, *Teilen* als Markdown.
 - Tests entstehen mit dem Code; Regeln haben sprechende Testnamen.
 - Ein Befehl für alles, lokal wie in CI:
   `./gradlew :core:check :core:koverLog :app:testDebugUnitTest :app:assembleDebug`.
+
+## 15. Schnittstelle für Claude (V1.3a2, Anf. 7.26 AG11)
+
+- **Weg:** `ContentProvider` `com.avlreminder.claude`, nur im Debug-Source-Set
+  (`app/src/debug`), geschützt mit `android.permission.DUMP` (hat nur die adb-Shell).
+  `call()` prüft die Berechtigung selbst, weil das Manifest sie dort nicht erzwingt.
+  Antwort als Bundle-Extra `json`.
+  ```bash
+  adb shell "content call --uri content://com.avlreminder.claude --method reminders"
+  adb shell "content call --uri content://com.avlreminder.claude --method reminder --arg '{\"id\":3}'"
+  ```
+- **Freigabe:** Einstellung `claudeAccess` (DataStore), Standard aus; Schalter
+  *Schnittstelle für Claude* in den Einstellungen mit Rückfrage, nur sichtbar, wenn die
+  App `debuggable` ist. Ohne Freigabe beantwortet sie nur `status`.
+- **Logik:** `ClaudeApi` (in `main`, testbar mit Robolectric) über `ClaudeApi.Access`, in
+  der App `AppGraph`. Schreiben geht über `ReminderEngine.save` usw., also mit derselben
+  Prüfung und Alarmplanung wie die Oberfläche.
+- **Methoden:** `status`, `methods`, `reminders` (`{"archived":true}`), `reminder`
+  (`{"id"}`: Reminder, nächste Fälligkeit, letzte 10, Statistik, Serie, Blocker,
+  Startklar), `today`, `history` (`{"days":14}`), `save` (`{"reminder":{…},"prep":[…]}`;
+  ohne `id` neu mit `title` und `schedule`, Strenge-Voreinstellung wie im Formular; mit
+  `id` ändern sich nur die angegebenen Felder), `setActive`, `archive`, `addBlocker`.
+  Kein Erledigen, Auslassen, Alarm beenden, Nachweis, Löschen (AG5).
+- **JSON** (`ClaudeJson`): Zeiten lokal ohne Zone (`2026-11-03T19:15`), Enums mit ihrem
+  Namen. Takt z. B. `{"type":"daily","times":["12:30","19:15"]}`, `weekdays` mit `days`,
+  `once` mit `at`, `afterDone` mit `intervalDays`/`time`/`firstOn`, `onArrival`,
+  `deadline` mit `due`/`days`/`from`/`until`/`intervalMinutes`. Jede Antwort hat `ok`
+  und `version` (1), Fehler in `error`.
+- **Protokoll:** `claude <Methode> id=<ID> ok|error` im Diagnose-Log, keine Inhalte.
 
 ---
 

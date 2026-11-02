@@ -12,7 +12,10 @@ import com.avlreminder.alarm.OverviewNotifications
 import com.avlreminder.alarm.PreNotices
 import com.avlreminder.alarm.Ringer
 import com.avlreminder.core.model.Place
+import com.avlreminder.claude.ClaudeApi
+import com.avlreminder.core.model.Occurrence
 import com.avlreminder.core.model.Reminder
+import com.avlreminder.data.toModel
 import com.avlreminder.core.ports.DeviceStatePort
 import com.avlreminder.core.rules.AlertSettings
 import com.avlreminder.core.usecases.ReminderEngine
@@ -74,7 +77,7 @@ class AndroidDeviceState(private val context: Context) : DeviceStatePort {
 }
 
 /** Manually wired dependencies; no DI library needed for one user and a handful of classes. */
-class AppGraph(private val context: Context) {
+class AppGraph(private val context: Context) : ClaudeApi.Access {
     val db = AvlDatabase.create(context)
     val repository = RoomReminderRepository(db)
     val settings = Settings(context)
@@ -106,7 +109,7 @@ class AppGraph(private val context: Context) {
     }
 
     /** Runs use cases one at a time and refreshes the widget afterwards. */
-    suspend fun <T> withEngine(block: suspend (ReminderEngine) -> T): T {
+    override suspend fun <T> withEngine(block: suspend (ReminderEngine) -> T): T {
         val result = mutex.withLock {
             // Read fresh each time: an alarm may start the process before anything else loaded the settings.
             alert = settings.alert.first()
@@ -117,8 +120,25 @@ class AppGraph(private val context: Context) {
         return result
     }
 
+    // --- Interface for Claude (Anf. 7.26 AG11) ----------------------------------------------
+
+    override suspend fun enabled(): Boolean = debuggable && settings.claudeAccess.first()
+    override suspend fun reminders(): List<Reminder> = repository.reminders()
+    override suspend fun openOccurrences(): List<Occurrence> = db.dao().openOccurrences().map { it.toModel() }
+    override suspend fun resolvedOccurrences(): List<Occurrence> = db.dao().observeResolved().first().map { it.toModel() }
+    override fun now(): Instant = Instant.now()
+    override val zone: ZoneId get() = ZoneId.systemDefault()
+
+    /** The interface for Claude exists only in the debug build (sideload). */
+    val debuggable: Boolean get() = context.applicationInfo.flags and android.content.pm.ApplicationInfo.FLAG_DEBUGGABLE != 0
+
+    suspend fun setClaudeAccess(on: Boolean) {
+        settings.setClaudeAccess(on)
+        Diag.log("claude access ${if (on) "on" else "off"}")
+    }
+
     /** Rebuilds all alarms and rings what was missed. */
-    fun ring(ring: com.avlreminder.core.usecases.Ring) = Ringer.ring(context, ring)
+    override fun ring(ring: com.avlreminder.core.usecases.Ring) = Ringer.ring(context, ring)
 
     suspend fun syncAndRing() {
         val rings = withEngine { it.sync() }

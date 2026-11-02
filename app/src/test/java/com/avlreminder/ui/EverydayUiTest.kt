@@ -54,6 +54,7 @@ class EverydayUiTest {
         var chosenOverview: OverviewTimes? = null
         val paused = mutableListOf<Instant?>()
         val answers = mutableListOf<Pair<Long, SnoozeHintChoice>>()
+        val claude = mutableListOf<Boolean>()
         override fun save(reminder: Reminder, prep: List<PrepAnswer>, onResult: (SaveResult) -> Unit) {
             saved += reminder
             onResult(SaveResult.Saved(reminder.id))
@@ -68,6 +69,7 @@ class EverydayUiTest {
         override fun setOverview(times: OverviewTimes) { chosenOverview = times }
         override fun setAlarmsPaused(until: Instant?) { paused += until }
         override fun answerSnoozeHint(reminderId: Long, choice: SnoozeHintChoice) { answers += reminderId to choice }
+        override fun setClaudeAccess(on: Boolean) { claude += on }
     }
 
     private val t19 = LocalTime.of(19, 0)
@@ -169,6 +171,23 @@ class EverydayUiTest {
         compose.onNodeWithTag("hintTime").performClick()
         compose.onNodeWithTag("hintDismiss").performClick()
         assertEquals(listOf(1L to SnoozeHintChoice.TIME, 1L to SnoozeHintChoice.DISMISS), actions.answers)
+    }
+
+    @Test
+    fun theInterfaceForClaudeIsSwitchedOnOnlyAfterTheQuestion() {
+        val actions = FakeActions()
+        compose.setContent { AvlTheme(dark = false) { AvlAppUi(state().copy(claudeAccess = false), actions, now, zone, startRoute = Routes.SETTINGS) } }
+
+        compose.onNodeWithTag("claudeAccess").performScrollTo().performClick()
+        assertTrue(actions.claude.isEmpty())
+        compose.onNodeWithTag("claudeOk").performClick()
+        assertEquals(listOf(true), actions.claude)
+    }
+
+    @Test
+    fun noInterfaceForClaudeInARelease() {
+        compose.setContent { AvlTheme(dark = false) { AvlAppUi(state(), FakeActions(), now, zone, startRoute = Routes.SETTINGS) } }
+        compose.onNodeWithTag("claudeAccess").assertDoesNotExist()
     }
 
     @Test

@@ -87,6 +87,8 @@ fun SettingsScreen(
     onPause: (Instant?) -> Unit = {},
     now: Instant = Instant.now(),
     zone: ZoneId = ZoneId.systemDefault(),
+    claudeAccess: Boolean? = null,
+    onClaudeAccess: (Boolean) -> Unit = {},
 ) {
     val c = Avl.colors
     var homeState by remember { mutableStateOf<String?>(null) }
@@ -210,6 +212,11 @@ fun SettingsScreen(
             }
             Text("Eine stille Benachrichtigung ohne Ton; ein Tipp öffnet die App.", Modifier.padding(4.dp), color = c.muted, fontSize = 13.sp)
 
+            if (claudeAccess != null) {
+                SectionTitle("Schnittstelle für Claude")
+                Card { ClaudeSetting(claudeAccess, onClaudeAccess) }
+            }
+
             SectionTitle("Zuhause")
             Card {
                 Column(Modifier.padding(16.dp)) {
@@ -247,7 +254,7 @@ fun SettingsScreen(
                     }
                 }
             }
-            Text("AVL-Reminder 1.3a-Prototyp", Modifier.padding(vertical = 24.dp, horizontal = 4.dp), color = c.muted, fontSize = 12.sp)
+            Text("AVL-Reminder 1.3a2-Prototyp", Modifier.padding(vertical = 24.dp, horizontal = 4.dp), color = c.muted, fontSize = 12.sp)
         }
     }
 }
@@ -261,6 +268,39 @@ private fun Card(content: @Composable () -> Unit) {
  * One line per time: label left, the time as a button right that opens a free entry
  * (Vorschlag 1). With [onOff] the time can be switched off; null then shows "aus".
  */
+/**
+ * The interface for Claude over adb (Anf. 7.26 AG11), only in the debug build. Switching it on
+ * asks first: Claude then reads all reminders and may create and change them.
+ */
+@Composable
+private fun ClaudeSetting(on: Boolean, onChange: (Boolean) -> Unit) {
+    val c = Avl.colors
+    var asking by remember { mutableStateOf(false) }
+    Column(Modifier.padding(16.dp)) {
+        Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
+            Column(Modifier.weight(1f)) {
+                Text(if (on) "Freigegeben" else "Aus", color = if (on) c.strict else c.text, fontSize = 15.sp, fontWeight = if (on) FontWeight.SemiBold else null)
+                Text("Nur über adb vom Rechner", color = c.muted, fontSize = 13.sp)
+            }
+            Switch(on, { if (it) asking = true else onChange(false) }, Modifier.testTag("claudeAccess"))
+        }
+        Text(
+            "Claude liest dann alle Reminder, Verlauf, Statistik und Blocker und kann Reminder anlegen, ändern, pausieren " +
+                "und archivieren. Erledigen, auslassen, Alarme beenden und löschen kann Claude nicht.",
+            Modifier.padding(top = 6.dp), color = c.muted, fontSize = 13.sp,
+        )
+    }
+    if (asking) {
+        AlertDialog(
+            onDismissRequest = { asking = false },
+            title = { Text("Schnittstelle für Claude freigeben?") },
+            text = { Text("Die Inhalte deiner Reminder gehen dann an Claude. Ausschalten jederzeit hier.") },
+            confirmButton = { TextButton(onClick = { onChange(true); asking = false }, Modifier.testTag("claudeOk")) { Text("Freigeben") } },
+            dismissButton = { TextButton(onClick = { asking = false }) { Text("Abbrechen") } },
+        )
+    }
+}
+
 /** "Am Wochenende andere Zeiten" (VS2): alarm times and overview together. */
 @Composable
 private fun WeekendSwitch(on: Boolean, onChange: (Boolean) -> Unit) {

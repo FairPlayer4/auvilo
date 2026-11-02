@@ -1,7 +1,7 @@
 # Anforderungen – avlreminder
 
 > Arbeitsname. AVL = **A**udio / **V**isual / **L**ocation.
-> Stand: 2026-11-02 – umgesetzt bis V1.2c, V1.3a gebaut (Übersicht in Kap. 10). Entscheidungen mit Datum in
+> Stand: 2026-11-02 – umgesetzt bis V1.3a, V1.3a2 gebaut (Übersicht in Kap. 10). Entscheidungen mit Datum in
 > Kap. 9, technisches Design nach Themen in [design.md](design.md). Wird iterativ verfeinert.
 
 ## 1. Vision
@@ -745,7 +745,7 @@ soll helfen, die Reminder einzuhalten: planen, Vorarbeit erledigen, motivieren.
   was gelesen oder geändert hat.
 - Vorbereitung bis dahin: neue Logik weiter als saubere Befehle in `core`, damit
   Oberfläche und Agent später dieselben Wege nutzen.
-- AG11 **Vorstufe für Claude über adb (vorgezogen, 2026-11-02, Entwurf):** Kevin möchte,
+- AG11 **Vorstufe für Claude über adb (vorgezogen, 2026-11-02, umgesetzt in V1.3a2):** Kevin möchte,
   dass Claude in der Entwicklung Reminder lesen und schreiben kann (z. B. Test-Reminder
   einrichten, Stand prüfen). Datenschutz ist für ihn als Entwickler kein Hindernis, die
   Schnittstelle muss aber **ausdrücklich in der App freigegeben** werden. Empfehlung:
@@ -764,6 +764,8 @@ soll helfen, die Reminder einzuhalten: planen, Vorarbeit erledigen, motivieren.
   - **Protokoll:** jeder Zugriff im Diagnose-Log mit Methode und ID, ohne Inhalte.
   - **Nur im Debug-Build** (Sideload); der Play-Store-Release bekommt stattdessen die
     Agenten-Schnittstelle aus AG1–AG10.
+  - Umsetzung: design.md 15. Einstellungen liest die Schnittstelle vorerst nicht; ein
+    neuer Reminder ohne Angabe ist *festhalten* (Überwinden braucht die vier Startklar-Antworten).
 
 ### 7.27 Nutzung beobachten, Funktionen trimmen, Schlupflöcher bremsen
 Stand 2026-11-02: Die App funktioniert im Alltag sehr gut. Mit V1.2c ist aber viel
@@ -950,6 +952,7 @@ früh am S24 Ultra testen (Spike, siehe Abschnitt 10).
 | 2026-11-02 | V1.3-Entwurf bestätigt (design.md E.5): Aufteilung a/b/c; mehrere Uhrzeiten – verpasst beim nächsten Termin, kein Wochenziel und keine Ankunft; NT2-Schwelle 3×2 (oder einmal 4×), Karte auf *Heute*, *Nein danke* 14 Tage; *Notaus* bricht keine Serie; für V1.3b: *abgebrochen* bricht die Serie, Nachfragen *locker*, max. 90 min. V1.3a gestartet |
 | 2026-11-02 | V1.3a umgesetzt: höchstens 6 Uhrzeiten am Tag; Notaus mit 1 Stunde, bis morgen 06:00 oder bis zum Einschalten; Wochenend-Schalter gilt für Alarmzeiten und Übersicht zusammen |
 | 2026-11-02 | Schnittstelle für Claude vorgezogen (vor V1.3b): Reminder lesen und schreiben über adb, ausdrücklich in der App freizugeben; Entwurf in 7.26 AG11 |
+| 2026-11-02 | AG11 bestätigt und als V1.3a2 umgesetzt: ContentProvider mit `DUMP`, nur Debug-Build, Schalter mit Rückfrage; Claude darf Reminder-Inhalte über die freigegebene Schnittstelle lesen, sie bleiben aber aus Repo und Logs |
 
 ## 10. Nächste Schritte
 
@@ -964,7 +967,8 @@ früh am S24 Ultra testen (Spike, siehe Abschnitt 10).
 | V1.2a | ✅ | Verbesserung vorschlagen (7.24), Reminder-Liste (7.9 L1–L5) |
 | V1.2b | 2026-10-31 | Wochenziele, Serien/Joker, Statistik, Übersicht morgens/abends, Diagnose-Log, UI aus Kevins Vorschlägen |
 | V1.2c | 2026-11-02 | Fristen mit Fenstern (7.2), Vorlagen, Vorab-Reminder (T6), Blocker als Aufgaben (7.21 S5–S8) |
-| V1.3a | gebaut | Mehrmals täglich, Wochenend-Zeiten (7.25 VS1, VS2), Hinweis bei ständigem *Später* (7.27 NT2), Notausschalter (7.28 PS7) |
+| V1.3a | 2026-11-02 | Mehrmals täglich, Wochenend-Zeiten (7.25 VS1, VS2), Hinweis bei ständigem *Später* (7.27 NT2), Notausschalter (7.28 PS7) |
+| V1.3a2 | gebaut | Schnittstelle für Claude über adb (7.26 AG11) |
 
 Details zum Verhalten: [design.md](design.md), Gerätetests: [geraetetest.md](geraetetest.md).
 

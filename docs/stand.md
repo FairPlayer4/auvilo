@@ -3,15 +3,19 @@
 Stand: 2026-11-02. Bei jedem größeren Schritt aktualisieren.
 
 ## In Arbeit
-- **V1.3a** (`versionName` 1.3a-prototyp, `versionCode` 7) auf `feature/v1.3a`, gebaut,
-  **noch nicht installiert** (wartet auf Kevins Go): mehrmals täglich (VS1),
-  Wochenend-Zeiten (VS2), Hinweis bei ständigem *Später* (NT2), Notausschalter (PS7).
-  Migration 6→7 (nur neue Spalten) mit Backup v6. Build grün: 296 Tests, Kover in `core`
-  98,84 %. Gerätetests: geraetetest.md *Neu in V1.3a*.
+- **V1.3a2** (`versionName` 1.3a2-prototyp, `versionCode` 8) auf `feature/v1.3a`, gebaut,
+  **noch nicht installiert** (wartet auf Kevins Go): Schnittstelle für Claude über adb
+  (anforderungen.md 7.26 AG11, design.md 15), nur im Debug-Build, Schalter in den
+  Einstellungen. Keine Migration. Build grün: 305 Tests, Kover in `core` 98,84 %.
+  Gerätetest: geraetetest.md *Neu in V1.3a2*.
+- Danach: Kevins Wochenplan (Gerätetests V1.3a), dann V1.3b.
 
 ## Auf dem Gerät
-- **V1.2c** (`versionName` 1.2c-prototyp, `versionCode` 6), installiert am 2026-11-02,
-  in `develop` gemergt. Enthält zusätzlich zu V1.2b Fristen mit Ausführungsfenstern und
+- **V1.3a** (`versionName` 1.3a-prototyp, `versionCode` 7), installiert am 2026-11-02
+  auf `feature/v1.3a` (noch nicht in `develop`): mehrmals täglich (VS1),
+  Wochenend-Zeiten (VS2), Hinweis bei ständigem *Später* (NT2), Notausschalter (PS7).
+  Migration 6→7 mit Backup v6 geprüft. Gerätetests: geraetetest.md *Neu in V1.3a*.
+- Davor **V1.2c** (`versionName` 1.2c-prototyp, `versionCode` 6), in `develop` gemergt. Enthält zusätzlich zu V1.2b Fristen mit Ausführungsfenstern und
   *Überfällig*, Vorlagen, Vorab-Reminder, Blocker als Liste mit Vorbereitungsaufgaben,
   *Blocker gelöst* als Minimum und Nachfragen, wenn es hakt. Migration 5→6 mit Backup v5
   geprüft, alle Alarme neu geplant.

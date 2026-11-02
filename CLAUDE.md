@@ -44,7 +44,14 @@ Strenge und invasive Mechanismen sind gewollt. Kommunikation auf **Deutsch, mit 
   `adb logcat -d -s AvlDiag`. Die Datenbank (`databases/avlreminder.db` plus `-wal`, `-shm`)
   nur in ein temporäres Verzeichnis kopieren, lesen und wieder löschen.
 - Inhalte von Kevins Remindern und Nachweisen sind privat: nicht ins Repo, nicht in
-  Logs schreiben, nicht an externe Dienste geben.
+  Logs schreiben, nicht an externe Dienste geben. Lesen über die Schnittstelle ist erlaubt.
+- **Schnittstelle für Claude** (Debug-Build, design.md 15): erst nutzbar, wenn Kevin sie
+  in den Einstellungen einschaltet. Lesen ohne Rückfrage; Reminder anlegen, ändern,
+  pausieren, archivieren nur nach Absprache mit Kevin.
+  ```bash
+  adb shell "content call --uri content://com.avlreminder.claude --method today"
+  adb shell "content call --uri content://com.avlreminder.claude --method save --arg '{\"reminder\":{\"id\":3,\"goal\":\"…\"}}'"
+  ```
 
 ## Git
 - Remote `origin`: GitHub `FairPlayer4/avlreminder` (privat). `develop` ist der

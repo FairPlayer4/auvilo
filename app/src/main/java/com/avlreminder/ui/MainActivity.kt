@@ -94,6 +94,7 @@ class MainActivity : ComponentActivity() {
             val blockers by vm.blockers.collectAsStateWithLifecycle()
             val templates by vm.templates.collectAsStateWithLifecycle()
             val snoozeHints by vm.snoozeHints.collectAsStateWithLifecycle()
+            val claudeAccess by vm.claudeAccess.collectAsStateWithLifecycle()
             var now by androidx.compose.runtime.remember { mutableStateOf(Instant.now()) }
             var dnd by androidx.compose.runtime.remember { mutableStateOf(device.isDoNotDisturb()) }
             LaunchedEffect(Unit) {
@@ -114,6 +115,7 @@ class MainActivity : ComponentActivity() {
                             home = home, dwellMinutes = dwell, itemsDone = itemsDone,
                             reminderSort = reminderSort, suggestions = suggestions, overview = overview,
                             blockers = blockers, templates = templates, snoozeHints = snoozeHints,
+                            claudeAccess = claudeAccess,
                         ),
                         actions = actions,
                         now = now,
@@ -171,6 +173,7 @@ class MainActivity : ComponentActivity() {
         override fun setReminderSort(sort: ReminderSort) = vm.setReminderSort(sort)
         override fun setOverview(times: OverviewTimes) = vm.setOverview(times)
         override fun setAlarmsPaused(until: Instant?) = vm.setAlarmsPaused(until)
+        override fun setClaudeAccess(on: Boolean) = vm.setClaudeAccess(on)
         override fun answerSnoozeHint(reminderId: Long, choice: SnoozeHintChoice) = vm.answerSnoozeHint(reminderId, choice)
         override fun setArchived(reminderId: Long, archived: Boolean) = vm.setArchived(reminderId, archived)
         override fun addSuggestion(text: String, important: Boolean, screen: String, reminderId: Long?) =

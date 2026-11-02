@@ -103,6 +103,8 @@ data class AppState(
     val templates: List<TemplateEntity>? = emptyList(),
     /** Reminders snoozed again and again (NT2). */
     val snoozeHints: List<SnoozeHint> = emptyList(),
+    /** Interface for Claude (Anf. 7.26 AG11): null = not in this build. */
+    val claudeAccess: Boolean? = null,
 )
 
 interface AppActions {
@@ -140,6 +142,7 @@ interface AppActions {
     /** "Alle Alarme pausieren" (PS7); null switches them on again. */
     fun setAlarmsPaused(until: Instant?) {}
     fun answerSnoozeHint(reminderId: Long, choice: SnoozeHintChoice) {}
+    fun setClaudeAccess(on: Boolean) {}
 }
 
 /** Simple navigation without a library: one route string, back goes to "today". */
@@ -255,6 +258,7 @@ fun AvlAppUi(
                 SettingsScreen(
                     theme = state.theme, onTheme = actions::setTheme, alert = state.alert, onAlert = actions::setAlert,
                     onPause = actions::setAlarmsPaused, now = now, zone = zone,
+                    claudeAccess = state.claudeAccess, onClaudeAccess = actions::setClaudeAccess,
                     permissions = state.permissions, onBack = { go(Routes.TODAY) },
                     home = state.home, onSetHome = actions::setHomeHere,
                     dwellMinutes = state.dwellMinutes, onDwell = actions::setDwellMinutes,

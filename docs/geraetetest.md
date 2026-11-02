@@ -49,9 +49,17 @@
 | N5 | Notaus *bis ich einschalte*, Gerät neu starten | Pause und Benachrichtigung bleiben; Fälligkeiten nur still |
 | N6 | Hinweiskarte (nur, wenn ein Reminder 3× in Folge mind. 2× geschoben wurde) | Karte auf *Heute* mit Uhrzeit/Strenge/*Nein danke*; nach einer Antwort weg |
 
+## Neu in V1.3a2
+
+| # | Test | Erwartung |
+|---|---|---|
+| N7 | Claude ruft `status` und `reminders` auf, solange der Schalter aus ist | `enabled: false`; `reminders` antwortet „nicht freigegeben …“ |
+| N8 | Einstellungen: *Schnittstelle für Claude* einschalten | Rückfrage; danach liefert `reminders` die Liste, `diag.log` zeigt `claude reminders ok` ohne Titel |
+| N9 | Claude legt *Gerätetest* an | Reminder in der Liste wie selbst angelegt, nächster Alarm 12:30 bzw. 19:15 |
+
 ### Wochenplan V1.3a (03.–08.11.2026)
 Reminder *Gerätetest*: täglich 12:30 und 19:15, *normal*, Minimum „Test nur
-vorbereiten“. Pro Alarm ein Test, freie Termine zum Nachholen.
+vorbereiten“ (legt Claude nach N9 über die Schnittstelle an). Pro Alarm ein Test, freie Termine zum Nachholen.
 
 | Wann | Test | Dauer |
 |---|---|---|

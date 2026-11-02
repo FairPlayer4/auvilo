@@ -51,6 +51,8 @@ class Settings(private val context: Context) {
     private val weekendOnKey = intPreferencesKey("weekendOverview")
     private val weekendMorningKey = intPreferencesKey("weekendOverviewMorning")
     private val weekendEveningKey = intPreferencesKey("weekendOverviewEvening")
+    /** Interface for Claude over adb (Anf. 7.26 AG11), debug build only; absent = off. */
+    private val claudeKey = intPreferencesKey("claudeAccess")
     /** Epoch milliseconds; absent = alarms not paused (PS7). */
     private val pausedUntilKey = longPreferencesKey("alarmsPausedUntil")
 
@@ -108,6 +110,12 @@ class Settings(private val context: Context) {
                 it[weekendEveningKey] = weekend.evening?.toMinutes() ?: -1
             }
         }
+    }
+
+    val claudeAccess: Flow<Boolean> = context.dataStore.data.map { it[claudeKey] == 1 }
+
+    suspend fun setClaudeAccess(on: Boolean) {
+        context.dataStore.edit { it[claudeKey] = if (on) 1 else 0 }
     }
 
     /** "Alle Alarme pausieren" (PS7); null switches the alarms on again. */
