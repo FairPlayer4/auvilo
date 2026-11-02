@@ -49,6 +49,23 @@
 | N5 | Notaus *bis ich einschalte*, Gerät neu starten | Pause und Benachrichtigung bleiben; Fälligkeiten nur still |
 | N6 | Hinweiskarte (nur, wenn ein Reminder 3× in Folge mind. 2× geschoben wurde) | Karte auf *Heute* mit Uhrzeit/Strenge/*Nein danke*; nach einer Antwort weg |
 
+### Wochenplan V1.3a (03.–08.11.2026)
+Reminder *Gerätetest*: täglich 12:30 und 19:15, *normal*, Minimum „Test nur
+vorbereiten“. Pro Alarm ein Test, freie Termine zum Nachholen.
+
+| Wann | Test | Dauer |
+|---|---|---|
+| Di 12:30 | T1 = N2: Formular, zweite Uhrzeit hinzufügen/entfernen, mit Wochenziel | 2 min |
+| Di 19:15 | T2 = N4: Wenn *Gerätetest* klingelt → Notaus *1 Stunde*, Banner und Benachrichtigung ansehen, *Wieder einschalten* | 3 min |
+| Mi 12:30 | T3 = K4 + K5: einmalig in 3 min, „+10“, *Erledigt*; Hell/Dunkel | 15 min, meist warten |
+| Mi 19:15 | T4 = N1: Test-Reminder täglich in 3 und 8 min, ersten nicht beantworten | 10 min |
+| Do 12:30 | T5 = K14: Aktionen auf der Uhr | 3 min |
+| Do 19:15 | T6 = K11: *Nicht stören* an, Reminder in 2 min, dann aus | 15 min |
+| Fr 19:15 | T7 = N3: Wochenend-Zeiten an, Übersicht Sa–So 9:00; Sa früh prüfen | 2 min |
+| Sa 19:15 | T8 = N5: Notaus *bis ich einschalte*, Handy neu starten, dann **sofort wieder einschalten** | 5 min |
+
+Fr 12:30, Sa 12:30 und So: frei oder nachholen. Danach liest Claude die Logs (C.).
+
 ## C. Nach dem Test
 - Claude liest `adb logcat -d -s AvlDiag` und `files/diag/diag.log` (per `run-as`) und
   gleicht sie mit den Erwartungen ab. Simulationen (DND, Standort, Zeit) zurücksetzen.
