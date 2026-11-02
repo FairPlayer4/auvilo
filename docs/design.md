@@ -340,3 +340,140 @@ umgesetzt / verworfen. Liste in den Einstellungen, *Teilen* als Markdown.
 - Tests entstehen mit dem Code; Regeln haben sprechende Testnamen.
 - Ein Befehl für alles, lokal wie in CI:
   `./gradlew :core:check :core:koverLog :app:testDebugUnitTest :app:assembleDebug`.
+
+---
+
+## Entwurf V1.3 (2026-11-02, noch nicht bestätigt)
+
+> Grundlage: anforderungen.md 7.11 (Timer), 7.12 (Abläufe), 7.14 G2/G3 (Uhr über
+> Benachrichtigungen), 7.20 V2 (vorgezogen starten), 7.25 VS1/VS2, 7.27 NT2 und 7.28 PS7.
+> **[E]** = Empfehlung, von Kevin zu bestätigen; **[P]** = vorher auf dem Gerät prüfen.
+> Nach der Umsetzung wandert alles in die Themen oben.
+
+### E.1 Aufteilung
+
+| Etappe | Inhalt | Warum so |
+|---|---|---|
+| **V1.3a – Alltag** | Mehrmals täglich (VS1), Wochenend-Zeiten (VS2), Hinweis bei ständigem *Später* (NT2), Notausschalter (PS7) | Klein, sofort im Alltag spürbar, passt zur Beobachtungsphase. Keine neuen Bildschirme, nur Regeln und Einstellungen. |
+| **V1.3b – Sitzung mit Timer** | *Ich starte jetzt*, Timer, Nachfragen, Ziel/Minimum als Dauer, maximale Dauer, Dauer-Vergleich (7.11 D1–D6), vorgezogen starten (7.20 V2), Aktionen und Timer auf der Uhr per Benachrichtigung (G2, G3) | Der große neue Mechanismus. Braucht einen neuen Zustand *läuft* im Lebenszyklus und einen Dienst für den Timer. |
+| **V1.3c – Abläufe** | Schritte, Pausen, Wiederholungen, Signale, Fortschritt, Abläufe als Vorlagen (7.12 A1–A7) | Baut vollständig auf der Sitzung aus V1.3b auf; erst sinnvoll, wenn der Timer im Alltag trägt. |
+
+**[E]** Reihenfolge a → b → c, jede Etappe einzeln installieren. Nach V1.3b eine
+Woche Training mit Timer, bevor die Abläufe festgelegt werden – die Erfahrung mit den
+Nachfragen zeigt, wie viel Ablauf wirklich nötig ist (passt zu NT1, *trimmen*).
+
+### E.2 V1.3a – Alltag
+
+**Mehrmals täglich (VS1)**
+- `Schedule.Daily` und `Schedule.Weekdays` bekommen statt einer Uhrzeit eine **Liste
+  von Uhrzeiten** (1–6, sortiert). Eine Uhrzeit = Verhalten wie bisher. **[E]**
+- Weiterhin **eine offene Fälligkeit** pro Reminder: Nach dem Abschluss folgt die
+  nächste Uhrzeit desselben Tages, sonst der nächste Tag.
+- **Verpasst** wird ein Termin, wenn der nächste Termin beginnt (spätestens an der
+  Tagesgrenze) – sonst würden sich Termine überlappen. **[E]**
+- *Später* und *Verschieben* nur bis vor den nächsten Termin (wie bei der Tagesgrenze).
+- **Vorab erledigen** erledigt nur den nächsten Termin (7.20 V4).
+- **Serie:** Ein Tag zählt, sobald mindestens ein Termin *Ziel* oder *Minimum* hat
+  (in VS1 so entschieden). Die Statistik zählt Termine.
+- **Wochenziel:** **[E]** nicht kombinierbar mit mehreren Uhrzeiten (das Formular
+  blendet es aus). Beides zusammen ergibt keine klare Regel; bei Bedarf später.
+- **Ort** (*bei Ankunft*): **[E]** nur mit einer Uhrzeit – die Ankunft ist ein Moment
+  pro Tag.
+- Migration: neue Spalte `times` (Text, z. B. `480,780,1140`), aus `timeMinutes` befüllt.
+
+**Wochenend-Zeiten (VS2)**
+- `AlertSettings` und Übersicht bekommen eine zweite Gruppe für **Sa–So**: *laut ab*,
+  Tagesgrenze, Übersicht morgens/abends. Standard „wie Mo–Fr“. **[E]**
+- Einstellungen: Schalter *Am Wochenende andere Zeiten*, darunter dieselben Felder.
+- Regel in `:core`: `AlertSettings.forDate(date)` liefert die passende Gruppe; alle
+  Stellen, die heute `loudFrom`/`dayEnd` lesen, gehen darüber.
+
+**Hinweis bei ständigem *Später* (NT2)**
+- Regel in `:core`: Wurden die **letzten 3 Fälligkeiten jeweils mindestens 2×
+  geschoben** (oder eine 4×), schlägt die App eine neue Uhrzeit vor: den Median der
+  tatsächlichen Erledigungszeiten, auf 15 min gerundet. **[E]**
+- Ort: eine **Karte auf *Heute*** („Training schiebst du oft – lieber um 19:30?“) mit
+  *Uhrzeit ändern*, *Strenge senken*, *Nein danke*. Nicht im Alarm – der soll beim
+  Handeln bleiben. *Nein danke* ruht 14 Tage. **[E]**
+- Gezählt wird nur *Später* (`SNOOZED`), nicht *Verschieben* (das hat schon ein Limit).
+
+**Notausschalter (PS7)**
+- Einstellungen, ganz oben: *Alle Alarme pausieren* mit Dauer **1 Stunde**, **bis
+  morgen früh** oder **bis ich es wieder einschalte**; mit Rückfrage. **[E]**
+- Während der Pause: kein Vollbild, kein Ton, keine Vibration; fällige Reminder
+  erscheinen nur als stille Benachrichtigung. Was bis zur Tagesgrenze offen bleibt,
+  gilt als **ausgelassen mit Grund *Notaus*** (System-Grund: bricht keine Serie, zählt
+  nicht als *hängen*). **[E]**
+- Sichtbar: rotes Banner auf *Heute*, dauerhafte stille Benachrichtigung mit
+  *Wieder einschalten*, Eintrag im Diagnose-Log.
+- Später (Play Store, PS6) zusätzlich als Schnelleinstellungs-Kachel.
+
+### E.3 V1.3b – Sitzung mit Timer
+
+**Modell**
+- Pro Reminder `session: SessionSpec?` (aus = wie bisher): Nachfrage-Intervall
+  (Standard 10 min), Strenge der Nachfragen, Ziel- und Minimum-Dauer (optional, D4),
+  maximale Dauer (Standard 90 min, D5), Reaktionszeit des letzten Reminders (5 min).
+- Neuer Zustand **`RUNNING`** der Fälligkeit mit den Feldern `startedAt` und
+  `nextCheckAt`. Neue Ereignisse `STARTED`, `CHECK_ASKED`, `CHECK_ANSWERED`,
+  `FINAL_CALL`. Neues Ergebnis **`ABORTED`** (*abgebrochen*: zählt nicht als Erfolg und
+  bricht die Serie wie *verpasst* – ehrlich in der Statistik, D3). **[E]**
+- Dauer = `resolvedAt − startedAt`, ohne eigene Tabelle. Vergleich mit dem Schnitt
+  der letzten 10 Sitzungen (D6) im Verlauf und nach dem Abschluss.
+
+**Ablauf**
+```
+PLANNED/DUE/ESCALATING ─Ich starte jetzt─► RUNNING ─Fertig──────► Nachweis? ─► DONE (GOAL)
+                                            │ ▲   ├─Teilschritt─────────────► DONE (MINIMUM)
+                              Noch dran ────┘ │   ├─Abbruch─────────────────► CLOSED (ABORTED)
+                       Nachfrage alle x min ──┘   └─max. Dauer → letzter Reminder (5 min)
+                                                        └─ keine Antwort ─► MISSED bzw. MINIMUM*
+```
+\* MINIMUM, wenn schon Checklistenpunkte erledigt sind (D5), in V1.3c auch erreichte
+Schritte eines Ablaufs.
+- *Ich starte jetzt* beendet die Eskalation sofort. Auch **vorab** möglich (7.20 V2) –
+  dann entfällt der Alarm wie beim Vorab-Erledigen.
+- Mit Ziel-Dauer schlägt die Nachfrage die passende Antwort vor („45 min erreicht –
+  *Fertig*?“).
+- Nachfragen sind Alarme mit eigener Strenge: **[E]** Standard *locker* (Banner +
+  Vibration), damit das Training nicht ständig vom Vollbild unterbrochen wird; ohne
+  Antwort eskaliert die Nachfrage wie ein normaler Alarm.
+- **Tagesgrenze:** Eine laufende Sitzung wird an der Tagesgrenze nicht verpasst; es gilt
+  nur die maximale Dauer. **[E]**
+
+**Android**
+- Foreground-Service (Typ `systemExempted` wie der Alarm; Sitzungen dauern zu lange für
+  `shortService`) mit laufender Benachrichtigung: Chronometer, *Fertig*, *Teilschritt*,
+  *Abbruch*.
+- Nachfragen und letzter Reminder über den `AlarmPort` (exakt); sie überleben einen
+  Neustart über `sync`.
+- **Uhr (G2, G3):** Die laufende Benachrichtigung erscheint nicht auf der Uhr (G1).
+  Deshalb wie in V1.1 eine **zweite, spiegelbare Benachrichtigung**: Nachfragen mit
+  *Noch dran / Fertig / Teilschritt / Abbruch*, im Alarm zusätzlich *Ich starte
+  jetzt*. **[P]** ob die Uhr einen Chronometer aus einer gespiegelten Benachrichtigung
+  anzeigt; falls nicht, zeigt sie die Startzeit („seit 18:42“).
+- Bildschirm: Sitzungsansicht mit großem Timer und den vier Antworten; erreichbar aus
+  *Heute* (*läuft seit …*) und über die Benachrichtigung.
+
+### E.4 V1.3c – Abläufe (Skizze)
+- Tabelle `routine` (Name, Schritte als JSON): Schritt = Art (*Zeit*, *offen*,
+  *Pause*), Titel, Dauer, Signal; Gruppen mit Wiederholungen (A3). Der Reminder
+  verweist per `routineId`; mehrere Reminder können denselben Ablauf nutzen (A7).
+- Die Sitzung führt `stepIndex` und `stepStartedAt`; jeder Schrittwechsel ist ein
+  Ereignis (`STEP_DONE`), ein Abbruch speichert den Stand (A5).
+- Signale (A4): drei feste Vibrationsmuster (*Schritt vorbei*, *Pause vorbei*,
+  *nächster Satz*), per spiegelbarer Benachrichtigung auch auf der Uhr. **[P]** ob die
+  Uhr die Muster unterscheidbar wiedergibt.
+- Minimum über den Ablauf (A6): „bis Schritt x“.
+- Vor dem Start anpassbar (A7): Schritt überspringen, Pause verlängern – nur für diese
+  Sitzung.
+- Genauer Entwurf nach den Erfahrungen mit V1.3b.
+
+### E.5 Zum Bestätigen
+1. Aufteilung a/b/c und Reihenfolge (E.1).
+2. Mehrere Uhrzeiten: verpasst beim nächsten Termin; kein Wochenziel und kein Ort mit
+   mehreren Uhrzeiten (E.2).
+3. NT2-Schwelle (3 Fälligkeiten × 2 *Später*) und Karte auf *Heute* statt im Alarm.
+4. Notausschalter: *Notaus*-Auslassen bricht keine Serie.
+5. `ABORTED` bricht die Serie; Nachfragen standardmäßig *locker*; eine Sitzung ignoriert
+   die Tagesgrenze und endet nur über die maximale Dauer (Standard 90 min).

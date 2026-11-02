@@ -31,7 +31,8 @@ Stand: 2026-11-02. Bei jedem größeren Schritt aktualisieren.
    als „umgesetzt“. Offen sind VS1–VS3 (anforderungen.md 7.25).
 3. **CI:** PRs nach `main` laufen über GitHub Actions (`upload-artifact@v6`, Node 24,
    seit 2026-11-02). Branch-Regel für `main` setzt Kevin.
-4. **V1.3** (Timer, Abläufe, Watch, mehrmals täglich, Wochenend-Zeiten) laut
+4. **V1.3**: Entwurf mit Aufteilung a/b/c in design.md (*Entwurf V1.3*), wartet auf
+   Kevins Bestätigung (E.5). Inhalt (Timer, Abläufe, Watch, mehrmals täglich, Wochenend-Zeiten) laut
    anforderungen.md Kap. 10, nach der Beobachtungsphase.
 
 ## Doku

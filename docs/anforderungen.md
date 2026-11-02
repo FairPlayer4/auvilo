@@ -786,8 +786,10 @@ Vordergrund, nicht Reichweite.
   er aktiv ist. Wichtig, weil die Mechanismen absichtlich invasiv sind.
 - PS8 **Backend nur nach ausdrücklichem Einschalten.** Ohne Zustimmung keine Anmeldung,
   keine Verbindung; die App bleibt vollständig lokal nutzbar.
-- PS9 **Verschlüsselung auf dem Gerät** (nur die App kann die Daten lesen) – noch zu
-  bewerten (Kap. 11).
+- PS9 **Verschlüsselung auf dem Gerät** (nur die App kann die Daten lesen): **geklärt
+  (2026-11-02)** – Android-Sandbox, dateibasierte Verschlüsselung und `allowBackup=false`
+  reichen; der Play-Store-Release ist ein Release-Build (nicht debuggable, kein
+  `run-as`). Kein SQLCipher, solange kein konkreter Fall übrig bleibt.
 - Backend-Stand und was es für die App bedeutet: [backend.md](backend.md).
 
 ## 8. Zielplattform und Technik
@@ -924,6 +926,7 @@ früh am S24 Ultra testen (Spike, siehe Abschnitt 10).
 | 2026-11-02 | Vor V1.3 erst Nutzung beobachten: Funktionen trimmen statt erweitern, Rückfragen bei Schlupflöchern (7.27) |
 | 2026-11-02 | Hinweis bei wiederholtem *Später* bestätigt (7.27 NT2); Nutzung erst vor V2 mit der Testsession zählen (NT4) |
 | 2026-11-02 | Play Store ohne Eile: erst „fertig“ (mindestens bis V2, ggf. Backend); dafür Transparenz, Notausschalter, Backend nur nach Einschalten; Verschlüsselung auf dem Gerät wird bewertet (7.28 PS5–PS9) |
+| 2026-11-02 | Verschlüsselung auf dem Gerät geklärt: Sandbox + Release-Build reichen, kein SQLCipher (7.28 PS9) |
 | 2026-11-02 | Ziel offizieller Play-Store-Release für eine sehr kleine Zielgruppe, mit Backend (Backup, Sync) und vollem EU-Datenschutz; Android 17 bleibt Minimum (7.28) |
 
 ## 10. Nächste Schritte
@@ -1002,13 +1005,13 @@ Für später:
 - Backend (7.28): Wie passen Backup und Sync zu 8.4 (sensible Daten nur auf dem Gerät)?
   Empfehlung: Backup Ende-zu-Ende verschlüsselt, sodass das Backend nur verschlüsselte
   Daten sieht. **Geklärt:** Das Backend ist genau so gebaut ([backend.md](backend.md)).
-- Verschlüsselung auf dem Gerät (7.28 PS9): Android trennt App-Daten schon heute
+- ~~Verschlüsselung auf dem Gerät~~ – geklärt 2026-11-02 (7.28 PS9). Begründung: Android trennt App-Daten schon heute
   (Sandbox, dateibasierte Verschlüsselung, `allowBackup=false`). Lesbar sind sie nur
   über `run-as` in Debug-Builds und auf gerooteten Geräten. **Empfehlung:** Für den
   Play Store ein Release-Build (nicht debuggable) – das schließt `run-as` aus.
   Zusätzlich SQLCipher mit Schlüssel im Keystore nur, wenn ein konkreter Fall übrig
   bleibt; es kostet Leistung, erschwert Diagnose und Migrationen. Fotos und Audio
-  lägen weiterhin als Dateien vor. Bewertung vor dem Play-Store-Release.
+  lägen weiterhin als Dateien vor.
 - V2: Wie genau funktioniert die Freigabe für Agenten (Kopplung, Stufen, sensible
   Kategorien), und welche Agenten-Apps erreichen App Functions bzw. einen lokalen
   MCP-Server tatsächlich (7.26)?
