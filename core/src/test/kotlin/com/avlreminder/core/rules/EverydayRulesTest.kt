@@ -37,6 +37,13 @@ class EverydayRulesTest {
     }
 
     @Test
+    fun `a time in the gap of the clock change does not hide a later one`() {
+        // 29.03.2026: 02:30 does not exist and becomes 03:30, after the 03:00 time.
+        val s = Schedule.Daily(listOf(t(2, 30), t(3)))
+        assertEquals(at(29, 3, month = 3), ScheduleRules.nextDue(s, at(29, 0, month = 3), ZONE))
+    }
+
+    @Test
     fun `weekdays with several times skip the other days`() {
         val s = Schedule.Weekdays(listOf(t(8), t(19)), setOf(DayOfWeek.MONDAY, DayOfWeek.WEDNESDAY))
         assertEquals(at(26, 8), ScheduleRules.nextDue(s, at(26, 7), ZONE))

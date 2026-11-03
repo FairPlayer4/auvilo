@@ -96,7 +96,8 @@ object ScheduleRules {
         var date = after.atZone(zone).toLocalDate()
         while (true) {
             if (dayOk(date)) {
-                times.map { date.atTime(it).atZone(zone).toInstant() }.firstOrNull { it > after }?.let { return it }
+                // A time in the gap of the clock change moves behind later ones: sort again.
+                times.map { date.atTime(it).atZone(zone).toInstant() }.sorted().firstOrNull { it > after }?.let { return it }
             }
             date = date.plusDays(1)
         }
