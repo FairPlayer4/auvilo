@@ -15,6 +15,7 @@ import com.avlreminder.core.model.Schedule
 import com.avlreminder.core.model.Strictness
 import com.avlreminder.core.ports.AlarmKind
 import com.avlreminder.core.rules.AlarmLevel
+import com.avlreminder.core.usecases.AlarmView
 import com.avlreminder.core.usecases.Ring
 import com.avlreminder.graph
 import kotlinx.coroutines.runBlocking
@@ -48,7 +49,7 @@ class AlarmGlueTest {
     )
 
     private fun ring(level: AlarmLevel, proof: ProofSpec = ProofSpec.CONFIRM, snooze: List<Int> = listOf(10, 30)) =
-        Ring(reminder(Strictness.NORMAL, proof), Occurrence(id = 42, reminderId = 7, dueAt = at, state = OccurrenceState.DUE), level, snooze)
+        Ring(AlarmView(reminder(Strictness.NORMAL, proof), Occurrence(id = 42, reminderId = 7, dueAt = at, state = OccurrenceState.DUE), true, null, true, null, snooze), level)
 
     @Test
     fun strictAndNormalUseAlarmClockRelaxedUsesExactAlarm() {
@@ -63,6 +64,19 @@ class AlarmGlueTest {
         port.cancel(1)
         port.cancel(2)
         assertEquals(0, shadowOf(alarmManager).scheduledAlarms.size)
+    }
+
+    @Test
+    fun eachNotificationOpensItsOwnAlarm() {
+        val first = ring(AlarmLevel.BANNER)
+        Ringer.ring(context, first)
+        Ringer.ring(context, first.copy(view = first.view.copy(occurrence = first.occurrence.copy(id = 43))))
+        for (id in listOf(42L, 43L)) {
+            val n = shadowOf(notifications).getNotification(Notifications.id(id))
+            assertEquals(id, shadowOf(n.contentIntent).savedIntent.getLongExtra("occurrence", -1))
+        }
+        Ringer.dismiss(context, 42)
+        Ringer.dismiss(context, 43)
     }
 
     @Test

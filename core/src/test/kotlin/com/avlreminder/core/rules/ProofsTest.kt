@@ -82,7 +82,7 @@ class ProofsTest {
     }
 
     @Test
-    fun `open points are unknowns, obstacles and what is missing`() {
+    fun `open points are unknowns and obstacles, what is missing is a blocker`() {
         val current = mapOf(
             1 to answer(1, null, unknown = true),
             2 to answer(2, "Müde nach der Arbeit"),
@@ -90,7 +90,8 @@ class ProofsTest {
             4 to answer(4, "Matte ausrollen"),
         )
         assertEquals(listOf(1, 2), Prep.open(current).map { it.question })
-        assertEquals(listOf(3), Prep.open(mapOf(3 to answer(3, "Bereich aufräumen"))).map { it.question })
+        assertEquals(emptyList<Int>(), Prep.open(mapOf(3 to answer(3, "Bereich aufräumen"))).map { it.question })
+        assertEquals(listOf(3), Prep.open(mapOf(3 to answer(3, null, unknown = true))).map { it.question })
     }
 
     @Test

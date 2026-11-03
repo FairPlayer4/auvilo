@@ -1,20 +1,34 @@
 package com.avlreminder.ui.screens
 
+import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.ExperimentalLayoutApi
+import androidx.compose.foundation.layout.FlowRow
+import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
+import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.setValue
+import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.clip
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.avlreminder.core.model.ItemDone
 import com.avlreminder.core.model.Reminder
+import com.avlreminder.core.rules.SnoozeHint
+import com.avlreminder.core.rules.SnoozeHintChoice
 import com.avlreminder.core.rules.WeekStatus
 import com.avlreminder.core.usecases.Digests
 import com.avlreminder.core.usecases.Entry
@@ -38,10 +52,18 @@ fun TodayScreen(
     onEdit: (Reminder) -> Unit,
     modifier: Modifier = Modifier,
     onCompleteEarly: (Entry) -> Unit = {},
+    /** "Verwerfen" for an overdue deadline. */
+    onDiscard: (Entry) -> Unit = {},
     doNotDisturb: Boolean = false,
     itemsDone: Map<Long, List<ItemDone>> = emptyMap(),
     /** Reminders with a weekly goal and their week so far. */
     weeks: List<Pair<Reminder, WeekStatus>> = emptyList(),
+    /** "bis 19:30" while all alarms are paused (PS7), null otherwise. */
+    pausedUntil: String? = null,
+    onResume: () -> Unit = {},
+    /** Reminders snoozed again and again (NT2). */
+    hints: List<SnoozeHint> = emptyList(),
+    onHint: (SnoozeHint, SnoozeHintChoice) -> Unit = { _, _ -> },
 ) {
     fun progress(e: Entry): String {
         val items = e.reminder.checklist
@@ -49,6 +71,7 @@ fun TodayScreen(
     }
 
     val c = Avl.colors
+    var discarding by remember { mutableStateOf<Entry?>(null) }
     val waiting = if (doNotDisturb) today.dueNow.count { !it.reminder.ignoreDnd } else 0
     LazyColumn(modifier.padding(horizontal = 16.dp)) {
         item {
@@ -57,6 +80,8 @@ fun TodayScreen(
                 Text("Heute", color = c.text, fontSize = 30.sp, fontWeight = FontWeight.Bold)
             }
         }
+        if (pausedUntil != null) item { PausedBanner(pausedUntil, onResume) }
+        items(hints, key = { "hint${it.reminder.id}" }) { SnoozeHintCard(it, onHint) }
         if (waiting > 0) {
             item {
                 Text(
@@ -65,7 +90,7 @@ fun TodayScreen(
                 )
             }
         }
-        if (today.dueNow.isEmpty() && today.laterToday.isEmpty() && today.resolved.isEmpty() && today.waiting.isEmpty()) {
+        if (today.dueNow.isEmpty() && today.laterToday.isEmpty() && today.resolved.isEmpty() && today.waiting.isEmpty() && today.overdue.isEmpty()) {
             item {
                 Text(
                     "Heute steht nichts mehr an. Mit + legst du einen Reminder an.",
@@ -82,6 +107,23 @@ fun TodayScreen(
                     highlight = c.strict,
                     onClick = { onOpenDue(e) },
                 ) { StrictnessTag(e.reminder.strictness) }
+            }
+        }
+        if (today.overdue.isNotEmpty()) {
+            // Passed deadlines stay until done or discarded (design 12.4 point 9).
+            item { SectionTitle("Überfällig") }
+            items(today.overdue, key = { "over" + it.occurrence.id }) { e ->
+                EntryCard(
+                    title = e.reminder.title,
+                    detail = Format.plan(e.reminder) + progress(e),
+                    highlight = c.strict,
+                    onClick = { onEdit(e.reminder) },
+                ) {
+                    Column {
+                        TextButton(onClick = { onCompleteEarly(e) }) { Text("Erledigen", color = c.accent) }
+                        TextButton(onClick = { discarding = e }, Modifier.testTag("discard${e.occurrence.id}")) { Text("Verwerfen", color = c.muted) }
+                    }
+                }
             }
         }
         if (today.laterToday.isNotEmpty()) {
@@ -129,6 +171,17 @@ fun TodayScreen(
         }
         item { Spacer(Modifier.height(96.dp)) }
     }
+    discarding?.let { e ->
+        AlertDialog(
+            onDismissRequest = { discarding = null },
+            title = { Text("„${e.reminder.title}“ verwerfen?") },
+            text = { Text("Die Frist ist vorbei. Verworfen erinnert die App nicht mehr daran; im Verlauf steht es als übersprungen.") },
+            confirmButton = {
+                TextButton(onClick = { onDiscard(e); discarding = null }, Modifier.testTag("discardOk")) { Text("Verwerfen", color = c.strict) }
+            },
+            dismissButton = { TextButton(onClick = { discarding = null }) { Text("Abbrechen") } },
+        )
+    }
 }
 
 internal fun goalLine(r: Reminder): String? = when {
@@ -142,4 +195,43 @@ private fun proofHint(r: Reminder): String {
     if (!p.needsEvidence) return ""
     val parts = listOfNotNull("Foto".takeIf { p.photo }, "Text".takeIf { p.textMinChars != null }, "Audio".takeIf { p.audioMinSeconds != null })
     return " · Nachweis: " + parts.joinToString(" + ")
+}
+
+/** All alarms paused by hand (PS7): impossible to overlook, one tap to switch them on again. */
+@Composable
+private fun PausedBanner(until: String, onResume: () -> Unit) {
+    val c = Avl.colors
+    Column(
+        Modifier.padding(top = 12.dp).fillMaxWidth().clip(RoundedCornerShape(12.dp)).background(c.strict)
+            .padding(horizontal = 16.dp, vertical = 10.dp).testTag("pausedBanner"),
+    ) {
+        Text("Alle Alarme pausiert $until", color = c.onStrict, fontSize = 15.sp, fontWeight = FontWeight.SemiBold)
+        Text("Fällige Reminder kommen nur still. Offen Gebliebenes zählt als ausgelassen (Notaus).", color = c.onStrict, fontSize = 13.sp)
+        TextButton(onClick = onResume, Modifier.testTag("resumeAlarms")) { Text("Wieder einschalten", color = c.onStrict) }
+    }
+}
+
+/** "Training schiebst du oft – lieber um 19:15?" (NT2). */
+@OptIn(ExperimentalLayoutApi::class)
+@Composable
+private fun SnoozeHintCard(hint: SnoozeHint, onHint: (SnoozeHint, SnoozeHintChoice) -> Unit) {
+    val c = Avl.colors
+    val question = hint.time?.let { "lieber um ${Format.time(it)}?" } ?: "lieber lockerer?"
+    Column(
+        Modifier.padding(top = 12.dp).fillMaxWidth().clip(RoundedCornerShape(12.dp)).background(c.accentSoft)
+            .padding(horizontal = 16.dp, vertical = 10.dp).testTag("snoozeHint${hint.reminder.id}"),
+    ) {
+        Text("„${hint.reminder.title}“ schiebst du oft – $question", color = c.onAccentSoft, fontSize = 15.sp)
+        FlowRow {
+            hint.time?.let { t ->
+                TextButton(onClick = { onHint(hint, SnoozeHintChoice.TIME) }, Modifier.testTag("hintTime")) { Text("Auf ${Format.time(t)}") }
+            }
+            hint.relax?.let { s ->
+                TextButton(onClick = { onHint(hint, SnoozeHintChoice.RELAX) }, Modifier.testTag("hintRelax")) {
+                    Text("Strenge: ${Format.strictness(s)}")
+                }
+            }
+            TextButton(onClick = { onHint(hint, SnoozeHintChoice.DISMISS) }, Modifier.testTag("hintDismiss")) { Text("Nein danke", color = c.muted) }
+        }
+    }
 }

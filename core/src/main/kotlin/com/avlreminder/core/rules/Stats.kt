@@ -72,10 +72,16 @@ object Stats {
         val goal = reminder.weeklyGoal
         return when {
             goal != null -> weekStreak(reminder, resolved, now, zone)
+            // Per day: one time done is enough, a day only misses if nothing counted (VS1).
             reminder.schedule is Schedule.Daily || reminder.schedule is Schedule.Weekdays ->
-                run(StreakUnit.DAYS, resolved.sortedBy { it.dueAt }.map { o ->
-                    val day = o.dueAt.atZone(zone).toLocalDate()
-                    Step(outcome(o.resolution), Weeks.start(day))
+                run(StreakUnit.DAYS, resolved.groupBy { it.dueAt.atZone(zone).toLocalDate() }.toSortedMap().map { (day, list) ->
+                    val outcomes = list.map { outcome(it.resolution) }
+                    val outcome = when {
+                        Outcome.COUNT in outcomes -> Outcome.COUNT
+                        Outcome.MISS in outcomes -> Outcome.MISS
+                        else -> Outcome.KEEP
+                    }
+                    Step(outcome, Weeks.start(day))
                 })
             reminder.schedule is Schedule.AfterDone ->
                 run(StreakUnit.TIMES, resolved.sortedBy { it.dueAt }.map { o ->

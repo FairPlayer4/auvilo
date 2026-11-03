@@ -69,6 +69,14 @@
             android:exported="false" />
 
         <receiver
+            android:name=".alarm.PreNoticeReceiver"
+            android:exported="false" />
+
+        <receiver
+            android:name=".alarm.PauseReceiver"
+            android:exported="false" />
+
+        <receiver
             android:name=".location.GeofenceReceiver"
             android:exported="false" />
 

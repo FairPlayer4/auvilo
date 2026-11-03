@@ -30,13 +30,18 @@ import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
+import com.avlreminder.core.model.Blocker
 import com.avlreminder.core.model.ItemDone
 import com.avlreminder.core.model.Occurrence
 import com.avlreminder.core.model.Place
 import com.avlreminder.core.model.PrepAnswer
 import com.avlreminder.core.model.Proof
 import com.avlreminder.core.model.Reminder
+import com.avlreminder.alarm.AlarmPause
 import com.avlreminder.core.rules.AlertSettings
+import com.avlreminder.core.rules.Blockers
+import com.avlreminder.core.rules.SnoozeHint
+import com.avlreminder.core.rules.SnoozeHintChoice
 import com.avlreminder.core.rules.Stats
 import com.avlreminder.core.rules.WeeklyGoals
 import com.avlreminder.core.usecases.HistoryDay
@@ -47,7 +52,9 @@ import com.avlreminder.data.OverviewTimes
 import com.avlreminder.data.Settings
 import com.avlreminder.data.SuggestionEntity
 import com.avlreminder.data.SuggestionStatus
+import com.avlreminder.data.TemplateEntity
 import com.avlreminder.data.ThemeMode
+import com.avlreminder.ui.screens.BlockerActions
 import com.avlreminder.ui.screens.EditScreen
 import com.avlreminder.ui.screens.HistoryScreen
 import com.avlreminder.ui.screens.PermissionItem
@@ -59,9 +66,13 @@ import com.avlreminder.ui.screens.SuggestButton
 import com.avlreminder.ui.screens.TopActions
 import com.avlreminder.ui.screens.SuggestionDialog
 import com.avlreminder.ui.screens.SuggestionsScreen
+import com.avlreminder.ui.screens.TemplateChooser
 import com.avlreminder.ui.screens.TodayScreen
+import com.avlreminder.ui.screens.toTemplate
+import com.avlreminder.ui.screens.withTemplate
 import com.avlreminder.ui.theme.Avl
 import java.time.Instant
+import java.time.LocalDateTime
 import java.time.ZoneId
 
 /** Everything the main UI shows and can do; the activity fills it from the view model. */
@@ -86,6 +97,14 @@ data class AppState(
     /** Open ones first (Anf. 7.24). */
     val suggestions: List<SuggestionEntity> = emptyList(),
     val overview: OverviewTimes = OverviewTimes(),
+    /** Blockers per reminder, open and solved (S5). */
+    val blockers: Map<Long, List<Blocker>> = emptyMap(),
+    /** Most recently used first; null until loaded. */
+    val templates: List<TemplateEntity>? = emptyList(),
+    /** Reminders snoozed again and again (NT2). */
+    val snoozeHints: List<SnoozeHint> = emptyList(),
+    /** Interface for Claude (Anf. 7.26 AG11): null = not in this build. */
+    val claudeAccess: Boolean? = null,
 )
 
 interface AppActions {
@@ -110,6 +129,20 @@ interface AppActions {
     /** Hands the text to another app of the user's choice. */
     fun share(text: String) {}
     fun setOverview(times: OverviewTimes) {}
+    /** "Verwerfen" for an overdue deadline. */
+    fun discard(occurrenceId: Long) {}
+    fun addBlocker(reminderId: Long, text: String) {}
+    fun solveBlocker(blockerId: Long) {}
+    /** "Als Aufgabe planen": a relaxed one-off for the blocker. */
+    fun planTask(blockerId: Long, at: LocalDateTime) {}
+    fun saveTemplate(template: TemplateEntity) {}
+    fun templateUsed(id: Long) {}
+    fun renameTemplate(id: Long, name: String) {}
+    fun deleteTemplate(id: Long) {}
+    /** "Alle Alarme pausieren" (PS7); null switches them on again. */
+    fun setAlarmsPaused(until: Instant?) {}
+    fun answerSnoozeHint(reminderId: Long, choice: SnoozeHintChoice) {}
+    fun setClaudeAccess(on: Boolean) {}
 }
 
 /** Simple navigation without a library: one route string, back goes to "today". */
@@ -120,7 +153,10 @@ object Routes {
     const val SETTINGS = "settings"
     const val SUGGESTIONS = "suggestions"
     const val NEW = "edit:0"
+    /** "Neuer Reminder": pick a template or start empty. */
+    const val CHOOSE = "choose"
     fun edit(id: Long) = "edit:$id"
+    fun fromTemplate(id: Long) = "template:$id"
     fun stats(id: Long) = "stats:$id"
 }
 
@@ -174,7 +210,7 @@ fun AvlAppUi(
         },
         floatingActionButton = {
             if (route == Routes.TODAY || route == Routes.REMINDERS) {
-                FloatingActionButton(onClick = { go(Routes.NEW) }, containerColor = c.accentFill, contentColor = Color.White) {
+                FloatingActionButton(onClick = { go(if (state.templates?.isEmpty() == true) Routes.NEW else Routes.CHOOSE) }, containerColor = c.accentFill, contentColor = Color.White) {
                     Icon(AvlIcons.Add, "Neuer Reminder")
                 }
             }
@@ -191,9 +227,14 @@ fun AvlAppUi(
                             onOpenDue = { actions.openAlarm(it.occurrence.id) },
                             onEdit = { go(Routes.edit(it.id)) },
                             onCompleteEarly = { actions.completeEarly(it.occurrence.id) },
+                            onDiscard = { actions.discard(it.occurrence.id) },
                             doNotDisturb = state.doNotDisturb,
                             itemsDone = state.itemsDone,
                             weeks = state.reminders.filter { it.active }.mapNotNull { r -> WeeklyGoals.status(r, resolved, date, zone)?.let { r to it } },
+                            pausedUntil = state.alert.alarmsPausedUntil?.takeIf { state.alert.alarmsPaused(now) }?.let { AlarmPause.untilText(it, now, zone) },
+                            onResume = { actions.setAlarmsPaused(null) },
+                            hints = state.snoozeHints,
+                            onHint = { h, choice -> actions.answerSnoozeHint(h.reminder.id, choice) },
                         )
                     }
                 }
@@ -216,12 +257,15 @@ fun AvlAppUi(
             route == Routes.SETTINGS -> Box(m) {
                 SettingsScreen(
                     theme = state.theme, onTheme = actions::setTheme, alert = state.alert, onAlert = actions::setAlert,
+                    onPause = actions::setAlarmsPaused, now = now, zone = zone,
+                    claudeAccess = state.claudeAccess, onClaudeAccess = actions::setClaudeAccess,
                     permissions = state.permissions, onBack = { go(Routes.TODAY) },
                     home = state.home, onSetHome = actions::setHomeHere,
                     dwellMinutes = state.dwellMinutes, onDwell = actions::setDwellMinutes,
                     openSuggestions = state.suggestions.count { it.status == SuggestionStatus.OPEN },
                     onSuggestions = { go(Routes.SUGGESTIONS) },
                     overview = state.overview, onOverview = actions::setOverview,
+                    templates = state.templates.orEmpty(), onRenameTemplate = actions::renameTemplate, onDeleteTemplate = actions::deleteTemplate,
                 )
                 SuggestButton({ suggestHere("Einstellungen") }, Modifier.align(Alignment.TopEnd).padding(4.dp))
             }
@@ -247,13 +291,34 @@ fun AvlAppUi(
                     }
                 }
             }
-            route.startsWith("edit:") -> {
-                val id = route.removePrefix("edit:").toLong()
+            route == Routes.CHOOSE -> when (val templates = state.templates) {
+                null -> {}
+                // The last template was deleted meanwhile: straight to the empty form.
+                emptyList<TemplateEntity>() -> LaunchedEffect(Unit) { go(Routes.NEW) }
+                else -> TemplateChooser(
+                    templates,
+                    onPick = { t ->
+                        if (t == null) {
+                            go(Routes.NEW)
+                        } else {
+                            actions.templateUsed(t.id)
+                            go(Routes.fromTemplate(t.id))
+                        }
+                    },
+                    onCancel = { go(Routes.TODAY) },
+                    modifier = m,
+                )
+            }
+            route.startsWith("edit:") || route.startsWith("template:") -> {
+                val fromTemplate = route.startsWith("template:")
+                val id = if (fromTemplate) 0L else route.removePrefix("edit:").toLong()
                 val existing = state.reminders.firstOrNull { it.id == id }
-                val initial = remember(id, existing != null) {
+                val initial = remember(route, existing != null) {
+                    val template = if (fromTemplate) state.templates?.firstOrNull { it.id == route.removePrefix("template:").toLong() } else null
                     existing?.let { ReminderForm.of(it, date, state.prep[it.id].orEmpty(), state.home?.id) }
-                        ?: ReminderForm.new(now, zone, state.home?.id)
+                        ?: ReminderForm.new(now, zone, state.home?.id).let { f -> template?.let { f.withTemplate(it) } ?: f }
                 }
+                val blockers = existing?.let { state.blockers[it.id] }.orEmpty()
                 EditScreen(
                     initial = initial,
                     problems = problems,
@@ -279,6 +344,17 @@ fun AvlAppUi(
                     onArchive = existing?.let { r -> { archived -> actions.setArchived(r.id, archived); go(Routes.REMINDERS) } },
                     archived = existing?.archivedAt != null,
                     onStats = existing?.let { r -> { go(Routes.stats(r.id)) } },
+                    onSaveTemplate = { name, form -> actions.saveTemplate(form.toTemplate(name, now)) },
+                    blockers = blockers,
+                    blockerActions = existing?.let { r ->
+                        BlockerActions(
+                            add = { actions.addBlocker(r.id, it) },
+                            solve = actions::solveBlocker,
+                            plan = actions::planTask,
+                            suggestedTime = Blockers.suggestTaskTime(state.openByReminder[r.id]?.currentAt, now, zone),
+                            taskAt = { taskId -> state.openByReminder[taskId]?.currentAt },
+                        )
+                    },
                 )
             }
         }

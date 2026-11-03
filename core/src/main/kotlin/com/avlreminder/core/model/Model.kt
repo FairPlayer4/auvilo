@@ -54,14 +54,26 @@ enum class EventType {
     CREATED, DUE, ESCALATED, SNOOZED, POSTPONED, COMPLETED, SKIPPED, MISSED, MISSED_DETECTED,
     PROOF_STARTED, PROOF_ABORTED,
     DROPPED, ITEM_DONE, DEFERRED,
+    /** A deadline's window ended without completion; it rings again in the next window. */
+    WINDOW_CLOSED,
+    /** "Was hält dich gerade ab?" was asked (answered or skipped) for the occurrence. */
+    BLOCKER_ASKED,
 }
 
 /** When a reminder is due. */
 sealed interface Schedule {
     data class Once(val at: LocalDateTime) : Schedule
-    data class Daily(val time: LocalTime) : Schedule
-    data class Weekdays(val time: LocalTime, val days: Set<DayOfWeek>) : Schedule {
-        init { require(days.isNotEmpty()) { "at least one weekday" } }
+    /** Every day at [times] (VS1: several a day, ascending). */
+    data class Daily(override val times: List<LocalTime>) : Schedule, AtTimes {
+        constructor(time: LocalTime) : this(listOf(time))
+        init { requireTimes(times) }
+    }
+    data class Weekdays(override val times: List<LocalTime>, val days: Set<DayOfWeek>) : Schedule, AtTimes {
+        constructor(time: LocalTime, days: Set<DayOfWeek>) : this(listOf(time), days)
+        init {
+            requireTimes(times)
+            require(days.isNotEmpty()) { "at least one weekday" }
+        }
     }
     /**
      * [intervalDays] after the last completion, at [time]. Before the first completion it is due
@@ -72,6 +84,67 @@ sealed interface Schedule {
     }
     /** Once, without a time: due only through its [Arrival] ("wenn ich zuhause bin"). */
     data object OnArrival : Schedule
+    /**
+     * Once, by [due] (T1d): rings only in its windows – on [days] from [from] to [until] – at the
+     * start of each window and then every [intervalMinutes] until it is done.
+     */
+    data class Deadline(
+        val due: LocalDateTime,
+        val days: Set<DayOfWeek>,
+        val from: LocalTime,
+        val until: LocalTime,
+        val intervalMinutes: Int = 60,
+    ) : Schedule {
+        init {
+            require(days.isNotEmpty()) { "at least one weekday" }
+            require(intervalMinutes >= 1) { "interval must be at least one minute" }
+        }
+    }
+}
+
+/** A schedule with one or more fixed times a day (VS1). */
+interface AtTimes {
+    val times: List<LocalTime>
+    /** The first time of the day; the only one for most reminders. */
+    val time: LocalTime get() = times.first()
+    /** Several times a day: each counts as missed when the next one starts. */
+    val severalADay: Boolean get() = times.size > 1
+}
+
+private fun requireTimes(times: List<LocalTime>) {
+    require(times.isNotEmpty()) { "at least one time" }
+    require(times.zipWithNext().all { (a, b) -> a < b }) { "times ascending without duplicates" }
+}
+
+/** Several times a day (VS1)? */
+val Schedule.severalADay: Boolean get() = (this as? AtTimes)?.severalADay == true
+
+/** A silent notice before the reminder is due (T6), naming its open blockers (S6). */
+sealed interface PreNotice {
+    /** The evening before the due day, at [time]. */
+    data class Evening(val time: LocalTime) : PreNotice
+    data class Before(val minutes: Int) : PreNotice
+}
+
+enum class BlockerOrigin {
+    /** "Was fehlt?" of the "Startklar" questions (question 3). */
+    STARTKLAR,
+    /** "Was hält dich gerade ab?" after it got stuck (S8). */
+    ASKED,
+}
+
+/** Something that keeps one from starting (S5); solved by hand or by doing its [taskReminderId]. */
+data class Blocker(
+    val id: Long = 0,
+    val reminderId: Long,
+    val text: String,
+    val createdAt: Instant,
+    val solvedAt: Instant? = null,
+    val origin: BlockerOrigin = BlockerOrigin.STARTKLAR,
+    /** The preparation task planned for it, a one-off with [Reminder.prepFor]. */
+    val taskReminderId: Long? = null,
+) {
+    val isOpen: Boolean get() = solvedAt == null
 }
 
 /** A place for arrival triggers; V1.1b knows only "Zuhause". */
@@ -137,6 +210,13 @@ data class Reminder(
     val archivedAt: Instant? = null,
     /** null = every offer counts on its own. */
     val weeklyGoal: WeeklyGoal? = null,
+    val preNotice: PreNotice? = null,
+    /** A preparation task (S5) for this reminder; doing it solves its blocker. */
+    val prepFor: Long? = null,
+    /** A blocker solved since the last occurrence may be used as the minimum (S7). */
+    val solvedBlockerIsMinimum: Boolean = false,
+    /** The hint about snoozing (NT2) counts only occurrences due from here on; null = all. */
+    val hintQuietUntil: Instant? = null,
 )
 
 /** One concrete time a reminder is due. */

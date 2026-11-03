@@ -14,16 +14,16 @@ import androidx.compose.runtime.mutableLongStateOf
 import androidx.compose.runtime.produceState
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
+import androidx.core.net.toUri
 import androidx.lifecycle.lifecycleScope
 import com.avlreminder.core.model.OccurrenceState
 import com.avlreminder.core.rules.Action
-import com.avlreminder.core.rules.Lifecycle
 import com.avlreminder.core.rules.TransitionResult
+import com.avlreminder.core.usecases.AlarmView
 import com.avlreminder.graph
 import com.avlreminder.system.Diag
 import com.avlreminder.ui.screens.AlarmContent
 import com.avlreminder.ui.screens.AlarmDevices
-import com.avlreminder.ui.screens.AlarmUi
 import com.avlreminder.ui.theme.AvlTheme
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
@@ -40,6 +40,8 @@ class AlarmActivity : ComponentActivity() {
         /** [early]: complete before the reminder is due ("vorab erledigen"). */
         fun intent(context: Context, occurrenceId: Long, early: Boolean = false): Intent =
             Intent(context, AlarmActivity::class.java)
+                // Its own data, so each notification keeps its own PendingIntent.
+                .setData("avl://alarm/$occurrenceId${if (early) "/early" else ""}".toUri())
                 .putExtra(EXTRA_ID, occurrenceId)
                 .putExtra(EXTRA_EARLY, early)
                 .addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
@@ -90,7 +92,7 @@ class AlarmActivity : ComponentActivity() {
     private fun AlarmHost(id: Long) {
         val graph = remember { graph }
         val zone = ZoneId.systemDefault()
-        val ui by produceState<AlarmUi?>(null, id, version) {
+        val ui by produceState<AlarmView?>(null, id, version) {
             value = load(id)
         }
         // Close as soon as the occurrence is resolved or snoozed elsewhere (notification, other device action).
@@ -117,6 +119,9 @@ class AlarmActivity : ComponentActivity() {
             onSkip = { act(id, Action.Skip(it)) },
             onCheckItem = { itemId, evidence -> act(id, Action.CheckItem(itemId, evidence), stay = true) },
             onDeferRest = { act(id, Action.DeferRest(it)) },
+            onBlockerSolved = { act(id, Action.Complete(minimumOnly = false, blockerSolved = true)) },
+            onTomorrow = { act(id, Action.CloseWindow(it)) },
+            onAnswerAsk = { text, plan -> answerAsk(id, text, plan) },
             onSuggest = { text, important -> graph.scope.launch { graph.addSuggestion(text, important, "Alarm", current.reminder) } },
             onStartProof = { startProof(id) },
             onAbortProof = { abortProof(id) },
@@ -128,28 +133,18 @@ class AlarmActivity : ComponentActivity() {
         )
     }
 
-    private suspend fun load(id: Long): AlarmUi? {
-        val repo = graph.repository
-        val occurrence = repo.occurrence(id) ?: return null
-        val reminder = repo.reminder(occurrence.reminderId) ?: return null
-        return graph.withEngine { engine ->
-            val limits = engine.limits(reminder, occurrence)
-            AlarmUi(
-                reminder = reminder,
-                occurrence = occurrence,
-                minimumAllowed = Lifecycle.canUseMinimum(reminder, limits),
-                minimumsLeft = Lifecycle.minimumsLeft(reminder, limits),
-                canPostpone = Lifecycle.canPostpone(reminder, occurrence),
-                postponesLeft = Lifecycle.postponesLeft(reminder, occurrence),
-                snooze = engine.snoozeOptions(reminder, occurrence),
-                prep = engine.prep(reminder.id),
-                lastProofText = limits.lastProofText,
-                early = early,
-                done = limits.itemsDone.keys,
-                // Doing an item today makes "Rest auf morgen" free; otherwise it is a postponement.
-                canDeferRest = reminder.checklist.isNotEmpty() && (limits.itemDoneToday || Lifecycle.canPostpone(reminder, occurrence)),
-                week = engine.weekStatus(reminder, occurrence.dueAt.atZone(ZoneId.systemDefault()).toLocalDate()),
-            )
+    private suspend fun load(id: Long): AlarmView? = graph.withEngine { it.alarmView(id, early) }
+
+    /** Saves the answer as a blocker; [plan] makes it a task for the suggested time. Stays on the alarm. */
+    private fun answerAsk(id: Long, text: String?, plan: Boolean) {
+        lifecycleScope.launch {
+            graph.withEngine { engine ->
+                val blockerId = engine.answerAsk(id, text)
+                val reminderId = graph.repository.occurrence(id)?.reminderId
+                if (plan && blockerId != null && reminderId != null) engine.planTask(blockerId, engine.suggestTaskTime(reminderId))
+            }
+            Diag.log("alarm screen occ=$id asked → ${if (text.isNullOrBlank()) "skipped" else if (plan) "blocker + task" else "blocker"}")
+            version++
         }
     }
 

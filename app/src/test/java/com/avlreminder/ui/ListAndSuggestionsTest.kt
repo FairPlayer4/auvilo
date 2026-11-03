@@ -13,6 +13,7 @@ import com.avlreminder.core.model.PrepAnswer
 import com.avlreminder.core.model.Reminder
 import com.avlreminder.core.model.Schedule
 import com.avlreminder.core.rules.AlertSettings
+import com.avlreminder.core.usecases.AlarmView
 import com.avlreminder.core.usecases.ReminderSort
 import com.avlreminder.core.usecases.SaveResult
 import com.avlreminder.core.usecases.Today
@@ -22,7 +23,6 @@ import com.avlreminder.data.SuggestionStatus
 import com.avlreminder.data.ThemeMode
 import com.avlreminder.ui.screens.AlarmContent
 import com.avlreminder.ui.screens.AlarmDevices
-import com.avlreminder.ui.screens.AlarmUi
 import com.avlreminder.ui.theme.AvlTheme
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertTrue
@@ -160,7 +160,7 @@ class ListAndSuggestionsTest {
     @Test
     fun alarmOffersASuggestionAtTheEnd() {
         var noted: Pair<String, Boolean>? = null
-        val ui = AlarmUi(
+        val ui = AlarmView(
             reminder = training, occurrence = Occurrence(id = 5, reminderId = 1, dueAt = now),
             minimumAllowed = false, minimumsLeft = 0, canPostpone = true, postponesLeft = null, snooze = listOf(10),
         )

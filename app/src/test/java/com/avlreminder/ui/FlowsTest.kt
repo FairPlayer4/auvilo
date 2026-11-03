@@ -28,6 +28,7 @@ import com.avlreminder.core.model.Schedule
 import com.avlreminder.core.model.Strictness
 import com.avlreminder.core.rules.AlertSettings
 import com.avlreminder.core.rules.Evidence
+import com.avlreminder.core.usecases.AlarmView
 import com.avlreminder.core.usecases.Entry
 import com.avlreminder.core.usecases.HistoryDay
 import com.avlreminder.core.usecases.SaveResult
@@ -35,7 +36,6 @@ import com.avlreminder.core.usecases.Today
 import com.avlreminder.data.ThemeMode
 import com.avlreminder.ui.screens.AlarmContent
 import com.avlreminder.ui.screens.AlarmDevices
-import com.avlreminder.ui.screens.AlarmUi
 import com.avlreminder.ui.screens.HistoryScreen
 import com.avlreminder.ui.theme.AvlTheme
 import androidx.compose.ui.test.assertIsEnabled
@@ -117,7 +117,7 @@ class FlowsTest {
         minimumLimitPerWeek = 1, proof = ProofSpec.PHOTO, postponeLimit = 1, createdAt = now,
     )
 
-    private fun alarmUi(minimumAllowed: Boolean = true, reminder: Reminder = strict) = AlarmUi(
+    private fun alarmUi(minimumAllowed: Boolean = true, reminder: Reminder = strict) = AlarmView(
         reminder = reminder,
         occurrence = Occurrence(id = 9, reminderId = 1, dueAt = now.minusSeconds(1800), state = OccurrenceState.DUE),
         minimumAllowed = minimumAllowed, minimumsLeft = if (minimumAllowed) 1 else 0,
@@ -205,6 +205,35 @@ class FlowsTest {
         assertEquals(listOf(2L to Evidence()), checked)
         compose.onNodeWithText("Rest auf morgen 18:00").performScrollTo().performClick()
         assertEquals(Instant.parse("2026-10-25T17:00:00Z"), deferred)
+    }
+
+    @Test
+    fun severalTimesADayTheChecklistOffersTheNextItemAndNoRestForTomorrow() {
+        val checked = mutableListOf<Long>()
+        var all = 0
+        val list = strict.copy(
+            proof = ProofSpec.CONFIRM,
+            schedule = Schedule.Daily(listOf(LocalTime.of(12, 30), LocalTime.of(19, 15))),
+            checklist = listOf(ChecklistItem(1, "Test 1"), ChecklistItem(2, "Test 2"), ChecklistItem(3, "Test 3")),
+        )
+        val nextTime = now.atZone(zone).toLocalDate().plusDays(1).atTime(12, 30).atZone(zone).toInstant()
+        compose.setContent {
+            AvlTheme(dark = true) {
+                AlarmContent(
+                    ui = alarmUi(reminder = list).copy(done = setOf(1L), nextTime = nextTime), now = now, zone = zone,
+                    onComplete = { _, _, _ -> all++ }, onSnooze = {}, onPostpone = {}, onSkip = {}, onStartProof = {}, onAbortProof = {},
+                    devices = devices,
+                    onCheckItem = { id, _ -> checked += id },
+                )
+            }
+        }
+        compose.onNodeWithText("Danach: Rest um morgen 12:30").assertExists()
+        compose.onNodeWithText("Rest auf morgen", substring = true).assertDoesNotExist()
+        compose.onNodeWithText("Alles erledigt").assertDoesNotExist()
+        compose.onNodeWithTag("doItem").performScrollTo().performClick()
+        assertEquals(listOf(2L), checked)
+        compose.onNodeWithTag("allDone").performScrollTo().performClick()
+        assertEquals(1, all)
     }
 
     @Test
@@ -316,7 +345,7 @@ class FlowsTest {
         val actions = FakeActions()
         compose.setContent { AvlTheme(dark = false) { AvlAppUi(emptyState, actions, now, zone) } }
         compose.onNodeWithContentDescription("Einstellungen").performClick()
-        compose.onNodeWithText("Dunkel").performClick()
+        compose.onNodeWithText("Dunkel").performScrollTo().performClick()
         assertEquals(ThemeMode.DARK, actions.chosenTheme)
         compose.onNodeWithTag("loudFrom").performScrollTo().performClick()
         compose.onAllNodes(hasSetTextAction())[0].performTextReplacement("19")

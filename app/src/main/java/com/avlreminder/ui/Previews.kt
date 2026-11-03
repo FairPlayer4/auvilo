@@ -14,13 +14,13 @@ import com.avlreminder.core.model.Resolution
 import com.avlreminder.core.model.Schedule
 import com.avlreminder.core.model.Strictness
 import com.avlreminder.core.rules.AlertSettings
+import com.avlreminder.core.usecases.AlarmView
 import com.avlreminder.core.usecases.Entry
 import com.avlreminder.core.usecases.HistoryDay
 import com.avlreminder.core.usecases.Today
 import com.avlreminder.data.ThemeMode
 import com.avlreminder.ui.screens.AlarmContent
 import com.avlreminder.ui.screens.AlarmDevices
-import com.avlreminder.ui.screens.AlarmUi
 import com.avlreminder.ui.screens.EditScreen
 import com.avlreminder.ui.screens.HistoryScreen
 import com.avlreminder.ui.screens.PermissionItem
@@ -102,7 +102,7 @@ private fun SettingsPreview() = Themed {
 @Composable
 private fun AlarmPreview() = AvlTheme(dark = true) {
     AlarmContent(
-        AlarmUi(Sample.cat, Sample.due, minimumAllowed = true, minimumsLeft = 1, canPostpone = true, postponesLeft = 1, snooze = listOf(10, 30)),
+        AlarmView(Sample.cat, Sample.due, minimumAllowed = true, minimumsLeft = 1, canPostpone = true, postponesLeft = 1, snooze = listOf(10, 30)),
         Sample.now, Sample.zone, onComplete = { _, _, _ -> }, onSnooze = {}, onPostpone = {}, onSkip = {},
         onStartProof = {}, onAbortProof = {}, devices = AlarmDevices(camera = {}, recorder = {}, play = {}),
     )

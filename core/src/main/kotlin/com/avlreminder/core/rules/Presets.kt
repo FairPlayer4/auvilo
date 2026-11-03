@@ -1,6 +1,8 @@
 package com.avlreminder.core.rules
 
+import com.avlreminder.core.model.AtTimes
 import com.avlreminder.core.model.Character
+import com.avlreminder.core.model.PreNotice
 import com.avlreminder.core.model.ProofKind
 import com.avlreminder.core.model.ProofSpec
 import com.avlreminder.core.model.Reminder
@@ -55,6 +57,20 @@ object Validation {
         reminder.minimumLimitPerWeek?.let { if (it < 0) add("Minimum-Limit darf nicht negativ sein") }
         if (reminder.minimumLimitPerWeek != null && reminder.minimum.isNullOrBlank()) add("Limit ohne Minimum")
         if (reminder.schedule == Schedule.OnArrival && reminder.arrival == null) add("„Wenn ich zuhause bin“ braucht einen Ort")
+        (reminder.schedule as? Schedule.Deadline)?.let { d ->
+            if (d.until <= d.from) add("Fenster: Ende nach dem Beginn")
+            if (d.intervalMinutes !in 5..480) add("Abstand 5 bis 480 min")
+            if (reminder.arrival != null) add("Frist ohne Ankunft")
+        }
+        reminder.preNotice?.let { n ->
+            if (reminder.schedule == Schedule.OnArrival) add("Vorab-Reminder braucht eine Uhrzeit")
+            if (n is PreNotice.Before && n.minutes !in 5..1440) add("Vorab 5 bis 1440 min vorher")
+        }
+        (reminder.schedule as? AtTimes)?.let { s ->
+            if (s.times.size > MAX_TIMES) add("Höchstens $MAX_TIMES Uhrzeiten am Tag")
+            if (s.severalADay && reminder.weeklyGoal != null) add("Wochenziel nur mit einer Uhrzeit am Tag")
+            if (s.severalADay && reminder.arrival != null) add("Ankunft nur mit einer Uhrzeit am Tag")
+        }
         if (reminder.checklist.any { it.title.isBlank() }) add("Checklisten-Punkt ohne Text")
         if (reminder.checklist.size > MAX_ITEMS) add("Höchstens $MAX_ITEMS Checklisten-Punkte")
         reminder.weeklyGoal?.let { g ->
@@ -68,6 +84,7 @@ object Validation {
     }
 
     const val MAX_ITEMS = 20
+    const val MAX_TIMES = 6
 }
 
 /** Weeks run Monday to Sunday. */

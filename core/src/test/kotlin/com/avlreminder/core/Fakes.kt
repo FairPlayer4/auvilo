@@ -1,5 +1,6 @@
 package com.avlreminder.core
 
+import com.avlreminder.core.model.Blocker
 import com.avlreminder.core.model.Character
 import com.avlreminder.core.model.Event
 import com.avlreminder.core.model.ItemDone
@@ -17,6 +18,7 @@ import com.avlreminder.core.ports.AlarmPort
 import com.avlreminder.core.ports.DeviceStatePort
 import com.avlreminder.core.ports.GeofencePort
 import com.avlreminder.core.ports.LocationPort
+import com.avlreminder.core.ports.PreNoticePort
 import com.avlreminder.core.ports.ReminderRepository
 import java.time.Clock
 import java.time.Instant
@@ -63,6 +65,16 @@ class FakeGeofences : GeofencePort {
     }
 }
 
+class FakePreNotices : PreNoticePort {
+    val set = mutableMapOf<Long, Instant>()
+    override fun set(occurrenceId: Long, at: Instant) {
+        set[occurrenceId] = at
+    }
+    override fun cancel(occurrenceId: Long) {
+        set.remove(occurrenceId)
+    }
+}
+
 /** [here]: null = position unknown. */
 class FakeLocation(var here: Boolean? = null) : LocationPort {
     var checks = 0
@@ -80,6 +92,7 @@ class FakeRepository : ReminderRepository {
     val prep = mutableListOf<PrepAnswer>()
     val places = linkedMapOf<Long, Place>()
     val done = mutableListOf<ItemDone>()
+    val blockers = linkedMapOf<Long, Blocker>()
     private var nextId = 1L
 
     override suspend fun reminders() = reminders.values.toList()
@@ -96,6 +109,7 @@ class FakeRepository : ReminderRepository {
         events.removeAll { it.occurrenceId in ids }
         proofs.removeAll { it.occurrenceId in ids }
         prep.removeAll { it.reminderId == id }
+        blockers.values.removeAll { it.reminderId == id }
     }
 
     override suspend fun occurrence(id: Long) = occurrences[id]
@@ -103,9 +117,11 @@ class FakeRepository : ReminderRepository {
     override suspend fun openOccurrence(reminderId: Long) =
         occurrences.values.firstOrNull { it.reminderId == reminderId && it.isOpen }
     override suspend fun lastResolved(reminderId: Long) =
-        occurrences.values.filter { it.reminderId == reminderId && !it.isOpen }.maxByOrNull { it.resolvedAt!! }
+        occurrences.values.filter { it.reminderId == reminderId && !it.isOpen }.maxWithOrNull(compareBy({ it.resolvedAt!! }, { it.id }))
     override suspend fun lastDone(reminderId: Long) =
-        occurrences.values.filter { it.reminderId == reminderId && it.state == OccurrenceState.DONE }.maxByOrNull { it.resolvedAt!! }
+        occurrences.values.filter { it.reminderId == reminderId && it.state == OccurrenceState.DONE }.maxWithOrNull(compareBy({ it.resolvedAt!! }, { it.id }))
+    override suspend fun recentResolved(reminderId: Long, limit: Int) =
+        occurrences.values.filter { it.reminderId == reminderId && !it.isOpen }.sortedByDescending { it.resolvedAt!! }.take(limit)
     override suspend fun countResolved(reminderId: Long, resolution: Resolution, from: Instant, until: Instant) =
         occurrences.values.count {
             it.reminderId == reminderId && it.resolution == resolution && it.resolvedAt!! >= from && it.resolvedAt < until
@@ -119,6 +135,7 @@ class FakeRepository : ReminderRepository {
     override suspend fun addEvent(event: Event) {
         events += event
     }
+    override suspend fun events(occurrenceId: Long) = events.filter { it.occurrenceId == occurrenceId }
     override suspend fun addProof(proof: Proof) {
         proofs += proof.copy(id = nextId++)
     }
@@ -140,7 +157,16 @@ class FakeRepository : ReminderRepository {
     }
 
     override suspend fun itemsDone(occurrenceId: Long) = done.filter { it.occurrenceId == occurrenceId }
+    override suspend fun itemsDoneOfReminder(reminderId: Long) = done.filter { occurrences[it.occurrenceId]?.reminderId == reminderId }
     override suspend fun addItemDone(done: ItemDone) {
         this.done += done.copy(id = nextId++)
+    }
+
+    override suspend fun blockers(reminderId: Long) = blockers.values.filter { it.reminderId == reminderId }
+    override suspend fun blocker(id: Long) = blockers[id]
+    override suspend fun saveBlocker(blocker: Blocker): Long {
+        val id = if (blocker.id == 0L) nextId++ else blocker.id
+        blockers[id] = blocker.copy(id = id)
+        return id
     }
 }

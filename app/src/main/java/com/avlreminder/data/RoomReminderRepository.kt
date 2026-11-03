@@ -2,11 +2,14 @@ package com.avlreminder.data
 
 import androidx.room.withTransaction
 import com.avlreminder.core.model.Arrival
+import com.avlreminder.core.model.AtTimes
+import com.avlreminder.core.model.Blocker
 import com.avlreminder.core.model.ChecklistItem
 import com.avlreminder.core.model.Event
 import com.avlreminder.core.model.ItemDone
 import com.avlreminder.core.model.Occurrence
 import com.avlreminder.core.model.Place
+import com.avlreminder.core.model.PreNotice
 import com.avlreminder.core.model.PrepAnswer
 import com.avlreminder.core.model.Proof
 import com.avlreminder.core.model.ProofSpec
@@ -23,6 +26,8 @@ import java.time.LocalTime
 
 class RoomReminderRepository(private val db: AvlDatabase) : ReminderRepository {
     private val dao = db.dao()
+
+    override suspend fun <T> transaction(block: suspend () -> T): T = db.withTransaction { block() }
 
     override suspend fun reminders(): List<Reminder> {
         val items = dao.allItems().groupBy { it.reminderId }
@@ -76,6 +81,7 @@ class RoomReminderRepository(private val db: AvlDatabase) : ReminderRepository {
     override suspend fun openOccurrence(reminderId: Long) = dao.openOccurrence(reminderId)?.toModel()
     override suspend fun lastResolved(reminderId: Long) = dao.lastResolved(reminderId)?.toModel()
     override suspend fun lastDone(reminderId: Long) = dao.lastDone(reminderId)?.toModel()
+    override suspend fun recentResolved(reminderId: Long, limit: Int) = dao.recentResolved(reminderId, limit).map { it.toModel() }
     override suspend fun countResolved(reminderId: Long, resolution: Resolution, from: Instant, until: Instant) =
         dao.countResolved(reminderId, resolution.name, from, until)
 
@@ -88,6 +94,9 @@ class RoomReminderRepository(private val db: AvlDatabase) : ReminderRepository {
 
     override suspend fun addEvent(event: Event) =
         dao.insert(EventEntity(occurrenceId = event.occurrenceId, at = event.at, type = event.type, detail = event.detail))
+
+    override suspend fun events(occurrenceId: Long) =
+        dao.events(occurrenceId).map { Event(occurrenceId = it.occurrenceId, at = it.at, type = it.type, detail = it.detail) }
 
     override suspend fun addProof(proof: Proof) = dao.insert(
         ProofEntity(
@@ -114,15 +123,26 @@ class RoomReminderRepository(private val db: AvlDatabase) : ReminderRepository {
     }
 
     override suspend fun itemsDone(occurrenceId: Long) = dao.itemsDone(occurrenceId).map { it.toModel() }
+    override suspend fun itemsDoneOfReminder(reminderId: Long) = dao.itemsDoneOfReminder(reminderId).map { it.toModel() }
 
     override suspend fun addItemDone(done: ItemDone) =
         dao.insert(ItemDoneEntity(occurrenceId = done.occurrenceId, itemId = done.itemId, doneAt = done.doneAt, withProof = done.withProof))
+
+    override suspend fun blockers(reminderId: Long) = dao.blockers(reminderId).map { it.toModel() }
+    override suspend fun blocker(id: Long) = dao.blocker(id)?.toModel()
+
+    override suspend fun saveBlocker(blocker: Blocker): Long {
+        val entity = blocker.toEntity()
+        if (blocker.id == 0L) return dao.insert(entity)
+        dao.update(entity)
+        return blocker.id
+    }
 }
 
 // --- Mapping ----------------------------------------------------------------------------------
 
-private fun Int.toTime(): LocalTime = LocalTime.of(this / 60, this % 60)
-private fun LocalTime.toMinutes(): Int = hour * 60 + minute
+internal fun Int.toTime(): LocalTime = LocalTime.of(this / 60, this % 60)
+internal fun LocalTime.toMinutes(): Int = hour * 60 + minute
 
 internal fun Set<DayOfWeek>.toBits(): Int = fold(0) { bits, day -> bits or (1 shl (day.value - 1)) }
 internal fun Int.toDays(): Set<DayOfWeek> = DayOfWeek.entries.filter { this and (1 shl (it.value - 1)) != 0 }.toSet()
@@ -135,11 +155,15 @@ fun ReminderEntity.toModel(items: List<ChecklistItemEntity> = emptyList()): Remi
     strictness = strictness,
     schedule = when (scheduleType) {
         ScheduleType.ONCE -> Schedule.Once(requireNotNull(onceAt))
-        ScheduleType.DAILY -> Schedule.Daily(requireNotNull(timeMinutes).toTime())
-        ScheduleType.WEEKDAYS -> Schedule.Weekdays(requireNotNull(timeMinutes).toTime(), weekdays.toDays())
+        ScheduleType.DAILY -> Schedule.Daily(times(timeMinutes, moreTimes))
+        ScheduleType.WEEKDAYS -> Schedule.Weekdays(times(timeMinutes, moreTimes), weekdays.toDays())
         // For AFTER_DONE, onceAt holds the first due day (no schema change needed).
         ScheduleType.AFTER_DONE -> Schedule.AfterDone(requireNotNull(intervalDays), requireNotNull(timeMinutes).toTime(), onceAt?.toLocalDate())
         ScheduleType.ON_ARRIVAL -> Schedule.OnArrival
+        ScheduleType.DEADLINE -> Schedule.Deadline(
+            requireNotNull(onceAt), weekdays.toDays(), requireNotNull(timeMinutes).toTime(),
+            requireNotNull(windowUntilMinutes).toTime(), remindEveryMinutes ?: 60,
+        )
     },
     goal = goal,
     minimum = minimum,
@@ -155,7 +179,19 @@ fun ReminderEntity.toModel(items: List<ChecklistItemEntity> = emptyList()): Remi
     checklist = items.sortedBy { it.position }.map { ChecklistItem(it.id, it.title) },
     archivedAt = archivedAt,
     weeklyGoal = weekTarget?.let { WeeklyGoal(it, weekMax ?: it, weekMinimum ?: 1) },
+    preNotice = preNoticeEveningMinutes?.let { PreNotice.Evening(it.toTime()) } ?: preNoticeBeforeMinutes?.let { PreNotice.Before(it) },
+    prepFor = prepFor,
+    solvedBlockerIsMinimum = solvedBlockerIsMinimum,
+    hintQuietUntil = hintQuietUntil,
 )
+
+/** The first time plus the further ones of several a day (VS1). */
+internal fun times(first: Int?, more: String?): List<LocalTime> =
+    listOf(requireNotNull(first).toTime()) + more.orEmpty().split(',').mapNotNull { it.trim().toIntOrNull()?.toTime() }
+
+/** The times after the first, or null for one time a day. */
+internal fun Schedule.moreTimes(): String? =
+    (this as? AtTimes)?.times?.drop(1)?.takeIf { it.isNotEmpty() }?.joinToString(",") { it.toMinutes().toString() }
 
 fun Reminder.toEntity(): ReminderEntity {
     val s = schedule
@@ -171,19 +207,26 @@ fun Reminder.toEntity(): ReminderEntity {
             is Schedule.Weekdays -> ScheduleType.WEEKDAYS
             is Schedule.AfterDone -> ScheduleType.AFTER_DONE
             Schedule.OnArrival -> ScheduleType.ON_ARRIVAL
+            is Schedule.Deadline -> ScheduleType.DEADLINE
         },
         timeMinutes = when (s) {
             is Schedule.Once, Schedule.OnArrival -> null
             is Schedule.Daily -> s.time.toMinutes()
             is Schedule.Weekdays -> s.time.toMinutes()
             is Schedule.AfterDone -> s.time.toMinutes()
+            is Schedule.Deadline -> s.from.toMinutes()
         },
         onceAt = when (s) {
             is Schedule.Once -> s.at
             is Schedule.AfterDone -> s.firstOn?.atTime(s.time)
+            is Schedule.Deadline -> s.due
             else -> null
         },
-        weekdays = (s as? Schedule.Weekdays)?.days?.toBits() ?: 0,
+        weekdays = when (s) {
+            is Schedule.Weekdays -> s.days.toBits()
+            is Schedule.Deadline -> s.days.toBits()
+            else -> 0
+        },
         intervalDays = (s as? Schedule.AfterDone)?.intervalDays,
         goal = goal,
         minimum = minimum,
@@ -205,8 +248,24 @@ fun Reminder.toEntity(): ReminderEntity {
         weekTarget = weeklyGoal?.target,
         weekMax = weeklyGoal?.max,
         weekMinimum = weeklyGoal?.minimum,
+        windowUntilMinutes = (s as? Schedule.Deadline)?.until?.toMinutes(),
+        remindEveryMinutes = (s as? Schedule.Deadline)?.intervalMinutes,
+        preNoticeEveningMinutes = (preNotice as? PreNotice.Evening)?.time?.toMinutes(),
+        preNoticeBeforeMinutes = (preNotice as? PreNotice.Before)?.minutes,
+        prepFor = prepFor,
+        solvedBlockerIsMinimum = solvedBlockerIsMinimum,
+        moreTimes = s.moreTimes(),
+        hintQuietUntil = hintQuietUntil,
     )
 }
+
+fun BlockerEntity.toModel() = Blocker(
+    id = id, reminderId = reminderId, text = text, createdAt = createdAt, solvedAt = solvedAt, origin = origin, taskReminderId = taskReminderId,
+)
+
+fun Blocker.toEntity() = BlockerEntity(
+    id = id, reminderId = reminderId, text = text, createdAt = createdAt, solvedAt = solvedAt, origin = origin, taskReminderId = taskReminderId,
+)
 
 fun OccurrenceEntity.toModel() = Occurrence(
     id = id, reminderId = reminderId, dueAt = dueAt, currentAt = currentAt, state = state,

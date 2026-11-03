@@ -4,6 +4,7 @@ import com.avlreminder.core.model.Arrival
 import com.avlreminder.core.model.Character
 import com.avlreminder.core.model.ChecklistItem
 import com.avlreminder.core.model.PrepAnswer
+import com.avlreminder.core.model.PreNotice
 import com.avlreminder.core.model.ProofSpec
 import com.avlreminder.core.model.Reminder
 import com.avlreminder.core.model.Schedule
@@ -19,7 +20,9 @@ import java.time.LocalTime
 import java.time.ZoneId
 import java.time.temporal.ChronoUnit
 
-enum class ScheduleKind { ONCE, DAILY, WEEKDAYS, AFTER_DONE, ON_ARRIVAL }
+enum class ScheduleKind { ONCE, DAILY, WEEKDAYS, AFTER_DONE, ON_ARRIVAL, DEADLINE }
+
+enum class PreNoticeKind { NONE, EVENING, BEFORE }
 
 /** One "Startklar" answer while editing. */
 data class PrepDraft(val text: String = "", val unknown: Boolean = false) {
@@ -38,6 +41,8 @@ data class ReminderForm(
     val kind: ScheduleKind = ScheduleKind.DAILY,
     val date: LocalDate,
     val time: LocalTime,
+    /** DAILY/WEEKDAYS: the further times a day (VS1); empty = one time. */
+    val moreTimes: List<LocalTime> = emptyList(),
     val days: Set<DayOfWeek> = WORKDAYS,
     val intervalDays: Int = 14,
     val goal: String = "",
@@ -62,9 +67,27 @@ data class ReminderForm(
     val weekTarget: Int = 3,
     val weekMax: Int = 4,
     val weekMinimum: Int = 1,
+    /** DEADLINE: [date] and [time] are the deadline, [days] the window days. */
+    val windowFrom: LocalTime = LocalTime.of(9, 0),
+    val windowUntil: LocalTime = LocalTime.of(17, 0),
+    val remindEvery: Int = 60,
+    val preNotice: PreNoticeKind = PreNoticeKind.NONE,
+    val preNoticeEvening: LocalTime = LocalTime.of(19, 0),
+    val preNoticeBefore: Int = 30,
+    val solvedBlockerIsMinimum: Boolean = false,
+    /** Kept for a preparation task; not editable. */
+    val prepFor: Long? = null,
 ) {
-    /** A weekly goal fits only schedules with offer days. */
-    val weeklyPossible: Boolean get() = kind == ScheduleKind.DAILY || kind == ScheduleKind.WEEKDAYS
+    /** Several times a day are possible for these kinds only (VS1). */
+    val timesPossible: Boolean get() = kind == ScheduleKind.DAILY || kind == ScheduleKind.WEEKDAYS
+
+    /** All times of the day, ascending. */
+    val times: List<LocalTime> get() = if (timesPossible) (listOf(time) + moreTimes).distinct().sorted() else listOf(time)
+
+    val severalADay: Boolean get() = times.size > 1
+
+    /** A weekly goal fits only schedules with offer days, and one time a day. */
+    val weeklyPossible: Boolean get() = timesPossible && !severalADay
 
     /** Picking a strictness resets proof and limits to the preset; each can be changed afterwards. */
     fun withStrictness(s: Strictness): ReminderForm {
@@ -75,17 +98,22 @@ data class ReminderForm(
     val schedule: Schedule?
         get() = when (kind) {
             ScheduleKind.ONCE -> Schedule.Once(LocalDateTime.of(date, time))
-            ScheduleKind.DAILY -> Schedule.Daily(time)
-            ScheduleKind.WEEKDAYS -> if (days.isEmpty()) null else Schedule.Weekdays(time, days)
+            ScheduleKind.DAILY -> Schedule.Daily(times)
+            ScheduleKind.WEEKDAYS -> if (days.isEmpty()) null else Schedule.Weekdays(times, days)
             ScheduleKind.AFTER_DONE -> if (intervalDays < 1) null else Schedule.AfterDone(intervalDays, time, firstOn = date)
             ScheduleKind.ON_ARRIVAL -> Schedule.OnArrival
+            ScheduleKind.DEADLINE ->
+                if (days.isEmpty()) null else Schedule.Deadline(LocalDateTime.of(date, time), days, windowFrom, windowUntil, remindEvery)
         }
+
+    /** A deadline rings in its windows only, so it has no arrival; nor do several times a day. */
+    val placePossible: Boolean get() = kind != ScheduleKind.DEADLINE && !severalADay
 
     /** Waiting for the arrival needs no time; the arrival option of the other kinds is then implied. */
     val arrival: Arrival?
         get() = when {
             kind == ScheduleKind.ON_ARRIVAL -> Arrival(homeId ?: 0, WhenAway.RING)
-            atHome -> Arrival(homeId ?: 0, whenAway)
+            atHome && placePossible -> Arrival(homeId ?: 0, whenAway)
             else -> null
         }
 
@@ -115,6 +143,13 @@ data class ReminderForm(
             arrival = arrival?.takeIf { homeId != null },
             checklist = checklist.map { it.copy(title = it.title.trim()) }.filter { it.title.isNotEmpty() },
             weeklyGoal = if (weekly && weeklyPossible) WeeklyGoal(weekTarget, weekMax, weekMinimum) else null,
+            preNotice = when (preNotice) {
+                PreNoticeKind.NONE -> null
+                PreNoticeKind.EVENING -> PreNotice.Evening(preNoticeEvening)
+                PreNoticeKind.BEFORE -> PreNotice.Before(preNoticeBefore)
+            },
+            prepFor = prepFor,
+            solvedBlockerIsMinimum = solvedBlockerIsMinimum,
         )
     }
 
@@ -148,13 +183,26 @@ data class ReminderForm(
                 weekTarget = r.weeklyGoal?.target ?: 3,
                 weekMax = r.weeklyGoal?.max ?: 4,
                 weekMinimum = r.weeklyGoal?.minimum ?: 1,
+                preNotice = when (r.preNotice) {
+                    null -> PreNoticeKind.NONE
+                    is PreNotice.Evening -> PreNoticeKind.EVENING
+                    is PreNotice.Before -> PreNoticeKind.BEFORE
+                },
+                preNoticeEvening = (r.preNotice as? PreNotice.Evening)?.time ?: LocalTime.of(19, 0),
+                preNoticeBefore = (r.preNotice as? PreNotice.Before)?.minutes ?: 30,
+                solvedBlockerIsMinimum = r.solvedBlockerIsMinimum,
+                prepFor = r.prepFor,
             )
             return when (val s = r.schedule) {
                 is Schedule.Once -> base.copy(kind = ScheduleKind.ONCE, date = s.at.toLocalDate(), time = s.at.toLocalTime())
-                is Schedule.Daily -> base.copy(kind = ScheduleKind.DAILY, time = s.time)
-                is Schedule.Weekdays -> base.copy(kind = ScheduleKind.WEEKDAYS, time = s.time, days = s.days)
+                is Schedule.Daily -> base.copy(kind = ScheduleKind.DAILY, time = s.time, moreTimes = s.times.drop(1))
+                is Schedule.Weekdays -> base.copy(kind = ScheduleKind.WEEKDAYS, time = s.time, moreTimes = s.times.drop(1), days = s.days)
                 is Schedule.AfterDone -> base.copy(kind = ScheduleKind.AFTER_DONE, time = s.time, intervalDays = s.intervalDays, date = s.firstOn ?: today)
                 Schedule.OnArrival -> base.copy(kind = ScheduleKind.ON_ARRIVAL)
+                is Schedule.Deadline -> base.copy(
+                    kind = ScheduleKind.DEADLINE, date = s.due.toLocalDate(), time = s.due.toLocalTime(), days = s.days,
+                    windowFrom = s.from, windowUntil = s.until, remindEvery = s.intervalMinutes,
+                )
             }
         }
     }

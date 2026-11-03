@@ -5,10 +5,12 @@ import android.database.sqlite.SQLiteDatabase
 import androidx.room.Room
 import androidx.test.core.app.ApplicationProvider
 import androidx.test.ext.junit.runners.AndroidJUnit4
+import com.avlreminder.core.model.BlockerOrigin
 import com.avlreminder.core.model.ChecklistItem
 import com.avlreminder.core.model.ItemDone
 import com.avlreminder.core.model.ProofSpec
 import com.avlreminder.core.model.ProofType
+import com.avlreminder.core.model.Schedule
 import com.avlreminder.core.model.WeeklyGoal
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.test.runTest
@@ -20,10 +22,13 @@ import org.junit.Assert.assertTrue
 import org.junit.Test
 import org.junit.runner.RunWith
 import java.io.File
+import java.time.DayOfWeek
 import java.time.Instant
+import java.time.LocalDateTime
+import java.time.LocalTime
 
 /**
- * Room 1 → 2 (V1.1a), 2 → 3 (V1.1b), 3 → 4 (V1.2a) and 4 → 5 (V1.2b): existing reminders, occurrences and proofs survive, the
+ * Room 1 → 2 (V1.1a), 2 → 3 (V1.1b), 3 → 4 (V1.2a), 4 → 5 (V1.2b), 5 → 6 (V1.2c) and 6 → 7 (V1.3a): existing reminders, occurrences and proofs survive, the
  * backup is taken first. The old database is built from the exported schema; Room checks the
  * migrated tables against the current version on open.
  */
@@ -82,6 +87,36 @@ class MigrationTest {
         )
     }
 
+    /** Three reminders: a newer "Was fehlt?" answer that names something, "Ja, sofort", "weiß ich noch nicht". */
+    private fun createV5() = create(5) { db ->
+        db.execSQL(
+            "INSERT INTO reminder (id, title, character, strictness, scheduleType, timeMinutes, weekdays, proof, active, createdAt, " +
+                "proofPhoto, ignoreDnd, snoozeMinutes) VALUES " +
+                "(1, 'Steuer', 'OVERCOME', 'NORMAL', 'DAILY', 1140, 0, 'CONFIRM', 1, 0, 0, 0, '10'), " +
+                "(2, 'Training', 'OVERCOME', 'NORMAL', 'DAILY', 1080, 0, 'CONFIRM', 1, 0, 0, 0, '10'), " +
+                "(3, 'Keller', 'OVERCOME', 'NORMAL', 'DAILY', 1080, 0, 'CONFIRM', 1, 0, 0, 0, '10')",
+        )
+        db.execSQL(
+            "INSERT INTO prep_answer (reminderId, question, text, unknown, at) VALUES " +
+                "(1, 3, 'Belege suchen', 0, 100), (1, 3, ' Login fehlt ', 0, 200), (1, 2, 'keine Lust', 0, 200), " +
+                "(2, 3, 'Schuhe fehlen', 0, 100), (2, 3, 'Ja, sofort', 0, 200), " +
+                "(3, 3, NULL, 1, 100)",
+        )
+    }
+
+    private fun createV6() = create(6) { db ->
+        db.execSQL(
+            "INSERT INTO reminder (id, title, character, strictness, scheduleType, timeMinutes, weekdays, proof, active, createdAt, " +
+                "proofPhoto, ignoreDnd, snoozeMinutes, solvedBlockerIsMinimum) " +
+                "VALUES (1, 'Training', 'OVERCOME', 'NORMAL', 'WEEKDAYS', 1140, 31, 'CONFIRM', 1, 0, 0, 0, '10', 0)",
+        )
+        db.execSQL(
+            "INSERT INTO template (id, name, usedAt, character, strictness, scheduleType, timeMinutes, weekdays, proofKind, " +
+                "proofPhoto, proofWindowMinutes, ignoreDnd, snoozeMinutes) " +
+                "VALUES (2, 'Tabletten', 0, 'DOCUMENT', 'NORMAL', 'DAILY', 480, 0, 'CONFIRM', 0, 10, 0, '10')",
+        )
+    }
+
     private fun createV1() = create(1) { db ->
             db.execSQL(
                 "INSERT INTO reminder (id, title, why, character, strictness, scheduleType, timeMinutes, onceAt, weekdays, " +
@@ -98,7 +133,85 @@ class MigrationTest {
     }
 
     private fun open() = Room.databaseBuilder(context, AvlDatabase::class.java, file.path)
-        .addMigrations(MIGRATION_1_2, MIGRATION_2_3, MIGRATION_3_4, MIGRATION_4_5).allowMainThreadQueries().build()
+        .addMigrations(MIGRATION_1_2, MIGRATION_2_3, MIGRATION_3_4, MIGRATION_4_5, MIGRATION_5_6, MIGRATION_6_7)
+        .allowMainThreadQueries().build()
+
+    @Test
+    fun version6KeepsDataAndGetsSeveralTimesADay() = runTest {
+        createV6()
+        val db = open()
+        try {
+            val repo = RoomReminderRepository(db)
+            val r = repo.reminder(1)!!
+            val weekdays = (1..5).map { DayOfWeek.of(it) }.toSet()
+            assertEquals(Schedule.Weekdays(LocalTime.of(19, 0), weekdays), r.schedule)
+            assertNull(r.hintQuietUntil)
+            val template = db.dao().observeTemplates().first().single()
+            assertNull(template.moreTimes)
+
+            val three = Schedule.Weekdays(listOf(LocalTime.of(8, 0), LocalTime.of(13, 0), LocalTime.of(19, 0)), weekdays)
+            repo.saveReminder(r.copy(schedule = three, hintQuietUntil = Instant.ofEpochMilli(5000)))
+            assertEquals(three, repo.reminder(1)!!.schedule)
+            assertEquals(Instant.ofEpochMilli(5000), repo.reminder(1)!!.hintQuietUntil)
+            // Back to one time: the further times are gone.
+            repo.saveReminder(r)
+            assertEquals(r.schedule, repo.reminder(1)!!.schedule)
+        } finally {
+            db.close()
+        }
+    }
+
+    @Test
+    fun backupIsTakenBeforeTheUpgradeFromVersion6() {
+        createV6()
+        val dir = File(context.filesDir, "backup-test-6").apply { deleteRecursively() }
+        assertTrue(AvlDatabase.backupBeforeMigration(file, dir)!!.name.startsWith("avlreminder-v6-"))
+    }
+
+    @Test
+    fun version5KeepsDataAndTurnsTheMissingThingIntoABlocker() = runTest {
+        createV5()
+        val db = open()
+        try {
+            val repo = RoomReminderRepository(db)
+            val r = repo.reminder(1)!!
+            assertEquals("Steuer", r.title)
+            assertNull(r.preNotice)
+            assertNull(r.prepFor)
+            assertEquals(false, r.solvedBlockerIsMinimum)
+            // Only the newest answer, trimmed; "Ja, sofort" and "weiß ich noch nicht" are none.
+            val blockers = repo.blockers(1)
+            assertEquals(listOf("Login fehlt"), blockers.map { it.text })
+            assertEquals(BlockerOrigin.STARTKLAR, blockers.single().origin)
+            assertTrue(blockers.single().isOpen)
+            assertEquals(Instant.ofEpochMilli(200), blockers.single().createdAt)
+            assertTrue(repo.blockers(2).isEmpty())
+            assertTrue(repo.blockers(3).isEmpty())
+
+            // The new columns hold a deadline.
+            val deadline = Schedule.Deadline(
+                LocalDateTime.of(2026, 11, 6, 12, 0), setOf(DayOfWeek.MONDAY, DayOfWeek.FRIDAY),
+                LocalTime.of(9, 0), LocalTime.of(17, 0), 30,
+            )
+            repo.saveReminder(r.copy(schedule = deadline, solvedBlockerIsMinimum = true))
+            assertEquals(deadline, repo.reminder(1)!!.schedule)
+            assertTrue(repo.reminder(1)!!.solvedBlockerIsMinimum)
+
+            // Deleting the reminder takes its blockers along.
+            repo.deleteReminder(1)
+            assertTrue(repo.blockers(1).isEmpty())
+            assertTrue(db.dao().observeTemplates().first().isEmpty())
+        } finally {
+            db.close()
+        }
+    }
+
+    @Test
+    fun backupIsTakenBeforeTheUpgradeFromVersion5() {
+        createV5()
+        val dir = File(context.filesDir, "backup-test-5").apply { deleteRecursively() }
+        assertTrue(AvlDatabase.backupBeforeMigration(file, dir)!!.name.startsWith("avlreminder-v5-"))
+    }
 
     @Test
     fun version4KeepsDataAndGetsWeeklyGoal() = runTest {

@@ -1,7 +1,8 @@
 # Anforderungen – avlreminder
 
 > Arbeitsname. AVL = **A**udio / **V**isual / **L**ocation.
-> Stand: 2026-10-25 – sechzehnter Entwurf (Nachweis ohne Alarm, Text- und Audionachweis), wird iterativ verfeinert.
+> Stand: 2026-11-03 – umgesetzt bis V1.3a2, V1.3a3 gebaut (Übersicht in Kap. 10). Entscheidungen mit Datum in
+> Kap. 9, technisches Design nach Themen in [design.md](design.md). Wird iterativ verfeinert.
 
 ## 1. Vision
 
@@ -60,8 +61,8 @@ als eigenständige Verwaltungs-App.
 
 | Stufe | Inhalt | Technik |
 |---|---|---|
-| **V1** | Einzelnutzer, komplett lokal, Kernmechanismen | Kein Backend, Sideload-APK |
-| V2 | Abgleich mit Zielen, lokale KI, Zahlenwerte, Backup, **Forschung Bewegungsdaten** (7.16), **Räume und Taster über Home Assistant** (7.19), ggf. GPS-Routen (7.17) | lokal bzw. im Heimnetz |
+| **V1** | Einzelnutzer, komplett lokal, Kernmechanismen | Kein Backend, Sideload-APK; später Play-Store-Release mit Backend (7.28) |
+| V2 | Abgleich mit Zielen, lokale KI, Zahlenwerte, Backup, **Forschung Bewegungsdaten** (7.16), **Räume und Taster über Home Assistant** (7.19), ggf. GPS-Routen (7.17), **Schnittstelle für KI-Agenten** (7.26) | lokal bzw. im Heimnetz |
 | V3 | Mehrere Personen im Haushalt, gemeinsame Reminder (7.18), KI über Backend, ggf. NFC-Kontrollpunkte (7.15), ggf. **Haushaltsinventar und Einkaufsliste** (7.23) | Lokale Synchronisation zwischen den Handys – Backend nur, wenn nötig |
 
 "Alignment" umfasst langfristig: **Erledigung erzwingen** (V1), **Abgleich mit
@@ -696,11 +697,138 @@ klappbaren Bereichen, Charakter oben mit *Dokumentation* als Standard. Offen:
   die Serie, sobald **mindestens ein** Termin eingehalten wurde (Standard; strenger nur,
   falls es sich in der Nutzung als nötig zeigt). Im Design zu klären: wie das
   Wochenziel zählt und ob Auslassen pro Termin gilt. **[V1.3]**
+  **Mit Checkliste (2026-11-03):** Die Liste wird über die Termine abgearbeitet, pro
+  Termin ein Punkt. Ein abgehakter Punkt erfüllt den Termin, der Rest kommt beim
+  nächsten Termin (heute oder morgen). Ein Termin ohne Punkt ist *verpasst*, die Liste
+  behält ihren Stand; nach dem letzten Punkt beginnt sie von vorn. Im Alarm ist der
+  große Knopf „Erledigt: ‹nächster Punkt›“, *Alles auf einmal erledigt* ist klein.
+  Das Wochenlimit für das *Minimum* zählt Tage, nicht Termine.
 - VS2 **Andere Zeiten am Wochenende**: Übersicht, *laut ab* und Tagesgrenze getrennt
   für Mo–Fr und Sa–So einstellbar. Einzelne Tage erst, wenn zwei Gruppen nicht reichen.
   **[V1.3]**
 - VS3 **Statistik schöner**: Wochenverlauf als kleines Balkendiagramm, Serie
   hervorgehoben. Die Liste reicht vorerst. **[später]**
+
+### 7.26 Schnittstelle für KI-Agenten
+Persönliche KI-Agenten werden voraussichtlich immer mehr übernehmen. Die App soll
+deshalb vollständig über eine Schnittstelle für Agenten bedienbar sein, und ein Agent
+soll helfen, die Reminder einzuhalten: planen, Vorarbeit erledigen, motivieren.
+**[V2]**
+- AG1 **Nur lokal auf dem Gerät.** Kein Zugang aus dem Netz, kein Backend.
+- AG2 **Für alle persönlichen Agenten**, nicht nur einen (z. B. Gemini und die
+  KI-Assistenten-Apps anderer Anbieter). Deshalb über offene bzw. System-Standards:
+  Android *App Functions* (vom System geregelter Zugriff) und ein lokaler MCP-Server.
+  Beide nutzen dieselben Befehle aus `core` wie die Oberfläche der App.
+- AG3 **Freiwillig, Standard aus.** Wer seine Reminder komplett selbst verwalten
+  will, braucht keinen Agenten. Freigabe **pro Agent** (Kopplung mit Bestätigung in
+  der App), jederzeit widerrufbar, dazu ein Notschalter für die ganze Schnittstelle.
+  Ein localhost-Port ist für jede App auf dem Gerät erreichbar, darum ist die
+  Kopplung Pflicht. Wie die Freigabe im Detail aussieht, wird im Design geklärt.
+- AG4 **Rechte in Stufen:** lesen (Reminder, Stand, Statistik, Übersicht);
+  vorschlagen (anlegen, verschieben, erster Schritt – der Nutzer bestätigt in der
+  App); ändern (Reminder anlegen und bearbeiten). Der Nutzer wählt die Stufe pro
+  Agent.
+- AG5 **Kein Schlupfloch** (Leitprinzip 4): Ein Agent darf keinen Reminder als
+  erledigt markieren, keinen Alarm und keine Eskalation beenden und keinen Nachweis
+  ersetzen.
+- AG6 **Delegierbar** als Markierung pro Reminder: Nur dann darf ein Agent ihn
+  erledigen, mit einem Beleg als Nachweis. Beispiel: Termin vereinbaren oder ein
+  Meeting vorbereiten ja, Training nein. Beim Training kann der Agent aber den
+  Trainingstag planen, den Fortschritt verfolgen und motivieren.
+- AG7 **Ehrlich sichtbar** (Leitprinzip 6): Was ein Agent tut, steht im Verlauf als
+  *durch Agent*. Vom Agenten Erledigtes wird in der Statistik getrennt ausgewiesen.
+- AG8 **Coaching im Sinne der App:** Die Schnittstelle liefert neben den Daten auch
+  Vorlagen (z. B. „Hilf mir, mit X anzufangen“, „Wochenrückblick“) mit den Regeln der
+  App: positiv vor negativ, Minimum zählt, Joker, Warum (P3), Startklar-Fragen und
+  Blocker (7.21). So motiviert jeder Agent auf dieselbe Art.
+- AG9 **Die App stößt den Agenten an:** bei Eskalation, Verpasst, wiederholtem
+  Verschieben und zum Abendrückblick. Dazu ein Knopf *Mit Agent besprechen* im Alarm
+  und bei den Startklar-Fragen, der Reminder, Warum und Blocker mitgibt.
+- AG10 **Deutlicher Datenschutzhinweis** bei der Freigabe: Was der Agent sieht, kann
+  das Gerät verlassen; das verantwortet der Nutzer (wie I7). Sensible Kategorien
+  aus 8.4 (Fotos, Audio, Standorte, Bewegungsdaten, Inventar) sind einzeln
+  freizugeben und standardmäßig aus. Ein Zugriffsprotokoll zeigt, welcher Agent wann
+  was gelesen oder geändert hat.
+- Vorbereitung bis dahin: neue Logik weiter als saubere Befehle in `core`, damit
+  Oberfläche und Agent später dieselben Wege nutzen.
+- AG11 **Vorstufe für Claude über adb (vorgezogen, 2026-11-02, umgesetzt in V1.3a2):** Kevin möchte,
+  dass Claude in der Entwicklung Reminder lesen und schreiben kann (z. B. Test-Reminder
+  einrichten, Stand prüfen). Datenschutz ist für ihn als Entwickler kein Hindernis, die
+  Schnittstelle muss aber **ausdrücklich in der App freigegeben** werden. Empfehlung:
+  - **Weg:** `adb shell content call` an einen ContentProvider der App, geschützt mit
+    der Berechtigung `android.permission.DUMP` – die hat nur die adb-Shell, keine andere
+    App. Kein Netz, kein Port; geht per USB und kabellosem Debugging. Antworten als JSON
+    mit Versionsnummer.
+  - **Freigabe:** Schalter in den Einstellungen, Standard aus, mit Rückfrage. Solange er
+    an ist, steht das sichtbar in den Einstellungen; ohne Freigabe antwortet die
+    Schnittstelle nur „nicht freigegeben“.
+  - **Lesen:** Reminder, offene Fälligkeiten, Verlauf, Statistik, Blocker, Einstellungen.
+  - **Schreiben:** Reminder anlegen, bearbeiten, pausieren, archivieren; Blocker anlegen.
+    Immer über dieselben Befehle wie die Oberfläche (Prüfung, Alarme neu planen).
+  - **Nicht (AG5):** nichts erledigen oder auslassen, keinen Alarm beenden, keine
+    Nachweise, nicht löschen (archivieren statt löschen). Klingelt ein Reminder oder
+    ist er überfällig, darf die Schnittstelle ihn nicht ändern, pausieren oder
+    archivieren („läuft gerade – nur in der App“, 2026-11-03).
+  - **Protokoll:** jeder Zugriff im Diagnose-Log mit Methode und ID, ohne Inhalte.
+  - **Nur im Debug-Build** (Sideload); der Play-Store-Release bekommt stattdessen die
+    Agenten-Schnittstelle aus AG1–AG10.
+  - Umsetzung: design.md 15. Einstellungen liest die Schnittstelle vorerst nicht; ein
+    neuer Reminder ohne Angabe ist *festhalten* (Überwinden braucht die vier Startklar-Antworten).
+
+### 7.27 Nutzung beobachten, Funktionen trimmen, Schlupflöcher bremsen
+Stand 2026-11-02: Die App funktioniert im Alltag sehr gut. Mit V1.2c ist aber viel
+dazugekommen; Kevin sammelt jetzt erst einmal mit aktiver Nutzung.
+- NT1 **Funktionen trimmen:** herausfinden, welche Funktionen wirklich genutzt werden.
+  Was ungenutzt bleibt, wird vereinfacht oder entfernt, statt neue hinzuzufügen.
+- NT2 **Zu streng geplant:** Reminder werden manchmal strenger angelegt als
+  durchhaltbar und dann x-mal um 10 Minuten geschoben. Die App soll das erkennen und
+  helfen, realistischer zu planen (Zeit, Strenge, Minimum), statt nur lauter zu werden.
+  **Bestätigt (2026-11-02):** Wird ein Reminder über mehrere Fälligkeiten hintereinander
+  jeweils mehrfach mit *Später* geschoben (etwa ab dem dritten Mal), fragt die App
+  einmal, ob Uhrzeit, Strenge oder Minimum angepasst werden sollen – ähnlich der
+  Nachfrage aus 7.21 (S8), keine harte Sperre. Die Karte bietet Uhrzeit, Strenge und
+  *Nein danke*; *Minimum* braucht Kevin dort nicht (2026-11-03).
+- NT3 **Schlupflöcher (Cheats) bleiben vorerst**, bekommen aber sinnvolle Rückfragen
+  („Willst du wirklich …?“). Welche Stellen das sind und wie stark die Bremse sein
+  soll, ergibt sich aus der Nutzung.
+- Ergebnisse fließen als Vorschläge (7.24) oder hier ein; danach Entwurf.
+- NT4 **Nutzung zählen erst vor V2**, zusammen mit der Testsession: nur Anzahlen aus der
+  Datenbank (welche Funktionen eingestellt sind, wie oft Später, Verschieben, Minimum),
+  keine Titel oder Inhalte. Bis dahin nutzt Kevin V1.2c weiter.
+
+### 7.28 Play-Store-Release und Backend
+Ziel ist, einmal den kompletten Weg zu gehen: eine offizielle App im Play Store mit
+sehr kleiner Zielgruppe, mit Backend und vollem EU-Datenschutz. Lernen steht im
+Vordergrund, nicht Reichweite.
+- PS1 **Play Store** statt nur Sideload. **Android 17 bleibt Minimum** (8.1).
+- PS2 **Backend** entsteht parallel in einem eigenen Repository (Entscheidung vom
+  2026-11-01) und dient später als **Backup** und **Sync** mit anderen (7.18).
+- PS3 **EU-Datenschutz (DSGVO)** vollständig: Datenschutzerklärung, Hosting in der EU,
+  Export und Löschen auf Wunsch, Datensicherheits-Angaben im Play Store.
+- PS4 Die eingeschränkten Berechtigungen, die beim Sideload egal waren (8.2), müssen
+  für den Play Store begründet und deklariert werden.
+- PS5 **Keine Eile (2026-11-02):** Die App soll erst „fertig“ sein – mindestens alles bis
+  V2, eventuell Teile aus V2 und das Backend. Erst dann Play Store.
+- PS6 **Mehr Transparenz** für Tester: Die App zeigt verständlich, was sie speichert,
+  welche Berechtigungen sie wofür nutzt und warum ein Alarm kam bzw. nicht kam.
+- PS7 **Bewusster Notausschalter:** ein klar erreichbarer Weg, alle Alarme sofort
+  abzuschalten (z. B. wenn die App sich falsch verhält), mit Rückfrage und Anzeige, dass
+  er aktiv ist. Wichtig, weil die Mechanismen absichtlich invasiv sind. Neutral
+  (*ausgelassen – Notaus*) nur, wenn die Pause vor der Fälligkeit begann, sonst
+  *verpasst*; Fristen bleiben hart (2026-11-03). Endet die Pause, ob von selbst oder von
+  Hand, klingelt eine offene Fälligkeit sofort (2026-11-03).
+- PS8 **Backend nur nach ausdrücklichem Einschalten.** Ohne Zustimmung keine Anmeldung,
+  keine Verbindung; die App bleibt vollständig lokal nutzbar.
+- PS8a **Einstellungen im Backup** (2026-11-03): Das Backup B2b enthält neben der
+  Datenbank die Einstellungen (Darstellung, Alarmzeiten, Wochenende, Übersicht,
+  Nachfrage, Verweildauer, Sortierung). *Notaus* und der Schalter der Schnittstelle
+  bleiben auf dem Gerät: Eine Wiederherstellung schaltet keine Alarme stumm und keine
+  Schnittstelle ein.
+- PS9 **Verschlüsselung auf dem Gerät** (nur die App kann die Daten lesen): **geklärt
+  (2026-11-02)** – Android-Sandbox, dateibasierte Verschlüsselung und `allowBackup=false`
+  reichen; der Play-Store-Release ist ein Release-Build (nicht debuggable, kein
+  `run-as`). Kein SQLCipher, solange kein konkreter Fall übrig bleibt.
+- Backend-Stand und was es für die App bedeutet: [backend.md](backend.md).
 
 ## 8. Zielplattform und Technik
 
@@ -712,8 +840,9 @@ klappbaren Bereichen, Charakter oben mit *Dokumentation* als Standard. Offen:
 
 ### 8.2 Technische Machbarkeit
 
-Großer Vorteil: **Sideload statt Play Store** → die meisten Play-Richtlinien
-(eingeschränkte Berechtigungen) gelten nicht. Berechtigungen müssen aber trotzdem
+Bisher **Sideload statt Play Store** → die meisten Play-Richtlinien
+(eingeschränkte Berechtigungen) gelten nicht. Mit dem geplanten Play-Store-Release
+(7.28) ändert sich das. Berechtigungen müssen aber trotzdem
 vom Nutzer in den Systemeinstellungen erteilt werden.
 
 | Mechanismus | Machbar? | Android-Mittel | Anmerkung |
@@ -738,6 +867,7 @@ vom Nutzer in den Systemeinstellungen erteilt werden.
 | GPS-Routen | ✅ | Fused Location im Foreground-Service | Nur während Sitzungen, sonst zu akkuintensiv |
 | M2 Lokale Synchronisation | ✅ | Nearby Connections (Bluetooth/WLAN ohne Internet) oder WLAN im Haushalt | Konfliktauflösung ist der eigentliche Aufwand |
 | N8 / KI lokal | ⚠️ zu prüfen | On-Device-Modelle (z. B. Gemini Nano / ML Kit GenAI, Speech-to-Text) | Verfügbarkeit auf S24 Ultra mit Android 17 prüfen |
+| AG KI-Agenten | ⚠️ zu prüfen | Android App Functions (Jetpack `androidx.appfunctions`), lokaler MCP-Server mit Kopplung | Welche Agenten App Functions aufrufen dürfen und wie Agenten-Apps einen lokalen MCP-Server erreichen, auf Android 17 prüfen |
 | P2 Apps sperren | ✅ / ⚠️ | Accessibility-Service oder Overlay-Blocker | |
 | Zuverlässigkeit | ⚠️ | Akku-Optimierung deaktivieren | **Samsung "Schlafende Apps"/Geräteschutz ist das größte Risiko** |
 
@@ -761,7 +891,9 @@ früh am S24 Ultra testen (Spike, siehe Abschnitt 10).
   Cloud-KI für den Import vorbereitet wird, verantwortet der Nutzer selbst.
 - Rohdaten der Bewegungssensoren (7.16) nach einer einstellbaren Frist löschen;
   das Ergebnis (Dauer, erkanntes Muster) bleibt.
-- Kein Backup in V1 (später nachrüstbar, z. B. Export als ZIP).
+- Kein Backup in V1 (später nachrüstbar, z. B. Export als ZIP). Das Cloud-Backup des
+  Backends (B2b, [backend.md](backend.md)) ist Ende-zu-Ende verschlüsselt, enthält
+  keine Fotos und kein Audio und läuft nur nach ausdrücklichem Einschalten (7.28 PS8).
 - Aufbewahrung: vorerst unbegrenzt.
 
 ## 9. Entscheidungen
@@ -826,13 +958,48 @@ früh am S24 Ultra testen (Spike, siehe Abschnitt 10).
 | 2026-10-29 | Reminder-Liste: abgeschlossene Einmal-Reminder automatisch eingeklappt, Archivieren von Hand, Gruppen und Sortierung (V1.2). Einmal-Reminder mit neuer Zeit wird wieder eingeplant und eingeschaltet (Bugfix, sofort) |
 | 2026-10-31 | V1.2b bestätigt wie Entwurf. UI-Feinschliff aus den ersten Vorschlägen noch vor der Testsession; mehrmals täglich und Wochenend-Zeiten nach V1.3 (7.25) |
 | 2026-10-31 | Mehrmals täglich: Serie hält mit mindestens einem eingehaltenen Termin pro Tag. Wochenend-Zeiten gelten auch für die Tagesgrenze (7.25) |
+| 2026-11-01 | Schnittstelle für KI-Agenten in V2: nur lokal, für alle persönlichen Agenten, freiwillig mit Freigabe pro Agent; Agent erledigt nur als *delegierbar* markierte Reminder, nie Nachweis oder Alarm; App stößt den Agenten an; Datenschutz verantwortet der Nutzer, mit deutlichem Hinweis (7.26) |
+| 2026-11-02 | Testsession erst vor V2 statt vor V1.3 – die App läuft im Alltag gut |
+| 2026-11-02 | V1.2c-Entwurf (design.md 12.4) bestätigt und umgesetzt: Fristen mit Ausführungsfenstern, Vorlagen, Vorab-Reminder, Blocker als Liste mit Vorbereitungsaufgaben, *Blocker gelöst* als Minimum, Nachfragen wenn es hakt |
+| 2026-11-02 | Vor V1.3 erst Nutzung beobachten: Funktionen trimmen statt erweitern, Rückfragen bei Schlupflöchern (7.27) |
+| 2026-11-02 | Hinweis bei wiederholtem *Später* bestätigt (7.27 NT2); Nutzung erst vor V2 mit der Testsession zählen (NT4) |
+| 2026-11-02 | Play Store ohne Eile: erst „fertig“ (mindestens bis V2, ggf. Backend); dafür Transparenz, Notausschalter, Backend nur nach Einschalten; Verschlüsselung auf dem Gerät wird bewertet (7.28 PS5–PS9) |
+| 2026-11-02 | Verschlüsselung auf dem Gerät geklärt: Sandbox + Release-Build reichen, kein SQLCipher (7.28 PS9) |
+| 2026-11-02 | Ziel offizieller Play-Store-Release für eine sehr kleine Zielgruppe, mit Backend (Backup, Sync) und vollem EU-Datenschutz; Android 17 bleibt Minimum (7.28) |
+| 2026-11-02 | V1.3-Entwurf bestätigt (design.md E.5): Aufteilung a/b/c; mehrere Uhrzeiten – verpasst beim nächsten Termin, kein Wochenziel und keine Ankunft; NT2-Schwelle 3×2 (oder einmal 4×), Karte auf *Heute*, *Nein danke* 14 Tage; *Notaus* bricht keine Serie; für V1.3b: *abgebrochen* bricht die Serie, Nachfragen *locker*, max. 90 min. V1.3a gestartet |
+| 2026-11-02 | V1.3a umgesetzt: höchstens 6 Uhrzeiten am Tag; Notaus mit 1 Stunde, bis morgen 06:00 oder bis zum Einschalten; Wochenend-Schalter gilt für Alarmzeiten und Übersicht zusammen |
+| 2026-11-02 | Schnittstelle für Claude vorgezogen (vor V1.3b): Reminder lesen und schreiben über adb, ausdrücklich in der App freizugeben; Entwurf in 7.26 AG11 |
+| 2026-11-02 | AG11 bestätigt und als V1.3a2 umgesetzt: ContentProvider mit `DUMP`, nur Debug-Build, Schalter mit Rückfrage; Claude darf Reminder-Inhalte über die freigegebene Schnittstelle lesen, sie bleiben aber aus Repo und Logs |
+| 2026-11-03 | Antworten auf Review-Lauf 1 (Fragen 1–6): Schnittstelle ändert keinen klingelnden oder überfälligen Reminder (AG11); nach „Handy aus“ klingelt der gerade laufende Termin (VS1); *Notaus* neutral nur bei Pause vor der Fälligkeit, Fristen hart (PS7); NT2-Karte ohne *Minimum*; Titel im Diagnose-Log in der Entwicklungsphase erlaubt, vor einem offiziellen Release entfernen. Umgesetzt in V1.3a3 |
+| 2026-11-03 | Checkliste mit mehreren Uhrzeiten (7.25 VS1, Review-Frage 7a und 7c): pro Termin ein Punkt, der Rest kommt beim nächsten Termin, die Liste behält ihren Stand über verpasste Termine; Minimum-Limit zählt Tage. Umgesetzt in V1.3a3 |
+| 2026-11-03 | Notaus von Hand ausgeschaltet (Review-Frage 7b): eine offene Fälligkeit klingelt sofort wie beim automatischen Pausenende, nicht erst zur nächsten Runde (7.28 PS7). Umgesetzt in V1.3a3 |
+| 2026-11-03 | Einstellungen kommen mit ins Backup B2b, ohne *Notaus* und Schnittstellen-Schalter (Review-Lauf 2, Frage 2; 7.28 PS8a). Vorbereitet in V1.3b0 |
+| 2026-11-03 | Umbau-Etappe V1.3b0 vor V1.3b (Review-Lauf 2): Engine als Fassade, Befehle in einer Transaktion, zentrales Klingeln, Alarm-Ansicht in `core`; ein gespeicherter Ankunft-Reminder klingelt sofort, wenn man schon da ist, auch über die Schnittstelle. Sonst kein neues Verhalten |
 
 ## 10. Nächste Schritte
 
-1. **Technischer Spike auf dem S24 Ultra** (Plan: [spike.md](spike.md)): exakter
-   Alarm, Vollbild über Sperrbildschirm, Vibrationsmuster, Alarmton, Geofence
-   "Ankunft zuhause", Überleben von Neustart und Samsung-Akkumanagement über mehrere Tage
-2. **V1 in Etappen**, damit früh echte Nutzung möglich ist:
+### 10.1 Was ist wo umgesetzt
+
+| Version | auf dem Gerät | Inhalt (Anforderungen) |
+|---|---|---|
+| Spike | 2026-10 | Machbarkeit auf dem S24 Ultra ([spike.md](spike.md)) |
+| V1.0 | 2026-10-24 | Zeit-Reminder, Eskalation, Aktionen, Quittieren/Foto, Ziel/Minimum, Verlauf, Widget, *nach Erledigung* |
+| V1.1a | ✅ | Nicht stören und Tagesgrenze (7.3), Später-Knöpfe (7.4), Nachweis ohne Alarm, Text, Audio (7.5), vorab erledigen (7.20), Startklar (7.21 S1–S4), Uhr (7.14 G1b), Motivations-Audio |
+| V1.1b | ✅ | Ankunft zuhause (7.1), Checklisten (7.13) |
+| V1.2a | ✅ | Verbesserung vorschlagen (7.24), Reminder-Liste (7.9 L1–L5) |
+| V1.2b | 2026-10-31 | Wochenziele, Serien/Joker, Statistik, Übersicht morgens/abends, Diagnose-Log, UI aus Kevins Vorschlägen |
+| V1.2c | 2026-11-02 | Fristen mit Fenstern (7.2), Vorlagen, Vorab-Reminder (T6), Blocker als Aufgaben (7.21 S5–S8) |
+| V1.3a | 2026-11-02 | Mehrmals täglich, Wochenend-Zeiten (7.25 VS1, VS2), Hinweis bei ständigem *Später* (7.27 NT2), Notausschalter (7.28 PS7) |
+| V1.3a2 | 2026-11-02 | Schnittstelle für Claude über adb (7.26 AG11) |
+| V1.3a3 | gebaut | Fixes aus Review-Lauf 1 und Antworten darauf, Checkliste über mehrere Uhrzeiten (7.25 VS1) (Kap. 9, 2026-11-03) |
+| V1.3b0 | gebaut | Umbau ohne neues Verhalten (design.md 1), Empfehlungen E1–E4 aus Review-Lauf 2 (Kap. 9, 2026-11-03) |
+
+Details zum Verhalten: [design.md](design.md), Gerätetests: [geraetetest.md](geraetetest.md).
+
+### 10.2 Plan
+
+1. ✅ **Technischer Spike auf dem S24 Ultra** (Plan: [spike.md](spike.md))
+2. **V1 in Etappen**, damit früh echte Nutzung möglich ist (umgesetzt bis V1.2c, siehe 10.1):
    - **V1.0 (benutzbar):** Zeit-Reminder, Eskalation, Aktionen, Quittieren/Foto,
      Ziel/Minimum, einfache Liste der Erledigungen, Widget
      – ✅ seit 2026-10-24 auf dem Gerät, inkl. Intervall ab letzter Erledigung
@@ -842,12 +1009,15 @@ früh am S24 Ultra testen (Spike, siehe Abschnitt 10).
      und Tagesgrenze (7.3), **Verschiebe-Knöpfe pro Reminder** (7.4),
      **Alarm aus während des Nachweises**, **Text-Nachweis**, kombinierbare
      Nachweise (7.5)
-   - **V1.2** in drei Etappen (Design 12):
+   - **V1.2** in drei Etappen:
      - **V1.2a:** **Verbesserung vorschlagen** (7.24), **Reminder-Liste aufräumen**
        (7.9, L1–L5)
      - **V1.2b:** Wochenziele, Serien/Joker, Statistik, Übersicht morgens/abends
      - **V1.2c:** Fristen mit Ausführungsfenstern, **Vorab-Reminder** (T6), **Blocker
        als Aufgaben** (7.21, S5–S8), Vorlagen
+   - **Jetzt (seit 2026-11-02): Nutzung beobachten und trimmen** (7.27): welche
+     Funktionen Kevin wirklich nutzt, Rückfragen bei Schlupflöchern, Hinweis bei
+     wiederholtem *Später*. Fehler aus dem Alltag als Fix auf `develop`.
    - **V1.3:** **Durchführung mit Timer** und Nachfrage-Muster (7.11), **Abläufe**
      für Training (7.12), **Galaxy Watch** über Benachrichtigungen (7.14),
      **vorgezogen starten** (7.20)
@@ -857,7 +1027,9 @@ früh am S24 Ultra testen (Spike, siehe Abschnitt 10).
    - **Möglicher Kandidat zum Vorziehen:** Einkaufsliste nur für einen selbst mit
      Geschäfts-Trigger (7.23, E1–E3) – ohne Inventar, KI und Abgleich; Technik
      ab V1.1 vorhanden. Nicht festgelegt.
-3. Weitere Anforderungen ergeben sich aus der Nutzung.
+3. **Play-Store-Release** mit Backend für Backup und Sync, EU-Datenschutz (7.28);
+   Reihenfolge zu V1.3/V2 noch offen.
+4. Weitere Anforderungen ergeben sich aus der Nutzung.
 
 ## 11. Offene Fragen
 
@@ -877,3 +1049,20 @@ Für später:
   welche Konfliktregel gilt bei gleichzeitigen Änderungen (7.18)?
 - V3: Wie wird die geteilte Einkaufsliste aus der Ferne abgeglichen – Home
   Assistant oder eigenes Backend (7.23, E4)?
+- Play Store (7.28): Welche Berechtigungen lassen sich dort begründen (Vollbild-Alarm,
+  exakte Alarme, Standort im Hintergrund, Foreground-Service), und welche Testphase
+  verlangt Google vor dem ersten Release? Vor dem Start an den aktuellen Richtlinien
+  prüfen.
+- Backend (7.28): Wie passen Backup und Sync zu 8.4 (sensible Daten nur auf dem Gerät)?
+  Empfehlung: Backup Ende-zu-Ende verschlüsselt, sodass das Backend nur verschlüsselte
+  Daten sieht. **Geklärt:** Das Backend ist genau so gebaut ([backend.md](backend.md)).
+- ~~Verschlüsselung auf dem Gerät~~ – geklärt 2026-11-02 (7.28 PS9). Begründung: Android trennt App-Daten schon heute
+  (Sandbox, dateibasierte Verschlüsselung, `allowBackup=false`). Lesbar sind sie nur
+  über `run-as` in Debug-Builds und auf gerooteten Geräten. **Empfehlung:** Für den
+  Play Store ein Release-Build (nicht debuggable) – das schließt `run-as` aus.
+  Zusätzlich SQLCipher mit Schlüssel im Keystore nur, wenn ein konkreter Fall übrig
+  bleibt; es kostet Leistung, erschwert Diagnose und Migrationen. Fotos und Audio
+  lägen weiterhin als Dateien vor.
+- V2: Wie genau funktioniert die Freigabe für Agenten (Kopplung, Stufen, sensible
+  Kategorien), und welche Agenten-Apps erreichen App Functions bzw. einen lokalen
+  MCP-Server tatsächlich (7.26)?
