@@ -44,6 +44,21 @@ class EverydayRulesTest {
     }
 
     @Test
+    fun `after phone off the time that is running now still comes`() {
+        val s = Schedule.Daily(listOf(t(8), t(13), t(19)))
+        fun next(now: java.time.Instant, done: Boolean = false) =
+            ScheduleRules.nextDue(s, now, ZONE, previousDueAt = at(26, 8), previousWasDone = done, previousMissed = !done)
+        // Off from 12:50 to 13:30: 08:00 is missed only now, 13:00 still rings.
+        assertEquals(at(26, 13), next(at(26, 13, 30)))
+        // Off until after 19:00: the time running now, not the one before.
+        assertEquals(at(26, 19), next(at(26, 19, 30)))
+        // Off until the next day: today's times are over.
+        assertEquals(at(27, 8), next(at(27, 7)))
+        // Done: no time that has already started.
+        assertEquals(at(26, 19), next(at(26, 13, 30), done = true))
+    }
+
+    @Test
     fun `weekdays with several times skip the other days`() {
         val s = Schedule.Weekdays(listOf(t(8), t(19)), setOf(DayOfWeek.MONDAY, DayOfWeek.WEDNESDAY))
         assertEquals(at(26, 8), ScheduleRules.nextDue(s, at(26, 7), ZONE))

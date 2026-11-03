@@ -29,10 +29,12 @@ object ScheduleRules {
         previousMissed: Boolean = false,
     ): Instant? {
         // Never create a backlog: the next occurrence lies after both now and the previous one.
-        // Several a day: a time missed because the next one just started is that next one (VS1).
+        // Several a day: a time missed because the next one started is that next one (VS1), also
+        // when that is found late (phone off) – as long as it is still the current time of today.
         val after = when {
             previousDueAt == null -> now
-            schedule.severalADay -> maxOf(previousDueAt, now.minus(SLOT_TOLERANCE))
+            schedule.severalADay -> currentTime(schedule, previousDueAt, previousWasDone, now, zone)?.minusMillis(1)
+                ?: maxOf(previousDueAt, now.minus(SLOT_TOLERANCE))
             previousDueAt > now -> previousDueAt
             else -> now
         }
@@ -82,6 +84,22 @@ object ScheduleRules {
         schedule is Schedule.Daily -> nextAtTimes(schedule.times, dueAt, zone) { true }
         schedule is Schedule.Weekdays -> nextAtTimes(schedule.times, dueAt, zone) { it.dayOfWeek in schedule.days }
         else -> null
+    }
+
+    /**
+     * The last time of today after [previousDueAt] that has started by [now]; null if there is
+     * none. Only after a time that was not done: that one ended when the next started.
+     */
+    private fun currentTime(schedule: Schedule, previousDueAt: Instant, previousWasDone: Boolean, now: Instant, zone: ZoneId): Instant? {
+        if (previousWasDone) return null
+        val startOfToday = now.atZone(zone).toLocalDate().atStartOfDay(zone).toInstant()
+        var current: Instant? = null
+        var time = nextTime(schedule, maxOf(previousDueAt, startOfToday.minusMillis(1)), zone)
+        while (time != null && time <= now) {
+            current = time
+            time = nextTime(schedule, time, zone)
+        }
+        return current
     }
 
     /** A time missed because the next one started is still found when the alarm comes a bit late. */
