@@ -968,7 +968,7 @@ früh am S24 Ultra testen (Spike, siehe Abschnitt 10).
 | V1.2b | 2026-10-31 | Wochenziele, Serien/Joker, Statistik, Übersicht morgens/abends, Diagnose-Log, UI aus Kevins Vorschlägen |
 | V1.2c | 2026-11-02 | Fristen mit Fenstern (7.2), Vorlagen, Vorab-Reminder (T6), Blocker als Aufgaben (7.21 S5–S8) |
 | V1.3a | 2026-11-02 | Mehrmals täglich, Wochenend-Zeiten (7.25 VS1, VS2), Hinweis bei ständigem *Später* (7.27 NT2), Notausschalter (7.28 PS7) |
-| V1.3a2 | gebaut | Schnittstelle für Claude über adb (7.26 AG11) |
+| V1.3a2 | 2026-11-02 | Schnittstelle für Claude über adb (7.26 AG11) |
 
 Details zum Verhalten: [design.md](design.md), Gerätetests: [geraetetest.md](geraetetest.md).
 

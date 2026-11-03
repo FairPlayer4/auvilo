@@ -3,18 +3,18 @@
 Stand: 2026-11-02. Bei jedem größeren Schritt aktualisieren.
 
 ## In Arbeit
-- **V1.3a2** (`versionName` 1.3a2-prototyp, `versionCode` 8) auf `feature/v1.3a`, gebaut,
-  **noch nicht installiert** (wartet auf Kevins Go): Schnittstelle für Claude über adb
-  (anforderungen.md 7.26 AG11, design.md 15), nur im Debug-Build, Schalter in den
-  Einstellungen. Keine Migration. Build grün: 305 Tests, Kover in `core` 98,84 %.
-  Gerätetest: geraetetest.md *Neu in V1.3a2*.
-- Danach: Kevins Wochenplan (Gerätetests V1.3a), dann V1.3b.
+- **Review-Lauf 1** (2026-11-03, [.review/runs/2026-11-03.md](../.review/runs/2026-11-03.md)):
+  6 Fixes in `develop`, **noch nicht installiert**. Offen: Die Eskalationsrunde wird bei
+  jedem `sync` (App öffnen) neu ab „jetzt“ geplant; mehrere Uhrzeiten nach „Handy aus“;
+  dazu 7 Fragen an Kevin. Build grün: 312 Tests, Kover in `core` 98,85 %.
+- Danach: Kevins Wochenplan (Gerätetests V1.3a, Reminder *Gerätetest*), dann V1.3b.
 
 ## Auf dem Gerät
-- **V1.3a** (`versionName` 1.3a-prototyp, `versionCode` 7), installiert am 2026-11-02
-  auf `feature/v1.3a` (noch nicht in `develop`): mehrmals täglich (VS1),
-  Wochenend-Zeiten (VS2), Hinweis bei ständigem *Später* (NT2), Notausschalter (PS7).
-  Migration 6→7 mit Backup v6 geprüft. Gerätetests: geraetetest.md *Neu in V1.3a*.
+- **V1.3a2** (`versionName` 1.3a2-prototyp, `versionCode` 8), installiert am 2026-11-02,
+  seit 2026-11-03 in `develop`: V1.3a (mehrmals täglich VS1, Wochenend-Zeiten VS2,
+  Hinweis bei ständigem *Später* NT2, Notausschalter PS7; Migration 6→7 mit Backup v6
+  geprüft) und die Schnittstelle für Claude über adb (7.26 AG11, design.md 15), von
+  Kevin eingeschaltet. Gerätetests N7–N9 bestanden; offen: geraetetest.md *Neu in V1.3a*.
 - Davor **V1.2c** (`versionName` 1.2c-prototyp, `versionCode` 6), in `develop` gemergt. Enthält zusätzlich zu V1.2b Fristen mit Ausführungsfenstern und
   *Überfällig*, Vorlagen, Vorab-Reminder, Blocker als Liste mit Vorbereitungsaufgaben,
   *Blocker gelöst* als Minimum und Nachfragen, wenn es hakt. Migration 5→6 mit Backup v5
