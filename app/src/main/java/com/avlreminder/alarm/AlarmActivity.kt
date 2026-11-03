@@ -14,6 +14,7 @@ import androidx.compose.runtime.mutableLongStateOf
 import androidx.compose.runtime.produceState
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
+import androidx.core.net.toUri
 import androidx.lifecycle.lifecycleScope
 import com.avlreminder.core.model.OccurrenceState
 import com.avlreminder.core.rules.Action
@@ -41,6 +42,8 @@ class AlarmActivity : ComponentActivity() {
         /** [early]: complete before the reminder is due ("vorab erledigen"). */
         fun intent(context: Context, occurrenceId: Long, early: Boolean = false): Intent =
             Intent(context, AlarmActivity::class.java)
+                // Its own data, so each notification keeps its own PendingIntent.
+                .setData("avl://alarm/$occurrenceId${if (early) "/early" else ""}".toUri())
                 .putExtra(EXTRA_ID, occurrenceId)
                 .putExtra(EXTRA_EARLY, early)
                 .addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
