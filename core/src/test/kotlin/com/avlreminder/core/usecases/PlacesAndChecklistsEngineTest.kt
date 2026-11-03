@@ -156,6 +156,8 @@ class PlacesAndChecklistsEngineTest {
         val place = homeId()
         val id = create(reminder(Schedule.OnArrival).copy(title = "Paket", arrival = Arrival(place)))
         create(reminder(Schedule.OnArrival).copy(title = "Brief", arrival = Arrival(place)))
+        // Saving checked the position already, without a fix.
+        location.checks = 0
         location.here = false
         assertTrue(engine.checkPlaces().isEmpty())
         location.here = true
@@ -165,6 +167,16 @@ class PlacesAndChecklistsEngineTest {
         // One position check per place.
         assertEquals(2, location.checks)
         assertTrue(engine.checkPlaces().isEmpty())
+    }
+
+    @Test
+    fun `saving it while already at home rings in the save itself`() = runTest {
+        val place = homeId()
+        location.here = true
+        val result = engine.save(reminder(Schedule.OnArrival).copy(title = "Paket", arrival = Arrival(place)))
+        val ring = (result as SaveResult.Saved).ring!!
+        assertEquals(result.id, ring.reminder.id)
+        assertEquals(OccurrenceState.DUE, open(result.id).state)
     }
 
     @Test

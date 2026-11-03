@@ -9,7 +9,6 @@ import com.avlreminder.core.rules.Stats
 import com.avlreminder.core.usecases.Entry
 import com.avlreminder.core.usecases.Overview
 import com.avlreminder.core.usecases.ReminderEngine
-import com.avlreminder.core.usecases.Ring
 import com.avlreminder.core.usecases.SaveResult
 import org.json.JSONArray
 import org.json.JSONObject
@@ -33,8 +32,6 @@ class ClaudeApi(private val access: Access) {
         suspend fun reminders(): List<Reminder>
         suspend fun openOccurrences(): List<Occurrence>
         suspend fun resolvedOccurrences(): List<Occurrence>
-        /** A saved reminder that is due right away. */
-        fun ring(ring: Ring)
         fun now(): Instant
         val zone: ZoneId
     }
@@ -142,7 +139,6 @@ class ClaudeApi(private val access: Access) {
         return when (result) {
             is SaveResult.Invalid -> throw Failure(result.problems.joinToString("; "))
             is SaveResult.Saved -> {
-                result.ring?.let(access::ring)
                 ok().put("id", result.id).put("reminder", json.reminder(all().first { it.id == result.id }))
             }
         }

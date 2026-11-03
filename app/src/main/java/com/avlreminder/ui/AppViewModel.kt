@@ -10,7 +10,6 @@ import com.avlreminder.core.model.Place
 import com.avlreminder.core.model.PrepAnswer
 import com.avlreminder.core.model.Proof
 import com.avlreminder.core.model.Reminder
-import com.avlreminder.core.model.Schedule
 import com.avlreminder.core.model.severalADay
 import com.avlreminder.core.rules.Action
 import com.avlreminder.core.rules.AlertSettings
@@ -154,8 +153,7 @@ class AppViewModel(app: Application) : AndroidViewModel(app) {
 
     fun planTask(blockerId: Long, at: LocalDateTime) {
         viewModelScope.launch {
-            val result = graph.withEngine { it.planTask(blockerId, at) }
-            if (result is SaveResult.Saved) result.ring?.let(graph::ring)
+            graph.withEngine { it.planTask(blockerId, at) }
         }
     }
 
@@ -191,11 +189,6 @@ class AppViewModel(app: Application) : AndroidViewModel(app) {
         viewModelScope.launch {
             val result = graph.withEngine { it.save(reminder, prep) }
             onResult(result)
-            if (result is SaveResult.Saved) result.ring?.let(graph::ring)
-            // Already home when saving "wenn ich zuhause bin": the geofence would not report it.
-            if (result is SaveResult.Saved && reminder.schedule == Schedule.OnArrival) {
-                graph.scope.launch { graph.checkPlacesAndRing() }
-            }
         }
     }
 
@@ -233,8 +226,7 @@ class AppViewModel(app: Application) : AndroidViewModel(app) {
 
     fun answerSnoozeHint(reminderId: Long, choice: SnoozeHintChoice) {
         viewModelScope.launch {
-            val result = graph.withEngine { it.answerSnoozeHint(reminderId, choice) }
-            if (result is SaveResult.Saved) result.ring?.let(graph::ring)
+            graph.withEngine { it.answerSnoozeHint(reminderId, choice) }
         }
     }
 

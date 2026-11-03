@@ -13,7 +13,6 @@ import com.avlreminder.core.ports.AlarmKind
 import com.avlreminder.core.ports.AlarmPort
 import com.avlreminder.core.rules.Presets
 import com.avlreminder.core.usecases.ReminderEngine
-import com.avlreminder.core.usecases.Ring
 import com.avlreminder.data.AvlDatabase
 import com.avlreminder.data.RoomReminderRepository
 import com.avlreminder.data.toModel
@@ -55,7 +54,6 @@ class ClaudeApiTest {
         override suspend fun reminders(): List<Reminder> = repo.reminders()
         override suspend fun openOccurrences(): List<Occurrence> = repo.openOccurrences()
         override suspend fun resolvedOccurrences(): List<Occurrence> = db.dao().observeResolved().first().map { it.toModel() }
-        override fun ring(ring: Ring) {}
         override fun now(): Instant = now
         override val zone: ZoneId = this@ClaudeApiTest.zone
     })

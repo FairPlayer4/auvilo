@@ -13,6 +13,9 @@ import java.time.Instant
 
 /** Storage; the database behind it is the single source of truth. */
 interface ReminderRepository {
+    /** Runs [block] as a whole: all its changes are stored, or none if it fails. */
+    suspend fun <T> transaction(block: suspend () -> T): T = block()
+
     suspend fun reminders(): List<Reminder>
     suspend fun reminder(id: Long): Reminder?
     /** Inserts when id is 0, otherwise updates; also stores the checklist (items get ids). Returns the id. */

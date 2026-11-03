@@ -91,6 +91,7 @@ class AppGraph(private val context: Context) : ClaudeApi.Access {
         geofences = AndroidGeofences(context) { dwell },
         location = location,
         preNotices = PreNotices.Port(context),
+        ringer = { Ringer.ring(context, it) },
     )
     private val mutex = Mutex()
 
@@ -137,13 +138,10 @@ class AppGraph(private val context: Context) : ClaudeApi.Access {
         Diag.log("claude access ${if (on) "on" else "off"}")
     }
 
-    /** Rebuilds all alarms and rings what was missed. */
-    override fun ring(ring: com.avlreminder.core.usecases.Ring) = Ringer.ring(context, ring)
-
+    /** Rebuilds all alarms; the engine rings what was missed. */
     suspend fun syncAndRing() {
         val rings = withEngine { it.sync() }
         if (rings.isNotEmpty()) Diag.log("sync: ${rings.size} missed alarm(s) ring now")
-        rings.forEach { Ringer.ring(context, it) }
         AlarmPause.update(context, settings.alert.first().alarmsPausedUntil)
     }
 
@@ -158,7 +156,7 @@ class AppGraph(private val context: Context) : ClaudeApi.Access {
         if (until != null) AlarmService.ringing.value?.let { AlarmService.stop(context, it) }
         if (until == null && wasPaused) {
             // On again by hand: what is due rings now (PS7).
-            withEngine { it.resume() }.forEach { Ringer.ring(context, it) }
+            withEngine { it.resume() }
             AlarmPause.update(context, null)
         } else {
             syncAndRing()
@@ -170,7 +168,7 @@ class AppGraph(private val context: Context) : ClaudeApi.Access {
 
     /** Rings reminders that wait for an arrival when already there (geofences report only entering). */
     suspend fun checkPlacesAndRing() {
-        withEngine { it.checkPlaces() }.forEach { Ringer.ring(context, it) }
+        withEngine { it.checkPlaces() }
     }
 
     /** Sets "Zuhause" to the current position; false if there is no position. */

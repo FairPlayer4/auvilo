@@ -40,11 +40,9 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.avlreminder.core.model.Blocker
 import com.avlreminder.core.model.ChecklistItem
-import com.avlreminder.core.model.Occurrence
 import com.avlreminder.core.model.PrepAnswer
-import com.avlreminder.core.model.Reminder
 import com.avlreminder.core.model.severalADay
-import com.avlreminder.core.rules.WeekStatus
+import com.avlreminder.core.usecases.AlarmView
 import com.avlreminder.core.usecases.Digests
 import com.avlreminder.core.rules.Evidence
 import com.avlreminder.core.rules.Prep
@@ -55,42 +53,6 @@ import java.time.Instant
 import java.time.LocalTime
 import java.time.ZoneId
 import java.time.ZoneOffset
-
-/** Everything the alarm screen shows; limits already evaluated by the engine. */
-data class AlarmUi(
-    val reminder: Reminder,
-    val occurrence: Occurrence,
-    val minimumAllowed: Boolean,
-    /** null = unlimited. */
-    val minimumsLeft: Int?,
-    val canPostpone: Boolean,
-    /** null = unlimited. */
-    val postponesLeft: Int?,
-    /** Snooze buttons that stay before the end of the day. */
-    val snooze: List<Int> = emptyList(),
-    /** Current "Startklar" answers. */
-    val prep: Map<Int, PrepAnswer> = emptyMap(),
-    val lastProofText: String? = null,
-    /** Opened before the reminder is due ("vorab erledigen"): only done and minimum. */
-    val early: Boolean = false,
-    /** Checklist items already done in this occurrence. */
-    val done: Set<Long> = emptySet(),
-    val canDeferRest: Boolean = false,
-    /** The week so far, for a reminder with a weekly goal. */
-    val week: WeekStatus? = null,
-    /** "Blocker gelöst" may close it as the minimum (S7). */
-    val blockerSolved: Boolean = false,
-    /** It got stuck several times in a row: ask "Was hält dich gerade ab?" (S8). */
-    val askBlocker: Boolean = false,
-    /** A deadline's next window from tomorrow on ("Auf morgen", not a postponement). */
-    val tomorrow: Instant? = null,
-    /** A deadline not yet passed: postponing must stay before it. */
-    val deadline: Instant? = null,
-    /** Several times a day (VS1): postponing must stay before the next time. */
-    val nextTime: Instant? = null,
-    /** Open blockers of the reminder. */
-    val blockers: List<Blocker> = emptyList(),
-)
 
 private enum class View { MAIN, PROOF, POSTPONE, SKIP }
 
@@ -107,7 +69,7 @@ class AlarmDevices(
  */
 @Composable
 fun AlarmContent(
-    ui: AlarmUi,
+    ui: AlarmView,
     now: Instant,
     zone: ZoneId,
     onComplete: (minimumOnly: Boolean, evidence: Evidence, note: String?) -> Unit,
@@ -350,7 +312,7 @@ private fun StepHeader(title: String, subtitle: String) {
 /** Photo, text and audio as the reminder asks; parts can be given in any order. */
 @Composable
 private fun ProofStep(
-    ui: AlarmUi,
+    ui: AlarmView,
     subtitle: String,
     onDone: (Evidence, String?) -> Unit,
     onBack: () -> Unit,
@@ -415,7 +377,7 @@ private fun ProofStep(
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
-private fun PostponeStep(ui: AlarmUi, now: Instant, zone: ZoneId, onPostpone: (Instant) -> Unit, onBack: () -> Unit) {
+private fun PostponeStep(ui: AlarmView, now: Instant, zone: ZoneId, onPostpone: (Instant) -> Unit, onBack: () -> Unit) {
     val c = Avl.colors
     var pickDate by remember { mutableStateOf(false) }
     var pickedDate by remember { mutableStateOf<java.time.LocalDate?>(null) }

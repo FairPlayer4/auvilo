@@ -28,6 +28,7 @@ import com.avlreminder.core.model.Schedule
 import com.avlreminder.core.model.Strictness
 import com.avlreminder.core.rules.AlertSettings
 import com.avlreminder.core.rules.Evidence
+import com.avlreminder.core.usecases.AlarmView
 import com.avlreminder.core.usecases.Entry
 import com.avlreminder.core.usecases.HistoryDay
 import com.avlreminder.core.usecases.SaveResult
@@ -35,7 +36,6 @@ import com.avlreminder.core.usecases.Today
 import com.avlreminder.data.ThemeMode
 import com.avlreminder.ui.screens.AlarmContent
 import com.avlreminder.ui.screens.AlarmDevices
-import com.avlreminder.ui.screens.AlarmUi
 import com.avlreminder.ui.screens.HistoryScreen
 import com.avlreminder.ui.theme.AvlTheme
 import androidx.compose.ui.test.assertIsEnabled
@@ -117,7 +117,7 @@ class FlowsTest {
         minimumLimitPerWeek = 1, proof = ProofSpec.PHOTO, postponeLimit = 1, createdAt = now,
     )
 
-    private fun alarmUi(minimumAllowed: Boolean = true, reminder: Reminder = strict) = AlarmUi(
+    private fun alarmUi(minimumAllowed: Boolean = true, reminder: Reminder = strict) = AlarmView(
         reminder = reminder,
         occurrence = Occurrence(id = 9, reminderId = 1, dueAt = now.minusSeconds(1800), state = OccurrenceState.DUE),
         minimumAllowed = minimumAllowed, minimumsLeft = if (minimumAllowed) 1 else 0,
