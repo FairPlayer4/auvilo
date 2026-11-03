@@ -130,11 +130,9 @@ internal class ClaudeJson(private val zone: ZoneId) {
         if (o.has("title")) r = r.copy(title = o.getString("title").trim())
         if (o.has("why")) r = r.copy(why = o.optStringOrNull("why"))
         if (o.has("character")) r = r.copy(character = Character.valueOf(o.getString("character")))
-        if (o.has("strictness")) {
-            val s = Strictness.valueOf(o.getString("strictness"))
-            r = r.copy(strictness = s)
-            if (isNew) Presets.of(s).let { p -> r = r.copy(proof = p.proof, postponeLimit = p.postponeLimit, minimumLimitPerWeek = p.minimumLimitPerWeek) }
-        }
+        if (o.has("strictness")) r = r.copy(strictness = Strictness.valueOf(o.getString("strictness")))
+        // Like the form: a new reminder starts with the preset, also without a strictness given.
+        if (isNew) Presets.of(r.strictness).let { p -> r = r.copy(proof = p.proof, postponeLimit = p.postponeLimit, minimumLimitPerWeek = p.minimumLimitPerWeek) }
         if (o.has("schedule")) r = r.copy(schedule = schedule(o.getJSONObject("schedule")))
         if (o.has("goal")) r = r.copy(goal = o.optStringOrNull("goal"))
         if (o.has("minimum")) r = r.copy(minimum = o.optStringOrNull("minimum"))
@@ -167,6 +165,8 @@ internal class ClaudeJson(private val zone: ZoneId) {
             )
         }
         if (o.has("solvedBlockerIsMinimum")) r = r.copy(solvedBlockerIsMinimum = o.getBoolean("solvedBlockerIsMinimum"))
+        // Like the form: without a minimum a weekly limit means nothing.
+        if (r.minimum.isNullOrBlank() && !o.has("minimumLimitPerWeek")) r = r.copy(minimumLimitPerWeek = null)
         return r
     }
 
