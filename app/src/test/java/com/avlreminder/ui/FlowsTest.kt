@@ -208,6 +208,35 @@ class FlowsTest {
     }
 
     @Test
+    fun severalTimesADayTheChecklistOffersTheNextItemAndNoRestForTomorrow() {
+        val checked = mutableListOf<Long>()
+        var all = 0
+        val list = strict.copy(
+            proof = ProofSpec.CONFIRM,
+            schedule = Schedule.Daily(listOf(LocalTime.of(12, 30), LocalTime.of(19, 15))),
+            checklist = listOf(ChecklistItem(1, "Test 1"), ChecklistItem(2, "Test 2"), ChecklistItem(3, "Test 3")),
+        )
+        val nextTime = now.atZone(zone).toLocalDate().plusDays(1).atTime(12, 30).atZone(zone).toInstant()
+        compose.setContent {
+            AvlTheme(dark = true) {
+                AlarmContent(
+                    ui = alarmUi(reminder = list).copy(done = setOf(1L), nextTime = nextTime), now = now, zone = zone,
+                    onComplete = { _, _, _ -> all++ }, onSnooze = {}, onPostpone = {}, onSkip = {}, onStartProof = {}, onAbortProof = {},
+                    devices = devices,
+                    onCheckItem = { id, _ -> checked += id },
+                )
+            }
+        }
+        compose.onNodeWithText("Danach: Rest um morgen 12:30").assertExists()
+        compose.onNodeWithText("Rest auf morgen", substring = true).assertDoesNotExist()
+        compose.onNodeWithText("Alles erledigt").assertDoesNotExist()
+        compose.onNodeWithTag("doItem").performScrollTo().performClick()
+        assertEquals(listOf(2L), checked)
+        compose.onNodeWithTag("allDone").performScrollTo().performClick()
+        assertEquals(1, all)
+    }
+
+    @Test
     fun checklistItemWithProofOpensTheProofForThatItem() {
         var checked: Pair<Long, Evidence>? = null
         var started = 0

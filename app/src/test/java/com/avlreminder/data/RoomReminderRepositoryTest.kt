@@ -146,6 +146,21 @@ class RoomReminderRepositoryTest {
     }
 
     @Test
+    fun itemsDoneOfAReminderComeOverAllItsOccurrencesInOrder() = runTest {
+        val items = listOf(ChecklistItem(title = "a"), ChecklistItem(title = "b"))
+        val id = repo.saveReminder(reminder(Schedule.Daily(LocalTime.of(18, 0))).copy(checklist = items))
+        val other = repo.saveReminder(reminder(Schedule.Daily(LocalTime.of(18, 0))).copy(checklist = items))
+        val (a, b) = repo.reminder(id)!!.checklist
+        val o1 = repo.saveOccurrence(Occurrence(reminderId = id, dueAt = t0, state = OccurrenceState.DONE))
+        val o2 = repo.saveOccurrence(Occurrence(reminderId = id, dueAt = t0.plusSeconds(3600)))
+        val o3 = repo.saveOccurrence(Occurrence(reminderId = other, dueAt = t0))
+        repo.addItemDone(ItemDone(occurrenceId = o2, itemId = b.id, doneAt = t0.plusSeconds(3600)))
+        repo.addItemDone(ItemDone(occurrenceId = o1, itemId = a.id, doneAt = t0))
+        repo.addItemDone(ItemDone(occurrenceId = o3, itemId = repo.reminder(other)!!.checklist.first().id, doneAt = t0))
+        assertEquals(listOf(o1 to a.id, o2 to b.id), repo.itemsDoneOfReminder(id).map { it.occurrenceId to it.itemId })
+    }
+
+    @Test
     fun checklistKeepsItsIdsAndOrderAndTakesRemovedItemsAlong() = runTest {
         val r = reminder(Schedule.Daily(LocalTime.of(18, 0))).copy(
             checklist = listOf(ChecklistItem(title = "Brunnen 1"), ChecklistItem(title = "Brunnen 2"), ChecklistItem(title = "Futter")),

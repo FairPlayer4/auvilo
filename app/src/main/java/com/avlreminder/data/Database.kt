@@ -269,10 +269,10 @@ interface AvlDao {
     @Query("SELECT * FROM occurrence WHERE reminderId = :reminderId AND state IN $OPEN LIMIT 1")
     suspend fun openOccurrence(reminderId: Long): OccurrenceEntity?
 
-    @Query("SELECT * FROM occurrence WHERE reminderId = :reminderId AND state IN ('DONE','CLOSED') ORDER BY resolvedAt DESC LIMIT 1")
+    @Query("SELECT * FROM occurrence WHERE reminderId = :reminderId AND state IN ('DONE','CLOSED') ORDER BY resolvedAt DESC, id DESC LIMIT 1")
     suspend fun lastResolved(reminderId: Long): OccurrenceEntity?
 
-    @Query("SELECT * FROM occurrence WHERE reminderId = :reminderId AND state = 'DONE' ORDER BY resolvedAt DESC LIMIT 1")
+    @Query("SELECT * FROM occurrence WHERE reminderId = :reminderId AND state = 'DONE' ORDER BY resolvedAt DESC, id DESC LIMIT 1")
     suspend fun lastDone(reminderId: Long): OccurrenceEntity?
 
     @Query("SELECT * FROM occurrence WHERE reminderId = :reminderId AND state IN ('DONE','CLOSED') ORDER BY resolvedAt DESC LIMIT :limit")
@@ -355,6 +355,12 @@ interface AvlDao {
 
     @Query("SELECT * FROM item_done WHERE occurrenceId = :occurrenceId ORDER BY doneAt, id")
     suspend fun itemsDone(occurrenceId: Long): List<ItemDoneEntity>
+
+    @Query(
+        "SELECT item_done.* FROM item_done JOIN occurrence ON occurrence.id = item_done.occurrenceId " +
+            "WHERE occurrence.reminderId = :reminderId ORDER BY item_done.doneAt, item_done.id",
+    )
+    suspend fun itemsDoneOfReminder(reminderId: Long): List<ItemDoneEntity>
 
     @Query("SELECT * FROM item_done ORDER BY doneAt, id")
     fun observeItemsDone(): Flow<List<ItemDoneEntity>>

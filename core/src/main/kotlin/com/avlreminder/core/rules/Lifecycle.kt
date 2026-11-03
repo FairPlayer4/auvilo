@@ -10,6 +10,7 @@ import com.avlreminder.core.model.OccurrenceState.ESCALATING
 import com.avlreminder.core.model.OccurrenceState.PLANNED
 import com.avlreminder.core.model.Reminder
 import com.avlreminder.core.model.Resolution
+import com.avlreminder.core.model.severalADay
 import java.time.Duration
 import java.time.Instant
 
@@ -51,9 +52,11 @@ sealed interface Action {
 /** Facts beyond the occurrence itself that limit what is allowed. */
 data class Limits(
     val minimumsThisWeek: Int = 0,
+    /** Several times a day the limit counts days: the minimum was already used today (VS1). */
+    val minimumToday: Boolean = false,
     /** The previous text proof of this reminder; the same text again does not count. */
     val lastProofText: String? = null,
-    /** Checklist items already done in this occurrence → whether their proof was complete. */
+    /** Checklist items already done in this occurrence (several a day: in the list's round) → whether their proof was complete. */
     val itemsDone: Map<Long, Boolean> = emptyMap(),
     /** An item was done today: deferring the rest then does not count as postponing (C5c). */
     val itemDoneToday: Boolean = false,
@@ -81,13 +84,14 @@ object Lifecycle {
         reminder.postponeLimit?.let { (it - occurrence.postponeCount).coerceAtLeast(0) }
 
     fun canUseMinimum(reminder: Reminder, limits: Limits): Boolean =
-        reminder.minimum != null &&
-            (reminder.minimumLimitPerWeek == null || limits.minimumsThisWeek < reminder.minimumLimitPerWeek)
+        reminder.minimum != null && minimumLeft(reminder, limits)
 
     /** A solved blocker as the minimum (S7); the weekly limit for the minimum applies. */
     fun canUseSolvedBlocker(reminder: Reminder, limits: Limits): Boolean =
-        reminder.solvedBlockerIsMinimum && limits.blockerSolved &&
-            (reminder.minimumLimitPerWeek == null || limits.minimumsThisWeek < reminder.minimumLimitPerWeek)
+        reminder.solvedBlockerIsMinimum && limits.blockerSolved && minimumLeft(reminder, limits)
+
+    private fun minimumLeft(reminder: Reminder, limits: Limits): Boolean =
+        reminder.minimumLimitPerWeek == null || limits.minimumsThisWeek < reminder.minimumLimitPerWeek || limits.minimumToday
 
     fun minimumsLeft(reminder: Reminder, limits: Limits): Int? =
         reminder.minimumLimitPerWeek?.let { (it - limits.minimumsThisWeek).coerceAtLeast(0) }
@@ -187,8 +191,11 @@ object Lifecycle {
                 val withProof = ProofCheck.problems(reminder.proof, action.evidence, limits.lastProofText).isEmpty()
                 val done = limits.itemsDone + (item.id to withProof)
                 val progressed = occurrence.copy(firstProgressAt = occurrence.firstProgressAt ?: now, pausedUntil = null)
-                if (reminder.checklist.all { it.id in done }) {
-                    val resolution = if (done.values.all { it }) Resolution.GOAL else Resolution.NO_PROOF
+                // Several times a day one item is the part of this time; the rest comes at the next (VS1).
+                val several = reminder.schedule.severalADay
+                if (several || reminder.checklist.all { it.id in done }) {
+                    val proofs = if (several) listOf(withProof) else done.values
+                    val resolution = if (proofs.all { it }) Resolution.GOAL else Resolution.NO_PROOF
                     ok(progressed.copy(state = DONE, resolution = resolution, resolvedAt = now), EventType.COMPLETED, resolution.name)
                 } else {
                     ok(progressed, EventType.ITEM_DONE, item.title)

@@ -29,6 +29,7 @@ import com.avlreminder.core.ports.ReminderRepository
 import com.avlreminder.core.rules.Action
 import com.avlreminder.core.rules.AlarmLevel
 import com.avlreminder.core.rules.AlertSettings
+import com.avlreminder.core.rules.Checklists
 import com.avlreminder.core.rules.Blockers
 import com.avlreminder.core.rules.Deadlines
 import com.avlreminder.core.rules.Escalation
@@ -351,13 +352,19 @@ class ReminderEngine(
     /** Limits that apply to [reminder] right now; with [occurrence] also its checklist progress on [day]. */
     suspend fun limits(reminder: Reminder, occurrence: Occurrence? = null, day: LocalDate = now().atZone(zone).toLocalDate()): Limits {
         val (from, until) = Weeks.range(now(), zone)
-        val done = occurrence?.let { repo.itemsDone(it.id) }.orEmpty()
+        val done = occurrence?.let { checklistDone(reminder, it) }.orEmpty()
         val deadline = (reminder.schedule as? Schedule.Deadline)
             ?.takeIf { d -> occurrence == null || !Deadlines.isOverdue(d, occurrence, zone) }
             ?.let { Deadlines.dueAt(it, zone) }
         val since = repo.lastResolved(reminder.id)?.resolvedAt ?: reminder.createdAt
+        // Several a day: a day with the minimum counts once (VS1).
+        val minimumDays = if (!reminder.schedule.severalADay) null else
+            repo.recentResolved(reminder.id, MINIMUM_HISTORY)
+                .filter { o -> o.resolution == Resolution.MINIMUM && o.resolvedAt.let { it != null && it >= from && it < until } }
+                .map { it.resolvedAt!!.atZone(zone).toLocalDate() }.toSet()
         return Limits(
-            minimumsThisWeek = repo.countResolved(reminder.id, Resolution.MINIMUM, from, until),
+            minimumsThisWeek = minimumDays?.size ?: repo.countResolved(reminder.id, Resolution.MINIMUM, from, until),
+            minimumToday = minimumDays?.contains(now().atZone(zone).toLocalDate()) == true,
             lastProofText = repo.lastProofText(reminder.id),
             itemsDone = done.associate { it.itemId to it.withProof },
             itemDoneToday = done.any { it.doneAt.atZone(zone).toLocalDate() == day },
@@ -369,6 +376,16 @@ class ReminderEngine(
 
     /** Checklist items done in the occurrence. */
     suspend fun itemsDone(occurrenceId: Long): List<ItemDone> = repo.itemsDone(occurrenceId)
+
+    /**
+     * The items of [occurrence]'s list that are done: in the occurrence; several times a day
+     * since the list was last complete, over all times (VS1).
+     */
+    private suspend fun checklistDone(reminder: Reminder, occurrence: Occurrence): List<ItemDone> = when {
+        reminder.checklist.isEmpty() -> emptyList()
+        reminder.schedule.severalADay -> Checklists.round(reminder.checklist, repo.itemsDoneOfReminder(reminder.id))
+        else -> repo.itemsDone(occurrence.id)
+    }
 
     /** The week of [day] for a reminder with a weekly goal; offers counted from [day] on. */
     suspend fun weekStatus(reminder: Reminder, day: LocalDate = now().atZone(zone).toLocalDate()): WeekStatus? {
@@ -716,7 +733,7 @@ class ReminderEngine(
     }
 
     private suspend fun ring(reminder: Reminder, occurrence: Occurrence): Ring {
-        val done = if (reminder.checklist.isEmpty()) emptySet() else repo.itemsDone(occurrence.id).map { it.itemId }.toSet()
+        val done = checklistDone(reminder, occurrence).map { it.itemId }.toSet()
         val strictness = strictness(reminder, occurrence)
         val level = if (strictness == null || settings().alarmsPaused(now())) AlarmLevel.SILENT else Escalation.level(
             strictness, now().atZone(zone).toLocalTime(), settings().on(now().atZone(zone).toLocalDate()),
@@ -765,5 +782,7 @@ class ReminderEngine(
         val EARLY_TOLERANCE: Duration = Duration.ofMinutes(1)
         /** Resolved occurrences looked at for the stuck streak (S8). */
         private const val ASK_HISTORY = 10
+        /** Enough resolved occurrences for a week of six times a day. */
+        private const val MINIMUM_HISTORY = 60
     }
 }

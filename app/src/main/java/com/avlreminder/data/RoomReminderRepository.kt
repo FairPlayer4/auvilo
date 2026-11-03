@@ -121,6 +121,7 @@ class RoomReminderRepository(private val db: AvlDatabase) : ReminderRepository {
     }
 
     override suspend fun itemsDone(occurrenceId: Long) = dao.itemsDone(occurrenceId).map { it.toModel() }
+    override suspend fun itemsDoneOfReminder(reminderId: Long) = dao.itemsDoneOfReminder(reminderId).map { it.toModel() }
 
     override suspend fun addItemDone(done: ItemDone) =
         dao.insert(ItemDoneEntity(occurrenceId = done.occurrenceId, itemId = done.itemId, doneAt = done.doneAt, withProof = done.withProof))

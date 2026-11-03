@@ -117,9 +117,9 @@ class FakeRepository : ReminderRepository {
     override suspend fun openOccurrence(reminderId: Long) =
         occurrences.values.firstOrNull { it.reminderId == reminderId && it.isOpen }
     override suspend fun lastResolved(reminderId: Long) =
-        occurrences.values.filter { it.reminderId == reminderId && !it.isOpen }.maxByOrNull { it.resolvedAt!! }
+        occurrences.values.filter { it.reminderId == reminderId && !it.isOpen }.maxWithOrNull(compareBy({ it.resolvedAt!! }, { it.id }))
     override suspend fun lastDone(reminderId: Long) =
-        occurrences.values.filter { it.reminderId == reminderId && it.state == OccurrenceState.DONE }.maxByOrNull { it.resolvedAt!! }
+        occurrences.values.filter { it.reminderId == reminderId && it.state == OccurrenceState.DONE }.maxWithOrNull(compareBy({ it.resolvedAt!! }, { it.id }))
     override suspend fun recentResolved(reminderId: Long, limit: Int) =
         occurrences.values.filter { it.reminderId == reminderId && !it.isOpen }.sortedByDescending { it.resolvedAt!! }.take(limit)
     override suspend fun countResolved(reminderId: Long, resolution: Resolution, from: Instant, until: Instant) =
@@ -157,6 +157,7 @@ class FakeRepository : ReminderRepository {
     }
 
     override suspend fun itemsDone(occurrenceId: Long) = done.filter { it.occurrenceId == occurrenceId }
+    override suspend fun itemsDoneOfReminder(reminderId: Long) = done.filter { occurrences[it.occurrenceId]?.reminderId == reminderId }
     override suspend fun addItemDone(done: ItemDone) {
         this.done += done.copy(id = nextId++)
     }

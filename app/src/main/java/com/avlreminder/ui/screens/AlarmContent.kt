@@ -43,6 +43,7 @@ import com.avlreminder.core.model.ChecklistItem
 import com.avlreminder.core.model.Occurrence
 import com.avlreminder.core.model.PrepAnswer
 import com.avlreminder.core.model.Reminder
+import com.avlreminder.core.model.severalADay
 import com.avlreminder.core.rules.WeekStatus
 import com.avlreminder.core.usecases.Digests
 import com.avlreminder.core.rules.Evidence
@@ -136,6 +137,8 @@ fun AlarmContent(
     var proofItem by remember { mutableStateOf<ChecklistItem?>(null) }
     val r = ui.reminder
     val checklist = r.checklist.isNotEmpty()
+    // Several times a day a checklist is done one item per time; the rest comes at the next (VS1).
+    val oneItem = checklist && r.schedule.severalADay
 
     fun complete(minimum: Boolean) {
         minimumOnly = minimum
@@ -192,8 +195,23 @@ fun AlarmContent(
                     }
                     if (checklist) Checklist(r.checklist, ui.done, ::check)
                     Spacer(Modifier.height(24.dp))
-                    Button(onClick = { complete(false) }, modifier = Modifier.fillMaxWidth().height(56.dp)) {
-                        Text(if (checklist) "Alles erledigt" else "Erledigt", fontSize = 18.sp)
+                    val nextItem = r.checklist.firstOrNull { it.id !in ui.done }
+                    if (oneItem && nextItem != null) {
+                        Button(onClick = { check(nextItem) }, modifier = Modifier.fillMaxWidth().height(56.dp).testTag("doItem")) {
+                            Text("Erledigt: ${nextItem.title}", fontSize = 18.sp)
+                        }
+                        ui.nextTime?.let { at ->
+                            val rest = r.checklist.count { it.id !in ui.done } - 1
+                            val text = if (rest > 0) "Danach: Rest um ${Format.moment(at, zone, now.atZone(zone).toLocalDate())}" else "Danach ist die Liste durch"
+                            Text(text, Modifier.padding(top = 6.dp), color = c.muted, fontSize = 14.sp)
+                        }
+                        OutlinedButton(onClick = { complete(false) }, Modifier.fillMaxWidth().padding(top = 8.dp).testTag("allDone")) {
+                            Text("Alles auf einmal erledigt")
+                        }
+                    } else {
+                        Button(onClick = { complete(false) }, modifier = Modifier.fillMaxWidth().height(56.dp)) {
+                            Text(if (checklist) "Alles erledigt" else "Erledigt", fontSize = 18.sp)
+                        }
                     }
                     if (r.minimum != null) {
                         OutlinedButton(
@@ -208,7 +226,7 @@ fun AlarmContent(
                         }
                     }
                     if (!ui.early) {
-                        if (checklist) {
+                        if (checklist && !oneItem) {
                             val time = ui.occurrence.dueAt.atZone(zone).toLocalTime()
                             val tomorrow = now.atZone(zone).toLocalDate().plusDays(1).atTime(time).atZone(zone).toInstant()
                             OutlinedButton(

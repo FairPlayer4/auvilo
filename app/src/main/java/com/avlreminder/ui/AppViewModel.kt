@@ -11,8 +11,10 @@ import com.avlreminder.core.model.PrepAnswer
 import com.avlreminder.core.model.Proof
 import com.avlreminder.core.model.Reminder
 import com.avlreminder.core.model.Schedule
+import com.avlreminder.core.model.severalADay
 import com.avlreminder.core.rules.Action
 import com.avlreminder.core.rules.AlertSettings
+import com.avlreminder.core.rules.Checklists
 import com.avlreminder.core.rules.Prep
 import com.avlreminder.core.rules.SkipReasons
 import com.avlreminder.core.rules.SnoozeHint
@@ -70,11 +72,6 @@ class AppViewModel(app: Application) : AndroidViewModel(app) {
     /** V1.1b knows one place, "Zuhause". */
     val home: StateFlow<Place?> = state(null, dao.observePlaces().map { l -> l.firstOrNull()?.toModel() })
 
-    /** Done checklist items per occurrence. */
-    val itemsDone: StateFlow<Map<Long, List<ItemDone>>> = state(
-        emptyMap(),
-        dao.observeItemsDone().map { l -> l.map { it.toModel() }.groupBy { it.occurrenceId } },
-    )
 
     val dwellMinutes: StateFlow<Int> = state(com.avlreminder.data.Settings.DEFAULT_DWELL, graph.settings.dwellMinutes)
 
@@ -84,6 +81,25 @@ class AppViewModel(app: Application) : AndroidViewModel(app) {
     val today: StateFlow<Today?> = state(
         null,
         combine(reminders, open, resolved, ticks) { r, o, d, now -> Overview.today(r, o + d, now, zone) },
+    )
+
+    /**
+     * Done checklist items per occurrence; for the open one of a list over several times a day
+     * those done since the list was last complete (VS1).
+     */
+    val itemsDone: StateFlow<Map<Long, List<ItemDone>>> = state(
+        emptyMap(),
+        combine(dao.observeItemsDone(), reminders, open, resolved) { l, r, o, d ->
+            val done = l.map { it.toModel() }
+            val byOccurrence = done.groupBy { it.occurrenceId }
+            val reminderOf = (o + d).associate { it.id to it.reminderId }
+            val rounds = o.mapNotNull { open ->
+                val reminder = r.firstOrNull { it.id == open.reminderId }?.takeIf { it.checklist.isNotEmpty() && it.schedule.severalADay }
+                    ?: return@mapNotNull null
+                open.id to Checklists.round(reminder.checklist, done.filter { reminderOf[it.occurrenceId] == reminder.id })
+            }
+            byOccurrence + rounds
+        },
     )
 
     /** Open occurrence per reminder, for the reminder list. */

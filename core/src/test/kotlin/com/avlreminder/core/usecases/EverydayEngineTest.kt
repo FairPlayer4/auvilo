@@ -111,19 +111,67 @@ class EverydayEngineTest {
         assertInstanceOf(TransitionResult.Ok::class.java, engine.act(first.id, Action.Postpone(at(26, 12, 58))))
     }
 
+    private suspend fun checklist(vararg titles: String): Long =
+        (engine.save(reminder(threeTimes, created = at(26, 7)).copy(checklist = titles.map { ChecklistItem(title = it) })) as SaveResult.Saved).id
+
     @Test
-    fun `a checklist several times a day does not carry its rest to tomorrow`() = runTest {
-        val r = reminder(threeTimes, created = at(26, 7)).copy(checklist = listOf(ChecklistItem(title = "a"), ChecklistItem(title = "b")))
-        val id = (engine.save(r) as SaveResult.Saved).id
-        val o = open(id)
-        val item = repo.reminder(id)!!.checklist.first()
+    fun `a checklist several times a day does one item per time and keeps the rest`() = runTest {
+        val id = checklist("a", "b", "c")
+        val (a, b, c) = repo.reminder(id)!!.checklist
+        val first = open(id)
         clock.now = at(26, 8)
-        engine.onAlarm(o.id)
-        engine.act(o.id, Action.CheckItem(item.id))
-        assertInstanceOf(TransitionResult.Rejected::class.java, engine.act(o.id, Action.DeferRest(at(27, 8))))
+        assertEquals(a, engine.onAlarm(first.id)!!.nextItem)
+        // One item is this time's part: done, the rest comes at 13:00, no rest for tomorrow.
+        assertInstanceOf(TransitionResult.Ok::class.java, engine.act(first.id, Action.CheckItem(a.id)))
+        assertEquals(Resolution.GOAL, repo.occurrence(first.id)!!.resolution)
+        val second = open(id)
+        assertEquals(at(26, 13), second.dueAt)
         clock.now = at(26, 13)
-        engine.onAlarm(o.id)
-        assertEquals(Resolution.MISSED, repo.occurrence(o.id)!!.resolution)
+        assertEquals(b, engine.onAlarm(second.id)!!.nextItem)
+        assertInstanceOf(TransitionResult.Rejected::class.java, engine.act(second.id, Action.CheckItem(a.id)))
+        assertInstanceOf(TransitionResult.Rejected::class.java, engine.act(second.id, Action.DeferRest(at(27, 8))))
+        // A time without an item is missed, the list keeps its state.
+        clock.now = at(26, 19)
+        engine.onAlarm(second.id)
+        assertEquals(Resolution.MISSED, repo.occurrence(second.id)!!.resolution)
+        val third = open(id)
+        assertEquals(b, engine.onAlarm(third.id)!!.nextItem)
+        assertEquals(TransitionResult.Ok::class, engine.act(third.id, Action.CheckItem(b.id))::class)
+        // The last item completes the list; the next time starts it anew.
+        val fourth = open(id)
+        assertEquals(at(27, 8), fourth.dueAt)
+        clock.now = at(27, 8)
+        assertEquals(c, engine.onAlarm(fourth.id)!!.nextItem)
+        engine.act(fourth.id, Action.CheckItem(c.id))
+        clock.now = at(27, 13)
+        assertEquals(a, engine.onAlarm(open(id).id)!!.nextItem)
+    }
+
+    @Test
+    fun `all at once completes the list of several times a day`() = runTest {
+        val id = checklist("a", "b")
+        val (a) = repo.reminder(id)!!.checklist
+        clock.now = at(26, 8)
+        engine.act(open(id).id, Action.CheckItem(a.id))
+        clock.now = at(26, 13)
+        val second = open(id)
+        engine.onAlarm(second.id)
+        engine.act(second.id, Action.Complete(minimumOnly = false))
+        assertEquals(Resolution.GOAL, repo.occurrence(second.id)!!.resolution)
+        clock.now = at(26, 19)
+        assertEquals(a, engine.onAlarm(open(id).id)!!.nextItem)
+    }
+
+    @Test
+    fun `several times a day the weekly minimum limit counts days`() = runTest {
+        val id = (engine.save(reminder(threeTimes, created = at(26, 7)).copy(minimum = "kurz", minimumLimitPerWeek = 1)) as SaveResult.Saved).id
+        clock.now = at(26, 8)
+        assertInstanceOf(TransitionResult.Ok::class.java, engine.act(open(id).id, Action.Complete(minimumOnly = true)))
+        // The same day once more: still the one day.
+        clock.now = at(26, 13)
+        assertInstanceOf(TransitionResult.Ok::class.java, engine.act(open(id).id, Action.Complete(minimumOnly = true)))
+        clock.now = at(27, 8)
+        assertInstanceOf(TransitionResult.Rejected::class.java, engine.act(open(id).id, Action.Complete(minimumOnly = true)))
     }
 
     @Test

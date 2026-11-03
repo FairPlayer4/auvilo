@@ -49,6 +49,8 @@ interface ReminderRepository {
 
     /** Checklist items done within the occurrence, in the order they were done. */
     suspend fun itemsDone(occurrenceId: Long): List<ItemDone>
+    /** Checklist items done in any occurrence of the reminder, in the order they were done. */
+    suspend fun itemsDoneOfReminder(reminderId: Long): List<ItemDone>
     suspend fun addItemDone(done: ItemDone)
 
     /** Blockers of the reminder, oldest first. */
