@@ -73,7 +73,6 @@ class AlarmReceiver : BroadcastReceiver() {
             try {
                 val ring = graph.withEngine { it.onAlarm(id) }
                 Diag.log("alarm fired occ=$id late=$late → ${if (ring == null) "nothing (stale, planned again or day ended)" else "ring"}")
-                ring?.let { Ringer.ring(context, it) }
             } finally {
                 result.finish()
             }
@@ -101,9 +100,7 @@ class ActionReceiver : BroadcastReceiver() {
                     val o = (acted as? TransitionResult.Ok)?.occurrence
                     // Still open after an item: offer the next one, quietly.
                     if (action !is Action.CheckItem || o == null || o.state != OccurrenceState.DUE) return@withEngine null
-                    val r = graph.repository.reminder(o.reminderId) ?: return@withEngine null
-                    val done = e.itemsDone(o.id).map { it.itemId }.toSet()
-                    AlarmInfo.of(r, o, e.snoozeOptions(r, o), r.checklist.firstOrNull { it.id !in done })
+                    e.alarmView(o.id)?.let(AlarmInfo::of)
                 }
                 Ringer.dismiss(context, id)
                 next?.let { Notifications.show(context, it, quiet = true) }

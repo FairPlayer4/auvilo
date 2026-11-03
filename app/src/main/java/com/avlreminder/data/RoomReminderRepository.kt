@@ -27,6 +27,8 @@ import java.time.LocalTime
 class RoomReminderRepository(private val db: AvlDatabase) : ReminderRepository {
     private val dao = db.dao()
 
+    override suspend fun <T> transaction(block: suspend () -> T): T = db.withTransaction { block() }
+
     override suspend fun reminders(): List<Reminder> {
         val items = dao.allItems().groupBy { it.reminderId }
         return dao.reminders().map { it.toModel(items[it.id].orEmpty()) }

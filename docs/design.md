@@ -26,7 +26,8 @@
 │             Proofs, WeeklyGoals, Stats, Deadlines, Blockers             │
 │  ports/     ReminderRepository, AlarmPort, GeofencePort, LocationPort,  │
 │             DeviceStatePort, PreNoticePort, Clock                       │
-│  usecases/  ReminderEngine, Overview (Heute, Verlauf), Digest, Liste    │
+│  usecases/  ReminderEngine (Fassade) mit Scheduler, AlarmViews, Changes;│
+│             AlarmView, RingPort; Overview (Heute, Verlauf), Digest      │
 └─────────────────────────────────────────────────────────────────────────┘
 ```
 
@@ -34,7 +35,17 @@
   (Kover ≥ 90 %, Build schlägt sonst fehl).
 - **`ReminderEngine`** ist der einzige Weg, Reminder und Fälligkeiten zu ändern:
   Oberfläche, Benachrichtigungen, Receiver und später Agenten (Anf. 7.26) nutzen dieselben
-  Befehle.
+  Befehle. Seit V1.3b0 ist sie eine Fassade über drei interne Teile: `Scheduler` (Zeit:
+  nächste Fälligkeit, Alarm planen, auslösen, eskalieren, Tagesgrenze), `AlarmViews` (was
+  jetzt gilt: Limits, Woche, Strenge, Alarm-Ansicht) und `Changes` (was der Nutzer ändert:
+  Reminder, Aktionen, Blocker, Hinweise).
+- **Ein Befehl, eine Transaktion.** Jeder öffentliche Befehl läuft ganz oder gar nicht
+  (`ReminderRepository.transaction`, in Room `withTransaction`); ein Befehl in einem
+  anderen schließt sich ihm an. Was dabei fällig wird, klingelt erst danach über den
+  `RingPort` – die Aufrufer klingeln nicht selbst.
+- **Die Alarm-Ansicht kommt aus `core`** (`AlarmView`): Alarm-Bildschirm, Benachrichtigung
+  und der Knopf „✓ Punkt“ zeigen dieselben erlaubten Aktionen; `Ring` trägt sie mit der
+  Lautstärke.
 - **Die Datenbank ist die einzige Wahrheit.** Alarme, Geofences, Übersicht und
   Vorab-Reminder sind abgeleitet und werden jederzeit aus der DB neu aufgebaut
   (`sync` bei Änderung, Alarm, App-Start, Neustart, Update, Zeitänderung).

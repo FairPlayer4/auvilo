@@ -25,6 +25,7 @@ import com.avlreminder.core.model.Reminder
 import com.avlreminder.core.model.Schedule
 import com.avlreminder.core.model.Strictness
 import com.avlreminder.core.rules.AlertSettings
+import com.avlreminder.core.usecases.AlarmView
 import com.avlreminder.core.usecases.Entry
 import com.avlreminder.core.usecases.SaveResult
 import com.avlreminder.core.usecases.Today
@@ -32,7 +33,6 @@ import com.avlreminder.data.TemplateEntity
 import com.avlreminder.data.ThemeMode
 import com.avlreminder.ui.screens.AlarmContent
 import com.avlreminder.ui.screens.AlarmDevices
-import com.avlreminder.ui.screens.AlarmUi
 import com.avlreminder.ui.screens.PreNoticeKind
 import com.avlreminder.ui.screens.ReminderForm
 import com.avlreminder.ui.screens.ScheduleKind
@@ -227,7 +227,7 @@ class DeadlineAndBlockerUiTest {
 
     private val devices = AlarmDevices(camera = { Text("Kamera") }, recorder = { Text("Mikrofon") }, play = {})
 
-    private fun alarmUi(reminder: Reminder = tax) = AlarmUi(
+    private fun alarmUi(reminder: Reminder = tax) = AlarmView(
         reminder = reminder,
         occurrence = Occurrence(id = 9, reminderId = 1, dueAt = now.minusSeconds(600), state = OccurrenceState.DUE),
         minimumAllowed = false, minimumsLeft = null, canPostpone = true, postponesLeft = null,

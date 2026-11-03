@@ -9,7 +9,6 @@ import android.content.Intent
 import android.content.pm.PackageManager
 import android.location.Location
 import android.util.Log
-import com.avlreminder.alarm.Ringer
 import com.avlreminder.core.model.Place
 import com.avlreminder.core.ports.GeofencePort
 import com.avlreminder.core.ports.LocationPort
@@ -141,7 +140,6 @@ class GeofenceReceiver : BroadcastReceiver() {
                 ids.forEach { id ->
                     val rings = graph.withEngine { it.onArrival(id) }
                     Diag.log("arrival place=$id → ${rings.size} ring(s)")
-                    rings.forEach { Ringer.ring(context, it) }
                 }
             } finally {
                 result.finish()

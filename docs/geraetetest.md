@@ -66,6 +66,13 @@
 | N12 | *Gerätetest* mit Checkliste (ein Test pro Punkt): beim Alarm „Erledigt: ‹Punkt›“ tippen | Alarm endet, „Danach: Rest um …“ stimmte; in *Heute* steht der Fortschritt, der nächste Termin bietet den nächsten Punkt |
 | N13 | Während *Gerätetest* klingelt: Notaus *bis ich einschalte*, nach 1 min *Wieder einschalten* | Alarm stoppt beim Pausieren und klingelt sofort nach dem Einschalten wieder |
 
+## Neu in V1.3b0 (Umbau, kein neues Verhalten)
+
+| # | Test | Erwartung |
+|---|---|---|
+| N14 | K4 (einmalig in 3 min) und ein Alarm mit Checkliste: Punkt in der Benachrichtigung abhaken | Alarm wie bisher; nach dem Abhaken bietet die Benachrichtigung still den nächsten Punkt an |
+| N15 | Zuhause: Reminder *wenn ich zuhause bin* speichern | klingelt sofort nach dem Speichern |
+
 ### Wochenplan V1.3a (03.–08.11.2026)
 Reminder *Gerätetest*: täglich 12:30 und 19:15, *normal*, Minimum „Test nur
 vorbereiten“ (legt Claude nach N9 über die Schnittstelle an). Pro Alarm ein Test, freie Termine zum Nachholen.

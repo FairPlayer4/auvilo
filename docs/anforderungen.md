@@ -968,6 +968,7 @@ früh am S24 Ultra testen (Spike, siehe Abschnitt 10).
 | 2026-11-03 | Antworten auf Review-Lauf 1 (Fragen 1–6): Schnittstelle ändert keinen klingelnden oder überfälligen Reminder (AG11); nach „Handy aus“ klingelt der gerade laufende Termin (VS1); *Notaus* neutral nur bei Pause vor der Fälligkeit, Fristen hart (PS7); NT2-Karte ohne *Minimum*; Titel im Diagnose-Log in der Entwicklungsphase erlaubt, vor einem offiziellen Release entfernen. Umgesetzt in V1.3a3 |
 | 2026-11-03 | Checkliste mit mehreren Uhrzeiten (7.25 VS1, Review-Frage 7a und 7c): pro Termin ein Punkt, der Rest kommt beim nächsten Termin, die Liste behält ihren Stand über verpasste Termine; Minimum-Limit zählt Tage. Umgesetzt in V1.3a3 |
 | 2026-11-03 | Notaus von Hand ausgeschaltet (Review-Frage 7b): eine offene Fälligkeit klingelt sofort wie beim automatischen Pausenende, nicht erst zur nächsten Runde (7.28 PS7). Umgesetzt in V1.3a3 |
+| 2026-11-03 | Umbau-Etappe V1.3b0 vor V1.3b (Review-Lauf 2): Engine als Fassade, Befehle in einer Transaktion, zentrales Klingeln, Alarm-Ansicht in `core`; ein gespeicherter Ankunft-Reminder klingelt sofort, wenn man schon da ist, auch über die Schnittstelle. Sonst kein neues Verhalten |
 
 ## 10. Nächste Schritte
 
@@ -985,6 +986,7 @@ früh am S24 Ultra testen (Spike, siehe Abschnitt 10).
 | V1.3a | 2026-11-02 | Mehrmals täglich, Wochenend-Zeiten (7.25 VS1, VS2), Hinweis bei ständigem *Später* (7.27 NT2), Notausschalter (7.28 PS7) |
 | V1.3a2 | 2026-11-02 | Schnittstelle für Claude über adb (7.26 AG11) |
 | V1.3a3 | gebaut | Fixes aus Review-Lauf 1 und Antworten darauf, Checkliste über mehrere Uhrzeiten (7.25 VS1) (Kap. 9, 2026-11-03) |
+| V1.3b0 | gebaut | Umbau ohne neues Verhalten (design.md 1), Empfehlungen E1–E4 aus Review-Lauf 2 (Kap. 9, 2026-11-03) |
 
 Details zum Verhalten: [design.md](design.md), Gerätetests: [geraetetest.md](geraetetest.md).
 

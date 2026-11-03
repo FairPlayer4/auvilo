@@ -7,8 +7,7 @@ import android.app.PendingIntent
 import android.content.Context
 import com.avlreminder.R
 import com.avlreminder.core.model.ChecklistItem
-import com.avlreminder.core.model.Occurrence
-import com.avlreminder.core.model.Reminder
+import com.avlreminder.core.usecases.AlarmView
 import com.avlreminder.core.usecases.Ring
 import java.time.Instant
 import java.time.ZoneId
@@ -26,17 +25,19 @@ data class AlarmInfo(
     val nextItem: ChecklistItem? = null,
 ) {
     companion object {
-        fun of(ring: Ring) = of(ring.reminder, ring.occurrence, ring.snooze, ring.nextItem)
+        fun of(ring: Ring) = of(ring.view)
 
-        fun of(reminder: Reminder, occurrence: Occurrence, snooze: List<Int>, nextItem: ChecklistItem?): AlarmInfo {
+        fun of(view: AlarmView): AlarmInfo {
+            val reminder = view.reminder
+            val nextItem = view.nextItem
             // Photo, text or audio cannot be given from the notification, so "done" there would always count as without proof.
             val quick = !reminder.proof.needsEvidence
             return AlarmInfo(
-                occurrenceId = occurrence.id,
+                occurrenceId = view.occurrence.id,
                 title = reminder.title,
                 text = nextItem?.let { "Als Nächstes: ${it.title}" } ?: reminder.why ?: reminder.goal,
                 quickDone = quick,
-                snooze = snooze,
+                snooze = view.snooze,
                 nextItem = nextItem?.takeIf { quick },
             )
         }
