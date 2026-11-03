@@ -39,7 +39,8 @@
 ## Was B2b für die App bedeutet
 - **Nutzlast = Room-Datenbank** (Kopie per `VACUUM INTO`, gzip), verschlüsselt mit dem
   Tresorschlüssel. Keine Fotos, kein Audio. Beim Wiederherstellen laufen die normalen
-  Room-Migrationen.
+  Room-Migrationen. Dazu die Einstellungen als kleines JSON (`Settings.backup()`), ohne
+  *Notaus* und Schnittstellen-Schalter (Anf. 7.28 PS8a).
 - **Ein sicherndes Gerät** (bis zum Sync in B3); höchstens alle 15 min, nur bei
   Änderungen und mit Netz (WorkManager). Höchstens 8 MiB.
 - Server hält die letzten Fassungen (3 ältere, 30 Tage); Schutz gegen ältere

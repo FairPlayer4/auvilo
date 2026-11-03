@@ -819,6 +819,11 @@ Vordergrund, nicht Reichweite.
   Hand, klingelt eine offene Fälligkeit sofort (2026-11-03).
 - PS8 **Backend nur nach ausdrücklichem Einschalten.** Ohne Zustimmung keine Anmeldung,
   keine Verbindung; die App bleibt vollständig lokal nutzbar.
+- PS8a **Einstellungen im Backup** (2026-11-03): Das Backup B2b enthält neben der
+  Datenbank die Einstellungen (Darstellung, Alarmzeiten, Wochenende, Übersicht,
+  Nachfrage, Verweildauer, Sortierung). *Notaus* und der Schalter der Schnittstelle
+  bleiben auf dem Gerät: Eine Wiederherstellung schaltet keine Alarme stumm und keine
+  Schnittstelle ein.
 - PS9 **Verschlüsselung auf dem Gerät** (nur die App kann die Daten lesen): **geklärt
   (2026-11-02)** – Android-Sandbox, dateibasierte Verschlüsselung und `allowBackup=false`
   reichen; der Play-Store-Release ist ein Release-Build (nicht debuggable, kein
@@ -968,6 +973,7 @@ früh am S24 Ultra testen (Spike, siehe Abschnitt 10).
 | 2026-11-03 | Antworten auf Review-Lauf 1 (Fragen 1–6): Schnittstelle ändert keinen klingelnden oder überfälligen Reminder (AG11); nach „Handy aus“ klingelt der gerade laufende Termin (VS1); *Notaus* neutral nur bei Pause vor der Fälligkeit, Fristen hart (PS7); NT2-Karte ohne *Minimum*; Titel im Diagnose-Log in der Entwicklungsphase erlaubt, vor einem offiziellen Release entfernen. Umgesetzt in V1.3a3 |
 | 2026-11-03 | Checkliste mit mehreren Uhrzeiten (7.25 VS1, Review-Frage 7a und 7c): pro Termin ein Punkt, der Rest kommt beim nächsten Termin, die Liste behält ihren Stand über verpasste Termine; Minimum-Limit zählt Tage. Umgesetzt in V1.3a3 |
 | 2026-11-03 | Notaus von Hand ausgeschaltet (Review-Frage 7b): eine offene Fälligkeit klingelt sofort wie beim automatischen Pausenende, nicht erst zur nächsten Runde (7.28 PS7). Umgesetzt in V1.3a3 |
+| 2026-11-03 | Einstellungen kommen mit ins Backup B2b, ohne *Notaus* und Schnittstellen-Schalter (Review-Lauf 2, Frage 2; 7.28 PS8a). Vorbereitet in V1.3b0 |
 | 2026-11-03 | Umbau-Etappe V1.3b0 vor V1.3b (Review-Lauf 2): Engine als Fassade, Befehle in einer Transaktion, zentrales Klingeln, Alarm-Ansicht in `core`; ein gespeicherter Ankunft-Reminder klingelt sofort, wenn man schon da ist, auch über die Schnittstelle. Sonst kein neues Verhalten |
 
 ## 10. Nächste Schritte

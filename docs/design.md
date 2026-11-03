@@ -111,6 +111,9 @@ nach dem Abschluss legt die Engine die nächste an.
 
 Globale Einstellungen liegen im DataStore: Darstellung, Alarmzeiten (`loudFrom` 18:00,
 `dayEnd` 23:00), Nachfrage-Schwelle, Verweildauer, Übersicht, Sortierung der Liste.
+Für das Backup B2b liefert `Settings.backup()` sie als JSON (`version`, `values`, Schlüssel
+wie im DataStore); `restore` setzt sie zurück, Fehlendes auf den Standard. *Notaus* und
+`claudeAccess` sind nicht dabei (Anf. 7.28 PS8a).
 
 ## 3. Lebenszyklus
 

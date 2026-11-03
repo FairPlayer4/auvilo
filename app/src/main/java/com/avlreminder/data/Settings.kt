@@ -11,7 +11,9 @@ import com.avlreminder.core.rules.AlertSettings
 import com.avlreminder.core.rules.DayTimes
 import com.avlreminder.core.usecases.ReminderSort
 import kotlinx.coroutines.flow.Flow
+import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.flow.map
+import org.json.JSONObject
 import java.time.Instant
 import java.time.LocalDate
 import java.time.LocalTime
@@ -57,6 +59,13 @@ class Settings(private val context: Context) {
     private val pausedUntilKey = longPreferencesKey("alarmsPausedUntil")
     /** Epoch milliseconds when the running pause was switched on. */
     private val pausedFromKey = longPreferencesKey("alarmsPausedFrom")
+
+    /** What goes into the backup (B2b); the pause and the interface stay on the device. */
+    private val backupInts = listOf(
+        loudFromKey, dayEndKey, askBlockerKey, dwellKey, morningKey, eveningKey, weekendLoudKey,
+        weekendEndKey, weekendOnKey, weekendMorningKey, weekendEveningKey,
+    )
+    private val backupStrings = listOf(themeKey, sortKey)
 
     val theme: Flow<ThemeMode> = context.dataStore.data.map { prefs ->
         prefs[themeKey]?.let { runCatching { ThemeMode.valueOf(it) }.getOrNull() } ?: ThemeMode.SYSTEM
@@ -167,7 +176,32 @@ class Settings(private val context: Context) {
         }
     }
 
+    /** The settings for the backup (B2b) as JSON, next to the copy of the database. */
+    suspend fun backup(): String {
+        val prefs = context.dataStore.data.first()
+        val values = JSONObject()
+        (backupInts + backupStrings).forEach { key -> prefs[key]?.let { values.put(key.name, it) } }
+        return JSONObject().put("version", BACKUP_VERSION).put("values", values).toString()
+    }
+
+    /**
+     * Takes the settings of a [backup]; what it does not hold goes back to the default. The pause
+     * and the interface stay as they are on this device.
+     */
+    suspend fun restore(json: String) {
+        val values = JSONObject(json).getJSONObject("values")
+        context.dataStore.edit { prefs ->
+            backupInts.forEach { key ->
+                if (values.has(key.name)) prefs[key] = values.getInt(key.name) else prefs.remove(key)
+            }
+            backupStrings.forEach { key ->
+                if (values.has(key.name)) prefs[key] = values.getString(key.name) else prefs.remove(key)
+            }
+        }
+    }
+
     companion object {
+        const val BACKUP_VERSION = 1
         const val DEFAULT_DWELL = 3
         val DWELL_CHOICES = listOf(1, 3, 5, 10)
     }
