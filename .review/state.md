@@ -33,7 +33,7 @@ Vom Entwickler bestätigt am 2026-11-03.
 - 2026-11-03: Die Fälligkeit speichert den Zeitpunkt der nächsten Runde nicht; `plan()` rechnet ab „jetzt“.
 
 ## Offene Fragen an den Entwickler
-Aus .review/runs/2026-11-03.md, Frage 7b (an Kevin geschickt am 2026-11-03): Notaus von Hand aus klingelt erst nach 10 min, beim automatischen Ende sofort. Vorschlag: in beiden Fällen sofort.
+Keine.
 
 ## Getroffene Entscheidungen
 - 2026-11-03: `.review/` liegt im Repository.
@@ -41,4 +41,5 @@ Aus .review/runs/2026-11-03.md, Frage 7b (an Kevin geschickt am 2026-11-03): Not
 - 2026-11-03 (Fragen 1–4, nach Vorschlag, umgesetzt in V1.3a3): Die Schnittstelle ändert, pausiert und archiviert keinen klingelnden oder überfälligen Reminder. Nach „Handy aus“ klingelt der heute zuletzt begonnene Termin. *Notaus* ist nur neutral, wenn die Pause vor der Fälligkeit begann. Fristen bleiben im Notaus hart.
 - 2026-11-03 (Frage 5): Die NT2-Karte braucht kein *Minimum*; keine Abweichung mehr.
 - 2026-11-03 (Frage 7a, 7c, umgesetzt in V1.3a3): Checkliste mit mehreren Uhrzeiten läuft über die Termine, ein Punkt pro Termin; das Minimum-Limit zählt Tage.
+- 2026-11-03 (Frage 7b, nach Vorschlag, umgesetzt in V1.3a3): Notaus von Hand aus klingelt sofort, wie beim automatischen Pausenende.
 - 2026-11-03 (Frage 6): Titel im Diagnose-Log sind in der Entwicklungsphase erlaubt; vor einem offiziellen Release wird das ausgebaut.

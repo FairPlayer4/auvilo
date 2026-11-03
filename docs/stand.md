@@ -9,8 +9,8 @@ Stand: 2026-11-03. Bei jedem größeren Schritt aktualisieren.
   die Fragen 1–6 und 7a/7c, dazu Checklisten über mehrere Uhrzeiten (ein Punkt pro
   Termin, 7.25 VS1). Keine Migration. Kevin installiert am Abend des 2026-11-03. Gerätetests:
   geraetetest.md *Neu in V1.3a3*. Offen: Die Eskalationsrunde wird bei jedem `sync`
-  (App öffnen) neu ab „jetzt“ geplant; Frage 7b (Notaus von Hand aus) an Kevin. Build
-  grün: 321 Tests, Kover in `core` 98,87 %.
+  (App öffnen) neu ab „jetzt“ geplant. Frage 7b ist umgesetzt (Notaus von Hand aus klingelt
+  sofort). Build grün: 322 Tests, Kover in `core` 98,88 %.
 - Danach: Kevins Wochenplan (Gerätetests V1.3a, Reminder *Gerätetest*), dann V1.3b.
 
 ## Auf dem Gerät

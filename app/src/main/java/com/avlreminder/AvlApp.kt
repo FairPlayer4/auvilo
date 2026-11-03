@@ -152,10 +152,17 @@ class AppGraph(private val context: Context) : ClaudeApi.Access {
      * [sync] plans the open occurrences for the end of the pause.
      */
     suspend fun setAlarmsPaused(until: Instant?) {
+        val wasPaused = settings.alert.first().alarmsPaused(SystemZoneClock.instant())
         settings.setAlarmsPaused(until, SystemZoneClock.instant())
         Diag.log(if (until == null) "alarms on again" else "alarms paused until $until")
         if (until != null) AlarmService.ringing.value?.let { AlarmService.stop(context, it) }
-        syncAndRing()
+        if (until == null && wasPaused) {
+            // On again by hand: what is due rings now (PS7).
+            withEngine { it.resume() }.forEach { Ringer.ring(context, it) }
+            AlarmPause.update(context, null)
+        } else {
+            syncAndRing()
+        }
     }
 
     /** Sets the morning and evening overview from the settings. */

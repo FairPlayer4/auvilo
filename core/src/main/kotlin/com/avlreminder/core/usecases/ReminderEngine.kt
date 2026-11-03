@@ -349,6 +349,21 @@ class ReminderEngine(
         return rings
     }
 
+    /**
+     * The pause was switched off by hand (PS7): what is due rings now, as when the pause ends on
+     * its own, not only at the next round.
+     */
+    suspend fun resume(): List<Ring> {
+        val rings = sync().toMutableList()
+        for (open in repo.openOccurrences()) {
+            if (open.state == OccurrenceState.PLANNED || rings.any { it.occurrence.id == open.id }) continue
+            val reminder = repo.reminder(open.reminderId) ?: continue
+            if (strictness(reminder, open) == null) continue
+            onAlarm(open.id)?.let { rings += it }
+        }
+        return rings
+    }
+
     /** Limits that apply to [reminder] right now; with [occurrence] also its checklist progress on [day]. */
     suspend fun limits(reminder: Reminder, occurrence: Occurrence? = null, day: LocalDate = now().atZone(zone).toLocalDate()): Limits {
         val (from, until) = Weeks.range(now(), zone)

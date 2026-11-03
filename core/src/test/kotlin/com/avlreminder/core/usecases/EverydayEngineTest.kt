@@ -5,6 +5,7 @@ import com.avlreminder.core.FakeRepository
 import com.avlreminder.core.MutableClock
 import com.avlreminder.core.at
 import com.avlreminder.core.model.ChecklistItem
+import com.avlreminder.core.model.OccurrenceState
 import com.avlreminder.core.model.Resolution
 import com.avlreminder.core.model.Schedule
 import com.avlreminder.core.model.Strictness
@@ -272,6 +273,23 @@ class EverydayEngineTest {
         assertEquals(at(26, 20), alarms.set[o.id]!!.first)
         clock.now = at(26, 20)
         assertEquals(AlarmLevel.FULLSCREEN, engine.onAlarm(o.id)!!.level)
+    }
+
+    @Test
+    fun `switched on again by hand it rings at once`() = runTest {
+        val id = create(Schedule.Daily(LocalTime.of(18, 0)))
+        val o = open(id)
+        val planned = create(Schedule.Daily(LocalTime.of(21, 0)))
+        settings = AlertSettings(alarmsPausedUntil = AlertSettings.PAUSED_FOR_GOOD)
+        clock.now = at(26, 18)
+        engine.onAlarm(o.id)
+        clock.now = at(26, 18, 30)
+        settings = AlertSettings()
+        val rings = engine.resume()
+        assertEquals(listOf(o.id), rings.map { it.occurrence.id })
+        assertEquals(AlarmLevel.FULLSCREEN, rings.single().level)
+        // Not yet due stays planned.
+        assertEquals(OccurrenceState.PLANNED, open(planned).state)
     }
 
     @Test

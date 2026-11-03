@@ -144,6 +144,8 @@ PLANNED ──(Zeit/Ankunft)──► DUE ──(keine Reaktion)──► ESCALA
   keine Serie, zählt nicht als *hängen*), aber nur, wenn die Pause vor ihrer Fälligkeit
   begann (`alarmsPausedFrom`, `excusedByPause`, seit V1.3a3); sonst *verpasst*. Eine
   verlängerte Pause behält ihren Beginn. Ein laufender Alarm stoppt beim Pausieren.
+  Endet die Pause, klingelt eine offene Fälligkeit sofort, auch beim Einschalten von Hand
+  (`ReminderEngine.resume`, seit V1.3a3).
   Fristen sind hart: Eine Frist, die während der Pause abläuft, ist *verpasst*.
 - **Später** (+x min): Knöpfe pro Reminder; Knöpfe über die Tagesgrenze werden
   ausgeblendet; ohne Limit, jedes ist ein `SNOOZED`.

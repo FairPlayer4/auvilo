@@ -815,7 +815,8 @@ Vordergrund, nicht Reichweite.
   abzuschalten (z. B. wenn die App sich falsch verhält), mit Rückfrage und Anzeige, dass
   er aktiv ist. Wichtig, weil die Mechanismen absichtlich invasiv sind. Neutral
   (*ausgelassen – Notaus*) nur, wenn die Pause vor der Fälligkeit begann, sonst
-  *verpasst*; Fristen bleiben hart (2026-11-03).
+  *verpasst*; Fristen bleiben hart (2026-11-03). Endet die Pause, ob von selbst oder von
+  Hand, klingelt eine offene Fälligkeit sofort (2026-11-03).
 - PS8 **Backend nur nach ausdrücklichem Einschalten.** Ohne Zustimmung keine Anmeldung,
   keine Verbindung; die App bleibt vollständig lokal nutzbar.
 - PS9 **Verschlüsselung auf dem Gerät** (nur die App kann die Daten lesen): **geklärt
@@ -966,6 +967,7 @@ früh am S24 Ultra testen (Spike, siehe Abschnitt 10).
 | 2026-11-02 | AG11 bestätigt und als V1.3a2 umgesetzt: ContentProvider mit `DUMP`, nur Debug-Build, Schalter mit Rückfrage; Claude darf Reminder-Inhalte über die freigegebene Schnittstelle lesen, sie bleiben aber aus Repo und Logs |
 | 2026-11-03 | Antworten auf Review-Lauf 1 (Fragen 1–6): Schnittstelle ändert keinen klingelnden oder überfälligen Reminder (AG11); nach „Handy aus“ klingelt der gerade laufende Termin (VS1); *Notaus* neutral nur bei Pause vor der Fälligkeit, Fristen hart (PS7); NT2-Karte ohne *Minimum*; Titel im Diagnose-Log in der Entwicklungsphase erlaubt, vor einem offiziellen Release entfernen. Umgesetzt in V1.3a3 |
 | 2026-11-03 | Checkliste mit mehreren Uhrzeiten (7.25 VS1, Review-Frage 7a und 7c): pro Termin ein Punkt, der Rest kommt beim nächsten Termin, die Liste behält ihren Stand über verpasste Termine; Minimum-Limit zählt Tage. Umgesetzt in V1.3a3 |
+| 2026-11-03 | Notaus von Hand ausgeschaltet (Review-Frage 7b): eine offene Fälligkeit klingelt sofort wie beim automatischen Pausenende, nicht erst zur nächsten Runde (7.28 PS7). Umgesetzt in V1.3a3 |
 
 ## 10. Nächste Schritte
 
