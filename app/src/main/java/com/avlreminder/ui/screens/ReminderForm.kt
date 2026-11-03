@@ -41,6 +41,8 @@ data class ReminderForm(
     val kind: ScheduleKind = ScheduleKind.DAILY,
     val date: LocalDate,
     val time: LocalTime,
+    /** DAILY/WEEKDAYS: the further times a day (VS1); empty = one time. */
+    val moreTimes: List<LocalTime> = emptyList(),
     val days: Set<DayOfWeek> = WORKDAYS,
     val intervalDays: Int = 14,
     val goal: String = "",
@@ -76,8 +78,16 @@ data class ReminderForm(
     /** Kept for a preparation task; not editable. */
     val prepFor: Long? = null,
 ) {
-    /** A weekly goal fits only schedules with offer days. */
-    val weeklyPossible: Boolean get() = kind == ScheduleKind.DAILY || kind == ScheduleKind.WEEKDAYS
+    /** Several times a day are possible for these kinds only (VS1). */
+    val timesPossible: Boolean get() = kind == ScheduleKind.DAILY || kind == ScheduleKind.WEEKDAYS
+
+    /** All times of the day, ascending. */
+    val times: List<LocalTime> get() = if (timesPossible) (listOf(time) + moreTimes).distinct().sorted() else listOf(time)
+
+    val severalADay: Boolean get() = times.size > 1
+
+    /** A weekly goal fits only schedules with offer days, and one time a day. */
+    val weeklyPossible: Boolean get() = timesPossible && !severalADay
 
     /** Picking a strictness resets proof and limits to the preset; each can be changed afterwards. */
     fun withStrictness(s: Strictness): ReminderForm {
@@ -88,16 +98,16 @@ data class ReminderForm(
     val schedule: Schedule?
         get() = when (kind) {
             ScheduleKind.ONCE -> Schedule.Once(LocalDateTime.of(date, time))
-            ScheduleKind.DAILY -> Schedule.Daily(time)
-            ScheduleKind.WEEKDAYS -> if (days.isEmpty()) null else Schedule.Weekdays(time, days)
+            ScheduleKind.DAILY -> Schedule.Daily(times)
+            ScheduleKind.WEEKDAYS -> if (days.isEmpty()) null else Schedule.Weekdays(times, days)
             ScheduleKind.AFTER_DONE -> if (intervalDays < 1) null else Schedule.AfterDone(intervalDays, time, firstOn = date)
             ScheduleKind.ON_ARRIVAL -> Schedule.OnArrival
             ScheduleKind.DEADLINE ->
                 if (days.isEmpty()) null else Schedule.Deadline(LocalDateTime.of(date, time), days, windowFrom, windowUntil, remindEvery)
         }
 
-    /** A deadline rings in its windows only, so it has no arrival. */
-    val placePossible: Boolean get() = kind != ScheduleKind.DEADLINE
+    /** A deadline rings in its windows only, so it has no arrival; nor do several times a day. */
+    val placePossible: Boolean get() = kind != ScheduleKind.DEADLINE && !severalADay
 
     /** Waiting for the arrival needs no time; the arrival option of the other kinds is then implied. */
     val arrival: Arrival?
@@ -185,8 +195,8 @@ data class ReminderForm(
             )
             return when (val s = r.schedule) {
                 is Schedule.Once -> base.copy(kind = ScheduleKind.ONCE, date = s.at.toLocalDate(), time = s.at.toLocalTime())
-                is Schedule.Daily -> base.copy(kind = ScheduleKind.DAILY, time = s.time)
-                is Schedule.Weekdays -> base.copy(kind = ScheduleKind.WEEKDAYS, time = s.time, days = s.days)
+                is Schedule.Daily -> base.copy(kind = ScheduleKind.DAILY, time = s.time, moreTimes = s.times.drop(1))
+                is Schedule.Weekdays -> base.copy(kind = ScheduleKind.WEEKDAYS, time = s.time, moreTimes = s.times.drop(1), days = s.days)
                 is Schedule.AfterDone -> base.copy(kind = ScheduleKind.AFTER_DONE, time = s.time, intervalDays = s.intervalDays, date = s.firstOn ?: today)
                 Schedule.OnArrival -> base.copy(kind = ScheduleKind.ON_ARRIVAL)
                 is Schedule.Deadline -> base.copy(

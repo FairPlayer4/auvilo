@@ -48,6 +48,7 @@ import com.avlreminder.core.model.ProofKind
 import com.avlreminder.core.model.Strictness
 import com.avlreminder.core.model.WhenAway
 import com.avlreminder.core.rules.Prep
+import com.avlreminder.core.rules.Validation
 import com.avlreminder.ui.AvlIcons
 import com.avlreminder.ui.AvlSwitch
 import com.avlreminder.ui.Fold
@@ -388,6 +389,27 @@ private fun PlaceSection(form: ReminderForm, onChange: (ReminderForm) -> Unit) {
     }
 }
 
+/** The further times of a day (VS1): change, remove, add up to [Validation.MAX_TIMES] in all. */
+@Composable
+private fun MoreTimes(form: ReminderForm, onChange: (ReminderForm) -> Unit, onPick: (Int) -> Unit) {
+    val c = Avl.colors
+    form.moreTimes.forEachIndexed { i, t ->
+        Row(verticalAlignment = androidx.compose.ui.Alignment.CenterVertically) {
+            OutlinedButton(onClick = { onPick(i) }, Modifier.testTag("moreTime$i")) { Text("und ${Format.time(t)}") }
+            TextButton(onClick = { onChange(form.copy(moreTimes = form.moreTimes - t)) }, Modifier.testTag("removeTime$i")) { Text("entfernen") }
+        }
+    }
+    when {
+        form.weekly || form.atHome ->
+            Text("Mit Wochenziel oder Ankunft nur eine Uhrzeit am Tag.", Modifier.padding(top = 4.dp), color = c.muted, fontSize = 13.sp)
+        form.times.size < Validation.MAX_TIMES ->
+            TextButton(onClick = { onPick(-1) }, Modifier.testTag("addTime")) { Text("+ weitere Uhrzeit") }
+    }
+    if (form.severalADay) {
+        Text("Jede Uhrzeit gilt als verpasst, sobald die nächste beginnt.", Modifier.padding(top = 4.dp), color = c.muted, fontSize = 13.sp)
+    }
+}
+
 /** "3–4× pro Woche, mindestens 1×" (Anf. Z1c): the offers count over the week (design 12.3). */
 @Composable
 private fun WeeklyGoalSection(form: ReminderForm, onChange: (ReminderForm) -> Unit) {
@@ -546,6 +568,8 @@ private fun ScheduleDetail(form: ReminderForm, onChange: (ReminderForm) -> Unit)
     var pickDate by remember { mutableStateOf(false) }
     var pickFrom by remember { mutableStateOf(false) }
     var pickUntil by remember { mutableStateOf(false) }
+    // Index into moreTimes, or -1 for a new time.
+    var pickMore by remember { mutableStateOf<Int?>(null) }
 
     Column(Modifier.padding(top = 8.dp)) {
         when (form.kind) {
@@ -592,6 +616,18 @@ private fun ScheduleDetail(form: ReminderForm, onChange: (ReminderForm) -> Unit)
         if (form.kind != ScheduleKind.ON_ARRIVAL) {
             val label = if (form.kind == ScheduleKind.DEADLINE) "Frist um" else "um"
             OutlinedButton(onClick = { pickTime = true }, Modifier.padding(top = 4.dp).testTag("time")) { Text("$label ${Format.time(form.time)}") }
+        }
+        if (form.timesPossible) MoreTimes(form, onChange) { pickMore = it }
+    }
+    pickMore?.let { i ->
+        val others = form.times - (form.moreTimes.getOrNull(i) ?: LocalTime.MIDNIGHT.minusNanos(1))
+        TimeDialog(
+            form.moreTimes.getOrNull(i) ?: form.times.last().plusHours(1),
+            onDismiss = { pickMore = null },
+            error = { if (it in others) "Diese Uhrzeit gibt es schon" else null },
+        ) { t ->
+            val more = if (i < 0) form.moreTimes + t else form.moreTimes.mapIndexed { j, old -> if (j == i) t else old }
+            onChange(form.copy(moreTimes = more.sorted()))
         }
     }
     if (pickFrom) TimeDialog(form.windowFrom, onDismiss = { pickFrom = false }) { onChange(form.copy(windowFrom = it)) }

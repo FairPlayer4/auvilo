@@ -15,6 +15,8 @@ import com.avlreminder.core.rules.Action
 import com.avlreminder.core.rules.AlertSettings
 import com.avlreminder.core.rules.Prep
 import com.avlreminder.core.rules.SkipReasons
+import com.avlreminder.core.rules.SnoozeHint
+import com.avlreminder.core.rules.SnoozeHintChoice
 import com.avlreminder.core.usecases.HistoryDay
 import com.avlreminder.core.usecases.Overview
 import com.avlreminder.core.usecases.ReminderSort
@@ -206,6 +208,30 @@ class AppViewModel(app: Application) : AndroidViewModel(app) {
     }
 
     val overview: StateFlow<OverviewTimes> = state(OverviewTimes(), graph.settings.overview)
+
+    /** Asked again whenever a reminder or a resolved occurrence changes (NT2). */
+    val snoozeHints: StateFlow<List<SnoozeHint>> = state(
+        emptyList(),
+        combine(dao.observeReminders(), resolved) { _, _ -> graph.withEngine { it.snoozeHints() } },
+    )
+
+    fun answerSnoozeHint(reminderId: Long, choice: SnoozeHintChoice) {
+        viewModelScope.launch {
+            val result = graph.withEngine { it.answerSnoozeHint(reminderId, choice) }
+            if (result is SaveResult.Saved) result.ring?.let(graph::ring)
+        }
+    }
+
+    /** null in a release build, which has no interface for Claude. */
+    val claudeAccess: StateFlow<Boolean?> = state(null, graph.settings.claudeAccess.map { on -> on.takeIf { graph.debuggable } })
+
+    fun setClaudeAccess(on: Boolean) {
+        viewModelScope.launch { graph.setClaudeAccess(on) }
+    }
+
+    fun setAlarmsPaused(until: Instant?) {
+        viewModelScope.launch { graph.setAlarmsPaused(until) }
+    }
 
     fun setOverview(times: OverviewTimes) {
         viewModelScope.launch {

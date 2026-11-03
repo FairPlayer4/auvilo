@@ -38,6 +38,42 @@
 | K19 | Frist | Fenster, *Auf morgen*, Überfällig (87–89) | Ruhe außerhalb der Fenster; *Überfällig* auf *Heute* |
 | K20 | Blocker | *Als Aufgabe planen*, Nachfrage (94, 96) | Aufgabe am Vorabend; Nachfrage ab der Schwelle |
 
+## Neu in V1.3a
+
+| # | Test | Erwartung |
+|---|---|---|
+| N1 | Reminder täglich mit zwei Uhrzeiten in 3 und 8 min anlegen; ersten Alarm nicht beantworten | ab der zweiten Uhrzeit ist der erste *verpasst*, der zweite klingelt sofort; *Später*/*Verschieben* bieten nichts über die zweite Uhrzeit hinaus |
+| N2 | Formular: zweite Uhrzeit hinzufügen, entfernen; mit Wochenziel bzw. Ankunft | Hinweis „Jede Uhrzeit gilt als verpasst …“; mit Wochenziel/Ankunft kein *+ weitere Uhrzeit* |
+| N3 | Einstellungen: *Am Wochenende andere Zeiten* an, Sa–So-Felder ändern, wieder aus | Felder erscheinen mit den Mo–Fr-Werten; `diag.log` zeigt die Übersicht mit der Wochenend-Zeit geplant |
+| N4 | Notaus *1 Stunde* bei einem gerade klingelnden Reminder; dann *Wieder einschalten* in der Benachrichtigung | Rückfrage; Alarm stoppt, rotes Banner auf *Heute*, stille Benachrichtigung; nach dem Einschalten Banner weg, nächste Runde normal |
+| N5 | Notaus *bis ich einschalte*, Gerät neu starten | Pause und Benachrichtigung bleiben; Fälligkeiten nur still |
+| N6 | Hinweiskarte (nur, wenn ein Reminder 3× in Folge mind. 2× geschoben wurde) | Karte auf *Heute* mit Uhrzeit/Strenge/*Nein danke*; nach einer Antwort weg |
+
+## Neu in V1.3a2
+
+| # | Test | Erwartung |
+|---|---|---|
+| N7 | Claude ruft `status` und `reminders` auf, solange der Schalter aus ist | `enabled: false`; `reminders` antwortet „nicht freigegeben …“ |
+| N8 | Einstellungen: *Schnittstelle für Claude* einschalten | Rückfrage; danach liefert `reminders` die Liste, `diag.log` zeigt `claude reminders ok` ohne Titel |
+| N9 | Claude legt *Gerätetest* an | Reminder in der Liste wie selbst angelegt, nächster Alarm 12:30 bzw. 19:15 |
+
+### Wochenplan V1.3a (03.–08.11.2026)
+Reminder *Gerätetest*: täglich 12:30 und 19:15, *normal*, Minimum „Test nur
+vorbereiten“ (legt Claude nach N9 über die Schnittstelle an). Pro Alarm ein Test, freie Termine zum Nachholen.
+
+| Wann | Test | Dauer |
+|---|---|---|
+| Di 12:30 | T1 = N2: Formular, zweite Uhrzeit hinzufügen/entfernen, mit Wochenziel | 2 min |
+| Di 19:15 | T2 = N4: Wenn *Gerätetest* klingelt → Notaus *1 Stunde*, Banner und Benachrichtigung ansehen, *Wieder einschalten* | 3 min |
+| Mi 12:30 | T3 = K4 + K5: einmalig in 3 min, „+10“, *Erledigt*; Hell/Dunkel | 15 min, meist warten |
+| Mi 19:15 | T4 = N1: Test-Reminder täglich in 3 und 8 min, ersten nicht beantworten | 10 min |
+| Do 12:30 | T5 = K14: Aktionen auf der Uhr | 3 min |
+| Do 19:15 | T6 = K11: *Nicht stören* an, Reminder in 2 min, dann aus | 15 min |
+| Fr 19:15 | T7 = N3: Wochenend-Zeiten an, Übersicht Sa–So 9:00; Sa früh prüfen | 2 min |
+| Sa 19:15 | T8 = N5: Notaus *bis ich einschalte*, Handy neu starten, dann **sofort wieder einschalten** | 5 min |
+
+Fr 12:30, Sa 12:30 und So: frei oder nachholen. Danach liest Claude die Logs (C.).
+
 ## C. Nach dem Test
 - Claude liest `adb logcat -d -s AvlDiag` und `files/diag/diag.log` (per `run-as`) und
   gleicht sie mit den Erwartungen ab. Simulationen (DND, Standort, Zeit) zurücksetzen.

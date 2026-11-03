@@ -63,9 +63,17 @@ enum class EventType {
 /** When a reminder is due. */
 sealed interface Schedule {
     data class Once(val at: LocalDateTime) : Schedule
-    data class Daily(val time: LocalTime) : Schedule
-    data class Weekdays(val time: LocalTime, val days: Set<DayOfWeek>) : Schedule {
-        init { require(days.isNotEmpty()) { "at least one weekday" } }
+    /** Every day at [times] (VS1: several a day, ascending). */
+    data class Daily(override val times: List<LocalTime>) : Schedule, AtTimes {
+        constructor(time: LocalTime) : this(listOf(time))
+        init { requireTimes(times) }
+    }
+    data class Weekdays(override val times: List<LocalTime>, val days: Set<DayOfWeek>) : Schedule, AtTimes {
+        constructor(time: LocalTime, days: Set<DayOfWeek>) : this(listOf(time), days)
+        init {
+            requireTimes(times)
+            require(days.isNotEmpty()) { "at least one weekday" }
+        }
     }
     /**
      * [intervalDays] after the last completion, at [time]. Before the first completion it is due
@@ -93,6 +101,23 @@ sealed interface Schedule {
         }
     }
 }
+
+/** A schedule with one or more fixed times a day (VS1). */
+interface AtTimes {
+    val times: List<LocalTime>
+    /** The first time of the day; the only one for most reminders. */
+    val time: LocalTime get() = times.first()
+    /** Several times a day: each counts as missed when the next one starts. */
+    val severalADay: Boolean get() = times.size > 1
+}
+
+private fun requireTimes(times: List<LocalTime>) {
+    require(times.isNotEmpty()) { "at least one time" }
+    require(times.zipWithNext().all { (a, b) -> a < b }) { "times ascending without duplicates" }
+}
+
+/** Several times a day (VS1)? */
+val Schedule.severalADay: Boolean get() = (this as? AtTimes)?.severalADay == true
 
 /** A silent notice before the reminder is due (T6), naming its open blockers (S6). */
 sealed interface PreNotice {
@@ -190,6 +215,8 @@ data class Reminder(
     val prepFor: Long? = null,
     /** A blocker solved since the last occurrence may be used as the minimum (S7). */
     val solvedBlockerIsMinimum: Boolean = false,
+    /** The hint about snoozing (NT2) counts only occurrences due from here on; null = all. */
+    val hintQuietUntil: Instant? = null,
 )
 
 /** One concrete time a reminder is due. */

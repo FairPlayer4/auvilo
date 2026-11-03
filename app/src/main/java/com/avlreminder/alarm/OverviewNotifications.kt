@@ -44,15 +44,24 @@ object OverviewNotifications {
     /** Sets both alarms from the settings; a time of null cancels its alarm. */
     fun schedule(context: Context, times: OverviewTimes, now: Instant = Instant.now()) {
         val alarms = context.getSystemService(AlarmManager::class.java)
-        listOf(MORNING to times.morning, EVENING to times.evening).forEach { (kind, time) ->
+        listOf<Pair<String, (OverviewTimes) -> LocalTime?>>(MORNING to { it.morning }, EVENING to { it.evening }).forEach { (kind, time) ->
             val pending = pending(context, kind)
-            if (time == null) {
+            val at = next(times, time, now, ZoneId.systemDefault())
+            if (at == null) {
                 alarms.cancel(pending)
             } else {
-                val at = next(time, now, ZoneId.systemDefault())
                 alarms.setWindow(AlarmManager.RTC_WAKEUP, at.toEpochMilli(), WINDOW_MS, pending)
                 Diag.log("overview $kind planned for $at")
             }
+        }
+    }
+
+    /** The next overview after [now] with the times of its day (VS2); null if off on every day. */
+    fun next(times: OverviewTimes, pick: (OverviewTimes) -> LocalTime?, now: Instant, zone: ZoneId): Instant? {
+        val today = now.atZone(zone).toLocalDate()
+        return (0L..7L).firstNotNullOfOrNull { plus ->
+            val day = today.plusDays(plus)
+            pick(times.on(day))?.let { day.atTime(it).atZone(zone).toInstant() }?.takeIf { it > now }
         }
     }
 

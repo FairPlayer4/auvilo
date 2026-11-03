@@ -1,0 +1,12 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- Only in the debug build (sideload): the interface for Claude over adb (Anf. 7.26 AG11). -->
+<manifest xmlns:android="http://schemas.android.com/apk/res/android">
+    <application>
+        <!-- DUMP: only the adb shell holds it, no other app can call this provider. -->
+        <provider
+            android:name=".claude.ClaudeProvider"
+            android:authorities="com.avlreminder.claude"
+            android:exported="true"
+            android:permission="android.permission.DUMP" />
+    </application>
+</manifest>

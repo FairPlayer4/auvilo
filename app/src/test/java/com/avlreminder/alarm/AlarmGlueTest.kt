@@ -66,6 +66,19 @@ class AlarmGlueTest {
     }
 
     @Test
+    fun eachNotificationOpensItsOwnAlarm() {
+        val first = ring(AlarmLevel.BANNER)
+        Ringer.ring(context, first)
+        Ringer.ring(context, first.copy(occurrence = first.occurrence.copy(id = 43)))
+        for (id in listOf(42L, 43L)) {
+            val n = shadowOf(notifications).getNotification(Notifications.id(id))
+            assertEquals(id, shadowOf(n.contentIntent).savedIntent.getLongExtra("occurrence", -1))
+        }
+        Ringer.dismiss(context, 42)
+        Ringer.dismiss(context, 43)
+    }
+
+    @Test
     fun bannerHasDoneAndSnoozeActions() {
         Ringer.ring(context, ring(AlarmLevel.BANNER))
         val n = shadowOf(notifications).getNotification(Notifications.id(42))

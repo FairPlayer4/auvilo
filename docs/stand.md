@@ -2,9 +2,20 @@
 
 Stand: 2026-11-02. Bei jedem größeren Schritt aktualisieren.
 
+## In Arbeit
+- **V1.3a2** (`versionName` 1.3a2-prototyp, `versionCode` 8) auf `feature/v1.3a`, gebaut,
+  **noch nicht installiert** (wartet auf Kevins Go): Schnittstelle für Claude über adb
+  (anforderungen.md 7.26 AG11, design.md 15), nur im Debug-Build, Schalter in den
+  Einstellungen. Keine Migration. Build grün: 305 Tests, Kover in `core` 98,84 %.
+  Gerätetest: geraetetest.md *Neu in V1.3a2*.
+- Danach: Kevins Wochenplan (Gerätetests V1.3a), dann V1.3b.
+
 ## Auf dem Gerät
-- **V1.2c** (`versionName` 1.2c-prototyp, `versionCode` 6), installiert am 2026-11-02,
-  in `develop` gemergt. Enthält zusätzlich zu V1.2b Fristen mit Ausführungsfenstern und
+- **V1.3a** (`versionName` 1.3a-prototyp, `versionCode` 7), installiert am 2026-11-02
+  auf `feature/v1.3a` (noch nicht in `develop`): mehrmals täglich (VS1),
+  Wochenend-Zeiten (VS2), Hinweis bei ständigem *Später* (NT2), Notausschalter (PS7).
+  Migration 6→7 mit Backup v6 geprüft. Gerätetests: geraetetest.md *Neu in V1.3a*.
+- Davor **V1.2c** (`versionName` 1.2c-prototyp, `versionCode` 6), in `develop` gemergt. Enthält zusätzlich zu V1.2b Fristen mit Ausführungsfenstern und
   *Überfällig*, Vorlagen, Vorab-Reminder, Blocker als Liste mit Vorbereitungsaufgaben,
   *Blocker gelöst* als Minimum und Nachfragen, wenn es hakt. Migration 5→6 mit Backup v5
   geprüft, alle Alarme neu geplant.
@@ -16,24 +27,23 @@ Stand: 2026-11-02. Bei jedem größeren Schritt aktualisieren.
    welche Funktionen er wirklich nutzt. Auffällig bisher: Reminder werden manchmal zu
    streng angelegt und dann mehrfach um 10 min geschoben. Cheats bleiben vorerst, sollen
    aber sinnvolle Rückfragen („Willst du wirklich …?“) bekommen.
-   Bestätigt: Hinweis bei wiederholtem *Später* (NT2). Gezählt wird erst vor V2 mit der
-   Testsession (NT4).
+   Hinweis bei wiederholtem *Später* (NT2) ist in V1.3a umgesetzt. Gezählt wird erst vor
+   V2 mit der Testsession (NT4).
 2. **Backend** (Kevin, parallel, `../avlreminder-backend`): B0–B2 fertig, B2b
    (Daten-Backup) als Nächstes. Überblick: [backend.md](backend.md).
 3. **Play-Store-Release** ohne Eile, erst wenn die App „fertig“ ist (mindestens bis V2);
-   dafür Transparenz, Notausschalter, Backend nur nach Einschalten (7.28 PS5–PS9).
+   dafür Transparenz, Notausschalter (in V1.3a), Backend nur nach Einschalten (7.28 PS5–PS9).
 
 ## Offen
 1. **Testsession vor V2** (Plan: [testsession.md](testsession.md)): Kevin führt sie durch,
    danach wertet Claude `diag.log`, `logcat` und `adb shell dumpsys alarm` aus und gleicht
    das Ergebnis mit den Vorschlägen in der App ab.
 2. **Vorschläge in der App:** 1, 4, 5, 6, 7 und 9 sind umgesetzt; Kevin markiert sie dort
-   als „umgesetzt“. Offen sind VS1–VS3 (anforderungen.md 7.25).
+   als „umgesetzt“. VS1 und VS2 kommen mit V1.3a, offen bleibt VS3 (anforderungen.md 7.25).
 3. **CI:** PRs nach `main` laufen über GitHub Actions (`upload-artifact@v6`, Node 24,
    seit 2026-11-02). Branch-Regel für `main` setzt Kevin.
-4. **V1.3**: Entwurf mit Aufteilung a/b/c in design.md (*Entwurf V1.3*), wartet auf
-   Kevins Bestätigung (E.5). Inhalt (Timer, Abläufe, Watch, mehrmals täglich, Wochenend-Zeiten) laut
-   anforderungen.md Kap. 10, nach der Beobachtungsphase.
+4. **V1.3**: Entwurf bestätigt (design.md *Entwurf V1.3*, E.5). V1.3a ist gebaut (siehe
+   oben); danach V1.3b (Sitzung mit Timer, Uhr) und V1.3c (Abläufe).
 
 ## Doku
 - [design.md](design.md) beschreibt seit 2026-11-02 nur den aktuellen Stand, nach

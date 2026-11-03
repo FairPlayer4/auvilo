@@ -64,6 +64,7 @@ fun ReminderForm.toTemplate(name: String, now: Instant) = TemplateEntity(
     postponeLimit = postponeLimit,
     ignoreDnd = ignoreDnd,
     snoozeMinutes = snoozeMinutes.joinToString(","),
+    moreTimes = if (timesPossible) moreTimes.takeIf { it.isNotEmpty() }?.joinToString(",") { it.toMinutes().toString() } else null,
 )
 
 /** A new form with the template's settings; date and the rest stay as they are. */
@@ -75,6 +76,7 @@ fun ReminderForm.withTemplate(t: TemplateEntity): ReminderForm {
         strictness = t.strictness,
         kind = kind,
         time = if (kind == ScheduleKind.DEADLINE) this.time else time ?: this.time,
+        moreTimes = t.moreTimes.orEmpty().split(',').mapNotNull { it.trim().toIntOrNull()?.toTime() },
         windowFrom = if (kind == ScheduleKind.DEADLINE && time != null) time else windowFrom,
         windowUntil = t.windowUntilMinutes?.toTime() ?: windowUntil,
         remindEvery = t.remindEveryMinutes ?: remindEvery,
@@ -116,7 +118,8 @@ fun templateSummary(t: TemplateEntity): String = listOf(
         ScheduleType.AFTER_DONE -> "alle ${t.intervalDays} Tage"
         ScheduleType.ON_ARRIVAL -> "wenn ich zuhause bin"
         ScheduleType.DEADLINE -> "Frist"
-    } + (t.timeMinutes?.takeIf { t.scheduleType != ScheduleType.ON_ARRIVAL }?.let { " ${Format.time(it.toTime())}" } ?: ""),
+    } + (t.timeMinutes?.takeIf { t.scheduleType != ScheduleType.ON_ARRIVAL }?.let { " ${Format.time(it.toTime())}" } ?: "") +
+        t.moreTimes.orEmpty().split(',').mapNotNull { it.trim().toIntOrNull()?.toTime() }.joinToString("") { ", ${Format.time(it)}" },
     Format.strictness(t.strictness),
 ).joinToString(" · ")
 

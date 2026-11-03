@@ -73,6 +73,10 @@
             android:exported="false" />
 
         <receiver
+            android:name=".alarm.PauseReceiver"
+            android:exported="false" />
+
+        <receiver
             android:name=".location.GeofenceReceiver"
             android:exported="false" />
 

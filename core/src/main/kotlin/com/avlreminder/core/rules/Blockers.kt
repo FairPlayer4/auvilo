@@ -22,8 +22,10 @@ object SkipReasons {
     const val SCHEDULE_CHANGED = "Zeitplan geändert"
     /** An overdue deadline that is no longer to be done. */
     const val DISCARDED = "verworfen"
+    /** Left open while all alarms were paused by hand (PS7). */
+    const val EMERGENCY = "Notaus"
 
-    val SYSTEM = setOf(GOAL_REACHED, PAUSED, SCHEDULE_CHANGED, DISCARDED)
+    val SYSTEM = setOf(GOAL_REACHED, PAUSED, SCHEDULE_CHANGED, DISCARDED, EMERGENCY)
 }
 
 /** Blockers as tasks (S5), solved as the minimum (S7) and asking when it gets stuck (S8). */

@@ -18,6 +18,7 @@ import com.avlreminder.core.model.Resolution
 import com.avlreminder.core.model.Schedule
 import com.avlreminder.core.model.Strictness
 import com.avlreminder.core.model.WhenAway
+import com.avlreminder.core.model.severalADay
 import com.avlreminder.core.ports.AlarmKind
 import com.avlreminder.core.ports.AlarmPort
 import com.avlreminder.core.ports.DeviceStatePort
@@ -40,6 +41,9 @@ import com.avlreminder.core.rules.Presets
 import com.avlreminder.core.rules.ProofCheck
 import com.avlreminder.core.rules.ScheduleRules
 import com.avlreminder.core.rules.SkipReasons
+import com.avlreminder.core.rules.SnoozeHint
+import com.avlreminder.core.rules.SnoozeHintChoice
+import com.avlreminder.core.rules.Snoozing
 import com.avlreminder.core.rules.TransitionResult
 import com.avlreminder.core.rules.Validation
 import com.avlreminder.core.rules.WeekStatus
@@ -359,6 +363,7 @@ class ReminderEngine(
             itemDoneToday = done.any { it.doneAt.atZone(zone).toLocalDate() == day },
             deadline = deadline,
             blockerSolved = reminder.solvedBlockerIsMinimum && Blockers.solvedSince(repo.blockers(reminder.id), since),
+            nextTime = occurrence?.let { ScheduleRules.nextTime(reminder.schedule, it.dueAt, zone) },
         )
     }
 
@@ -434,6 +439,42 @@ class ReminderEngine(
         val firstStep = prep(reminder.id)[Prep.FIRST_STEP]?.takeIf { !it.unknown }?.text
         val (title, lines) = PreNotices.text(reminder, occurrence, firstStep, repo.blockers(reminder.id), now(), zone)
         return Digest(title, lines)
+    }
+
+    // --- Snoozing again and again (NT2) -----------------------------------------------------
+
+    /** Reminders that were snoozed again and again lately, for the card on "Heute". */
+    suspend fun snoozeHints(): List<SnoozeHint> = repo.reminders().mapNotNull { r ->
+        val recent = repo.recentResolved(r.id, Snoozing.IN_A_ROW + Snoozing.IN_A_ROW).map { o ->
+            o to repo.events(o.id).count { it.type == EventType.SNOOZED }
+        }
+        Snoozing.hint(r, recent, r.hintQuietUntil, now(), zone)
+    }
+
+    /**
+     * The card was answered: move the time, lower the strictness, or "Nein danke" (quiet for
+     * [Snoozing.QUIET_DAYS]). Either way the count starts anew.
+     */
+    suspend fun answerSnoozeHint(reminderId: Long, choice: SnoozeHintChoice): SaveResult {
+        val reminder = repo.reminder(reminderId) ?: return SaveResult.Invalid(listOf("Reminder nicht gefunden"))
+        val hint = snoozeHints().firstOrNull { it.reminder.id == reminderId }
+        val now = now()
+        val changed = when (choice) {
+            SnoozeHintChoice.TIME -> hint?.time?.let { reminder.copy(schedule = withTime(reminder.schedule, it)) }
+            SnoozeHintChoice.RELAX -> hint?.relax?.let { reminder.copy(strictness = it) }
+            SnoozeHintChoice.DISMISS -> null
+        }
+        // The card was gone already: no change, and no silent "Nein danke".
+        if (changed == null && choice != SnoozeHintChoice.DISMISS) return SaveResult.Invalid(listOf("Hinweis gilt nicht mehr"))
+        val quiet = if (changed == null) now.plus(Duration.ofDays(Snoozing.QUIET_DAYS)) else now
+        return save((changed ?: reminder).copy(hintQuietUntil = quiet))
+    }
+
+    private fun withTime(schedule: Schedule, time: java.time.LocalTime): Schedule = when (schedule) {
+        is Schedule.Daily -> Schedule.Daily(time)
+        is Schedule.Weekdays -> Schedule.Weekdays(time, schedule.days)
+        is Schedule.AfterDone -> schedule.copy(time = time)
+        else -> schedule
     }
 
     /** "Auf morgen" for a deadline; null if it is no deadline or no window before it is left. */
@@ -541,7 +582,8 @@ class ReminderEngine(
             return
         }
         val day = missedAt(reminder, occurrence).atZone(zone).toLocalDate()
-        if (reminder.checklist.isNotEmpty()) {
+        // Several a day: the next time takes over, the rest is not carried to tomorrow (VS1).
+        if (reminder.checklist.isNotEmpty() && !reminder.schedule.severalADay) {
             val limits = limits(reminder, occurrence, day)
             if (limits.itemDoneToday) {
                 val time = occurrence.dueAt.atZone(zone).toLocalTime()
@@ -550,9 +592,16 @@ class ReminderEngine(
                 return
             }
         }
-        // With the weekly target reached a further offer that was not taken up is no miss.
+        // With the weekly target reached a further offer that was not taken up is no miss;
+        // neither is one left open while all alarms were paused by hand (PS7) – at the end of
+        // the day, not when that is handled (phone off over night).
         val reached = weekStatus(reminder, occurrence.dueAt.atZone(zone).toLocalDate())?.reached == true
-        close(reminder, occurrence, if (reached) Action.Skip(SkipReasons.GOAL_REACHED) else Action.Miss)
+        val action = when {
+            settings().alarmsPaused(missedAt(reminder, occurrence)) -> Action.Skip(SkipReasons.EMERGENCY)
+            reached -> Action.Skip(SkipReasons.GOAL_REACHED)
+            else -> Action.Miss
+        }
+        close(reminder, occurrence, action)
         createNext(reminder)?.let { plan(reminder, it) }
     }
 
@@ -582,6 +631,9 @@ class ReminderEngine(
         } else if (strictness(reminder, occurrence) == null) {
             // Weekly target reached: no further rounds, only the end of the day.
             missedAt(reminder, occurrence)
+        } else if (settings().alarmsPaused(now)) {
+            // Paused by hand: no rounds; when the pause ends it rings as usual (PS7).
+            minOf(settings().alarmsPausedUntil!!, missedAt(reminder, occurrence))
         } else {
             val paused = occurrence.pausedUntil
             // A deadline rings again after its interval.
@@ -666,8 +718,9 @@ class ReminderEngine(
     private suspend fun ring(reminder: Reminder, occurrence: Occurrence): Ring {
         val done = if (reminder.checklist.isEmpty()) emptySet() else repo.itemsDone(occurrence.id).map { it.itemId }.toSet()
         val strictness = strictness(reminder, occurrence)
-        val level = if (strictness == null) AlarmLevel.SILENT else Escalation.level(
-            strictness, now().atZone(zone).toLocalTime(), settings(), device.isDoNotDisturb(), reminder.ignoreDnd,
+        val level = if (strictness == null || settings().alarmsPaused(now())) AlarmLevel.SILENT else Escalation.level(
+            strictness, now().atZone(zone).toLocalTime(), settings().on(now().atZone(zone).toLocalDate()),
+            device.isDoNotDisturb(), reminder.ignoreDnd,
         )
         return Ring(
             reminder, occurrence, level, snoozeOptions(reminder, occurrence),
@@ -693,9 +746,14 @@ class ReminderEngine(
         Strictness.NORMAL, Strictness.STRICT -> Strictness.STRICT
     }
 
-    /** When an unanswered occurrence counts as missed: the end of the day, or of a deadline's window. */
+    /**
+     * When an unanswered occurrence counts as missed: the end of the day, or of a deadline's window.
+     * Several times a day: at the latest when the next time starts (VS1).
+     */
     private fun missedAt(reminder: Reminder, occurrence: Occurrence): Instant {
-        val d = reminder.schedule as? Schedule.Deadline ?: return Escalation.missedAt(occurrence.currentAt, zone, settings())
+        val dayEnd = Escalation.missedAt(occurrence.currentAt, zone, settings())
+        val d = reminder.schedule as? Schedule.Deadline
+            ?: return ScheduleRules.nextTime(reminder.schedule, occurrence.dueAt, zone)?.let { minOf(it, dayEnd) } ?: dayEnd
         val end = Deadlines.windowEnd(d, occurrence.currentAt, zone)
         return if (Deadlines.isOverdue(d, occurrence, zone)) end else minOf(end, Deadlines.dueAt(d, zone))
     }

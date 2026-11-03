@@ -14,6 +14,7 @@ import androidx.compose.runtime.mutableLongStateOf
 import androidx.compose.runtime.produceState
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
+import androidx.core.net.toUri
 import androidx.lifecycle.lifecycleScope
 import com.avlreminder.core.model.OccurrenceState
 import com.avlreminder.core.rules.Action
@@ -41,6 +42,8 @@ class AlarmActivity : ComponentActivity() {
         /** [early]: complete before the reminder is due ("vorab erledigen"). */
         fun intent(context: Context, occurrenceId: Long, early: Boolean = false): Intent =
             Intent(context, AlarmActivity::class.java)
+                // Its own data, so each notification keeps its own PendingIntent.
+                .setData("avl://alarm/$occurrenceId${if (early) "/early" else ""}".toUri())
                 .putExtra(EXTRA_ID, occurrenceId)
                 .putExtra(EXTRA_EARLY, early)
                 .addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
@@ -151,12 +154,13 @@ class AlarmActivity : ComponentActivity() {
                 early = early,
                 done = limits.itemsDone.keys,
                 // Doing an item today makes "Rest auf morgen" free; otherwise it is a postponement.
-                canDeferRest = reminder.checklist.isNotEmpty() && (limits.itemDoneToday || Lifecycle.canPostpone(reminder, occurrence)),
+                canDeferRest = reminder.checklist.isNotEmpty() && limits.nextTime == null && (limits.itemDoneToday || Lifecycle.canPostpone(reminder, occurrence)),
                 week = engine.weekStatus(reminder, occurrence.dueAt.atZone(ZoneId.systemDefault()).toLocalDate()),
                 blockerSolved = Lifecycle.canUseSolvedBlocker(reminder, limits),
                 askBlocker = !early && engine.askBlocker(reminder, occurrence),
                 tomorrow = if (early) null else engine.tomorrow(reminder, occurrence),
                 deadline = limits.deadline,
+                nextTime = limits.nextTime,
                 blockers = engine.blockers(reminder.id).filter { it.isOpen },
             )
         }

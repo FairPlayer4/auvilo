@@ -85,6 +85,8 @@ data class AlarmUi(
     val tomorrow: Instant? = null,
     /** A deadline not yet passed: postponing must stay before it. */
     val deadline: Instant? = null,
+    /** Several times a day (VS1): postponing must stay before the next time. */
+    val nextTime: Instant? = null,
     /** Open blockers of the reminder. */
     val blockers: List<Blocker> = emptyList(),
 )
@@ -411,7 +413,10 @@ private fun PostponeStep(ui: AlarmUi, now: Instant, zone: ZoneId, onPostpone: (I
         add("In 1 Stunde" to now.plusSeconds(3600))
         if (evening > now.plusSeconds(1800)) add("Heute Abend" to evening)
         add("Morgen" to tomorrow)
-    }.filter { (_, at) -> ui.deadline == null || at < ui.deadline }
+    }.filter { (_, at) -> (ui.deadline == null || at < ui.deadline) && (ui.nextTime == null || at < ui.nextTime) }
+    ui.nextTime?.let {
+        Text("Nur bis vor die nächste Uhrzeit ${Format.moment(it, zone, today)}.", Modifier.padding(bottom = 8.dp), color = c.muted, fontSize = 13.sp)
+    }
     ui.deadline?.let {
         Text("Nur bis zur Frist ${Format.moment(it, zone, today)}.", Modifier.padding(bottom = 8.dp), color = c.muted, fontSize = 13.sp)
     }

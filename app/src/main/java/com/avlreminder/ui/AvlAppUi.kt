@@ -37,8 +37,11 @@ import com.avlreminder.core.model.Place
 import com.avlreminder.core.model.PrepAnswer
 import com.avlreminder.core.model.Proof
 import com.avlreminder.core.model.Reminder
+import com.avlreminder.alarm.AlarmPause
 import com.avlreminder.core.rules.AlertSettings
 import com.avlreminder.core.rules.Blockers
+import com.avlreminder.core.rules.SnoozeHint
+import com.avlreminder.core.rules.SnoozeHintChoice
 import com.avlreminder.core.rules.Stats
 import com.avlreminder.core.rules.WeeklyGoals
 import com.avlreminder.core.usecases.HistoryDay
@@ -98,6 +101,10 @@ data class AppState(
     val blockers: Map<Long, List<Blocker>> = emptyMap(),
     /** Most recently used first; null until loaded. */
     val templates: List<TemplateEntity>? = emptyList(),
+    /** Reminders snoozed again and again (NT2). */
+    val snoozeHints: List<SnoozeHint> = emptyList(),
+    /** Interface for Claude (Anf. 7.26 AG11): null = not in this build. */
+    val claudeAccess: Boolean? = null,
 )
 
 interface AppActions {
@@ -132,6 +139,10 @@ interface AppActions {
     fun templateUsed(id: Long) {}
     fun renameTemplate(id: Long, name: String) {}
     fun deleteTemplate(id: Long) {}
+    /** "Alle Alarme pausieren" (PS7); null switches them on again. */
+    fun setAlarmsPaused(until: Instant?) {}
+    fun answerSnoozeHint(reminderId: Long, choice: SnoozeHintChoice) {}
+    fun setClaudeAccess(on: Boolean) {}
 }
 
 /** Simple navigation without a library: one route string, back goes to "today". */
@@ -220,6 +231,10 @@ fun AvlAppUi(
                             doNotDisturb = state.doNotDisturb,
                             itemsDone = state.itemsDone,
                             weeks = state.reminders.filter { it.active }.mapNotNull { r -> WeeklyGoals.status(r, resolved, date, zone)?.let { r to it } },
+                            pausedUntil = state.alert.alarmsPausedUntil?.takeIf { state.alert.alarmsPaused(now) }?.let { AlarmPause.untilText(it, now, zone) },
+                            onResume = { actions.setAlarmsPaused(null) },
+                            hints = state.snoozeHints,
+                            onHint = { h, choice -> actions.answerSnoozeHint(h.reminder.id, choice) },
                         )
                     }
                 }
@@ -242,6 +257,8 @@ fun AvlAppUi(
             route == Routes.SETTINGS -> Box(m) {
                 SettingsScreen(
                     theme = state.theme, onTheme = actions::setTheme, alert = state.alert, onAlert = actions::setAlert,
+                    onPause = actions::setAlarmsPaused, now = now, zone = zone,
+                    claudeAccess = state.claudeAccess, onClaudeAccess = actions::setClaudeAccess,
                     permissions = state.permissions, onBack = { go(Routes.TODAY) },
                     home = state.home, onSetHome = actions::setHomeHere,
                     dwellMinutes = state.dwellMinutes, onDwell = actions::setDwellMinutes,

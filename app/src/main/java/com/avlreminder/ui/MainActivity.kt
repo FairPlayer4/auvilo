@@ -31,6 +31,7 @@ import com.avlreminder.alarm.Notifications
 import com.avlreminder.core.model.PrepAnswer
 import com.avlreminder.core.model.Reminder
 import com.avlreminder.core.rules.AlertSettings
+import com.avlreminder.core.rules.SnoozeHintChoice
 import com.avlreminder.core.usecases.SaveResult
 import com.avlreminder.data.ThemeMode
 import com.avlreminder.location.hasBackgroundLocation
@@ -92,6 +93,8 @@ class MainActivity : ComponentActivity() {
             val suggestions by vm.suggestions.collectAsStateWithLifecycle()
             val blockers by vm.blockers.collectAsStateWithLifecycle()
             val templates by vm.templates.collectAsStateWithLifecycle()
+            val snoozeHints by vm.snoozeHints.collectAsStateWithLifecycle()
+            val claudeAccess by vm.claudeAccess.collectAsStateWithLifecycle()
             var now by androidx.compose.runtime.remember { mutableStateOf(Instant.now()) }
             var dnd by androidx.compose.runtime.remember { mutableStateOf(device.isDoNotDisturb()) }
             LaunchedEffect(Unit) {
@@ -111,7 +114,8 @@ class MainActivity : ComponentActivity() {
                             today, reminders, openByReminder, history, proofs, theme, permissions, prep, alert, dnd,
                             home = home, dwellMinutes = dwell, itemsDone = itemsDone,
                             reminderSort = reminderSort, suggestions = suggestions, overview = overview,
-                            blockers = blockers, templates = templates,
+                            blockers = blockers, templates = templates, snoozeHints = snoozeHints,
+                            claudeAccess = claudeAccess,
                         ),
                         actions = actions,
                         now = now,
@@ -168,6 +172,9 @@ class MainActivity : ComponentActivity() {
         override fun setDwellMinutes(minutes: Int) = vm.setDwellMinutes(minutes)
         override fun setReminderSort(sort: ReminderSort) = vm.setReminderSort(sort)
         override fun setOverview(times: OverviewTimes) = vm.setOverview(times)
+        override fun setAlarmsPaused(until: Instant?) = vm.setAlarmsPaused(until)
+        override fun setClaudeAccess(on: Boolean) = vm.setClaudeAccess(on)
+        override fun answerSnoozeHint(reminderId: Long, choice: SnoozeHintChoice) = vm.answerSnoozeHint(reminderId, choice)
         override fun setArchived(reminderId: Long, archived: Boolean) = vm.setArchived(reminderId, archived)
         override fun addSuggestion(text: String, important: Boolean, screen: String, reminderId: Long?) =
             vm.addSuggestion(text, important, screen, reminderId)
