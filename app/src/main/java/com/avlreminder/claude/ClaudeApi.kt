@@ -124,16 +124,20 @@ class ClaudeApi(private val access: Access) {
     private suspend fun save(o: JSONObject): JSONObject {
         val data = o.getJSONObject("reminder")
         val id = data.optLong("id", 0)
-        val base = if (id == 0L) {
-            if (!data.has("title") || !data.has("schedule")) throw Failure("neuer Reminder braucht title und schedule")
-            // Like the form: "festhalten" unless said otherwise; "Überwindung" needs the four answers in "prep".
-            Reminder(title = "", character = Character.DOCUMENT, schedule = Schedule.Daily(LocalTime.NOON), createdAt = access.now())
-        } else {
-            all().firstOrNull { it.id == id } ?: throw Failure("Reminder $id nicht gefunden")
+        if (id == 0L && (!data.has("title") || !data.has("schedule"))) throw Failure("neuer Reminder braucht title und schedule")
+        // Read and save in one go, so a change in the app in between is not overwritten.
+        val result = access.withEngine { engine ->
+            val base = if (id == 0L) {
+                // Like the form: "festhalten" unless said otherwise; "Überwindung" needs the four answers in "prep".
+                Reminder(title = "", character = Character.DOCUMENT, schedule = Schedule.Daily(LocalTime.NOON), createdAt = access.now())
+            } else {
+                all().firstOrNull { it.id == id } ?: throw Failure("Reminder $id nicht gefunden")
+            }
+            val reminder = json.reminder(data, base, isNew = id == 0L)
+            val prep = o.optJSONArray("prep")?.let { json.prep(it, id, access.now()) }.orEmpty()
+            engine.save(reminder, prep)
         }
-        val reminder = json.reminder(data, base, isNew = id == 0L)
-        val prep = o.optJSONArray("prep")?.let { json.prep(it, id, access.now()) }.orEmpty()
-        return when (val result = access.withEngine { it.save(reminder, prep) }) {
+        return when (result) {
             is SaveResult.Invalid -> throw Failure(result.problems.joinToString("; "))
             is SaveResult.Saved -> {
                 result.ring?.let(access::ring)
@@ -172,7 +176,9 @@ class ClaudeApi(private val access: Access) {
 
         /** For the diagnosis log: method and id, never contents. */
         fun logLine(method: String, arg: String?, answer: String): String {
-            val id = runCatching { JSONObject(arg ?: "{}").let { o -> o.optJSONObject("reminder")?.optLong("id") ?: o.optLong("id", o.optLong("reminderId")) } }.getOrNull()
+            val asked = runCatching { JSONObject(arg ?: "{}").let { o -> o.optJSONObject("reminder")?.optLong("id") ?: o.optLong("id", o.optLong("reminderId")) } }.getOrNull()
+            // A new reminder has its id only in the answer.
+            val id = asked?.takeIf { it != 0L } ?: runCatching { JSONObject(answer).optLong("id") }.getOrNull()
             val ok = runCatching { JSONObject(answer).getBoolean("ok") }.getOrDefault(false)
             return "claude $method" + (id?.takeIf { it != 0L }?.let { " id=$it" } ?: "") + if (ok) " ok" else " error"
         }

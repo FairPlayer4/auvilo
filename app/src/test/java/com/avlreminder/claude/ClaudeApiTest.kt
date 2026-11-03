@@ -94,6 +94,21 @@ class ClaudeApiTest {
     }
 
     @Test
+    fun aNewReminderWithoutStrictnessTakesTheNormalPresetLikeTheForm() = runTest {
+        val saved = call("save", """{"reminder": {"title": "x", "schedule": {"type": "daily", "time": "19:00"}}}""")
+        val r = repo.reminder(saved.getLong("id"))!!
+        assertEquals(Strictness.NORMAL, r.strictness)
+        assertEquals(Presets.of(Strictness.NORMAL).postponeLimit, r.postponeLimit)
+    }
+
+    @Test
+    fun aStrictReminderWithoutMinimumHasNoWeeklyLimit() = runTest {
+        val saved = call("save", """{"reminder": {"title": "x", "strictness": "STRICT", "schedule": {"type": "daily", "time": "19:00"}}}""")
+        assertTrue(saved.toString(), saved.getBoolean("ok"))
+        assertEquals(null, repo.reminder(saved.getLong("id"))!!.minimumLimitPerWeek)
+    }
+
+    @Test
     fun anEditChangesOnlyTheGivenKeys() = runTest {
         val id = call("save", testReminder).getLong("id")
         val edited = call("save", """{"reminder": {"id": $id, "strictness": "STRICT", "goal": "zwei Tests"}}""")
@@ -152,5 +167,7 @@ class ClaudeApiTest {
         val line = ClaudeApi.logLine("save", """{"reminder": {"id": 7, "title": "Geheim"}}""", """{"ok": true}""")
         assertEquals("claude save id=7 ok", line)
         assertEquals("claude reminders error", ClaudeApi.logLine("reminders", null, """{"ok": false}"""))
+        // A new reminder: the id from the answer.
+        assertEquals("claude save id=9 ok", ClaudeApi.logLine("save", """{"reminder": {"title": "Geheim"}}""", """{"ok": true, "id": 9}"""))
     }
 }
