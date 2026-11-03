@@ -464,6 +464,8 @@ class ReminderEngine(
             SnoozeHintChoice.RELAX -> hint?.relax?.let { reminder.copy(strictness = it) }
             SnoozeHintChoice.DISMISS -> null
         }
+        // The card was gone already: no change, and no silent "Nein danke".
+        if (changed == null && choice != SnoozeHintChoice.DISMISS) return SaveResult.Invalid(listOf("Hinweis gilt nicht mehr"))
         val quiet = if (changed == null) now.plus(Duration.ofDays(Snoozing.QUIET_DAYS)) else now
         return save((changed ?: reminder).copy(hintQuietUntil = quiet))
     }

@@ -255,6 +255,14 @@ class EverydayEngineTest {
     }
 
     @Test
+    fun `an answer to a card that is gone changes nothing`() = runTest {
+        val id = create(Schedule.Daily(LocalTime.of(18, 0)))
+        assertInstanceOf(SaveResult.Invalid::class.java, engine.answerSnoozeHint(id, SnoozeHintChoice.TIME))
+        assertInstanceOf(SaveResult.Invalid::class.java, engine.answerSnoozeHint(id, SnoozeHintChoice.RELAX))
+        assertNull(repo.reminder(id)!!.hintQuietUntil)
+    }
+
+    @Test
     fun `several times a day do not go with a weekly goal`() = runTest {
         val result = engine.save(reminder(threeTimes, created = at(26, 7)).copy(weeklyGoal = WeeklyGoal(3)))
         assertInstanceOf(SaveResult.Invalid::class.java, result)
