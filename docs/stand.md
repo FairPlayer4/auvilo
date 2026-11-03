@@ -11,15 +11,17 @@ Stand: 2026-11-03. Bei jedem größeren Schritt aktualisieren.
   geraetetest.md *Neu in V1.3a3*. Offen: Die Eskalationsrunde wird bei jedem `sync`
   (App öffnen) neu ab „jetzt“ geplant. Frage 7b ist umgesetzt (Notaus von Hand aus klingelt
   sofort). Build grün: 322 Tests, Kover in `core` 98,88 %.
-- **V1.3b0** (`versionName` 1.3b0-prototyp, `versionCode` 10) auf `feature/v1.3b0`, gebaut,
-  **noch nicht installiert**: Umbau aus Review-Lauf 2
+- **V1.3b0** (`versionName` 1.3b0-prototyp, `versionCode` 10) auf `feature/v1.3b0`, installiert am 2026-11-03:
+  Umbau aus Review-Lauf 2
   ([.review/runs/2026-11-03-2.md](../.review/runs/2026-11-03-2.md), E1–E4) – Engine als
   Fassade (`Scheduler`, `AlarmViews`, `Changes`), jeder Befehl in einer Transaktion,
   zentrales Klingeln über `RingPort`, `AlarmView` in `core`. Einzige Verhaltensänderung: Ein
   gespeicherter Ankunft-Reminder klingelt sofort, wenn man schon da ist, auch über die
-  Schnittstelle. Keine Migration. Build grün: 327 Tests, Kover in `core` 98,44 %.
+  Schnittstelle. Keine Migration. Build grün: 328 Tests, Kover in `core` 98,44 %.
+  Für B2b vorbereitet: Einstellungen als JSON sichern und
+  wiederherstellen (`Settings.backup`/`restore`, ohne *Notaus* und Schnittstelle).
   Noch offen aus dem Review (optional): Paket `alarm` aufteilen, Wochenstand einmal
-  definieren, *Heute* an einer Stelle laden; Frage an Kevin: Einstellungen ins Backup (B2b).
+  definieren, *Heute* an einer Stelle laden.
 - Danach: Kevins Wochenplan (Gerätetests V1.3a, Reminder *Gerätetest*), dann V1.3b.
 
 ## Auf dem Gerät

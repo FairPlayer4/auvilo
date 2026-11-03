@@ -40,7 +40,7 @@ Anpassungsvorschläge aus Lauf 2 (noch nicht bestätigt): „Wahrheit“ = Room 
 - 2026-11-03: Die Fälligkeit speichert den Zeitpunkt der nächsten Runde nicht; `plan()` rechnet ab „jetzt“.
 
 ## Offene Fragen an den Entwickler
-Aus .review/runs/2026-11-03-2.md: (2) Einstellungen aus dem DataStore ins Backup B2b? Vorschlag ja, als JSON neben dem DB-Abzug.
+Keine.
 
 ## Getroffene Entscheidungen
 - 2026-11-03: `.review/` liegt im Repository.
@@ -49,5 +49,6 @@ Aus .review/runs/2026-11-03-2.md: (2) Einstellungen aus dem DataStore ins Backup
 - 2026-11-03 (Frage 5): Die NT2-Karte braucht kein *Minimum*; keine Abweichung mehr.
 - 2026-11-03 (Frage 7a, 7c, umgesetzt in V1.3a3): Checkliste mit mehreren Uhrzeiten läuft über die Termine, ein Punkt pro Termin; das Minimum-Limit zählt Tage.
 - 2026-11-03 (Frage 7b, nach Vorschlag, umgesetzt in V1.3a3): Notaus von Hand aus klingelt sofort, wie beim automatischen Pausenende.
+- 2026-11-03 (Lauf 2, Frage 2): Einstellungen kommen ins Backup B2b, als JSON neben dem DB-Abzug (`Settings.backup()`/`restore`); *Notaus* und `claudeAccess` bleiben auf dem Gerät.
 - 2026-11-03 (Lauf 2, Frage 1): Umbau-Etappe V1.3b0 vor V1.3b, ja. Umgesetzt E1–E4 auf `feature/v1.3b0` (3b86eab): Engine als Fassade mit `Scheduler`/`AlarmViews`/`Changes`, Befehle in einer Transaktion, `RingPort`, `AlarmView` in core; Mutant M1 jetzt durch `EngineCommandTest` abgedeckt. Optionale Punkte (Paket `alarm`, Wochenstand, *Heute*) offen.
 - 2026-11-03 (Frage 6): Titel im Diagnose-Log sind in der Entwicklungsphase erlaubt; vor einem offiziellen Release wird das ausgebaut.
