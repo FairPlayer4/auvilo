@@ -33,9 +33,11 @@ Vom Entwickler bestätigt am 2026-11-03.
 - 2026-11-03: Die Fälligkeit speichert den Zeitpunkt der nächsten Runde nicht; `plan()` rechnet ab „jetzt“.
 
 ## Offene Fragen an den Entwickler
-Siehe .review/runs/2026-11-03.md, Fragen 1–7: AG5 gegen AG11, Termin nach „Handy aus“ bei mehreren Uhrzeiten, Notaus als Schlupfloch, Notaus bei Fristen, NT2 ohne Minimum, Titel im Log, Checkliste und Limit bei mehreren Uhrzeiten.
+Aus .review/runs/2026-11-03.md, Frage 7 (an Kevin geschickt am 2026-11-03): Checkliste bei mehreren Uhrzeiten voll *verpasst*; Notaus von Hand aus klingelt erst nach 10 min; Minimum-Limit pro Termin statt pro Tag.
 
 ## Getroffene Entscheidungen
 - 2026-11-03: `.review/` liegt im Repository.
 - 2026-11-03: Das Architekturbild oben ist bestätigt.
-- design.md 13: Titel dürfen ins Diagnose-Log (bis Frage 6 beantwortet ist).
+- 2026-11-03 (Fragen 1–4, nach Vorschlag, umgesetzt in V1.3a3): Die Schnittstelle ändert, pausiert und archiviert keinen klingelnden oder überfälligen Reminder. Nach „Handy aus“ klingelt der heute zuletzt begonnene Termin. *Notaus* ist nur neutral, wenn die Pause vor der Fälligkeit begann. Fristen bleiben im Notaus hart.
+- 2026-11-03 (Frage 5): Die NT2-Karte braucht kein *Minimum*; keine Abweichung mehr.
+- 2026-11-03 (Frage 6): Titel im Diagnose-Log sind in der Entwicklungsphase erlaubt; vor einem offiziellen Release wird das ausgebaut.

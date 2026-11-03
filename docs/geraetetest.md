@@ -57,6 +57,13 @@
 | N8 | Einstellungen: *Schnittstelle für Claude* einschalten | Rückfrage; danach liefert `reminders` die Liste, `diag.log` zeigt `claude reminders ok` ohne Titel |
 | N9 | Claude legt *Gerätetest* an | Reminder in der Liste wie selbst angelegt, nächster Alarm 12:30 bzw. 19:15 |
 
+## Neu in V1.3a3
+
+| # | Test | Erwartung |
+|---|---|---|
+| N10 | Während *Gerätetest* klingelt, ruft Claude `setActive` mit `false` auf | „läuft gerade – nur in der App“, der Alarm klingelt weiter |
+| N11 | Notaus erst einschalten, wenn ein Alarm schon klingelt, bis nach der Tagesgrenze | am nächsten Tag im Verlauf *verpasst*, nicht *ausgelassen (Notaus)* |
+
 ### Wochenplan V1.3a (03.–08.11.2026)
 Reminder *Gerätetest*: täglich 12:30 und 19:15, *normal*, Minimum „Test nur
 vorbereiten“ (legt Claude nach N9 über die Schnittstelle an). Pro Alarm ein Test, freie Termine zum Nachholen.

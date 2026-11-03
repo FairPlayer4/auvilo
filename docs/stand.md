@@ -3,10 +3,13 @@
 Stand: 2026-11-03. Bei jedem größeren Schritt aktualisieren.
 
 ## In Arbeit
-- **Review-Lauf 1** (2026-11-03, [.review/runs/2026-11-03.md](../.review/runs/2026-11-03.md)):
-  6 Fixes in `develop`, **noch nicht installiert**. Offen: Die Eskalationsrunde wird bei
-  jedem `sync` (App öffnen) neu ab „jetzt“ geplant; mehrere Uhrzeiten nach „Handy aus“;
-  dazu 7 Fragen an Kevin. Build grün: 312 Tests, Kover in `core` 98,85 %.
+- **V1.3a3** (`versionName` 1.3a3-prototyp, `versionCode` 9) in `develop`, gebaut,
+  **noch nicht installiert**: 6 Fixes aus Review-Lauf 1
+  ([.review/runs/2026-11-03.md](../.review/runs/2026-11-03.md)) und Kevins Antworten auf
+  die Fragen 1–6 (anforderungen.md Kap. 9, 2026-11-03). Keine Migration. Gerätetests:
+  geraetetest.md *Neu in V1.3a3*. Offen: Die Eskalationsrunde wird bei jedem `sync`
+  (App öffnen) neu ab „jetzt“ geplant; Frage 7 (drei kleine Fragen) an Kevin. Build
+  grün: 317 Tests, Kover in `core` 98,86 %.
 - Danach: Kevins Wochenplan (Gerätetests V1.3a, Reminder *Gerätetest*), dann V1.3b.
 
 ## Auf dem Gerät

@@ -1,7 +1,7 @@
 # Anforderungen – avlreminder
 
 > Arbeitsname. AVL = **A**udio / **V**isual / **L**ocation.
-> Stand: 2026-11-02 – umgesetzt bis V1.3a, V1.3a2 gebaut (Übersicht in Kap. 10). Entscheidungen mit Datum in
+> Stand: 2026-11-03 – umgesetzt bis V1.3a2, V1.3a3 gebaut (Übersicht in Kap. 10). Entscheidungen mit Datum in
 > Kap. 9, technisches Design nach Themen in [design.md](design.md). Wird iterativ verfeinert.
 
 ## 1. Vision
@@ -760,7 +760,9 @@ soll helfen, die Reminder einzuhalten: planen, Vorarbeit erledigen, motivieren.
   - **Schreiben:** Reminder anlegen, bearbeiten, pausieren, archivieren; Blocker anlegen.
     Immer über dieselben Befehle wie die Oberfläche (Prüfung, Alarme neu planen).
   - **Nicht (AG5):** nichts erledigen oder auslassen, keinen Alarm beenden, keine
-    Nachweise, nicht löschen (archivieren statt löschen).
+    Nachweise, nicht löschen (archivieren statt löschen). Klingelt ein Reminder oder
+    ist er überfällig, darf die Schnittstelle ihn nicht ändern, pausieren oder
+    archivieren („läuft gerade – nur in der App“, 2026-11-03).
   - **Protokoll:** jeder Zugriff im Diagnose-Log mit Methode und ID, ohne Inhalte.
   - **Nur im Debug-Build** (Sideload); der Play-Store-Release bekommt stattdessen die
     Agenten-Schnittstelle aus AG1–AG10.
@@ -778,7 +780,8 @@ dazugekommen; Kevin sammelt jetzt erst einmal mit aktiver Nutzung.
   **Bestätigt (2026-11-02):** Wird ein Reminder über mehrere Fälligkeiten hintereinander
   jeweils mehrfach mit *Später* geschoben (etwa ab dem dritten Mal), fragt die App
   einmal, ob Uhrzeit, Strenge oder Minimum angepasst werden sollen – ähnlich der
-  Nachfrage aus 7.21 (S8), keine harte Sperre.
+  Nachfrage aus 7.21 (S8), keine harte Sperre. Die Karte bietet Uhrzeit, Strenge und
+  *Nein danke*; *Minimum* braucht Kevin dort nicht (2026-11-03).
 - NT3 **Schlupflöcher (Cheats) bleiben vorerst**, bekommen aber sinnvolle Rückfragen
   („Willst du wirklich …?“). Welche Stellen das sind und wie stark die Bremse sein
   soll, ergibt sich aus der Nutzung.
@@ -804,7 +807,9 @@ Vordergrund, nicht Reichweite.
   welche Berechtigungen sie wofür nutzt und warum ein Alarm kam bzw. nicht kam.
 - PS7 **Bewusster Notausschalter:** ein klar erreichbarer Weg, alle Alarme sofort
   abzuschalten (z. B. wenn die App sich falsch verhält), mit Rückfrage und Anzeige, dass
-  er aktiv ist. Wichtig, weil die Mechanismen absichtlich invasiv sind.
+  er aktiv ist. Wichtig, weil die Mechanismen absichtlich invasiv sind. Neutral
+  (*ausgelassen – Notaus*) nur, wenn die Pause vor der Fälligkeit begann, sonst
+  *verpasst*; Fristen bleiben hart (2026-11-03).
 - PS8 **Backend nur nach ausdrücklichem Einschalten.** Ohne Zustimmung keine Anmeldung,
   keine Verbindung; die App bleibt vollständig lokal nutzbar.
 - PS9 **Verschlüsselung auf dem Gerät** (nur die App kann die Daten lesen): **geklärt
@@ -953,6 +958,7 @@ früh am S24 Ultra testen (Spike, siehe Abschnitt 10).
 | 2026-11-02 | V1.3a umgesetzt: höchstens 6 Uhrzeiten am Tag; Notaus mit 1 Stunde, bis morgen 06:00 oder bis zum Einschalten; Wochenend-Schalter gilt für Alarmzeiten und Übersicht zusammen |
 | 2026-11-02 | Schnittstelle für Claude vorgezogen (vor V1.3b): Reminder lesen und schreiben über adb, ausdrücklich in der App freizugeben; Entwurf in 7.26 AG11 |
 | 2026-11-02 | AG11 bestätigt und als V1.3a2 umgesetzt: ContentProvider mit `DUMP`, nur Debug-Build, Schalter mit Rückfrage; Claude darf Reminder-Inhalte über die freigegebene Schnittstelle lesen, sie bleiben aber aus Repo und Logs |
+| 2026-11-03 | Antworten auf Review-Lauf 1 (Fragen 1–6): Schnittstelle ändert keinen klingelnden oder überfälligen Reminder (AG11); nach „Handy aus“ klingelt der gerade laufende Termin (VS1); *Notaus* neutral nur bei Pause vor der Fälligkeit, Fristen hart (PS7); NT2-Karte ohne *Minimum*; Titel im Diagnose-Log in der Entwicklungsphase erlaubt, vor einem offiziellen Release entfernen. Umgesetzt in V1.3a3 |
 
 ## 10. Nächste Schritte
 
@@ -969,6 +975,7 @@ früh am S24 Ultra testen (Spike, siehe Abschnitt 10).
 | V1.2c | 2026-11-02 | Fristen mit Fenstern (7.2), Vorlagen, Vorab-Reminder (T6), Blocker als Aufgaben (7.21 S5–S8) |
 | V1.3a | 2026-11-02 | Mehrmals täglich, Wochenend-Zeiten (7.25 VS1, VS2), Hinweis bei ständigem *Später* (7.27 NT2), Notausschalter (7.28 PS7) |
 | V1.3a2 | 2026-11-02 | Schnittstelle für Claude über adb (7.26 AG11) |
+| V1.3a3 | gebaut | Fixes aus Review-Lauf 1 und Antworten darauf (Kap. 9, 2026-11-03) |
 
 Details zum Verhalten: [design.md](design.md), Gerätetests: [geraetetest.md](geraetetest.md).
 

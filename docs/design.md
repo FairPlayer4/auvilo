@@ -72,6 +72,8 @@ Paket `com.avlreminder`.
 dem Abschluss folgt die nächste Uhrzeit desselben Tages, sonst der nächste Tag. Ein
 Termin gilt als **verpasst, sobald der nächste beginnt** (spätestens an der
 Tagesgrenze); ein Alarm bis 2 min zu spät klingelt noch den gerade begonnenen Termin.
+Wird das erst später bemerkt (Handy aus), folgt der Termin, der heute zuletzt begonnen
+hat, und klingelt sofort (`ScheduleRules.currentTime`, seit V1.3a3).
 *Später* und *Verschieben* nur bis vor den nächsten Termin, kein *Rest auf morgen* bei
 Checklisten. Nicht kombinierbar mit Wochenziel und Ankunft (Validierung, das Formular
 blendet beides aus). Vorab erledigen betrifft nur den nächsten Termin.
@@ -138,7 +140,10 @@ PLANNED ──(Zeit/Ankunft)──► DUE ──(keine Reaktion)──► ESCALA
   Einschalten, `PAUSED_FOR_GOOD`). Während der Pause klingelt alles still (`SILENT`), der
   nächste Alarm liegt am Pausenende (bzw. an der Tagesgrenze). Bleibt eine Fälligkeit
   bis zur Tagesgrenze offen, wird sie *ausgelassen* mit System-Grund *Notaus* (bricht
-  keine Serie, zählt nicht als *hängen*). Ein laufender Alarm stoppt beim Pausieren.
+  keine Serie, zählt nicht als *hängen*), aber nur, wenn die Pause vor ihrer Fälligkeit
+  begann (`alarmsPausedFrom`, `excusedByPause`, seit V1.3a3); sonst *verpasst*. Eine
+  verlängerte Pause behält ihren Beginn. Ein laufender Alarm stoppt beim Pausieren.
+  Fristen sind hart: Eine Frist, die während der Pause abläuft, ist *verpasst*.
 - **Später** (+x min): Knöpfe pro Reminder; Knöpfe über die Tagesgrenze werden
   ausgeblendet; ohne Limit, jedes ist ein `SNOOZED`.
 - **Verschieben** auf einen Zeitpunkt: zählt gegen `postponeLimit`. Ist es erreicht,
@@ -355,12 +360,14 @@ umgesetzt / verworfen. Liste in den Einstellungen, *Teilen* als Markdown.
   `template.moreTimes` (weitere Uhrzeiten als Minuten, z. B. `780,1200`; die erste bleibt
   in `timeMinutes`), `reminder.hintQuietUntil`.
 - **Einstellungen** (DataStore): Wochenend-Zeiten als eigene Schlüssel (fehlen = wie
-  Mo–Fr), `alarmsPausedUntil` in Millisekunden (fehlt = keine Pause).
+  Mo–Fr), `alarmsPausedUntil` und `alarmsPausedFrom` in Millisekunden (fehlt = keine
+  Pause bzw. Beginn unbekannt).
 - **Backup vor jeder Migration** per `VACUUM INTO` nach
   `filesDir/backup/avlreminder-v<alt>-<Zeit>.db`; scheitert es, startet die App trotzdem.
 - **Diagnose-Log** (`Diag`): logcat-Tag `AvlDiag` und `files/diag/diag.log` (rotiert bei
   512 KB). Zeiten, IDs, Titel, Zustände, Berechtigungen; keine Nachweis-Inhalte, keine
-  Positionen.
+  Positionen. Titel nur in der Entwicklungsphase; vor einem offiziellen Release
+  werden sie entfernt (Entscheidung 2026-11-03).
 - **Einstellungen** außerdem: `claudeAccess` (1 = Schnittstelle für Claude an, 15).
 - Alle Daten bleiben auf dem Gerät (Anf. 8.4).
 
@@ -398,7 +405,10 @@ umgesetzt / verworfen. Liste in den Einstellungen, *Teilen* als Markdown.
   Startklar), `today`, `history` (`{"days":14}`), `save` (`{"reminder":{…},"prep":[…]}`;
   ohne `id` neu mit `title` und `schedule`, Strenge-Voreinstellung wie im Formular; mit
   `id` ändern sich nur die angegebenen Felder), `setActive`, `archive`, `addBlocker`.
-  Kein Erledigen, Auslassen, Alarm beenden, Nachweis, Löschen (AG5).
+  Kein Erledigen, Auslassen, Alarm beenden, Nachweis, Löschen (AG5). Klingelt der
+  Reminder gerade oder ist er überfällig (offene Fälligkeit nicht mehr `PLANNED` oder
+  `currentAt` erreicht), lehnen `save`, `setActive` und `archive` ab: „läuft gerade –
+  nur in der App“ (seit V1.3a3).
 - **JSON** (`ClaudeJson`): Zeiten lokal ohne Zone (`2026-11-03T19:15`), Enums mit ihrem
   Namen. Takt z. B. `{"type":"daily","times":["12:30","19:15"]}`, `weekdays` mit `days`,
   `once` mit `at`, `afterDone` mit `intervalDays`/`time`/`firstOn`, `onArrival`,
