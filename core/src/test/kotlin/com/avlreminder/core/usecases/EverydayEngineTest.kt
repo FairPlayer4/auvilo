@@ -85,6 +85,21 @@ class EverydayEngineTest {
     }
 
     @Test
+    fun `after phone off the time running now rings at once`() = runTest {
+        val id = create(threeTimes)
+        val first = open(id)
+        clock.now = at(26, 8)
+        engine.onAlarm(first.id)
+        // Off from 12:50 to 13:30.
+        clock.now = at(26, 13, 30)
+        engine.sync()
+        assertEquals(Resolution.MISSED, repo.occurrence(first.id)!!.resolution)
+        val second = open(id)
+        assertEquals(at(26, 13), second.dueAt)
+        assertEquals(at(26, 13), alarms.set[second.id]!!.first)
+    }
+
+    @Test
     fun `snoozing and postponing stay before the next time`() = runTest {
         val id = create(threeTimes)
         val first = open(id)
@@ -233,13 +248,26 @@ class EverydayEngineTest {
         val o = open(id)
         clock.now = at(26, 18)
         engine.onAlarm(o.id)
-        settings = AlertSettings(alarmsPausedUntil = at(27, 6))
+        settings = AlertSettings(alarmsPausedUntil = at(27, 6), alarmsPausedFrom = at(26, 17))
         // Phone off over night: the end of the day is handled after the pause.
         clock.now = at(27, 7)
         engine.sync()
         val closed = repo.occurrence(o.id)!!
         assertEquals(Resolution.SKIPPED, closed.resolution)
         assertEquals(SkipReasons.EMERGENCY, closed.note)
+    }
+
+    @Test
+    fun `a pause switched on after it rang does not skip`() = runTest {
+        val id = create(Schedule.Daily(LocalTime.of(18, 0)))
+        val o = open(id)
+        clock.now = at(26, 18)
+        engine.onAlarm(o.id)
+        // Ignored all evening, paused shortly before the end of the day.
+        settings = AlertSettings(alarmsPausedUntil = at(26, 23, 58), alarmsPausedFrom = at(26, 22, 58))
+        clock.now = at(26, 23)
+        engine.onAlarm(o.id)
+        assertEquals(Resolution.MISSED, repo.occurrence(o.id)!!.resolution)
     }
 
     @Test

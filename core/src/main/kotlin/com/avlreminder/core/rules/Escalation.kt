@@ -26,6 +26,8 @@ data class AlertSettings(
     val weekend: DayTimes? = null,
     /** All alarms paused by hand until then (PS7); null = not paused. */
     val alarmsPausedUntil: Instant? = null,
+    /** When that pause was switched on; null = not known (paused before V1.3a3). */
+    val alarmsPausedFrom: Instant? = null,
 ) {
     init {
         require(loudFrom < dayEnd) { "loud must start before the end of the day" }
@@ -35,6 +37,13 @@ data class AlertSettings(
     fun isLoud(time: LocalTime) = time >= loudFrom
 
     fun alarmsPaused(now: Instant): Boolean = alarmsPausedUntil?.let { now < it } == true
+
+    /**
+     * Left open because of the pause (PS7): it held at [missedAt] and began before [dueAt].
+     * A pause switched on only when the occurrence already rang does not excuse it.
+     */
+    fun excusedByPause(dueAt: Instant, missedAt: Instant): Boolean =
+        alarmsPaused(missedAt) && (alarmsPausedFrom == null || alarmsPausedFrom <= dueAt)
 
     /** The settings that apply on [date]: on a weekend day its own times, if set. */
     fun on(date: LocalDate): AlertSettings =

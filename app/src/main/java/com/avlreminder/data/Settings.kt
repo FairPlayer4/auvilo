@@ -55,6 +55,8 @@ class Settings(private val context: Context) {
     private val claudeKey = intPreferencesKey("claudeAccess")
     /** Epoch milliseconds; absent = alarms not paused (PS7). */
     private val pausedUntilKey = longPreferencesKey("alarmsPausedUntil")
+    /** Epoch milliseconds when the running pause was switched on. */
+    private val pausedFromKey = longPreferencesKey("alarmsPausedFrom")
 
     val theme: Flow<ThemeMode> = context.dataStore.data.map { prefs ->
         prefs[themeKey]?.let { runCatching { ThemeMode.valueOf(it) }.getOrNull() } ?: ThemeMode.SYSTEM
@@ -71,6 +73,7 @@ class Settings(private val context: Context) {
                     DayTimes(requireNotNull(prefs[weekendLoudKey]).toTime(), requireNotNull(prefs[weekendEndKey]).toTime())
                 }.getOrNull(),
                 alarmsPausedUntil = prefs[pausedUntilKey]?.let(Instant::ofEpochMilli),
+                alarmsPausedFrom = prefs[pausedFromKey]?.let(Instant::ofEpochMilli),
             )
         }.getOrDefault(default)
     }
@@ -118,10 +121,20 @@ class Settings(private val context: Context) {
         context.dataStore.edit { it[claudeKey] = if (on) 1 else 0 }
     }
 
-    /** "Alle Alarme pausieren" (PS7); null switches the alarms on again. */
-    suspend fun setAlarmsPaused(until: Instant?) {
+    /**
+     * "Alle Alarme pausieren" (PS7); null switches the alarms on again. A running pause that is
+     * extended keeps its start.
+     */
+    suspend fun setAlarmsPaused(until: Instant?, now: Instant) {
         context.dataStore.edit {
-            if (until == null) it.remove(pausedUntilKey) else it[pausedUntilKey] = until.toEpochMilli()
+            if (until == null) {
+                it.remove(pausedUntilKey)
+                it.remove(pausedFromKey)
+            } else {
+                val running = it[pausedUntilKey]?.let { u -> u > now.toEpochMilli() } == true && it[pausedFromKey] != null
+                if (!running) it[pausedFromKey] = now.toEpochMilli()
+                it[pausedUntilKey] = until.toEpochMilli()
+            }
         }
     }
 

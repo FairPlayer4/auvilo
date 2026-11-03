@@ -593,11 +593,11 @@ class ReminderEngine(
             }
         }
         // With the weekly target reached a further offer that was not taken up is no miss;
-        // neither is one left open while all alarms were paused by hand (PS7) – at the end of
-        // the day, not when that is handled (phone off over night).
+        // neither is one left open while all alarms were paused by hand (PS7) – paused before it
+        // was due and still at the end of the day, not when that is handled (phone off over night).
         val reached = weekStatus(reminder, occurrence.dueAt.atZone(zone).toLocalDate())?.reached == true
         val action = when {
-            settings().alarmsPaused(missedAt(reminder, occurrence)) -> Action.Skip(SkipReasons.EMERGENCY)
+            settings().excusedByPause(occurrence.dueAt, missedAt(reminder, occurrence)) -> Action.Skip(SkipReasons.EMERGENCY)
             reached -> Action.Skip(SkipReasons.GOAL_REACHED)
             else -> Action.Miss
         }
