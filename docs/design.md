@@ -74,8 +74,9 @@ Termin gilt als **verpasst, sobald der nächste beginnt** (spätestens an der
 Tagesgrenze); ein Alarm bis 2 min zu spät klingelt noch den gerade begonnenen Termin.
 Wird das erst später bemerkt (Handy aus), folgt der Termin, der heute zuletzt begonnen
 hat, und klingelt sofort (`ScheduleRules.currentTime`, seit V1.3a3).
-*Später* und *Verschieben* nur bis vor den nächsten Termin, kein *Rest auf morgen* bei
-Checklisten. Nicht kombinierbar mit Wochenziel und Ankunft (Validierung, das Formular
+*Später* und *Verschieben* nur bis vor den nächsten Termin. Eine Checkliste läuft über
+die Termine, ein Punkt pro Termin (8.). Das Wochenlimit für das *Minimum* zählt Tage
+(`Limits.minimumToday`). Nicht kombinierbar mit Wochenziel und Ankunft (Validierung, das Formular
 blendet beides aus). Vorab erledigen betrifft nur den nächsten Termin.
 
 ### 2.3 Fälligkeit (`Occurrence`)
@@ -148,7 +149,7 @@ PLANNED ──(Zeit/Ankunft)──► DUE ──(keine Reaktion)──► ESCALA
   ausgeblendet; ohne Limit, jedes ist ein `SNOOZED`.
 - **Verschieben** auf einen Zeitpunkt: zählt gegen `postponeLimit`. Ist es erreicht,
   bleiben Erledigt, Minimum und Auslassen.
-- **Minimum:** ausgegraut, wenn das Wochenlimit erreicht ist.
+- **Minimum:** ausgegraut, wenn das Wochenlimit erreicht ist (mehrere Uhrzeiten: Tage mit Minimum).
 - **Startwerte der Strenge** (`Presets`, pro Reminder änderbar): locker – Quittieren,
   Verschieben unbegrenzt; normal – Quittieren, 3× Verschieben; streng – Foto, 1×
   Verschieben, Minimum 1×/Woche. Streng verlangt immer einen Nachweis.
@@ -207,6 +208,13 @@ um …*, Fenstertage, *von / bis*, Intervall (Standard Mo–Fr 9–17, 60 min).
   nächsten Tag zur selben Uhrzeit wieder (zählt nicht als Verschieben); sonst verpasst.
   *Rest auf morgen* im Alarm ist nach einem Punkt am selben Tag frei, sonst eine
   Verschiebung.
+- **Mehrere Uhrzeiten am Tag (V1.3a3):** Die Liste läuft über die Termine. Ein
+  abgehakter Punkt schließt den Termin (`GOAL` bzw. `NO_PROOF` nach dem Nachweis dieses
+  Punkts), der nächste Termin zeigt nur die offenen Punkte. Erledigt ist, was seit dem
+  letzten vollständigen Durchlauf abgehakt wurde (`Checklists.round` über
+  `itemsDoneOfReminder`); danach beginnt die Liste von vorn. Ein Termin ohne Punkt ist
+  *verpasst*, kein *Rest auf morgen*. Im Alarm: „Erledigt: ‹nächster Punkt›“, „Danach:
+  Rest um …“, klein *Alles auf einmal erledigt*.
 - *Nach Erledigung* zählt ab dem **ersten** erledigten Punkt (`firstProgressAt`).
 - Benachrichtigung: „✓ nächster Punkt“ nur ohne Nachweis; danach eine stille
   Benachrichtigung mit dem nächsten Punkt.

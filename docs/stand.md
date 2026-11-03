@@ -6,10 +6,11 @@ Stand: 2026-11-03. Bei jedem größeren Schritt aktualisieren.
 - **V1.3a3** (`versionName` 1.3a3-prototyp, `versionCode` 9) in `develop`, gebaut,
   **noch nicht installiert**: 6 Fixes aus Review-Lauf 1
   ([.review/runs/2026-11-03.md](../.review/runs/2026-11-03.md)) und Kevins Antworten auf
-  die Fragen 1–6 (anforderungen.md Kap. 9, 2026-11-03). Keine Migration. Gerätetests:
+  die Fragen 1–6 und 7a/7c, dazu Checklisten über mehrere Uhrzeiten (ein Punkt pro
+  Termin, 7.25 VS1). Keine Migration. Kevin installiert am Abend des 2026-11-03. Gerätetests:
   geraetetest.md *Neu in V1.3a3*. Offen: Die Eskalationsrunde wird bei jedem `sync`
-  (App öffnen) neu ab „jetzt“ geplant; Frage 7 (drei kleine Fragen) an Kevin. Build
-  grün: 317 Tests, Kover in `core` 98,86 %.
+  (App öffnen) neu ab „jetzt“ geplant; Frage 7b (Notaus von Hand aus) an Kevin. Build
+  grün: 321 Tests, Kover in `core` 98,87 %.
 - Danach: Kevins Wochenplan (Gerätetests V1.3a, Reminder *Gerätetest*), dann V1.3b.
 
 ## Auf dem Gerät

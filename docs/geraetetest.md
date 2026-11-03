@@ -63,6 +63,7 @@
 |---|---|---|
 | N10 | Während *Gerätetest* klingelt, ruft Claude `setActive` mit `false` auf | „läuft gerade – nur in der App“, der Alarm klingelt weiter |
 | N11 | Notaus erst einschalten, wenn ein Alarm schon klingelt, bis nach der Tagesgrenze | am nächsten Tag im Verlauf *verpasst*, nicht *ausgelassen (Notaus)* |
+| N12 | *Gerätetest* mit Checkliste (ein Test pro Punkt): beim Alarm „Erledigt: ‹Punkt›“ tippen | Alarm endet, „Danach: Rest um …“ stimmte; in *Heute* steht der Fortschritt, der nächste Termin bietet den nächsten Punkt |
 
 ### Wochenplan V1.3a (03.–08.11.2026)
 Reminder *Gerätetest*: täglich 12:30 und 19:15, *normal*, Minimum „Test nur

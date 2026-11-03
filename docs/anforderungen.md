@@ -697,6 +697,12 @@ klappbaren Bereichen, Charakter oben mit *Dokumentation* als Standard. Offen:
   die Serie, sobald **mindestens ein** Termin eingehalten wurde (Standard; strenger nur,
   falls es sich in der Nutzung als nötig zeigt). Im Design zu klären: wie das
   Wochenziel zählt und ob Auslassen pro Termin gilt. **[V1.3]**
+  **Mit Checkliste (2026-11-03):** Die Liste wird über die Termine abgearbeitet, pro
+  Termin ein Punkt. Ein abgehakter Punkt erfüllt den Termin, der Rest kommt beim
+  nächsten Termin (heute oder morgen). Ein Termin ohne Punkt ist *verpasst*, die Liste
+  behält ihren Stand; nach dem letzten Punkt beginnt sie von vorn. Im Alarm ist der
+  große Knopf „Erledigt: ‹nächster Punkt›“, *Alles auf einmal erledigt* ist klein.
+  Das Wochenlimit für das *Minimum* zählt Tage, nicht Termine.
 - VS2 **Andere Zeiten am Wochenende**: Übersicht, *laut ab* und Tagesgrenze getrennt
   für Mo–Fr und Sa–So einstellbar. Einzelne Tage erst, wenn zwei Gruppen nicht reichen.
   **[V1.3]**
@@ -959,6 +965,7 @@ früh am S24 Ultra testen (Spike, siehe Abschnitt 10).
 | 2026-11-02 | Schnittstelle für Claude vorgezogen (vor V1.3b): Reminder lesen und schreiben über adb, ausdrücklich in der App freizugeben; Entwurf in 7.26 AG11 |
 | 2026-11-02 | AG11 bestätigt und als V1.3a2 umgesetzt: ContentProvider mit `DUMP`, nur Debug-Build, Schalter mit Rückfrage; Claude darf Reminder-Inhalte über die freigegebene Schnittstelle lesen, sie bleiben aber aus Repo und Logs |
 | 2026-11-03 | Antworten auf Review-Lauf 1 (Fragen 1–6): Schnittstelle ändert keinen klingelnden oder überfälligen Reminder (AG11); nach „Handy aus“ klingelt der gerade laufende Termin (VS1); *Notaus* neutral nur bei Pause vor der Fälligkeit, Fristen hart (PS7); NT2-Karte ohne *Minimum*; Titel im Diagnose-Log in der Entwicklungsphase erlaubt, vor einem offiziellen Release entfernen. Umgesetzt in V1.3a3 |
+| 2026-11-03 | Checkliste mit mehreren Uhrzeiten (7.25 VS1, Review-Frage 7a und 7c): pro Termin ein Punkt, der Rest kommt beim nächsten Termin, die Liste behält ihren Stand über verpasste Termine; Minimum-Limit zählt Tage. Umgesetzt in V1.3a3 |
 
 ## 10. Nächste Schritte
 
@@ -975,7 +982,7 @@ früh am S24 Ultra testen (Spike, siehe Abschnitt 10).
 | V1.2c | 2026-11-02 | Fristen mit Fenstern (7.2), Vorlagen, Vorab-Reminder (T6), Blocker als Aufgaben (7.21 S5–S8) |
 | V1.3a | 2026-11-02 | Mehrmals täglich, Wochenend-Zeiten (7.25 VS1, VS2), Hinweis bei ständigem *Später* (7.27 NT2), Notausschalter (7.28 PS7) |
 | V1.3a2 | 2026-11-02 | Schnittstelle für Claude über adb (7.26 AG11) |
-| V1.3a3 | gebaut | Fixes aus Review-Lauf 1 und Antworten darauf (Kap. 9, 2026-11-03) |
+| V1.3a3 | gebaut | Fixes aus Review-Lauf 1 und Antworten darauf, Checkliste über mehrere Uhrzeiten (7.25 VS1) (Kap. 9, 2026-11-03) |
 
 Details zum Verhalten: [design.md](design.md), Gerätetests: [geraetetest.md](geraetetest.md).
 
