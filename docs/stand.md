@@ -1,6 +1,6 @@
 # Stand und nächste Schritte
 
-Stand: 2026-11-02. Bei jedem größeren Schritt aktualisieren.
+Stand: 2026-11-03. Bei jedem größeren Schritt aktualisieren.
 
 ## In Arbeit
 - **Review-Lauf 1** (2026-11-03, [.review/runs/2026-11-03.md](../.review/runs/2026-11-03.md)):
