@@ -5,6 +5,7 @@ import androidx.room.Room
 import androidx.test.core.app.ApplicationProvider
 import androidx.test.ext.junit.runners.AndroidJUnit4
 import com.avlreminder.core.model.Occurrence
+import com.avlreminder.core.model.OccurrenceState
 import com.avlreminder.core.model.Reminder
 import com.avlreminder.core.model.Schedule
 import com.avlreminder.core.model.Strictness
@@ -149,6 +150,28 @@ class ClaudeApiTest {
         assertEquals(0, call("reminders").getJSONArray("reminders").length())
         assertEquals(1, call("reminders", """{"archived": true}""").getJSONArray("reminders").length())
         assertFalse(call("delete", """{"id": $id}""").getBoolean("ok"))
+    }
+
+    @Test
+    fun aRingingReminderOnlyChangesInTheApp() = runTest {
+        val id = call("save", testReminder).getLong("id")
+        val open = repo.openOccurrence(id)!!
+        repo.saveOccurrence(open.copy(state = OccurrenceState.DUE))
+        for ((method, arg) in listOf(
+            "setActive" to """{"id": $id, "active": false}""",
+            "archive" to """{"id": $id}""",
+            "save" to """{"reminder": {"id": $id, "postponeLimit": null}}""",
+        )) {
+            val answer = call(method, arg)
+            assertEquals(method, "läuft gerade – nur in der App", answer.getString("error"))
+        }
+        assertTrue(repo.reminder(id)!!.active)
+        assertEquals(open.id, repo.openOccurrence(id)!!.id)
+        // Planned but already past (the alarm is late): the same.
+        repo.saveOccurrence(open.copy(currentAt = now))
+        assertFalse(call("setActive", """{"id": $id, "active": false}""").getBoolean("ok"))
+        // A blocker is fine.
+        assertTrue(call("addBlocker", """{"reminderId": $id, "text": "x"}""").getBoolean("ok"))
     }
 
     @Test

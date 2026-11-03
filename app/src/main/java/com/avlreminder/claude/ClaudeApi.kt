@@ -2,6 +2,7 @@ package com.avlreminder.claude
 
 import com.avlreminder.core.model.Character
 import com.avlreminder.core.model.Occurrence
+import com.avlreminder.core.model.OccurrenceState
 import com.avlreminder.core.model.Reminder
 import com.avlreminder.core.model.Schedule
 import com.avlreminder.core.rules.Stats
@@ -20,7 +21,7 @@ import java.time.ZoneId
 /**
  * The interface for Claude over adb (Anf. 7.26 AG11): read everything, create and edit
  * reminders through the same use cases as the screens. Nothing that completes, skips or
- * silences (AG5), no deleting. Answers `{"ok": true, …}` or `{"ok": false, "error": …}`.
+ * silences (AG5), no deleting; a reminder that rings or is overdue only changes in the app. Answers `{"ok": true, …}` or `{"ok": false, "error": …}`.
  */
 class ClaudeApi(private val access: Access) {
 
@@ -131,6 +132,7 @@ class ClaudeApi(private val access: Access) {
                 // Like the form: "festhalten" unless said otherwise; "Überwindung" needs the four answers in "prep".
                 Reminder(title = "", character = Character.DOCUMENT, schedule = Schedule.Daily(LocalTime.NOON), createdAt = access.now())
             } else {
+                notRunning(id)
                 all().firstOrNull { it.id == id } ?: throw Failure("Reminder $id nicht gefunden")
             }
             val reminder = json.reminder(data, base, isNew = id == 0L)
@@ -148,13 +150,13 @@ class ClaudeApi(private val access: Access) {
 
     private suspend fun setActive(id: Long, active: Boolean): JSONObject {
         known(id)
-        access.withEngine { it.setActive(id, active) }
+        access.withEngine { notRunning(id); it.setActive(id, active) }
         return ok().put("id", id).put("active", active)
     }
 
     private suspend fun archive(id: Long, archived: Boolean): JSONObject {
         known(id)
-        access.withEngine { it.setArchived(id, archived) }
+        access.withEngine { notRunning(id); it.setArchived(id, archived) }
         return ok().put("id", id).put("archived", archived)
     }
 
@@ -162,6 +164,15 @@ class ClaudeApi(private val access: Access) {
         known(reminderId)
         if (text.isBlank()) throw Failure("Blocker ohne Text")
         return ok().put("id", access.withEngine { it.addBlocker(reminderId, text) })
+    }
+
+    /**
+     * Pausing, archiving or editing would end a ringing alarm without a miss (AG5): new due
+     * times, a weaker proof, no postpone limit. That stays with Kevin in the app.
+     */
+    private suspend fun notRunning(id: Long) {
+        val open = access.openOccurrences().firstOrNull { it.reminderId == id } ?: return
+        if (open.state != OccurrenceState.PLANNED || open.currentAt <= access.now()) throw Failure("läuft gerade – nur in der App")
     }
 
     private suspend fun known(id: Long) {
