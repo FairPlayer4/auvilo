@@ -228,6 +228,33 @@ class EverydayEngineTest {
     }
 
     @Test
+    fun `a pause that held at the end of the day skips, also when that is found later`() = runTest {
+        val id = create(Schedule.Daily(LocalTime.of(18, 0)))
+        val o = open(id)
+        clock.now = at(26, 18)
+        engine.onAlarm(o.id)
+        settings = AlertSettings(alarmsPausedUntil = at(27, 6))
+        // Phone off over night: the end of the day is handled after the pause.
+        clock.now = at(27, 7)
+        engine.sync()
+        val closed = repo.occurrence(o.id)!!
+        assertEquals(Resolution.SKIPPED, closed.resolution)
+        assertEquals(SkipReasons.EMERGENCY, closed.note)
+    }
+
+    @Test
+    fun `a pause over before the end of the day does not skip`() = runTest {
+        val id = create(Schedule.Daily(LocalTime.of(18, 0)))
+        val o = open(id)
+        clock.now = at(26, 18)
+        engine.onAlarm(o.id)
+        settings = AlertSettings(alarmsPausedUntil = at(26, 19))
+        clock.now = at(26, 23)
+        engine.onAlarm(o.id)
+        assertEquals(Resolution.MISSED, repo.occurrence(o.id)!!.resolution)
+    }
+
+    @Test
     fun `several times a day do not go with a weekly goal`() = runTest {
         val result = engine.save(reminder(threeTimes, created = at(26, 7)).copy(weeklyGoal = WeeklyGoal(3)))
         assertInstanceOf(SaveResult.Invalid::class.java, result)
