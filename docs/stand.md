@@ -1,6 +1,6 @@
 # Stand und nächste Schritte
 
-Stand: 2026-11-03. Bei jedem größeren Schritt aktualisieren.
+Stand: 2026-11-04. Bei jedem größeren Schritt aktualisieren.
 
 ## In Arbeit
 - **V1.3a3** (`versionName` 1.3a3-prototyp, `versionCode` 9) in `develop`, gebaut,
@@ -28,6 +28,11 @@ Stand: 2026-11-03. Bei jedem größeren Schritt aktualisieren.
   Tastatur-Vorschlägen (`GrowingField`, `TextKeyboard` in `ui/Inputs.kt`). 333 Tests grün.
   Offen: Training-Alarm am Morgen und „Checkliste nicht richtig gespeichert“ – Kevin
   erklärt das Szenario, dann Logs (`diag.log`) und Daten über die Schnittstelle lesen.
+  Dazu bessere Tests (design.md 14): Szenario-Tests in `core` (`scenarios/`, 14 Tage
+  nachgespielt, zwei davon halten die offenen Punkte fest) und `ReceiverGlueTest` in `:app`
+  (8 Tests: Alarm, Knöpfe, Ankunft, Neustart). Das Diagnose-Log nennt bei einer Ankunft
+  jetzt Titel und Fälligkeit der klingelnden Reminder. 355 Tests grün, Kover 98,45 %.
+  Nächster Schritt: Kevins DB pseudonymisiert als Testdaten (heute Abend).
 - Danach: Kevins Wochenplan (Gerätetests V1.3a, Reminder *Gerätetest*), dann V1.3b.
 
 ## Auf dem Gerät

@@ -1,0 +1,143 @@
+package com.avlreminder.core.scenarios
+
+import com.avlreminder.core.FakeAlarms
+import com.avlreminder.core.FakeGeofences
+import com.avlreminder.core.FakeLocation
+import com.avlreminder.core.FakePreNotices
+import com.avlreminder.core.FakeRepository
+import com.avlreminder.core.MutableClock
+import com.avlreminder.core.ZONE
+import com.avlreminder.core.model.Occurrence
+import com.avlreminder.core.model.OccurrenceState
+import com.avlreminder.core.model.Place
+import com.avlreminder.core.model.Reminder
+import com.avlreminder.core.model.Schedule
+import com.avlreminder.core.rules.Action
+import com.avlreminder.core.rules.AlarmLevel
+import com.avlreminder.core.rules.AlertSettings
+import com.avlreminder.core.rules.TransitionResult
+import com.avlreminder.core.usecases.ReminderEngine
+import com.avlreminder.core.usecases.SaveResult
+import java.time.Instant
+import java.time.LocalDateTime
+import java.time.LocalTime
+import java.time.format.DateTimeFormatter
+
+/**
+ * Plays whole days through the engine as the phone would: the clock moves on, every alarm fires
+ * at its time, the position changes and the user acts at given times. After each step it checks
+ * the rules that must always hold ([checkInvariants]).
+ *
+ * What rang is in [rings] as "Mo 18:00 Training FULLSCREEN" lines, easy to compare in a test.
+ */
+class Simulation(start: Instant, var settings: AlertSettings = AlertSettings()) {
+    val clock = MutableClock(start)
+    val repo = FakeRepository()
+    val alarms = FakeAlarms()
+    val geofences = FakeGeofences()
+    val location = FakeLocation()
+    val preNotices = FakePreNotices()
+    val rings = mutableListOf<String>()
+    val engine = ReminderEngine(
+        repo, alarms, clock, settings = { settings }, geofences = geofences, location = location,
+        preNotices = preNotices, ringer = { rings += line(clock.now, it.reminder.title, it.level) },
+    )
+
+    suspend fun create(reminder: Reminder): Long = when (val r = engine.save(reminder)) {
+        is SaveResult.Saved -> r.id
+        is SaveResult.Invalid -> error("invalid: ${r.problems}")
+    }.also { checkInvariants() }
+
+    suspend fun place(place: Place): Long = engine.savePlace(place)
+
+    fun open(reminderId: Long): Occurrence = repo.occurrences.values.single { it.reminderId == reminderId && it.isOpen }
+
+    /** Lets time pass until [until]: every alarm planned up to then fires at its time, in order. */
+    suspend fun runUntil(until: Instant) {
+        require(until >= clock.now) { "time only moves forward" }
+        repeat(MAX_ALARMS) {
+            val (id, next) = alarms.set.entries.minByOrNull { it.value.first }?.let { it.key to it.value.first } ?: return finish(until)
+            if (next > until) return finish(until)
+            clock.now = maxOf(clock.now, next)
+            engine.onAlarm(id)
+            checkInvariants()
+            check(alarms.set[id]?.first != next) { "alarm of occurrence $id fired at $next and is set again to the same time" }
+        }
+        error("more than $MAX_ALARMS alarms before $until")
+    }
+
+    private fun finish(until: Instant) {
+        clock.now = until
+    }
+
+    /** The geofence reports the arrival at [placeId] at [at]; from then on the phone is there. */
+    suspend fun arrive(placeId: Long, at: Instant) {
+        runUntil(at)
+        location.here = true
+        engine.onArrival(placeId)
+        checkInvariants()
+    }
+
+    /** Leaves the place at [at]: no event, the engine only learns it when it asks for the position. */
+    suspend fun leave(at: Instant) {
+        runUntil(at)
+        location.here = false
+    }
+
+    /** The user acts on the open occurrence of [reminderId] at [at]; the action must be accepted. */
+    suspend fun act(reminderId: Long, at: Instant, action: (Occurrence) -> Action): Occurrence {
+        runUntil(at)
+        val o = open(reminderId)
+        val result = engine.act(o.id, action(o))
+        check(result is TransitionResult.Ok) { "rejected at $at: $result" }
+        checkInvariants()
+        return result.occurrence
+    }
+
+    /** The phone was off: no alarm fires until [until], then the app starts and syncs. */
+    suspend fun phoneOff(until: Instant) {
+        clock.now = until
+        engine.sync()
+        checkInvariants()
+    }
+
+    /**
+     * Rules that hold after every step, whatever the scenario:
+     * - each active reminder has exactly one open occurrence, a paused one none with an alarm;
+     * - an open occurrence has an alarm, except one that only waits for an arrival;
+     * - closed occurrences have no alarm and no notice before;
+     * - nothing rings loud before [AlertSettings.loudFrom].
+     */
+    fun checkInvariants() {
+        val byReminder = repo.occurrences.values.filter { it.isOpen }.groupBy { it.reminderId }
+        for (r in repo.reminders.values) {
+            val open = byReminder[r.id].orEmpty()
+            check(open.size <= 1) { "${r.title}: ${open.size} open occurrences" }
+            if (!r.active) {
+                open.forEach { check(it.id !in alarms.set) { "${r.title} is paused but has an alarm" } }
+                continue
+            }
+            check(open.size == 1 || r.schedule is Schedule.Once) { "${r.title}: no open occurrence" }
+            val o = open.singleOrNull() ?: continue
+            val waits = r.schedule == Schedule.OnArrival && o.state == OccurrenceState.PLANNED
+            check(waits || o.id in alarms.set) { "${r.title}: open occurrence ${o.id} (${o.state}) has no alarm" }
+        }
+        for (o in repo.occurrences.values.filter { !it.isOpen }) {
+            check(o.id !in alarms.set) { "closed occurrence ${o.id} still has an alarm" }
+            check(o.id !in preNotices.set) { "closed occurrence ${o.id} still has a notice before" }
+        }
+        rings.lastOrNull()?.let { last ->
+            val loud = last.endsWith(AlarmLevel.FULLSCREEN_LOUD.name)
+            val time = LocalTime.parse(last.substring(3, 8))
+            check(!loud || settings.weekend != null || time >= settings.loudFrom) { "loud before ${settings.loudFrom}: $last" }
+        }
+    }
+
+    companion object {
+        private const val MAX_ALARMS = 2_000
+        private val FORMAT = DateTimeFormatter.ofPattern("EE HH:mm", java.util.Locale.GERMAN)
+
+        fun line(at: Instant, title: String, level: AlarmLevel) =
+            "${LocalDateTime.ofInstant(at, ZONE).format(FORMAT).replace(".", "")} $title $level"
+    }
+}

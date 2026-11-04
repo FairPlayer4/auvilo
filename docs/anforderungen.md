@@ -980,6 +980,7 @@ früh am S24 Ultra testen (Spike, siehe Abschnitt 10).
 | 2026-11-03 | Notaus von Hand ausgeschaltet (Review-Frage 7b): eine offene Fälligkeit klingelt sofort wie beim automatischen Pausenende, nicht erst zur nächsten Runde (7.28 PS7). Umgesetzt in V1.3a3 |
 | 2026-11-03 | Einstellungen kommen mit ins Backup B2b, ohne *Notaus* und Schnittstellen-Schalter (Review-Lauf 2, Frage 2; 7.28 PS8a). Vorbereitet in V1.3b0 |
 | 2026-11-04 | Kevins Rückmeldungen nach V1.3b0: Checklisten-Punkte jederzeit abhaken (C8), lesbare Punkte im Alarm, Übersicht nennt jede Uhrzeit (O1), Textfelder wachsen mit und bieten Vorschläge der Tastatur. Umgesetzt in V1.3b0.1. Training-Alarm am Morgen und Checklisten-Speichern: Diagnose mit Kevins Szenario und Logs |
+| 2026-11-04 | Tests: Szenario-Tests ganzer Tage in `core` und Verbindungs-Tests der Receiver mit Robolectric, zunächst ohne Emulator. Kevins Datenbank darf als Testdaten ins Repo, aber nur mit pseudonymisierten Texten (Titel, Ziele, Notizen, Nachweise, Orte); umgesetzt mit Kevin am Abend |
 | 2026-11-03 | Umbau-Etappe V1.3b0 vor V1.3b (Review-Lauf 2): Engine als Fassade, Befehle in einer Transaktion, zentrales Klingeln, Alarm-Ansicht in `core`; ein gespeicherter Ankunft-Reminder klingelt sofort, wenn man schon da ist, auch über die Schnittstelle. Sonst kein neues Verhalten |
 
 ## 10. Nächste Schritte

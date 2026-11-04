@@ -399,10 +399,24 @@ umgesetzt / verworfen. Liste in den Einstellungen, *Teilen* als Markdown.
 
 | Bereich | Test-Art | Ziel |
 |---|---|---|
-| `:core` | JUnit, Fake-Clock, Fake-Repository | Kover ≥ 90 % (aktuell 99,4 %) |
+| `:core` | JUnit, Fake-Clock, Fake-Repository | Kover ≥ 90 % (aktuell 98,5 %) |
+| `:core` Szenarien | `scenarios/Simulation`: ganze Tage mit Uhr, Alarmen, Ort und Handlungen; prüft nach jedem Schritt die Invarianten | je gemeldetem Fehler ein Tag |
 | `:app` data | Robolectric + Room, `MigrationTest` gegen die Schemas | jede Migration, Backup |
+| `:app` Verbindung | `ReceiverGlueTest`: Broadcast (Alarm, Knopf, Ankunft, Neustart) → Engine mit echter Room-DB → Benachrichtigung, Dienst, Alarm | jeder Receiver |
 | `:app` ui | Compose-UI-Tests mit Robolectric für Kernabläufe; Previews hell und dunkel | keine Zahl |
 | Gerät | [geraetetest.md](geraetetest.md), Diagnose-Log | vor jeder Freigabe |
+
+- **Szenario-Tests** (seit 2026-11-04): `Simulation` stellt die Uhr vor und löst jeden Alarm
+  zu seiner Zeit aus, `arrive`/`leave` spielen Ort und Geofence nach, `act` die Handlungen,
+  `phoneOff` ein ausgeschaltetes Handy. Nach jedem Schritt gilt: je aktivem Reminder genau
+  ein offener Termin, jeder offene Termin hat einen Alarm (außer er wartet nur auf eine
+  Ankunft), geschlossene haben keinen, laut erst ab `loudFrom`. Ein Fehler aus der echten
+  Nutzung wird zuerst als Tag in `DayScenarioTest` nachgestellt. Tests mit „(open point)“
+  im Namen halten das heutige Verhalten fest, über das noch entschieden wird.
+- **Emulator** nur gezielt (der Rechner ist langsam): exakte Alarme im Doze-Modus, Vollbild
+  auf dem Sperrbildschirm, echte Geofences, Neustart. Noch nicht eingerichtet.
+- **Echte Daten** (geplant): Kevins DB pseudonymisiert als Testdaten im Repo, für
+  Migrationen und eine simulierte Woche mit den Invarianten (Anf. Kap. 9, 2026-11-04).
 
 - Tests entstehen mit dem Code; Regeln haben sprechende Testnamen.
 - Ein Befehl für alles, lokal wie in CI:
