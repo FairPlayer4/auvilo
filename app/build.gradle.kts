@@ -74,6 +74,7 @@ dependencies {
     // Compose tests drive Espresso; older versions call InputManager.getInstance(), which SDK 37 no longer has.
     testImplementation("androidx.test.espresso:espresso-core:3.7.0")
     testImplementation("androidx.room:room-testing:2.8.5")
+    testImplementation(testFixtures(project(":core")))
     testImplementation("org.jetbrains.kotlinx:kotlinx-coroutines-test:1.11.0")
     testImplementation(platform("androidx.compose:compose-bom:2026.09.00"))
     testImplementation("androidx.compose.ui:ui-test-junit4")

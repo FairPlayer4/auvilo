@@ -4,6 +4,8 @@ import org.jetbrains.kotlin.gradle.dsl.JvmTarget
 plugins {
     id("org.jetbrains.kotlin.jvm")
     id("org.jetbrains.kotlinx.kover")
+    // Fakes and the day simulation, shared with the app's tests (real data, RealDataTest).
+    `java-test-fixtures`
 }
 
 java {

@@ -16,6 +16,7 @@ import com.avlreminder.core.rules.Action
 import com.avlreminder.core.rules.AlarmLevel
 import com.avlreminder.core.rules.AlertSettings
 import com.avlreminder.core.rules.TransitionResult
+import com.avlreminder.core.ports.ReminderRepository
 import com.avlreminder.core.usecases.ReminderEngine
 import com.avlreminder.core.usecases.SaveResult
 import java.time.Instant
@@ -29,10 +30,10 @@ import java.time.format.DateTimeFormatter
  * the rules that must always hold ([checkInvariants]).
  *
  * What rang is in [rings] as "Mo 18:00 Training FULLSCREEN" lines, easy to compare in a test.
+ * [repo] is the fake one for scenarios, or the app's Room repository for Kevin's real data.
  */
-class Simulation(start: Instant, var settings: AlertSettings = AlertSettings()) {
+class Simulation<R : ReminderRepository>(start: Instant, val repo: R, var settings: AlertSettings = AlertSettings()) {
     val clock = MutableClock(start)
-    val repo = FakeRepository()
     val alarms = FakeAlarms()
     val geofences = FakeGeofences()
     val location = FakeLocation()
@@ -50,7 +51,7 @@ class Simulation(start: Instant, var settings: AlertSettings = AlertSettings()) 
 
     suspend fun place(place: Place): Long = engine.savePlace(place)
 
-    fun open(reminderId: Long): Occurrence = repo.occurrences.values.single { it.reminderId == reminderId && it.isOpen }
+    suspend fun open(reminderId: Long): Occurrence = checkNotNull(repo.openOccurrence(reminderId)) { "no open occurrence of $reminderId" }
 
     /** Lets time pass until [until]: every alarm planned up to then fires at its time, in order. */
     suspend fun runUntil(until: Instant) {
@@ -108,24 +109,22 @@ class Simulation(start: Instant, var settings: AlertSettings = AlertSettings()) 
      * - closed occurrences have no alarm and no notice before;
      * - nothing rings loud before [AlertSettings.loudFrom].
      */
-    fun checkInvariants() {
-        val byReminder = repo.occurrences.values.filter { it.isOpen }.groupBy { it.reminderId }
-        for (r in repo.reminders.values) {
-            val open = byReminder[r.id].orEmpty()
-            check(open.size <= 1) { "${r.title}: ${open.size} open occurrences" }
+    suspend fun checkInvariants() {
+        val open = repo.openOccurrences().groupBy { it.reminderId }
+        for (r in repo.reminders()) {
+            val mine = open[r.id].orEmpty()
+            check(mine.size <= 1) { "${r.title}: ${mine.size} open occurrences" }
             if (!r.active) {
-                open.forEach { check(it.id !in alarms.set) { "${r.title} is paused but has an alarm" } }
+                mine.forEach { check(it.id !in alarms.set) { "${r.title} is paused but has an alarm" } }
                 continue
             }
-            check(open.size == 1 || r.schedule is Schedule.Once) { "${r.title}: no open occurrence" }
-            val o = open.singleOrNull() ?: continue
+            check(mine.size == 1 || r.schedule is Schedule.Once || r.schedule is Schedule.Deadline) { "${r.title}: no open occurrence" }
+            val o = mine.singleOrNull() ?: continue
             val waits = r.schedule == Schedule.OnArrival && o.state == OccurrenceState.PLANNED
             check(waits || o.id in alarms.set) { "${r.title}: open occurrence ${o.id} (${o.state}) has no alarm" }
         }
-        for (o in repo.occurrences.values.filter { !it.isOpen }) {
-            check(o.id !in alarms.set) { "closed occurrence ${o.id} still has an alarm" }
-            check(o.id !in preNotices.set) { "closed occurrence ${o.id} still has a notice before" }
-        }
+        for (id in alarms.set.keys) check(repo.occurrence(id)?.isOpen == true) { "occurrence $id is closed or gone but has an alarm" }
+        for (id in preNotices.set.keys) check(repo.occurrence(id)?.isOpen == true) { "occurrence $id is closed or gone but has a notice before" }
         rings.lastOrNull()?.let { last ->
             val loud = last.endsWith(AlarmLevel.FULLSCREEN_LOUD.name)
             val time = LocalTime.parse(last.substring(3, 8))
@@ -134,10 +133,14 @@ class Simulation(start: Instant, var settings: AlertSettings = AlertSettings()) 
     }
 
     companion object {
-        private const val MAX_ALARMS = 2_000
+        private const val MAX_ALARMS = 50_000
         private val FORMAT = DateTimeFormatter.ofPattern("EE HH:mm", java.util.Locale.GERMAN)
 
         fun line(at: Instant, title: String, level: AlarmLevel) =
             "${LocalDateTime.ofInstant(at, ZONE).format(FORMAT).replace(".", "")} $title $level"
     }
 }
+
+/** A simulation on the fake repository, for scenarios told in a test. */
+fun Simulation(start: Instant, settings: AlertSettings = AlertSettings()): Simulation<FakeRepository> =
+    Simulation(start, FakeRepository(), settings)

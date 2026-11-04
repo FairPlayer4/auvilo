@@ -402,6 +402,7 @@ umgesetzt / verworfen. Liste in den Einstellungen, *Teilen* als Markdown.
 | `:core` | JUnit, Fake-Clock, Fake-Repository | Kover ≥ 90 % (aktuell 98,5 %) |
 | `:core` Szenarien | `scenarios/Simulation`: ganze Tage mit Uhr, Alarmen, Ort und Handlungen; prüft nach jedem Schritt die Invarianten | je gemeldetem Fehler ein Tag |
 | `:app` data | Robolectric + Room, `MigrationTest` gegen die Schemas | jede Migration, Backup |
+| `:app` echte Daten | `RealDataTest` mit `testdata/real-*.json`: Migration, Alarm-Ansicht, eine Woche mit allen Remindern | bei jeder neuen Version neu ziehen |
 | `:app` Verbindung | `ReceiverGlueTest`: Broadcast (Alarm, Knopf, Ankunft, Neustart) → Engine mit echter Room-DB → Benachrichtigung, Dienst, Alarm | jeder Receiver |
 | `:app` ui | Compose-UI-Tests mit Robolectric für Kernabläufe; Previews hell und dunkel | keine Zahl |
 | Gerät | [geraetetest.md](geraetetest.md), Diagnose-Log | vor jeder Freigabe |
@@ -415,8 +416,13 @@ umgesetzt / verworfen. Liste in den Einstellungen, *Teilen* als Markdown.
   im Namen halten das heutige Verhalten fest, über das noch entschieden wird.
 - **Emulator** nur gezielt (der Rechner ist langsam): exakte Alarme im Doze-Modus, Vollbild
   auf dem Sperrbildschirm, echte Geofences, Neustart. Noch nicht eingerichtet.
-- **Echte Daten** (geplant): Kevins DB pseudonymisiert als Testdaten im Repo, für
-  Migrationen und eine simulierte Woche mit den Invarianten (Anf. Kap. 9, 2026-11-04).
+- **Echte Daten** (seit 2026-11-04): Kevins Daten pseudonymisiert als JSON in
+  `testdata/` ([README](../testdata/README.md)), erzeugt mit
+  `tools/testdata/export_testdata.py` über adb, ohne Import/Export in der App.
+  `RealDataTest` lädt sie in das Schema ihrer Version, migriert, baut die Alarm-Ansicht
+  jedes offenen Termins und spielt eine Woche sowie zwei Tage mit ausgeschaltetem Handy
+  durch. `Fakes` und `Simulation` liegen dafür in den Testhilfen von `core`
+  (`src/testFixtures`, `java-test-fixtures`), die `:app` in den Tests mitbenutzt.
 
 - Tests entstehen mit dem Code; Regeln haben sprechende Testnamen.
 - Ein Befehl für alles, lokal wie in CI:
