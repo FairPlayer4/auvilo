@@ -15,6 +15,7 @@ import androidx.compose.ui.test.performScrollToNode
 import androidx.compose.ui.test.performTextReplacement
 import androidx.test.ext.junit.runners.AndroidJUnit4
 import com.avlreminder.alarm.OverviewNotifications
+import com.avlreminder.core.model.ChecklistItem
 import com.avlreminder.core.model.Occurrence
 import com.avlreminder.core.model.OccurrenceState
 import com.avlreminder.core.model.PrepAnswer
@@ -39,6 +40,7 @@ import org.junit.Assert.assertNull
 import org.junit.Rule
 import org.junit.Test
 import org.junit.runner.RunWith
+import java.time.Duration
 import java.time.Instant
 import java.time.LocalDate
 import java.time.LocalTime
@@ -56,6 +58,7 @@ class WeeklyGoalUiTest {
     private class FakeActions : AppActions {
         val saved = mutableListOf<Reminder>()
         var chosen: OverviewTimes? = null
+        val early = mutableListOf<Long>()
         override fun save(reminder: Reminder, prep: List<PrepAnswer>, onResult: (SaveResult) -> Unit) {
             saved += reminder
             onResult(SaveResult.Saved(reminder.id))
@@ -65,7 +68,9 @@ class WeeklyGoalUiTest {
         override fun setTheme(mode: ThemeMode) {}
         override fun setAlert(settings: AlertSettings) {}
         override fun openAlarm(occurrenceId: Long) {}
-        override fun completeEarly(occurrenceId: Long) {}
+        override fun completeEarly(occurrenceId: Long) {
+            early += occurrenceId
+        }
         override fun play(path: String) {}
         override fun setReminderSort(sort: ReminderSort) {}
         override fun setArchived(reminderId: Long, archived: Boolean) {}
@@ -133,6 +138,35 @@ class WeeklyGoalUiTest {
         compose.onNodeWithTag("week").assertTextContains("2 von 3", substring = true)
         compose.onNodeWithTag("streak").assertExists()
         compose.onNodeWithText("Gesamt").assertExists()
+    }
+
+    /** Checklist items can be checked any time, not only while it rings. */
+    @Test
+    fun checklistItemsAreCheckedFromTheEditScreen() {
+        val actions = FakeActions()
+        val list = training.copy(checklist = listOf(ChecklistItem(1, "Aufwärmen"), ChecklistItem(2, "Kraft")))
+        val open = Occurrence(id = 7, reminderId = list.id, dueAt = now.plus(Duration.ofDays(1)))
+        compose.setContent { AvlTheme(dark = false) { AvlAppUi(state(list).copy(openByReminder = mapOf(list.id to open)), actions, now, zone, startRoute = Routes.edit(1)) } }
+
+        compose.onNodeWithTag("checkItems").performScrollTo().performClick()
+        assertEquals(listOf(7L), actions.early)
+    }
+
+    /** The title grows with its text; a pasted line break becomes a space. */
+    @Test
+    fun aLineBreakInTheTitleBecomesASpace() {
+        val actions = FakeActions()
+        compose.setContent { AvlTheme(dark = false) { AvlAppUi(state(), actions, now, zone, startRoute = Routes.edit(1)) } }
+        compose.onNodeWithTag("title").performTextReplacement("Training\n  abends")
+        compose.onNodeWithText("Speichern").performClick()
+        assertEquals("Training abends", actions.saved.single().title)
+    }
+
+    @Test
+    fun withoutAChecklistThereIsNothingToCheck() {
+        compose.setContent { AvlTheme(dark = false) { AvlAppUi(state(), FakeActions(), now, zone, startRoute = Routes.edit(1)) } }
+        compose.onNodeWithTag("stats").assertExists()
+        compose.onNodeWithTag("checkItems").assertDoesNotExist()
     }
 
     @Test

@@ -41,6 +41,7 @@ import com.avlreminder.data.SuggestionStatus
 import com.avlreminder.ui.AvlIcons
 import com.avlreminder.ui.EntryCard
 import com.avlreminder.ui.SectionTitle
+import com.avlreminder.ui.TextKeyboard
 import com.avlreminder.ui.theme.Avl
 import java.time.ZoneId
 
@@ -75,7 +76,7 @@ fun SuggestionDialog(onSave: (text: String, important: Boolean) -> Unit, onDismi
             Column {
                 OutlinedTextField(
                     text, { text = it }, Modifier.fillMaxWidth().focusRequester(focus).testTag("suggestionText"),
-                    placeholder = { Text("Was ist dir aufgefallen?") }, minLines = 3,
+                    placeholder = { Text("Was ist dir aufgefallen?") }, minLines = 3, keyboardOptions = TextKeyboard,
                 )
                 Row(verticalAlignment = Alignment.CenterVertically) {
                     Checkbox(important, { important = it }, Modifier.testTag("important"))
@@ -188,7 +189,7 @@ private fun SuggestionEditDialog(
         title = { Text("Vorschlag") },
         text = {
             Column {
-                OutlinedTextField(text, { text = it }, Modifier.fillMaxWidth().testTag("suggestionEdit"), minLines = 3)
+                OutlinedTextField(text, { text = it }, Modifier.fillMaxWidth().testTag("suggestionEdit"), minLines = 3, keyboardOptions = TextKeyboard)
                 Row(verticalAlignment = Alignment.CenterVertically) {
                     Checkbox(important, { important = it })
                     Text("wichtig", color = Avl.colors.text)

@@ -118,6 +118,7 @@ class AlarmActivity : ComponentActivity() {
             onPostpone = { act(id, Action.Postpone(it)) },
             onSkip = { act(id, Action.Skip(it)) },
             onCheckItem = { itemId, evidence -> act(id, Action.CheckItem(itemId, evidence), stay = true) },
+            onLeave = ::finish,
             onDeferRest = { act(id, Action.DeferRest(it)) },
             onBlockerSolved = { act(id, Action.Complete(minimumOnly = false, blockerSolved = true)) },
             onTomorrow = { act(id, Action.CloseWindow(it)) },

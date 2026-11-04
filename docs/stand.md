@@ -22,6 +22,12 @@ Stand: 2026-11-03. Bei jedem größeren Schritt aktualisieren.
   wiederherstellen (`Settings.backup`/`restore`, ohne *Notaus* und Schnittstelle).
   Noch offen aus dem Review (optional): Paket `alarm` aufteilen, Wochenstand einmal
   definieren, *Heute* an einer Stelle laden.
+- **V1.3b0.1** (`versionCode` 11) auf `feature/v1.3b0`, gebaut, **noch nicht installiert**:
+  Kevins Rückmeldungen vom 2026-11-04 – Checklisten-Punkte jederzeit abhaken (C8), lesbare
+  Punkte im Alarm, Übersicht nennt jede Uhrzeit, mitwachsende Textfelder mit
+  Tastatur-Vorschlägen (`GrowingField`, `TextKeyboard` in `ui/Inputs.kt`). 333 Tests grün.
+  Offen: Training-Alarm am Morgen und „Checkliste nicht richtig gespeichert“ – Kevin
+  erklärt das Szenario, dann Logs (`diag.log`) und Daten über die Schnittstelle lesen.
 - Danach: Kevins Wochenplan (Gerätetests V1.3a, Reminder *Gerätetest*), dann V1.3b.
 
 ## Auf dem Gerät

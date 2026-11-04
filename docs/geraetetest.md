@@ -73,6 +73,15 @@
 | N14 | K4 (einmalig in 3 min) und ein Alarm mit Checkliste: Punkt in der Benachrichtigung abhaken | Alarm wie bisher; nach dem Abhaken bietet die Benachrichtigung still den nächsten Punkt an |
 | N15 | Zuhause: Reminder *wenn ich zuhause bin* speichern | klingelt sofort nach dem Speichern |
 
+## Neu in V1.3b0.1
+
+| # | Test | Erwartung |
+|---|---|---|
+| N16 | Reminder mit Checkliste bearbeiten → *Punkte abhaken ›*, einen Punkt abhaken, *Fertig für jetzt* | Punkt bleibt abgehakt; Termin und Uhrzeit unverändert; zur Zeit klingelt er nur mit dem Rest |
+| N17 | Alarm mit langem Checklisten-Punkt | Punkt als schlichte Zeile, umbricht lesbar |
+| N18 | Morgen-Übersicht mit einem Reminder mit mehreren Uhrzeiten | jede Uhrzeit steht einzeln drin |
+| N19 | Titel, Ziel, Minimum, Checklisten-Punkt lang tippen | Feld wächst mit; Tastatur zeigt Vorschläge; Enter beendet statt Zeilenumbruch |
+
 ### Wochenplan V1.3a (03.–08.11.2026)
 Reminder *Gerätetest*: täglich 12:30 und 19:15, *normal*, Minimum „Test nur
 vorbereiten“ (legt Claude nach N9 über die Schnittstelle an). Pro Alarm ein Test, freie Termine zum Nachholen.
