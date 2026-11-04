@@ -22,7 +22,7 @@ Stand: 2026-11-04. Bei jedem größeren Schritt aktualisieren.
   wiederherstellen (`Settings.backup`/`restore`, ohne *Notaus* und Schnittstelle).
   Noch offen aus dem Review (optional): Paket `alarm` aufteilen, Wochenstand einmal
   definieren, *Heute* an einer Stelle laden.
-- **V1.3b0.1** (`versionCode` 11) auf `feature/v1.3b0`, gebaut, **noch nicht installiert**:
+- **V1.3b0.1** (`versionCode` 11) auf `feature/v1.3b0`, **installiert am 2026-11-04 21:38**:
   Kevins Rückmeldungen vom 2026-11-04 – Checklisten-Punkte jederzeit abhaken (C8), lesbare
   Punkte im Alarm, Übersicht nennt jede Uhrzeit, mitwachsende Textfelder mit
   Tastatur-Vorschlägen (`GrowingField`, `TextKeyboard` in `ui/Inputs.kt`). 333 Tests grün.
@@ -37,8 +37,10 @@ Stand: 2026-11-04. Bei jedem größeren Schritt aktualisieren.
   07:12 eine Ankunft, und ohne früheste Uhrzeit klingelte das Training sofort. Kevin
   verschob es auf 20:30. Um 20:30 lieferte die grobe Ortsabfrage auf dem Heimweg
   vermutlich „unklar“, also klingelte es; die Ankunft kam erst um 20:34. Daraus die
-  Anforderungen 7.29 (Ankunftszeitraum, WLAN, GPS im Zeitraum, Puffer). Offen: Kevins
-  Antworten auf F1–F3, dann Design und Umsetzung vor V1.3b.
+  Anforderungen 7.29 (Ankunftszeitraum, WLAN, GPS im Zeitraum, Puffer); F1–F3 wie
+  vorgeschlagen entschieden. Kevin liest zuerst alle Anforderungen im Ganzen; bis dahin
+  nur Anforderungsarbeit und Tests. Bis zur Umsetzung kann eine Ankunft am Morgen das
+  Training weiter sofort auslösen.
 - Danach: Kevins Wochenplan (Gerätetests V1.3a, Reminder *Gerätetest*), dann V1.3b.
 
 ## Auf dem Gerät
