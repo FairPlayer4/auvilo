@@ -32,7 +32,9 @@ Stand: 2026-11-04. Bei jedem größeren Schritt aktualisieren.
   nachgespielt, zwei davon halten die offenen Punkte fest) und `ReceiverGlueTest` in `:app`
   (8 Tests: Alarm, Knöpfe, Ankunft, Neustart). Das Diagnose-Log nennt bei einer Ankunft
   jetzt Titel und Fälligkeit der klingelnden Reminder. 355 Tests grün, Kover 98,45 %.
-  Nächster Schritt: Kevins DB pseudonymisiert als Testdaten (heute Abend).
+  Echte Testdaten seit 2026-11-04 abends: `testdata/real-2026-11-04.json` (19 Reminder,
+  87 Termine, pseudonymisiert) und `RealDataTest` (Migration, Alarm-Ansicht, eine Woche,
+  Handy zwei Tage aus). 359 Tests grün, Kover 98,33 %.
 - **Training-Fälle geklärt (2026-11-04, aus `diag.log`):** Morgens meldete der Geofence um
   07:12 eine Ankunft, und ohne früheste Uhrzeit klingelte das Training sofort. Kevin
   verschob es auf 20:30. Um 20:30 lieferte die grobe Ortsabfrage auf dem Heimweg

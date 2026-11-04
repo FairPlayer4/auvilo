@@ -46,6 +46,9 @@ Strenge und invasive Mechanismen sind gewollt. Kommunikation auf **Deutsch, mit 
 - Inhalte von Kevins Remindern und Nachweisen sind privat: nicht ins Repo, nicht in
   Logs schreiben, nicht an externe Dienste geben. Lesen über die Schnittstelle ist erlaubt.
   Ausnahme in der Entwicklungsphase: Titel dürfen ins Diagnose-Log (design.md 13).
+  Ausnahme Testdaten: `testdata/real-*.json` aus `tools/testdata/export_testdata.py`
+  (alle Texte ersetzt, keine Medien, Orte verschoben, Leck-Prüfung im Skript) dürfen ins
+  Repo; nur dieses Skript benutzen und das Ergebnis vor dem Commit stichprobenartig ansehen.
 - **Schnittstelle für Claude** (Debug-Build, design.md 15): erst nutzbar, wenn Kevin sie
   in den Einstellungen einschaltet. Lesen ohne Rückfrage; Reminder anlegen, ändern,
   pausieren, archivieren nur nach Absprache mit Kevin.
