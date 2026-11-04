@@ -853,9 +853,8 @@ wurde erst um 20:34 gemeldet. Ziel: **Man wird zuverlässig ausgelöst, wenn man
   - Ankunft vor dem Zeitraum (z. B. morgens) zählt nicht als Ankunft. Das
     Diagnose-Log vermerkt sie als „zu früh“.
   - Ist man beim Beginn des Zeitraums schon da (Homeoffice), klingelt er zur
-    spätesten Uhrzeit wie bisher (5.1). *Vorschlag, siehe F2.*
-  - Zur spätesten Uhrzeit klar nicht da → entfällt für heute, neutral (5.1).
-    *Vorschlag, siehe F1.*
+    spätesten Uhrzeit wie bisher (5.1, F2).
+  - Zur spätesten Uhrzeit klar nicht da → entfällt für heute, neutral (5.1, F1).
 - OZ2 **Genaue Ortsprüfung nur im Zeitraum:** Innerhalb des Zeitraums prüft die App
   den Ort aktiv alle **15–30 min** (pro Reminder einstellbar, Standard 20 min), dazu
   beim Beginn und zur spätesten Uhrzeit. Geprüft wird zuerst das WLAN (OZ3), danach
@@ -880,7 +879,7 @@ wurde erst um 20:34 gemeldet. Ziel: **Man wird zuverlässig ausgelöst, wenn man
 - OZ5 **Verschoben oder geschlummert behält die Ortsbedingung:** Zur neuen Zeit gilt
   dieselbe Prüfung wie zur spätesten Uhrzeit. Ist man noch nicht da, klingelt der
   Termin bei Ankunft, spätestens bis zum Tagesende; danach zählt er wie ein nicht
-  erledigter Termin. *Vorschlag: Wer verschiebt, hat sich für heute entschieden.*
+  erledigter Termin. Wer verschiebt, hat sich für heute entschieden.
 - OZ6 **Weitere Orte:** Orte sind allgemein (Zuhause, Arbeit, Fitnessstudio, später
   Geschäfte, 7.23 E2), jeder mit Mittelpunkt, Radius und WLANs. Ein Reminder wählt
   seinen Ort. Für den Anfang reicht die Oberfläche für Zuhause plus ein weiterer Ort.
@@ -893,12 +892,13 @@ wurde erst um 20:34 gemeldet. Ziel: **Man wird zuverlässig ausgelöst, wenn man
   „Puffer bis 18:47“), ohne Koordinaten und ohne WLAN-Namen. Später zeigt die App das
   verständlich an (7.28 PS6: warum es klingelte oder nicht).
 
-**Offene Fragen an Kevin (mit Vorschlag):**
-- F1 Zur spätesten Uhrzeit nicht da: **entfällt** wie bisher (Vorschlag), oder auf die
-  Ankunft warten bis zu einer Nachfrist (z. B. 21:00)?
-- F2 Schon zu Beginn des Zeitraums da: klingeln zur **spätesten Uhrzeit** (Vorschlag,
-  wie 5.1), oder schon beim Beginn des Zeitraums?
-- F3 Standardwerte: Puffer 5 min, Prüfabstand 20 min, Vorlauf 90 min – passt das?
+**Entschieden (2026-11-04, Kevin übernimmt die Vorschläge):**
+- F1 Zur spätesten Uhrzeit nicht da: **entfällt** wie bisher, keine Nachfrist.
+- F2 Schon zu Beginn des Zeitraums da: klingelt zur **spätesten Uhrzeit** (wie 5.1).
+- F3 Standardwerte: Puffer 5 min, Prüfabstand 20 min, Vorlauf 90 min.
+
+Kevin liest vor dem Design alle Anforderungen noch einmal im Ganzen; bis dahin nur
+Anforderungsarbeit und Tests, keine Umsetzung.
 
 ## 8. Zielplattform und Technik
 
@@ -1048,7 +1048,7 @@ früh am S24 Ultra testen (Spike, siehe Abschnitt 10).
 | 2026-11-03 | Einstellungen kommen mit ins Backup B2b, ohne *Notaus* und Schnittstellen-Schalter (Review-Lauf 2, Frage 2; 7.28 PS8a). Vorbereitet in V1.3b0 |
 | 2026-11-04 | Kevins Rückmeldungen nach V1.3b0: Checklisten-Punkte jederzeit abhaken (C8), lesbare Punkte im Alarm, Übersicht nennt jede Uhrzeit (O1), Textfelder wachsen mit und bieten Vorschläge der Tastatur. Umgesetzt in V1.3b0.1. Training-Alarm am Morgen und Checklisten-Speichern: Diagnose mit Kevins Szenario und Logs |
 | 2026-11-04 | Tests: Szenario-Tests ganzer Tage in `core` und Verbindungs-Tests der Receiver mit Robolectric, zunächst ohne Emulator. Kevins Datenbank darf als Testdaten ins Repo, aber nur mit pseudonymisierten Texten (Titel, Ziele, Notizen, Nachweise, Orte); umgesetzt mit Kevin am Abend |
-| 2026-11-04 | Ankunft im Zeitraum (7.29) nach der Diagnose der Training-Fälle (morgens Geofence-Ankunft ohne früheste Zeit, abends grobe Ortsabfrage „unklar“): Ankunftszeitraum mit spätester Uhrzeit und Vorlauf, genaue Ortsprüfung (GPS) nur im Zeitraum alle 15–30 min, WLAN als stärkstes und zusätzliches Ortssignal, Puffer nach der Ankunft, weitere Orte. Offen: F1–F3 |
+| 2026-11-04 | Ankunft im Zeitraum (7.29) nach der Diagnose der Training-Fälle (morgens Geofence-Ankunft ohne früheste Zeit, abends grobe Ortsabfrage „unklar“): Ankunftszeitraum mit spätester Uhrzeit und Vorlauf, genaue Ortsprüfung (GPS) nur im Zeitraum alle 15–30 min, WLAN als stärkstes und zusätzliches Ortssignal, Puffer nach der Ankunft, weitere Orte. F1–F3 wie vorgeschlagen entschieden (entfällt ohne Nachfrist, schon da → späteste Uhrzeit, 5/20/90 min); Umsetzung erst nach Kevins Gesamtdurchsicht der Anforderungen |
 | 2026-11-03 | Umbau-Etappe V1.3b0 vor V1.3b (Review-Lauf 2): Engine als Fassade, Befehle in einer Transaktion, zentrales Klingeln, Alarm-Ansicht in `core`; ein gespeicherter Ankunft-Reminder klingelt sofort, wenn man schon da ist, auch über die Schnittstelle. Sonst kein neues Verhalten |
 
 ## 10. Nächste Schritte
@@ -1068,7 +1068,7 @@ früh am S24 Ultra testen (Spike, siehe Abschnitt 10).
 | V1.3a2 | 2026-11-02 | Schnittstelle für Claude über adb (7.26 AG11) |
 | V1.3a3 | gebaut | Fixes aus Review-Lauf 1 und Antworten darauf, Checkliste über mehrere Uhrzeiten (7.25 VS1) (Kap. 9, 2026-11-03) |
 | V1.3b0 | installiert | Umbau ohne neues Verhalten (design.md 1), Empfehlungen E1–E4 aus Review-Lauf 2 (Kap. 9, 2026-11-03) |
-| V1.3b0.1 | gebaut | Kevins Rückmeldungen: Checkliste jederzeit, Übersicht mit allen Uhrzeiten, Textfelder (Kap. 9, 2026-11-04) |
+| V1.3b0.1 | 2026-11-04 | Kevins Rückmeldungen: Checkliste jederzeit, Übersicht mit allen Uhrzeiten, Textfelder (Kap. 9, 2026-11-04) |
 
 Details zum Verhalten: [design.md](design.md), Gerätetests: [geraetetest.md](geraetetest.md).
 
@@ -1092,7 +1092,8 @@ Details zum Verhalten: [design.md](design.md), Gerätetests: [geraetetest.md](ge
      - **V1.2c:** Fristen mit Ausführungsfenstern, **Vorab-Reminder** (T6), **Blocker
        als Aufgaben** (7.21, S5–S8), Vorlagen
    - **Als Nächstes (2026-11-04): Ankunft im Zeitraum** mit WLAN und genauer
-     Ortsprüfung (7.29), nach Kevins Antworten auf F1–F3; vor V1.3b.
+     Ortsprüfung (7.29); F1–F3 entschieden, Umsetzung nach Kevins Gesamtdurchsicht
+     der Anforderungen; vor V1.3b.
    - **Jetzt (seit 2026-11-02): Nutzung beobachten und trimmen** (7.27): welche
      Funktionen Kevin wirklich nutzt, Rückfragen bei Schlupflöchern, Hinweis bei
      wiederholtem *Später*. Fehler aus dem Alltag als Fix auf `develop`.
