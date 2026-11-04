@@ -33,6 +33,12 @@ Stand: 2026-11-04. Bei jedem größeren Schritt aktualisieren.
   (8 Tests: Alarm, Knöpfe, Ankunft, Neustart). Das Diagnose-Log nennt bei einer Ankunft
   jetzt Titel und Fälligkeit der klingelnden Reminder. 355 Tests grün, Kover 98,45 %.
   Nächster Schritt: Kevins DB pseudonymisiert als Testdaten (heute Abend).
+- **Training-Fälle geklärt (2026-11-04, aus `diag.log`):** Morgens meldete der Geofence um
+  07:12 eine Ankunft, und ohne früheste Uhrzeit klingelte das Training sofort. Kevin
+  verschob es auf 20:30. Um 20:30 lieferte die grobe Ortsabfrage auf dem Heimweg
+  vermutlich „unklar“, also klingelte es; die Ankunft kam erst um 20:34. Daraus die
+  Anforderungen 7.29 (Ankunftszeitraum, WLAN, GPS im Zeitraum, Puffer). Offen: Kevins
+  Antworten auf F1–F3, dann Design und Umsetzung vor V1.3b.
 - Danach: Kevins Wochenplan (Gerätetests V1.3a, Reminder *Gerätetest*), dann V1.3b.
 
 ## Auf dem Gerät

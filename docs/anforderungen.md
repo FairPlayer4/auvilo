@@ -95,6 +95,8 @@ Zielen** (V2), **Abstimmung mehrerer Personen** (V3).
 
 Die Regel "um 19 Uhr nicht zuhause → entfällt" macht eine Erkennung von
 Homeoffice-Tagen überflüssig: Es zählt nur, ob man zum Zeitpunkt am Ort ist.
+Seit 2026-11-04 zählt eine Ankunft nur im Zeitraum vor der Uhrzeit (z. B. 90 min),
+erkannt über WLAN und genaue Ortsprüfung (7.29).
 
 ## 6. Reminder-Modell (Entwurf)
 
@@ -133,7 +135,8 @@ Die Einordnung ist vorläufig.
   - Nach einem Neustart den Standort aktiv prüfen, statt auf die automatische
     Meldung zu warten.
 - T2b Kombination Ort + Uhrzeit: "bei Ankunft, sonst um 19 Uhr falls schon dort,
-  sonst entfällt" **[V1]**
+  sonst entfällt" **[V1]**. Wird zum Ankunftszeitraum mit Vorlauf, WLAN und genauer
+  Ortsprüfung (7.29, 2026-11-04).
 - T3 Kontext: WLAN, Bluetooth-Gerät (Auto, Kopfhörer), Ladegerät [später]
 - T4 Kalender: vor/nach Terminen [später]
 - T5 Aktivität: z. B. Gerät entsperrt, bestimmte App geöffnet [später]
@@ -835,6 +838,68 @@ Vordergrund, nicht Reichweite.
   `run-as`). Kein SQLCipher, solange kein konkreter Fall übrig bleibt.
 - Backend-Stand und was es für die App bedeutet: [backend.md](backend.md).
 
+### 7.29 Ankunft im Zeitraum, WLAN und genaue Ortsprüfung (2026-11-04)
+**Anlass:** Am 2026-11-04 klingelte *Training* (19:30, Ankunft zuhause, sonst entfällt)
+um 07:12, weil der Geofence morgens eine Ankunft meldete. Eine früheste Uhrzeit gibt es
+bisher nicht (T2b). Abends klingelte der auf 20:30 verschobene Termin auf dem Heimweg:
+Die grobe Ortsabfrage ergab vermutlich „unklar“, und dann klingelt die App. Die Ankunft
+wurde erst um 20:34 gemeldet. Ziel: **Man wird zuverlässig ausgelöst, wenn man ankommt**
+(mit Puffer), und nicht, solange man noch nicht da ist.
+
+- OZ1 **Ankunftszeitraum pro Reminder:** Statt nur einer Uhrzeit gibt es einen Zeitraum
+  mit einer **spätesten Uhrzeit** und einem **Vorlauf**. Beispiel Training: spätestens
+  19:30, Vorlauf 90 min, also Zeitraum 18:00–19:30.
+  - Ankunft im Zeitraum → der Reminder klingelt bei Ankunft (plus Puffer, OZ4).
+  - Ankunft vor dem Zeitraum (z. B. morgens) zählt nicht als Ankunft. Das
+    Diagnose-Log vermerkt sie als „zu früh“.
+  - Ist man beim Beginn des Zeitraums schon da (Homeoffice), klingelt er zur
+    spätesten Uhrzeit wie bisher (5.1). *Vorschlag, siehe F2.*
+  - Zur spätesten Uhrzeit klar nicht da → entfällt für heute, neutral (5.1).
+    *Vorschlag, siehe F1.*
+- OZ2 **Genaue Ortsprüfung nur im Zeitraum:** Innerhalb des Zeitraums prüft die App
+  den Ort aktiv alle **15–30 min** (pro Reminder einstellbar, Standard 20 min), dazu
+  beim Beginn und zur spätesten Uhrzeit. Geprüft wird zuerst das WLAN (OZ3), danach
+  der genaue Standort (GPS, hohe Genauigkeit). Außerhalb der Zeiträume kein GPS:
+  dort reichen Geofence und WLAN-Wechsel, die kaum Strom kosten.
+  - Mehrere Reminder am selben Ort teilen sich eine Prüfung.
+  - Ergebnis *da* → Auslösen (mit Puffer). *Klar weg* → nächste Prüfung. *Unklar*
+    (kein WLAN, kein brauchbarer Fix) → nächste Prüfung; zur spätesten Uhrzeit immer
+    noch unklar → klingelt, damit nichts verloren geht (wie bisher).
+- OZ3 **WLAN als Ortssignal:** Jeder Ort kann ein oder mehrere WLANs haben (beim
+  Festlegen des Orts übernehmen: „mit diesem WLAN verbunden“).
+  - Verbunden mit einem WLAN des Orts → **da**. Das ist das stärkste Signal und gilt
+    vor GPS.
+  - Nicht verbunden heißt nicht *weg* (WLAN aus, Router gestört): dann entscheidet GPS.
+  - Verbindet sich das Handy im Zeitraum mit dem WLAN eines Orts, zählt das sofort
+    als Ankunft, ohne auf die nächste Prüfung zu warten.
+  - Der Geofence bleibt zusätzlich bestehen (Ankunft ohne WLAN, unterwegs).
+- OZ4 **Puffer nach der Ankunft:** Zwischen erkannter Ankunft und Alarm liegt ein
+  Puffer, damit man erst reinkommt (Standard 5 min, pro Reminder 0–30 min). Bei einer
+  Ankunft kurz vor der spätesten Uhrzeit verschiebt der Puffer den Alarm auch über sie
+  hinaus.
+- OZ5 **Verschoben oder geschlummert behält die Ortsbedingung:** Zur neuen Zeit gilt
+  dieselbe Prüfung wie zur spätesten Uhrzeit. Ist man noch nicht da, klingelt der
+  Termin bei Ankunft, spätestens bis zum Tagesende; danach zählt er wie ein nicht
+  erledigter Termin. *Vorschlag: Wer verschiebt, hat sich für heute entschieden.*
+- OZ6 **Weitere Orte:** Orte sind allgemein (Zuhause, Arbeit, Fitnessstudio, später
+  Geschäfte, 7.23 E2), jeder mit Mittelpunkt, Radius und WLANs. Ein Reminder wählt
+  seinen Ort. Für den Anfang reicht die Oberfläche für Zuhause plus ein weiterer Ort.
+- OZ7 **Strom:** GPS nur im Zeitraum, höchstens eine Prüfung pro Ort und Intervall,
+  jede mit Zeitlimit. Das WLAN zu prüfen kostet nichts. Erwartung: wenige GPS-Fixes am
+  Tag pro Reminder, im Akkuverbrauch nicht spürbar. Die Diagnose zählt die Fixes pro
+  Tag, damit man es nachprüfen kann.
+- OZ8 **Nachvollziehbar:** Das Diagnose-Log schreibt jede Prüfung mit Quelle (WLAN,
+  GPS, Geofence), Ergebnis (da, weg, unklar), Genauigkeit und Grund („zu früh“,
+  „Puffer bis 18:47“), ohne Koordinaten und ohne WLAN-Namen. Später zeigt die App das
+  verständlich an (7.28 PS6: warum es klingelte oder nicht).
+
+**Offene Fragen an Kevin (mit Vorschlag):**
+- F1 Zur spätesten Uhrzeit nicht da: **entfällt** wie bisher (Vorschlag), oder auf die
+  Ankunft warten bis zu einer Nachfrist (z. B. 21:00)?
+- F2 Schon zu Beginn des Zeitraums da: klingeln zur **spätesten Uhrzeit** (Vorschlag,
+  wie 5.1), oder schon beim Beginn des Zeitraums?
+- F3 Standardwerte: Puffer 5 min, Prüfabstand 20 min, Vorlauf 90 min – passt das?
+
 ## 8. Zielplattform und Technik
 
 ### 8.1 Zielgerät
@@ -856,6 +921,8 @@ vom Nutzer in den Systemeinstellungen erteilt werden.
 | T2 Geofence | ✅ (mit Latenz) | Play Services Geofencing (Dwell-Übergang für Verweildauer) | Hintergrund-Standort nötig; Auslösung oft 1–5 min verzögert – laut Nutzer akzeptabel; Spike: grob, Vorbeifahren kann auslösen |
 | T2b "um 19 Uhr am Ort?" | ✅ | Alarm + aktueller Geofence-Status / Standortabfrage | |
 | T3 WLAN/BT/Laden | ✅ teilweise | Broadcasts, `ConnectivityManager` Callbacks | Im Hintergrund nur mit Foreground-Service zuverlässig |
+| 7.29 WLAN als Ort | ✅ | `NetworkCallback` mit Standort-Info (WLAN-Name braucht genauen Standort, Standortdienst an); bei jeder Prüfung den aktuellen WLAN-Zustand lesen | Wechsel im Hintergrund nicht garantiert sofort, deshalb zusätzlich die Prüfungen im Zeitraum |
+| 7.29 GPS im Zeitraum | ✅ | exakte Alarme alle 15–30 min, `getCurrentLocation` mit hoher Genauigkeit und Zeitlimit; Hintergrund-Standort ist erteilt | Fix drinnen oft langsam; Empfänger hat ~10 s, sonst kurzer Vordergrund-Dienst (Typ Standort) |
 | T4 Kalender | ✅ | `CalendarContract` | Leseberechtigung |
 | T5 App geöffnet | ⚠️ | `UsageStatsManager` / Accessibility-Service | Funktioniert, aber akkuintensiv bzw. heikle Berechtigung |
 | W1/W2 Vollbild, DND-Bypass | ✅ | Full-Screen-Intent, Alarm-Audiostream | Full-Screen-Intent manuell erlauben |
@@ -981,6 +1048,7 @@ früh am S24 Ultra testen (Spike, siehe Abschnitt 10).
 | 2026-11-03 | Einstellungen kommen mit ins Backup B2b, ohne *Notaus* und Schnittstellen-Schalter (Review-Lauf 2, Frage 2; 7.28 PS8a). Vorbereitet in V1.3b0 |
 | 2026-11-04 | Kevins Rückmeldungen nach V1.3b0: Checklisten-Punkte jederzeit abhaken (C8), lesbare Punkte im Alarm, Übersicht nennt jede Uhrzeit (O1), Textfelder wachsen mit und bieten Vorschläge der Tastatur. Umgesetzt in V1.3b0.1. Training-Alarm am Morgen und Checklisten-Speichern: Diagnose mit Kevins Szenario und Logs |
 | 2026-11-04 | Tests: Szenario-Tests ganzer Tage in `core` und Verbindungs-Tests der Receiver mit Robolectric, zunächst ohne Emulator. Kevins Datenbank darf als Testdaten ins Repo, aber nur mit pseudonymisierten Texten (Titel, Ziele, Notizen, Nachweise, Orte); umgesetzt mit Kevin am Abend |
+| 2026-11-04 | Ankunft im Zeitraum (7.29) nach der Diagnose der Training-Fälle (morgens Geofence-Ankunft ohne früheste Zeit, abends grobe Ortsabfrage „unklar“): Ankunftszeitraum mit spätester Uhrzeit und Vorlauf, genaue Ortsprüfung (GPS) nur im Zeitraum alle 15–30 min, WLAN als stärkstes und zusätzliches Ortssignal, Puffer nach der Ankunft, weitere Orte. Offen: F1–F3 |
 | 2026-11-03 | Umbau-Etappe V1.3b0 vor V1.3b (Review-Lauf 2): Engine als Fassade, Befehle in einer Transaktion, zentrales Klingeln, Alarm-Ansicht in `core`; ein gespeicherter Ankunft-Reminder klingelt sofort, wenn man schon da ist, auch über die Schnittstelle. Sonst kein neues Verhalten |
 
 ## 10. Nächste Schritte
@@ -1023,6 +1091,8 @@ Details zum Verhalten: [design.md](design.md), Gerätetests: [geraetetest.md](ge
      - **V1.2b:** Wochenziele, Serien/Joker, Statistik, Übersicht morgens/abends
      - **V1.2c:** Fristen mit Ausführungsfenstern, **Vorab-Reminder** (T6), **Blocker
        als Aufgaben** (7.21, S5–S8), Vorlagen
+   - **Als Nächstes (2026-11-04): Ankunft im Zeitraum** mit WLAN und genauer
+     Ortsprüfung (7.29), nach Kevins Antworten auf F1–F3; vor V1.3b.
    - **Jetzt (seit 2026-11-02): Nutzung beobachten und trimmen** (7.27): welche
      Funktionen Kevin wirklich nutzt, Rückfragen bei Schlupflöchern, Hinweis bei
      wiederholtem *Später*. Fehler aus dem Alltag als Fix auf `develop`.
