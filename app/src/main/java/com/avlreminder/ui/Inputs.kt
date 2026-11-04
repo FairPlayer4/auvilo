@@ -25,12 +25,32 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.input.ImeAction
+import androidx.compose.ui.text.input.KeyboardCapitalization
 import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.avlreminder.ui.theme.Avl
 import java.time.LocalTime
+
+/** Text the user writes: sentences, with the keyboard's suggestions and correction. */
+val TextKeyboard = KeyboardOptions(capitalization = KeyboardCapitalization.Sentences, autoCorrectEnabled = true, keyboardType = KeyboardType.Text)
+
+/**
+ * One line of text that grows with its content instead of scrolling sideways: long titles and
+ * checklist items stay readable. Enter finishes; line breaks (also pasted ones) become spaces.
+ */
+@Composable
+fun GrowingField(value: String, onChange: (String) -> Unit, modifier: Modifier = Modifier, placeholder: String? = null) {
+    OutlinedTextField(
+        value, { onChange(it.replace(LINE_BREAK, " ")) }, modifier,
+        placeholder = placeholder?.let { { Text(it) } },
+        keyboardOptions = TextKeyboard.copy(imeAction = ImeAction.Done),
+    )
+}
+
+private val LINE_BREAK = Regex("""\s*\R\s*""")
 
 /** Switch with a visible off state: with the theme's line color alone it looked disabled. */
 @Composable

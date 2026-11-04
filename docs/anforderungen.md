@@ -287,6 +287,7 @@ Erster Satz, wird mit der Nutzung angepasst: **[V1]**
 ### 7.8 Überblick
 - O1 **Übersicht morgens** (was steht heute an) und **abends** (Rückblick auf heute,
   Stand der Wochenziele, Vorschau auf morgen). Zeiten und Umfang einstellbar. **[V1]**
+  Bei mehreren Uhrzeiten (7.25 VS1) steht jede Uhrzeit einzeln drin (2026-11-04).
 - O2 Rückblick ist Teil der Übersicht (Tag; Woche/Monat in der Statistik) **[V1]**
 
 ### 7.9 Bedienung
@@ -402,6 +403,10 @@ schafft oder schaffen will. **[V1.1]**
   wenn am selben Tag mindestens ein Punkt erledigt wurde; sonst schon.
 - C6 Nachweis wahlweise **pro Punkt** (Foto je Brunnen) oder einmal für alles.
 - C7 Verlauf zeigt pro Punkt, wann er erledigt wurde.
+- C8 **Punkte jederzeit abhaken** (2026-11-04): im Formular *Punkte abhaken ›* öffnet den
+  offenen Termin wie *Vorab erledigen*; *Fertig für jetzt – Termin bleibt* geht ohne
+  Abschluss zurück, der nächste Zeitpunkt ändert sich nicht. Im Alarm sind die Punkte
+  schlichte Zeilen (kleiner Radius, mehrzeilig), damit lange Punkte lesbar bleiben.
 
 ### 7.14 Galaxy Watch
 Guter Hebel für neue Anforderungen; zuerst so viel wie möglich über
@@ -974,6 +979,7 @@ früh am S24 Ultra testen (Spike, siehe Abschnitt 10).
 | 2026-11-03 | Checkliste mit mehreren Uhrzeiten (7.25 VS1, Review-Frage 7a und 7c): pro Termin ein Punkt, der Rest kommt beim nächsten Termin, die Liste behält ihren Stand über verpasste Termine; Minimum-Limit zählt Tage. Umgesetzt in V1.3a3 |
 | 2026-11-03 | Notaus von Hand ausgeschaltet (Review-Frage 7b): eine offene Fälligkeit klingelt sofort wie beim automatischen Pausenende, nicht erst zur nächsten Runde (7.28 PS7). Umgesetzt in V1.3a3 |
 | 2026-11-03 | Einstellungen kommen mit ins Backup B2b, ohne *Notaus* und Schnittstellen-Schalter (Review-Lauf 2, Frage 2; 7.28 PS8a). Vorbereitet in V1.3b0 |
+| 2026-11-04 | Kevins Rückmeldungen nach V1.3b0: Checklisten-Punkte jederzeit abhaken (C8), lesbare Punkte im Alarm, Übersicht nennt jede Uhrzeit (O1), Textfelder wachsen mit und bieten Vorschläge der Tastatur. Umgesetzt in V1.3b0.1. Training-Alarm am Morgen und Checklisten-Speichern: Diagnose mit Kevins Szenario und Logs |
 | 2026-11-03 | Umbau-Etappe V1.3b0 vor V1.3b (Review-Lauf 2): Engine als Fassade, Befehle in einer Transaktion, zentrales Klingeln, Alarm-Ansicht in `core`; ein gespeicherter Ankunft-Reminder klingelt sofort, wenn man schon da ist, auch über die Schnittstelle. Sonst kein neues Verhalten |
 
 ## 10. Nächste Schritte
@@ -992,7 +998,8 @@ früh am S24 Ultra testen (Spike, siehe Abschnitt 10).
 | V1.3a | 2026-11-02 | Mehrmals täglich, Wochenend-Zeiten (7.25 VS1, VS2), Hinweis bei ständigem *Später* (7.27 NT2), Notausschalter (7.28 PS7) |
 | V1.3a2 | 2026-11-02 | Schnittstelle für Claude über adb (7.26 AG11) |
 | V1.3a3 | gebaut | Fixes aus Review-Lauf 1 und Antworten darauf, Checkliste über mehrere Uhrzeiten (7.25 VS1) (Kap. 9, 2026-11-03) |
-| V1.3b0 | gebaut | Umbau ohne neues Verhalten (design.md 1), Empfehlungen E1–E4 aus Review-Lauf 2 (Kap. 9, 2026-11-03) |
+| V1.3b0 | installiert | Umbau ohne neues Verhalten (design.md 1), Empfehlungen E1–E4 aus Review-Lauf 2 (Kap. 9, 2026-11-03) |
+| V1.3b0.1 | gebaut | Kevins Rückmeldungen: Checkliste jederzeit, Übersicht mit allen Uhrzeiten, Textfelder (Kap. 9, 2026-11-04) |
 
 Details zum Verhalten: [design.md](design.md), Gerätetests: [geraetetest.md](geraetetest.md).
 

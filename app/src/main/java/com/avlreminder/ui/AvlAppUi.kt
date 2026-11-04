@@ -344,6 +344,8 @@ fun AvlAppUi(
                     onArchive = existing?.let { r -> { archived -> actions.setArchived(r.id, archived); go(Routes.REMINDERS) } },
                     archived = existing?.archivedAt != null,
                     onStats = existing?.let { r -> { go(Routes.stats(r.id)) } },
+                    onCheckItems = existing?.takeIf { it.checklist.isNotEmpty() && it.active }
+                        ?.let { state.openByReminder[it.id] }?.let { o -> { actions.completeEarly(o.id) } },
                     onSaveTemplate = { name, form -> actions.saveTemplate(form.toTemplate(name, now)) },
                     blockers = blockers,
                     blockerActions = existing?.let { r ->

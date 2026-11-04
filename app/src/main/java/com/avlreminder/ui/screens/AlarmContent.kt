@@ -1,6 +1,8 @@
 package com.avlreminder.ui.screens
 
 import androidx.compose.foundation.background
+import androidx.compose.foundation.border
+import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -48,6 +50,7 @@ import com.avlreminder.core.rules.Evidence
 import com.avlreminder.core.rules.Prep
 import com.avlreminder.core.rules.ProofCheck
 import com.avlreminder.ui.Format
+import com.avlreminder.ui.TextKeyboard
 import com.avlreminder.ui.theme.Avl
 import java.time.Instant
 import java.time.LocalTime
@@ -89,6 +92,8 @@ fun AlarmContent(
     onAnswerAsk: (text: String?, plan: Boolean) -> Unit = { _, _ -> },
     /** "Auf morgen" for a deadline. */
     onTomorrow: (Instant) -> Unit = {},
+    /** Leaves "Vorab erledigen" with the items checked so far; the reminder stays as planned. */
+    onLeave: () -> Unit = {},
 ) {
     val c = Avl.colors
     var view by remember { mutableStateOf(View.MAIN) }
@@ -187,6 +192,11 @@ fun AlarmContent(
                             Text("Blocker gelöst – zählt als Minimum")
                         }
                     }
+                    if (ui.early && checklist) {
+                        OutlinedButton(onClick = onLeave, Modifier.fillMaxWidth().padding(top = 8.dp).testTag("leave")) {
+                            Text("Fertig für jetzt – Termin bleibt")
+                        }
+                    }
                     if (!ui.early) {
                         if (checklist && !oneItem) {
                             val time = ui.occurrence.dueAt.atZone(zone).toLocalTime()
@@ -254,11 +264,20 @@ private fun Checklist(items: List<ChecklistItem>, done: Set<Long>, onCheck: (Che
     Column(Modifier.fillMaxWidth().padding(vertical = 4.dp).clip(RoundedCornerShape(12.dp)).background(c.surface).padding(14.dp)) {
         Text("Checkliste · ${items.count { it.id in done }} von ${items.size}", color = c.muted, fontSize = 13.sp)
         items.forEach { item ->
+            // Plain rows with a small radius: long items stay readable over several lines.
             if (item.id in done) {
-                Text("✓ ${item.title}", Modifier.padding(vertical = 10.dp), color = c.muted, fontSize = 17.sp)
+                Row(Modifier.fillMaxWidth().padding(horizontal = 12.dp, vertical = 10.dp).testTag("done${item.id}")) {
+                    Text("✓", Modifier.padding(end = 10.dp), color = c.muted, fontSize = 17.sp)
+                    Text(item.title, color = c.muted, fontSize = 17.sp)
+                }
             } else {
-                OutlinedButton(onClick = { onCheck(item) }, Modifier.fillMaxWidth().padding(vertical = 2.dp).testTag("item${item.id}")) {
-                    Text("○  ${item.title}", Modifier.weight(1f), color = c.text, fontSize = 17.sp)
+                Row(
+                    Modifier.fillMaxWidth().padding(vertical = 3.dp).clip(RoundedCornerShape(8.dp))
+                        .border(1.dp, c.line, RoundedCornerShape(8.dp)).clickable { onCheck(item) }
+                        .padding(horizontal = 12.dp, vertical = 12.dp).testTag("item${item.id}"),
+                ) {
+                    Text("○", Modifier.padding(end = 10.dp), color = c.accent, fontSize = 17.sp)
+                    Text(item.title, color = c.text, fontSize = 17.sp)
                 }
             }
         }
@@ -345,7 +364,7 @@ private fun ProofStep(
     spec.textMinChars?.let { min ->
         Text("Was hast du getan?", color = c.text, fontWeight = FontWeight.SemiBold, modifier = Modifier.padding(top = 16.dp))
         OutlinedTextField(
-            text, { text = it }, Modifier.fillMaxWidth().padding(top = 6.dp).testTag("proofText"), minLines = 3,
+            text, { text = it }, Modifier.fillMaxWidth().padding(top = 6.dp).testTag("proofText"), minLines = 3, keyboardOptions = TextKeyboard,
             supportingText = { Text("${ProofCheck.chars(text)} / $min Zeichen · Diktieren über die Tastatur geht auch") },
         )
     }
@@ -360,7 +379,7 @@ private fun ProofStep(
         devices.recorder { path, seconds -> audio = path to seconds }
     }
     if (spec.textMinChars == null) {
-        OutlinedTextField(note, { note = it }, Modifier.fillMaxWidth().padding(top = 12.dp), label = { Text("Notiz (optional)") })
+        OutlinedTextField(note, { note = it }, Modifier.fillMaxWidth().padding(top = 12.dp), label = { Text("Notiz (optional)") }, keyboardOptions = TextKeyboard)
     }
 
     problems.forEach { Text(it, Modifier.padding(top = 8.dp), color = c.muted, fontSize = 14.sp) }
@@ -447,7 +466,7 @@ private fun SkipStep(onSkip: (String) -> Unit, onBack: () -> Unit) {
     val c = Avl.colors
     var reason by remember { mutableStateOf("") }
     StepHeader("Auslassen", "Zählt neutral, nicht als verpasst.")
-    OutlinedTextField(reason, { reason = it }, Modifier.fillMaxWidth(), label = { Text("Grund") })
+    OutlinedTextField(reason, { reason = it }, Modifier.fillMaxWidth(), label = { Text("Grund") }, keyboardOptions = TextKeyboard)
     Button(onClick = { onSkip(reason.trim()) }, enabled = reason.isNotBlank(), modifier = Modifier.fillMaxWidth().padding(top = 12.dp)) {
         Text("Auslassen")
     }
@@ -465,7 +484,7 @@ private fun AskDialog(onAnswer: (text: String?, plan: Boolean) -> Unit) {
         text = {
             Column {
                 Text("Das hängt jetzt mehrmals. Was fehlt oder stört?", color = c.muted, fontSize = 14.sp)
-                OutlinedTextField(text, { text = it }, Modifier.fillMaxWidth().padding(top = 8.dp).testTag("askText"), minLines = 2)
+                OutlinedTextField(text, { text = it }, Modifier.fillMaxWidth().padding(top = 8.dp).testTag("askText"), minLines = 2, keyboardOptions = TextKeyboard)
                 TextButton(onClick = { onAnswer(text, true) }, enabled = text.isNotBlank(), modifier = Modifier.testTag("askPlan")) {
                     Text("Speichern und als Aufgabe planen")
                 }

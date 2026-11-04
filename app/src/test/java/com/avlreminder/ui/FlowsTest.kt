@@ -40,6 +40,7 @@ import com.avlreminder.ui.screens.HistoryScreen
 import com.avlreminder.ui.theme.AvlTheme
 import androidx.compose.ui.test.assertIsEnabled
 import org.junit.Assert.assertEquals
+import org.junit.Assert.assertFalse
 import org.junit.Assert.assertTrue
 import org.junit.Rule
 import org.junit.Test
@@ -199,12 +200,40 @@ class FlowsTest {
             }
         }
         compose.onNodeWithText("Checkliste · 1 von 3").assertExists()
-        compose.onNodeWithText("✓ Brunnen 1").assertExists()
+        compose.onNodeWithTag("done1").assertExists()
+        compose.onNodeWithTag("item1").assertDoesNotExist()
         compose.onNodeWithText("Alles erledigt").assertExists()
+        // Not in "Vorab erledigen": leaving without completing is for early checking only.
+        compose.onNodeWithTag("leave").assertDoesNotExist()
         compose.onNodeWithTag("item2").performScrollTo().performClick()
         assertEquals(listOf(2L to Evidence()), checked)
         compose.onNodeWithText("Rest auf morgen 18:00").performScrollTo().performClick()
         assertEquals(Instant.parse("2026-10-25T17:00:00Z"), deferred)
+    }
+
+    /** Items can be checked any time; "Fertig für jetzt" leaves and the reminder keeps its time. */
+    @Test
+    fun earlyACheckedItemCanBeLeftWithoutCompleting() {
+        val checked = mutableListOf<Long>()
+        var left = false
+        var completed = false
+        val list = strict.copy(proof = ProofSpec.CONFIRM, checklist = listOf(ChecklistItem(1, "Brunnen 1"), ChecklistItem(2, "Brunnen 2")))
+        compose.setContent {
+            AvlTheme(dark = true) {
+                AlarmContent(
+                    ui = alarmUi(reminder = list).copy(early = true), now = now, zone = zone,
+                    onComplete = { _, _, _ -> completed = true }, onSnooze = {}, onPostpone = {}, onSkip = {}, onStartProof = {}, onAbortProof = {},
+                    devices = devices,
+                    onCheckItem = { id, _ -> checked += id },
+                    onLeave = { left = true },
+                )
+            }
+        }
+        compose.onNodeWithTag("item1").performScrollTo().performClick()
+        compose.onNodeWithTag("leave").performScrollTo().performClick()
+        assertEquals(listOf(1L), checked)
+        assertTrue(left)
+        assertFalse(completed)
     }
 
     @Test

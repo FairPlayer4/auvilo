@@ -5,11 +5,13 @@ import com.avlreminder.core.at
 import com.avlreminder.core.model.Occurrence
 import com.avlreminder.core.model.OccurrenceState
 import com.avlreminder.core.model.Resolution
+import com.avlreminder.core.model.Schedule
 import com.avlreminder.core.model.WeeklyGoal
 import com.avlreminder.core.reminder
 import com.avlreminder.core.rules.WeekStatus
 import org.junit.jupiter.api.Assertions.assertEquals
 import org.junit.jupiter.api.Test
+import java.time.LocalTime
 
 class DigestTest {
     private val brunnen = reminder().copy(id = 1)
@@ -58,5 +60,30 @@ class DigestTest {
         )
         assertEquals("0 von 2", Digests.week(WeekStatus(WeeklyGoal(2, 2, 1), 0, 0, 5)))
         assertEquals("0 von 2, knapp", Digests.week(WeekStatus(WeeklyGoal(2, 2, 1), 0, 0, 2)))
+    }
+
+    /** Several times a day there is one open occurrence; the overview still lists every time (VS1). */
+    @Test
+    fun `several times a day the overview lists each time`() {
+        val pills = reminder().copy(id = 4, title = "Tabletten", schedule = Schedule.Daily(listOf(LocalTime.of(8, 0), LocalTime.of(13, 0), LocalTime.of(20, 0))))
+        val morning = Today(
+            dueNow = listOf(entry(pills, Occurrence(id = 1, reminderId = 4, dueAt = at(27, 8), state = OccurrenceState.DUE))),
+            laterToday = listOf(entry(brunnen, Occurrence(id = 2, reminderId = 1, dueAt = at(27, 18)))),
+            resolved = emptyList(), upcoming = emptyList(),
+        )
+        assertEquals(
+            Digest("Heute: 2 Reminder", listOf("jetzt: Tabletten", "13:00 Tabletten", "18:00 Katzenbrunnen", "20:00 Tabletten")),
+            Digests.morning(morning, ZONE),
+        )
+        val evening = Today(
+            dueNow = emptyList(),
+            laterToday = listOf(entry(pills, Occurrence(id = 3, reminderId = 4, dueAt = at(27, 20)))),
+            resolved = emptyList(),
+            upcoming = listOf(entry(brunnen, Occurrence(id = 4, reminderId = 1, dueAt = at(28, 18)))),
+        )
+        assertEquals(
+            listOf("morgen 08:00 Tabletten", "morgen 13:00 Tabletten", "morgen 18:00 Katzenbrunnen", "morgen 20:00 Tabletten"),
+            Digests.evening(evening, emptyList(), at(27, 19), ZONE).lines,
+        )
     }
 }
