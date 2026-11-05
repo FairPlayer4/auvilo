@@ -58,6 +58,8 @@ enum class EventType {
     WINDOW_CLOSED,
     /** "Was hält dich gerade ab?" was asked (answered or skipped) for the occurrence. */
     BLOCKER_ASKED,
+    /** Snoozed or postponed with an arrival: not at the place at the new time, it waits for the arrival (7.29 OZ5). */
+    AWAITING_ARRIVAL,
 }
 
 /** When a reminder is due. */
@@ -236,8 +238,18 @@ data class Occurrence(
     val pausedUntil: Instant? = null,
     /** First checked item; "after done" counts from here for a checklist. */
     val firstProgressAt: Instant? = null,
+    /**
+     * When it first became due (fired or arrived). Null: it never rang yet. A planned occurrence
+     * with it set was snoozed, postponed, deferred or its window closed (E5, Review 2026-11-05).
+     */
+    val firedAt: Instant? = null,
+    /** Planned again after it rang, not at the place at the new time: rings on arrival, missed at the end of the day (7.29 OZ5). */
+    val awaitsArrival: Boolean = false,
 ) {
     val isOpen: Boolean get() = state != OccurrenceState.DONE && state != OccurrenceState.CLOSED
+
+    /** It rang already; planned again it keeps its day and its time. */
+    val hasFired: Boolean get() = firedAt != null
 }
 
 data class Proof(

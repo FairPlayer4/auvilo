@@ -114,8 +114,51 @@ class MigrationTest {
     }
 
     private fun open() = Room.databaseBuilder(context, AvlDatabase::class.java, file.path)
-        .addMigrations(MIGRATION_1_2, MIGRATION_2_3, MIGRATION_3_4, MIGRATION_4_5, MIGRATION_5_6, MIGRATION_6_7)
+        .addMigrations(*AvlDatabase.MIGRATIONS)
         .allowMainThreadQueries().build()
+
+    private fun createV7() = create(7) { db ->
+        db.execSQL(
+            "INSERT INTO reminder (id, title, character, strictness, scheduleType, timeMinutes, weekdays, proof, active, createdAt, " +
+                "proofPhoto, ignoreDnd, snoozeMinutes, solvedBlockerIsMinimum) " +
+                "VALUES (1, 'Training', 'DOCUMENT', 'NORMAL', 'DAILY', 1140, 0, 'CONFIRM', 1, 0, 0, 0, '10', 0)",
+        )
+        // 5 rang twice and was snoozed in between, 6 never rang.
+        db.execSQL(
+            "INSERT INTO occurrence (id, reminderId, dueAt, currentAt, state, postponeCount, resolvedAt, resolution, note) VALUES " +
+                "(5, 1, 1000, 3000, 'PLANNED', 0, NULL, NULL, NULL), (6, 1, 9000, 9000, 'PLANNED', 0, NULL, NULL, NULL)",
+        )
+        db.execSQL(
+            "INSERT INTO event (id, occurrenceId, at, type, detail) VALUES " +
+                "(1, 5, 500, 'CREATED', NULL), (2, 5, 1000, 'DUE', NULL), (3, 5, 1100, 'SNOOZED', '10 min'), (4, 5, 2000, 'DUE', NULL), " +
+                "(5, 6, 600, 'CREATED', NULL)",
+        )
+    }
+
+    @Test
+    fun version7KeepsDataAndLearnsWhenAnOccurrenceFirstRang() = runTest {
+        createV7()
+        val db = open()
+        try {
+            val repo = RoomReminderRepository(db)
+            val rang = repo.occurrence(5)!!
+            assertEquals(Instant.ofEpochMilli(1000), rang.firedAt)
+            assertTrue(rang.hasFired)
+            assertEquals(false, rang.awaitsArrival)
+            assertNull(repo.occurrence(6)!!.firedAt)
+            repo.saveOccurrence(repo.occurrence(6)!!.copy(firedAt = Instant.ofEpochMilli(9000), awaitsArrival = true))
+            assertEquals(true, repo.occurrence(6)!!.awaitsArrival)
+        } finally {
+            db.close()
+        }
+    }
+
+    @Test
+    fun backupIsTakenBeforeTheUpgradeFromVersion7() {
+        createV7()
+        val dir = File(context.filesDir, "backup-test-7").apply { deleteRecursively() }
+        assertTrue(AvlDatabase.backupBeforeMigration(file, dir)!!.name.startsWith("avlreminder-v7-"))
+    }
 
     @Test
     fun version6KeepsDataAndGetsSeveralTimesADay() = runTest {

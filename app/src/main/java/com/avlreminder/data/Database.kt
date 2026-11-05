@@ -190,6 +190,8 @@ data class OccurrenceEntity(
     val note: String?,
     val pausedUntil: Instant? = null,
     val firstProgressAt: Instant? = null,
+    val firedAt: Instant? = null,
+    @ColumnInfo(defaultValue = "0") val awaitsArrival: Boolean = false,
 )
 
 @Entity(
@@ -499,6 +501,20 @@ val MIGRATION_6_7 = object : Migration(6, 7) {
     }
 }
 
+/**
+ * V1.3b0.2 (Review 2026-11-05, E5): when an occurrence first rang and whether it waits for an
+ * arrival. firedAt is taken from its first DUE event, so occurrences that rang before keep that.
+ */
+val MIGRATION_7_8 = object : Migration(7, 8) {
+    override fun migrate(db: SupportSQLiteDatabase) {
+        db.execSQL("ALTER TABLE occurrence ADD COLUMN firedAt INTEGER")
+        db.execSQL("ALTER TABLE occurrence ADD COLUMN awaitsArrival INTEGER NOT NULL DEFAULT 0")
+        db.execSQL(
+            "UPDATE occurrence SET firedAt = (SELECT MIN(e.at) FROM event e WHERE e.occurrenceId = occurrence.id AND e.type = 'DUE')",
+        )
+    }
+}
+
 /** The new tables of version 6, as Room generates them (see schemas/…/6.json). */
 private val CREATE_6 = listOf(
     "CREATE TABLE IF NOT EXISTS `blocker` (`id` INTEGER PRIMARY KEY AUTOINCREMENT NOT NULL, `reminderId` INTEGER NOT NULL, " +
@@ -544,12 +560,14 @@ abstract class AvlDatabase : RoomDatabase() {
 
     companion object {
         const val NAME = "avlreminder.db"
-        const val VERSION = 7
+
+        val MIGRATIONS = arrayOf(MIGRATION_1_2, MIGRATION_2_3, MIGRATION_3_4, MIGRATION_4_5, MIGRATION_5_6, MIGRATION_6_7, MIGRATION_7_8)
+        const val VERSION = 8
 
         fun create(context: Context): AvlDatabase {
             backupBeforeMigration(context.getDatabasePath(NAME), File(context.filesDir, "backup"))
             return Room.databaseBuilder(context, AvlDatabase::class.java, NAME)
-                .addMigrations(MIGRATION_1_2, MIGRATION_2_3, MIGRATION_3_4, MIGRATION_4_5, MIGRATION_5_6, MIGRATION_6_7)
+                .addMigrations(*MIGRATIONS)
                 .build()
         }
 

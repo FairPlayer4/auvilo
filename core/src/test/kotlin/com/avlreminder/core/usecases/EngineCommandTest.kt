@@ -9,11 +9,14 @@ import com.avlreminder.core.model.Place
 import com.avlreminder.core.model.Reminder
 import com.avlreminder.core.model.Schedule
 import com.avlreminder.core.model.WeeklyGoal
+import com.avlreminder.core.ports.AlarmKind
+import com.avlreminder.core.ports.AlarmPort
 import com.avlreminder.core.ports.LocationPort
 import com.avlreminder.core.ports.ReminderRepository
 import com.avlreminder.core.reminder
 import com.avlreminder.core.rules.Action
 import com.avlreminder.core.rules.AlertSettings
+import java.time.Instant
 import java.time.LocalTime
 import kotlinx.coroutines.test.runTest
 import org.junit.jupiter.api.Assertions.assertEquals
@@ -33,7 +36,7 @@ class EngineCommandTest {
             inTransaction = true
             transactions++
             try {
-                return block()
+                return inner.transaction(block)
             } finally {
                 inTransaction = false
             }
@@ -45,8 +48,26 @@ class EngineCommandTest {
     private val rung = mutableListOf<Ring>()
     private var settings = AlertSettings()
     private var location = LocationPort { null }
+    private val alarms = FakeAlarms()
+    private var checks = 0
     private val engine = ReminderEngine(
-        repo, FakeAlarms(), clock, settings = { settings }, location = { location.isAt(it) },
+        repo,
+        object : AlarmPort {
+            override fun set(occurrenceId: Long, at: Instant, kind: AlarmKind) {
+                assertFalse(repo.inTransaction, "alarms change only once the command is stored")
+                alarms.set(occurrenceId, at, kind)
+            }
+            override fun cancel(occurrenceId: Long) {
+                assertFalse(repo.inTransaction, "alarms change only once the command is stored")
+                alarms.cancel(occurrenceId)
+            }
+        },
+        clock, settings = { settings },
+        location = {
+            assertFalse(repo.inTransaction, "no position check inside the transaction (E6)")
+            checks++
+            location.isAt(it)
+        },
         ringer = { ring ->
             assertFalse(repo.inTransaction, "rings only once the command is stored")
             rung += ring
@@ -88,6 +109,23 @@ class EngineCommandTest {
         location = LocationPort { false }
         engine.sync()
         assertTrue(rung.isEmpty())
+    }
+
+    @Test
+    fun `the position is found outside the transaction, once per place, and the command runs again with it`() = runTest {
+        val home = engine.savePlace(Place(name = "Zuhause", lat = 48.1, lon = 11.5))
+        create(reminder(Schedule.OnArrival).copy(title = "Paket", arrival = Arrival(home)))
+        create(reminder(Schedule.OnArrival).copy(title = "Brief", arrival = Arrival(home)))
+        location = LocationPort { true }
+        checks = 0
+        repo.transactions = 0
+        val rings = engine.checkPlaces()
+        assertEquals(listOf("Paket", "Brief"), rings.map { it.reminder.title })
+        assertEquals(listOf("Paket", "Brief"), rung.map { it.reminder.title })
+        assertEquals(1, checks)
+        // The first try stopped at the missing position and left nothing behind.
+        assertEquals(2, repo.transactions)
+        assertEquals(1, repo.inner.events.count { it.type == com.avlreminder.core.model.EventType.DUE && it.occurrenceId == open(rings[0].reminder.id).id })
     }
 
     @Test

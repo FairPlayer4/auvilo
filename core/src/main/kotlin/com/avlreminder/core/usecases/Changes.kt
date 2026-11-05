@@ -88,8 +88,9 @@ internal class Changes(private val c: EngineContext, private val views: AlarmVie
             repo.addEvent(Event(occurrenceId = created, at = now(), type = EventType.CREATED))
         }
         val open = repo.openOccurrence(id)
-        // A changed schedule moves an occurrence that has not started yet.
-        if (open != null && open.state == OccurrenceState.PLANNED && open.postponeCount == 0 && schedule != Schedule.OnArrival && schedule !is Schedule.Deadline) {
+        // A changed schedule moves an occurrence that never rang. One that rang and was snoozed or
+        // postponed keeps its day: editing must not make today's occurrence vanish (Review B1).
+        if (open != null && open.state == OccurrenceState.PLANNED && !open.hasFired && open.postponeCount == 0 && schedule != Schedule.OnArrival && schedule !is Schedule.Deadline) {
             val due = scheduler.nextDue(saved, repo.lastResolved(id))
             if (due == null) {
                 scheduler.close(saved, open, Action.Skip(SkipReasons.SCHEDULE_CHANGED))
@@ -126,7 +127,9 @@ internal class Changes(private val c: EngineContext, private val views: AlarmVie
         if (open != null && open.currentAt < now()) {
             val due = scheduler.nextDue(reminder, repo.lastResolved(reminderId))
             if (due == null || due <= now()) scheduler.close(reminder, open, Action.Skip(SkipReasons.PAUSED))
-            else repo.saveOccurrence(open.copy(state = OccurrenceState.PLANNED, dueAt = due, currentAt = due))
+            else repo.saveOccurrence(
+                open.copy(state = OccurrenceState.PLANNED, dueAt = due, currentAt = due, pausedUntil = null, firedAt = null, awaitsArrival = false),
+            )
         }
         scheduler.syncReminder(reminder.copy(active = true))
         scheduler.watchPlaces()

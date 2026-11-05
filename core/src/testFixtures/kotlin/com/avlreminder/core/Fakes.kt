@@ -95,6 +95,29 @@ class FakeRepository : ReminderRepository {
     val blockers = linkedMapOf<Long, Blocker>()
     private var nextId = 1L
 
+    /** Like the database: a failed transaction leaves nothing behind. */
+    override suspend fun <T> transaction(block: suspend () -> T): T {
+        val saved = listOf(LinkedHashMap(reminders), LinkedHashMap(occurrences), LinkedHashMap(places), LinkedHashMap(blockers))
+        val lists = listOf(events.toList(), proofs.toList(), prep.toList(), done.toList())
+        val id = nextId
+        try {
+            return block()
+        } catch (e: Throwable) {
+            @Suppress("UNCHECKED_CAST")
+            fun <K, V> restore(map: MutableMap<K, V>, from: Any) {
+                map.clear()
+                map.putAll(from as Map<K, V>)
+            }
+            restore(reminders, saved[0]); restore(occurrences, saved[1]); restore(places, saved[2]); restore(blockers, saved[3])
+            events.clear(); events.addAll(lists[0] as List<Event>)
+            proofs.clear(); proofs.addAll(lists[1] as List<Proof>)
+            prep.clear(); prep.addAll(lists[2] as List<PrepAnswer>)
+            done.clear(); done.addAll(lists[3] as List<ItemDone>)
+            nextId = id
+            throw e
+        }
+    }
+
     override suspend fun reminders() = reminders.values.toList()
     override suspend fun reminder(id: Long) = reminders[id]
     override suspend fun saveReminder(reminder: Reminder): Long {
