@@ -82,6 +82,24 @@
 | N18 | Morgen-Übersicht mit einem Reminder mit mehreren Uhrzeiten | jede Uhrzeit steht einzeln drin |
 | N19 | Titel, Ziel, Minimum, Checklisten-Punkt lang tippen | Feld wächst mit; Tastatur zeigt Vorschläge; Enter beendet statt Zeilenumbruch |
 
+## Neu in V1.3b0.3: WLAN-Sonde für 7.29 (ab 05.11.2026, ein paar Tage)
+Nur im Debug-Build, ändert kein Verhalten. Die Sonde schreibt bei jeder WLAN-Verbindung,
+die Android meldet (`connect`), und alle 20 min (`tick`) eine Zeile ins Diagnose-Log: verbunden
+mit welchem gelernten Netz (N1, N2, … ohne Namen), Alter der letzten WLAN-Suche und was 7.29
+pro Netz entscheiden würde (`AT` / `AWAY` / `UNKNOWN`). Sie lernt jedes Netz, mit dem das Handy
+verbunden ist; Namen und BSSIDs bleiben in der App. Kevin muss nichts tun außer den Alltag;
+hilfreich ist, wenn er notiert, wann er ungefähr nach Hause kam und wegging.
+
+| # | Frage | Woran man es im Log sieht |
+|---|---|---|
+| W1 | Meldet Android die Verbindung im Hintergrund, auch bei gesperrtem Handy? | `connect` kurz nach der Ankunft |
+| W2 | Gibt es die BSSID im Hintergrund, und über welchen Weg? | `connected=N1/cb` oder `/info`; `wifi-no-bssid` heißt: nein |
+| W3 | Wie alt sind die Suchergebnisse unterwegs und zuhause? | `age=` bei `tick` |
+| W4 | Stimmt *klar weg*? | unterwegs `N1=AWAY`, nie `AWAY`, während er zuhause ist |
+| W5 | Kommt `tick` im Ruhezustand alle 20 min? | Abstände der `tick`-Zeilen, auch nachts |
+
+Welches Netz N1 ist, sieht man an der Zeile `learned N1` und der Uhrzeit.
+
 ### Wochenplan V1.3a (03.–08.11.2026)
 Reminder *Gerätetest*: täglich 12:30 und 19:15, *normal*, Minimum „Test nur
 vorbereiten“ (legt Claude nach N9 über die Schnittstelle an). Pro Alarm ein Test, freie Termine zum Nachholen.

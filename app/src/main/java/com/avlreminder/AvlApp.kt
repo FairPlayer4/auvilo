@@ -26,6 +26,7 @@ import com.avlreminder.data.SuggestionEntity
 import com.avlreminder.location.AndroidGeofences
 import com.avlreminder.system.Diag
 import com.avlreminder.location.AndroidLocation
+import com.avlreminder.location.WifiProbe
 import com.avlreminder.widget.AvlWidget
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
@@ -51,6 +52,8 @@ class AvlApp : Application() {
         OverviewNotifications.createChannel(this)
         PreNotices.createChannel(this)
         AlarmPause.createChannel(this)
+        // WLAN device test before 7.29, debug build only (design.md *Entwurf 7.29*).
+        if (graph.debuggable) runCatching { WifiProbe.start(this) }
         // Alarms may have been lost (reboot, force-stop, update): rebuild them from the database.
         graph.scope.launch {
             graph.syncAndRing()
