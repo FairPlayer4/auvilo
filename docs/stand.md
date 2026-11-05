@@ -63,7 +63,8 @@ Stand: 2026-11-05. Bei jedem größeren Schritt aktualisieren.
   bestimmt den Ort zuerst nur über WLAN (Verbindung und Suchergebnisse, BSSIDs pro Ort);
   GPS ist nach 7.30 ausgelagert und kommt später. Nächster Schritt: Entwurf 7.29 Z.7
   bestätigen, kleiner Gerätetest zum WLAN im Hintergrund, dann Umsetzung.
-- **V1.3b0.3** (`versionCode` 13): WLAN-Sonde im Debug-Build (`location/WifiProbe.kt`),
+- **V1.3b0.3** (`versionCode` 13, **installiert am 2026-11-05 22:43**, Sonde läuft, Heimnetz
+  als N1 mit 4 Zugangspunkten gelernt, BSSID über den Callback): WLAN-Sonde im Debug-Build (`location/WifiProbe.kt`),
   nur Diagnose, kein neues Verhalten; Fragen W1–W5 in geraetetest.md. Neue Berechtigungen
   `ACCESS_WIFI_STATE` und `ACCESS_NETWORK_STATE` (normal, ohne Rückfrage). 375 Tests grün.
   Nach ein paar Tagen wertet Claude `diag.log` aus, danach 7.29 umsetzen und die Sonde
