@@ -168,7 +168,8 @@ class ClaudeApi(private val access: Access) {
      */
     private suspend fun notRunning(id: Long) {
         val open = access.openOccurrences().firstOrNull { it.reminderId == id } ?: return
-        if (open.state != OccurrenceState.PLANNED || open.currentAt <= access.now()) throw Failure("läuft gerade – nur in der App")
+        // Ringing, overdue or waiting for the arrival after it rang (AG5); snoozed keeps its day on save.
+        if (open.state != OccurrenceState.PLANNED || open.currentAt <= access.now() || open.awaitsArrival) throw Failure("läuft gerade – nur in der App")
     }
 
     private suspend fun known(id: Long) {

@@ -103,6 +103,65 @@ class DayScenarioTest {
         assertEquals(listOf("Mo 17:00 Training FULLSCREEN"), ringsOf("Training"))
     }
 
+    // --- Postponed with an arrival: the decision is made (7.29 OZ5, Review B2) ---------------
+
+    /** Rang at 19:00 with the position unknown, then postponed to 20:30. */
+    private suspend fun postponedTraining(): Pair<Long, Long> {
+        val (home, id) = training()
+        sim.location.here = null
+        sim.runUntil(at(26, 19, 1))
+        sim.act(id, at(26, 19, 2)) { Action.Postpone(at(26, 20, 30)) }
+        return home to id
+    }
+
+    @Test
+    fun `postponed and away at the new time it waits and rings on the arrival`() = runTest {
+        val (home, id) = postponedTraining()
+        sim.leave(at(26, 20))
+        sim.runUntil(at(26, 20, 35))
+        assertTrue(sim.open(id).awaitsArrival)
+        sim.arrive(home, at(26, 21, 10))
+        assertEquals(listOf("Mo 19:00 Training FULLSCREEN", "Mo 21:10 Training FULLSCREEN"), ringsOf("Training"))
+    }
+
+    @Test
+    fun `postponed and never back home it is missed at the end of the day, not dropped`() = runTest {
+        val (_, id) = postponedTraining()
+        sim.leave(at(26, 20))
+        sim.runUntil(at(27, 6))
+        assertEquals(listOf("Mo 19:00 Training FULLSCREEN"), ringsOf("Training"))
+        val monday = sim.repo.occurrences.values.single { it.dueAt == at(26, 19) }
+        assertEquals(Resolution.MISSED, monday.resolution)
+        assertEquals(at(27, 19), sim.open(id).dueAt)
+    }
+
+    @Test
+    fun `postponed with the position unknown at the new time it waits as well`() = runTest {
+        val (_, id) = postponedTraining()
+        sim.runUntil(at(26, 20, 35))
+        assertEquals(listOf("Mo 19:00 Training FULLSCREEN"), ringsOf("Training"))
+        assertTrue(sim.open(id).awaitsArrival)
+    }
+
+    @Test
+    fun `postponed and at home at the new time it rings then`() = runTest {
+        postponedTraining()
+        sim.location.here = true
+        sim.runUntil(at(26, 20, 31))
+        assertEquals(listOf("Mo 19:00 Training FULLSCREEN", "Mo 20:30 Training FULLSCREEN"), ringsOf("Training"))
+    }
+
+    @Test
+    fun `waiting for the arrival survives a restart`() = runTest {
+        val (home, id) = postponedTraining()
+        sim.leave(at(26, 20))
+        sim.runUntil(at(26, 20, 35))
+        sim.phoneOff(until = at(26, 21))
+        assertTrue(sim.open(id).awaitsArrival)
+        sim.arrive(home, at(26, 21, 10))
+        assertEquals(listOf("Mo 19:00 Training FULLSCREEN", "Mo 21:10 Training FULLSCREEN"), ringsOf("Training"))
+    }
+
     // --- An ordinary daily reminder -----------------------------------------------------------
 
     @Test
@@ -125,6 +184,17 @@ class DayScenarioTest {
         sim.act(id, at(26, 18, 40)) { Action.Complete(minimumOnly = false) }
         sim.runUntil(at(27, 6))
         assertEquals(listOf("Mo 18:00 Brunnen FULLSCREEN", "Mo 18:32 Brunnen FULLSCREEN"), ringsOf("Brunnen"))
+    }
+
+    @Test
+    fun `editing a snoozed reminder keeps today's occurrence (Review B1)`() = runTest {
+        val id = sim.create(reminder(Schedule.Daily(LocalTime.of(8, 0))).copy(title = "Tabletten"))
+        sim.act(id, at(26, 8, 15)) { Action.Snooze(Duration.ofMinutes(10)) }
+        sim.runUntil(at(26, 8, 18))
+        sim.engine.save(sim.repo.reminder(id)!!.copy(title = "Tabletten morgens"))
+        assertEquals(at(26, 8), sim.open(id).dueAt)
+        sim.runUntil(at(26, 8, 26))
+        assertEquals("Mo 08:25 Tabletten morgens FULLSCREEN", sim.rings.last())
     }
 
     @Test

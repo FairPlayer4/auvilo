@@ -270,13 +270,13 @@ fun Blocker.toEntity() = BlockerEntity(
 fun OccurrenceEntity.toModel() = Occurrence(
     id = id, reminderId = reminderId, dueAt = dueAt, currentAt = currentAt, state = state,
     postponeCount = postponeCount, resolvedAt = resolvedAt, resolution = resolution, note = note,
-    pausedUntil = pausedUntil, firstProgressAt = firstProgressAt,
+    pausedUntil = pausedUntil, firstProgressAt = firstProgressAt, firedAt = firedAt, awaitsArrival = awaitsArrival,
 )
 
 fun Occurrence.toEntity() = OccurrenceEntity(
     id = id, reminderId = reminderId, dueAt = dueAt, currentAt = currentAt, state = state,
     postponeCount = postponeCount, resolvedAt = resolvedAt, resolution = resolution, note = note,
-    pausedUntil = pausedUntil, firstProgressAt = firstProgressAt,
+    pausedUntil = pausedUntil, firstProgressAt = firstProgressAt, firedAt = firedAt, awaitsArrival = awaitsArrival,
 )
 
 fun PrepAnswerEntity.toModel() = PrepAnswer(id = id, reminderId = reminderId, question = question, text = text, unknown = unknown, at = at)

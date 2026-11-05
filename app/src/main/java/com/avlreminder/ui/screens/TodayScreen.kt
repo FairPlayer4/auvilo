@@ -145,7 +145,8 @@ fun TodayScreen(
             items(today.waiting, key = { "wait" + it.occurrence.id }) { e ->
                 EntryCard(
                     title = e.reminder.title,
-                    detail = (goalLine(e.reminder) ?: "klingelt bei Ankunft") + progress(e),
+                    detail = if (e.occurrence.awaitsArrival) "verschoben – klingelt bei Ankunft, sonst heute verpasst" + progress(e)
+                    else (goalLine(e.reminder) ?: "klingelt bei Ankunft") + progress(e),
                     onClick = { onEdit(e.reminder) },
                 ) {
                     StrictnessTag(e.reminder.strictness)

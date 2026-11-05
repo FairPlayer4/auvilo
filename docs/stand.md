@@ -1,6 +1,6 @@
 # Stand und nächste Schritte
 
-Stand: 2026-11-04. Bei jedem größeren Schritt aktualisieren.
+Stand: 2026-11-05. Bei jedem größeren Schritt aktualisieren.
 
 ## In Arbeit
 - **V1.3a3** (`versionName` 1.3a3-prototyp, `versionCode` 9) in `develop`, gebaut,
@@ -43,6 +43,21 @@ Stand: 2026-11-04. Bei jedem größeren Schritt aktualisieren.
   vorgeschlagen entschieden. Kevin liest zuerst alle Anforderungen im Ganzen; bis dahin
   nur Anforderungsarbeit und Tests. Bis zur Umsetzung kann eine Ankunft am Morgen das
   Training weiter sofort auslösen.
+- **V1.3b0.2** (`versionName` 1.3b0.2-prototyp, `versionCode` 12) auf `feature/v1.3b0`,
+  gebaut, **noch nicht installiert** (2026-11-05): Funde und Empfehlungen aus Review-Lauf 3
+  ([.review/runs/2026-11-05.md](../.review/runs/2026-11-05.md)).
+  - E5: Ein Termin merkt sich, ob er geklungen hat (`firedAt`) und ob er nach dem
+    Verschieben auf die Ankunft wartet (`awaitsArrival`). **Migration 7→8** (`ADD COLUMN`,
+    `firedAt` aus dem ersten `DUE`-Ereignis), Backup v7 vor der Migration.
+  - B1: Speichern eines geschlummerten oder verschobenen Reminders verschiebt den
+    heutigen Termin nicht mehr auf morgen.
+  - B2: Verschobenes Training, zur neuen Zeit nicht zuhause (oder *unklar*) → wartet auf
+    die Ankunft, sonst zur Tagesgrenze *verpasst* statt *entfällt* (7.29 OZ5). Das löst
+    auch den Fehlalarm auf dem Heimweg vom 2026-11-04 um 20:30.
+  - E6: Ortsprüfung außerhalb der Transaktion, Alarme erst nach dem Speichern.
+  - Kevins Antworten auf die Fragen 1–7 und die Empfehlungen E7–E10 stehen in
+    anforderungen.md (Kap. 9, 2026-11-05) und design.md (Entwurf 7.29, E.3).
+  - 368 Tests grün, Kover in `core` 98,2 %.
 - Danach: Kevins Wochenplan (Gerätetests V1.3a, Reminder *Gerätetest*), dann V1.3b.
 
 ## Auf dem Gerät
