@@ -44,7 +44,8 @@ Stand: 2026-11-05. Bei jedem größeren Schritt aktualisieren.
   nur Anforderungsarbeit und Tests. Bis zur Umsetzung kann eine Ankunft am Morgen das
   Training weiter sofort auslösen.
 - **V1.3b0.2** (`versionName` 1.3b0.2-prototyp, `versionCode` 12) auf `feature/v1.3b0`,
-  gebaut, **noch nicht installiert** (2026-11-05): Funde und Empfehlungen aus Review-Lauf 3
+  **installiert am 2026-11-05 20:10** (Migration 7→8 geprüft: Backup v7, Schema 8, 80
+  Termine mit `firedAt`, `foreign_key_check` leer): Funde und Empfehlungen aus Review-Lauf 3
   ([.review/runs/2026-11-05.md](../.review/runs/2026-11-05.md)).
   - E5: Ein Termin merkt sich, ob er geklungen hat (`firedAt`) und ob er nach dem
     Verschieben auf die Ankunft wartet (`awaitsArrival`). **Migration 7→8** (`ADD COLUMN`,
