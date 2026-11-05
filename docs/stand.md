@@ -59,6 +59,10 @@ Stand: 2026-11-05. Bei jedem größeren Schritt aktualisieren.
   - Kevins Antworten auf die Fragen 1–7 und die Empfehlungen E7–E10 stehen in
     anforderungen.md (Kap. 9, 2026-11-05) und design.md (Entwurf 7.29, E.3).
   - 368 Tests grün, Kover in `core` 98,2 %.
+- **7.29 vereinfacht (2026-11-05):** Kevin hat die Anforderungen im Ganzen gelesen. 7.29
+  bestimmt den Ort zuerst nur über WLAN (Verbindung und Suchergebnisse, BSSIDs pro Ort);
+  GPS ist nach 7.30 ausgelagert und kommt später. Nächster Schritt: Entwurf 7.29 Z.7
+  bestätigen, kleiner Gerätetest zum WLAN im Hintergrund, dann Umsetzung.
 - Danach: Kevins Wochenplan (Gerätetests V1.3a, Reminder *Gerätetest*), dann V1.3b.
 
 ## Auf dem Gerät

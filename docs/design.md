@@ -527,7 +527,7 @@ umgesetzt / verworfen. Liste in den Einstellungen, *Teilen* als Markdown.
 |---|---|---|
 | **V1.3a – Alltag** | Mehrmals täglich (VS1), Wochenend-Zeiten (VS2), Hinweis bei ständigem *Später* (NT2), Notausschalter (PS7) | Klein, sofort im Alltag spürbar, passt zur Beobachtungsphase. Keine neuen Bildschirme, nur Regeln und Einstellungen. |
 | **V1.3b0 – Umbau** | Engine als Fassade, Befehle in einer Transaktion, Alarm-Ansicht in `core` (Review-Lauf 2); V1.3b0.2: `firedAt`/`awaitsArrival`, Ortsprüfung vor der Transaktion (Review-Lauf 3) | Umgesetzt. Macht die Sitzung (neuer Zustand) und 7.29 (Ort im Befehl) sicher. |
-| **7.29 – Ankunft im Zeitraum** | Zeitraum, WLAN, genaue Ortsprüfung (Entwurf unten) | Vor V1.3b, nach Kevins Gesamtdurchsicht der Anforderungen. |
+| **7.29 – Ankunft im Zeitraum** | Zeitraum und WLAN, ohne GPS (Entwurf unten); GPS später mit Anf. 7.30 | Vor V1.3b; Anforderungen von Kevin am 2026-11-05 gelesen. |
 | **V1.3b – Sitzung mit Timer** | *Ich starte jetzt*, Timer, Nachfragen, Ziel/Minimum als Dauer, maximale Dauer, Dauer-Vergleich (7.11 D1–D6), vorgezogen starten (7.20 V2), Aktionen und Timer auf der Uhr per Benachrichtigung (G2, G3) | Der große neue Mechanismus. Braucht einen neuen Zustand *läuft* im Lebenszyklus und einen Dienst für den Timer. |
 | **V1.3c – Abläufe** | Schritte, Pausen, Wiederholungen, Signale, Fortschritt, Abläufe als Vorlagen (7.12 A1–A7) | Baut vollständig auf der Sitzung aus V1.3b auf; erst sinnvoll, wenn der Timer im Alltag trägt. |
 
@@ -634,7 +634,8 @@ die anderen Regeln* in E.3 kam am 2026-11-05 dazu (Review-Lauf 3).
 
 ## Entwurf 7.29 – Ankunft im Zeitraum (2026-11-05, zum Bestätigen)
 
-> Grundlage: anforderungen.md 7.29 OZ1–OZ9 und F1–F3, Review-Lauf 3 E7. **[E]** = Empfehlung,
+> Grundlage: anforderungen.md 7.29 OZ1–OZ9 und F1–F3, Review-Lauf 3 E7. Seit 2026-11-05 nur
+> WLAN, GPS ist nach 7.30 ausgelagert. **[E]** = Empfehlung,
 > **[P]** = vorher auf dem Gerät prüfen. Umsetzung erst nach Kevins Gesamtdurchsicht der
 > Anforderungen; dieser Entwurf soll nur verhindern, dass der Umbau später teurer wird.
 
@@ -644,8 +645,11 @@ die anderen Regeln* in E.3 kam am 2026-11-05 dazu (Review-Lauf 3).
   `reminder.arrivalLead`, `arrivalBuffer`, `arrivalCheck` per `ADD COLUMN` mit den
   Standardwerten: Bestehende Ankunfts-Reminder bekommen F3 (OZ9), *Heute* zeigt einmal
   einen Hinweis.
-- Neue Tabelle `place_wifi` (`placeId` → `place` mit `ON DELETE CASCADE`, `ssid`). WLAN-Namen
-  sind privat: nicht ins Diagnose-Log, im Testdaten-Export ersetzt.
+- Neue Tabelle `place_wifi` (`placeId` → `place` mit `ON DELETE CASCADE`, `bssid`, `ssid`
+  nur zur Anzeige), eine Zeile pro Zugangspunkt (Anf. 7.29 OZ3). Beim Festlegen übernimmt
+  die App die verbundene BSSID und alle BSSIDs derselben SSID aus den letzten
+  Suchergebnissen. WLAN-Namen und BSSIDs sind privat: nicht ins Diagnose-Log, im
+  Testdaten-Export ersetzt.
 - `Occurrence.arrivedAt: Instant?` **[E]**: erkannte Ankunft im Zeitraum. Der Alarm liegt bei
   `arrivedAt + Puffer`; kurz wieder weg ändert daran nichts (OZ4). Ohne eigenes Feld müsste
   man den Puffer aus Ereignissen raten – genau das Problem, das E5 gelöst hat.
@@ -674,27 +678,30 @@ späteste Uhrzeit.
   genug ist `setWindow` mit 2 min. `ReminderEngine.onPlaceCheck(placeId)` sammelt alle
   Fälligkeiten, die an dem Ort warten, prüft einmal und plant den nächsten Prüf-Alarm.
 - **Ortsergebnis als Fakt:** `LocationPort.check(place): PlaceCheck(placeId, source, result,
-  accuracyMeters, at)` mit `source` = `WIFI` / `GPS` / `GEOFENCE` und `result` = `AT` / `AWAY`
-  / `UNKNOWN`. Er ersetzt `isAt(): Boolean?`; die Engine bekommt ihn über denselben Weg wie
-  heute (`EngineContext.positions`, außerhalb der Transaktion, 1.). Reihenfolge: WLAN
-  zuerst, dann GPS (OZ2, OZ3).
-- **WLAN:** `WifiPort.connectedSsid()` und eine Registrierung über
+  scanAge, at)` mit `source` = `WIFI_CONNECTED` / `WIFI_SCAN` / `GEOFENCE` / `FALLBACK` und
+  `result` = `AT` / `AWAY` / `UNKNOWN`. Er ersetzt `isAt(): Boolean?`; die Engine bekommt
+  ihn über denselben Weg wie heute (`EngineContext.positions`, außerhalb der Transaktion,
+  1.). Reihenfolge: verbunden → `AT`; Suche ≤ 10 min ohne WLAN des Orts → `AWAY`; sonst
+  `UNKNOWN`. Erst zur spätesten Uhrzeit fällt `UNKNOWN` auf die heutige Prüfung (Geofence-
+  Stand, grobe Ortsabfrage) zurück (OZ2). 7.30 ergänzt später `GPS` und eine Genauigkeit.
+- **WLAN:** `WifiPort.connected(): Bssid?` und `WifiPort.lastScan(): Scan(bssids, at)?`
+  (`WifiManager.getScanResults`, nie `startScan`). Verbindungen über
   `ConnectivityManager.registerNetworkCallback(request, PendingIntent)`; der Receiver ruft
-  `ReminderEngine.onWifi(ssid)`. **[P]** Die SSID gibt es nur mit Standort-Berechtigung
-  (`FLAG_INCLUDE_LOCATION_INFO`), im Hintergrund mit „Immer erlauben“ – auf dem S24 mit
-  Android 17 prüfen, auch ob der PendingIntent nach einem Neustart neu registriert werden
-  muss (dann über `sync`).
+  `ReminderEngine.onWifi(bssid)`. **[P]** BSSID und SSID gibt es nur mit
+  Standort-Berechtigung (`FLAG_INCLUDE_LOCATION_INFO`), im Hintergrund mit „Immer
+  erlauben“. Auf dem S24 mit Android 17 prüfen: Kommt der Callback zuverlässig, wie alt
+  sind die Suchergebnisse im Hintergrund typischerweise, und muss der PendingIntent nach
+  einem Neustart neu registriert werden (dann über `sync`)?
 
 ### Z.4 Android
-- **GPS:** `getCurrentLocation(PRIORITY_HIGH_ACCURACY)` mit Zeitlimit 30 s, nur im Zeitraum
-  (OZ7). **[P]** ob ein Prüf-Alarm im Hintergrund einen frischen Fix bekommt. Falls nicht:
-  ein kurzer Vordergrunddienst vom Typ `location` (`FOREGROUND_SERVICE_LOCATION`), gestartet
-  aus dem exakten Alarm, der nach dem Fix endet.
+- **Kein GPS** (Anf. 7.30, später). Wenn es kommt: `getCurrentLocation(PRIORITY_HIGH_ACCURACY)`
+  mit Zeitlimit 30 s, nur im Zeitraum und nur bei `UNKNOWN`; notfalls ein kurzer
+  Vordergrunddienst vom Typ `location`. Davor die Messung aus 7.30 GP3.
 - **Geofence** bleibt (Ankunft ohne WLAN); die Verweildauer gilt nur für ihn (Anf. T2).
   Bei der Gelegenheit den offenen Punkt aus 6. lösen (Neuregistrierung nach
   `GEOFENCE_NOT_AVAILABLE`).
-- **Diagnose (OZ8):** jede Prüfung mit Quelle, Ergebnis, Genauigkeit und Grund; Zähler der
-  GPS-Fixes pro Tag. Keine Koordinaten, keine WLAN-Namen.
+- **Diagnose (OZ8):** jede Prüfung mit Quelle, Ergebnis, Alter der Suche und Grund. Keine
+  Koordinaten, keine WLAN-Namen, keine BSSIDs (nur „WLAN von Zuhause“).
 
 ### Z.5 Oberfläche
 - Formular, Ankunft: *spätestens um* (die Uhrzeit), *ab* als Vorlauf-Chips (30 / 60 / 90 /
@@ -705,8 +712,8 @@ späteste Uhrzeit.
 - *Heute*: „Training – ab 18:00 bei Ankunft, sonst 19:30“.
 
 ### Z.6 Tests
-- `Simulation` bekommt `wifi(ssid?)` und GPS-Ergebnisse mit Genauigkeit; die Prüf-Alarme
-  laufen wie die anderen Alarme.
+- `Simulation` bekommt `wifi(bssid?)` und `scan(bssids, at)`; die Prüf-Alarme laufen wie die
+  anderen Alarme.
 - Tage in `DayScenarioTest`: 2026-11-04 nachgestellt (Ankunft 07:12 → kein Alarm; auf 20:30
   verschoben, *unklar* → wartet; Ankunft 20:34 → Alarm 20:39), Homeoffice (F2), nicht da
   (F1), zwei Reminder am selben Ort mit verschiedenen Prüfabständen.
@@ -715,5 +722,7 @@ späteste Uhrzeit.
 ### Z.7 Zum Bestätigen
 1. `Occurrence.arrivedAt` als eigenes Feld (Z.1).
 2. Prüf-Alarme pro Ort mit eigenem Port (Z.3).
-3. Vordergrunddienst `location` nur, wenn der Gerätetest **[P]** ohne ihn scheitert (Z.4).
+3. Ohne GPS (2026-11-05): *klar weg* nur aus einer Suche ≤ 10 min ohne WLAN des Orts,
+   sonst *unklar* und Rückfall zur spätesten Uhrzeit (Z.3). Die **[P]**-Punkte zum WLAN
+   prüfe ich zuerst mit einem kleinen Gerätetest.
 4. Vorlauf 0 bedeutet „wie bisher“, auch als Ausweg, falls 7.29 im Alltag stört.
