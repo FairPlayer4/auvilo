@@ -58,12 +58,13 @@ class AlarmGlueTest {
         assertEquals(at.toEpochMilli(), alarmManager.nextAlarmClock?.triggerTime)
 
         port.set(2, at.plusSeconds(60), AlarmKind.EXACT)
-        val scheduled = shadowOf(alarmManager).scheduledAlarms
-        assertEquals(2, scheduled.size)
+        // Without the WLAN probe's tick (debug build, elapsed-time alarm).
+        fun reminderAlarms() = shadowOf(alarmManager).scheduledAlarms.filter { it.type != AlarmManager.ELAPSED_REALTIME_WAKEUP }
+        assertEquals(2, reminderAlarms().size)
 
         port.cancel(1)
         port.cancel(2)
-        assertEquals(0, shadowOf(alarmManager).scheduledAlarms.size)
+        assertEquals(0, reminderAlarms().size)
     }
 
     @Test
