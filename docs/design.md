@@ -473,7 +473,9 @@ umgesetzt / verworfen. Liste in den Einstellungen, *Teilen* als Markdown.
   Positionen. Titel nur in der Entwicklungsphase; vor einem offiziellen Release
   werden sie entfernt (Entscheidung 2026-11-03).
 - **Einstellungen** außerdem: `claudeAccess` (1 = Schnittstelle für Claude an, 15).
-- Alle Daten bleiben auf dem Gerät (Anf. 8.4).
+- Alle Daten bleiben auf dem Gerät; nur das Cloud-Backup bringt sie, wenn es
+  eingeschaltet ist, Ende-zu-Ende verschlüsselt zum Backend (Anf. 8.4,
+  [backup-entwurf.md](backup-entwurf.md)).
 
 ## 14. Tests und Qualität
 
