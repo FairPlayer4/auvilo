@@ -1254,7 +1254,7 @@ Neueste zuerst. Kap. 7 enthält immer den gültigen Stand; diese Tabelle ist die
 | V1.3b0.1 | 2026-11-04 | Kevins Rückmeldungen: Checkliste jederzeit, Übersicht mit allen Uhrzeiten, Textfelder (Kap. 9, 2026-11-04) |
 | V1.3b0.2 | 2026-11-05 | Termin merkt sich, ob er geklungen hat; Speichern beim Schlummern verschiebt nicht mehr auf morgen; verschobenes Training wartet auf die Ankunft (7.29 OZ5); Ortsprüfung vor der Transaktion (Kap. 9, 2026-11-05) |
 | V1.3b0.3 | 2026-11-05 | WLAN-Sonde im Debug-Build als Gerätetest für 7.29 |
-| V1.3b0.4 | gebaut | Erledigung zurücknehmen (7.31), vorab verschieben und auslassen (7.32) |
+| V1.3b0.4 | 2026-11-07 | Erledigung zurücknehmen (7.31), vorab verschieben und auslassen (7.32) |
 
 Details zum Verhalten: [design.md](design.md), Gerätetests: [geraetetest.md](geraetetest.md).
 
