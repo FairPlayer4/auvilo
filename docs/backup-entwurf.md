@@ -1,0 +1,97 @@
+# Entwurf: Cloud-Backup in der App (Backend B2b, Schritt 7)
+
+> Stand: 2026-11-07, von Kevin **bestätigt** am 2026-11-07 (anforderungen.md Kap. 9). Grundlage: Backend `../avlreminder-backend`,
+> `docs/b2b-entwurf.md` (E-B2b-1 bis E-B2b-13), `docs/formate.md`,
+> `docs/diagnose-entwurf.md`; hier Anf. 7.28 (PS8, PS8a, PS9) und 8.4.
+> Das Backend ist fertig und in der Cloud getestet; der Kotlin-Client (`client/`
+> dort) bringt alle Abläufe mit. Die App baut nur noch die Android-Seite.
+
+## Ziel
+Kevins echte Daten werden Ende-zu-Ende verschlüsselt in der Cloud gesichert und
+lassen sich auf einem neuen Gerät (oder nach Neuinstallation) zurückholen. Das
+Backend befindet sich im **Eigenbetrieb** (entschieden 2026-11-07 im Backend): Bis
+jemand außer Kevin die App gegen die Cloud nutzt, darf Claude die Schlüssel kennen;
+vor dem ersten weiteren Nutzer wird alles zurückgesetzt und neu eingerichtet.
+
+Weiterhin gilt (backend.md): Die App funktioniert ohne Backend vollständig, das
+Backup darf scheitern, der Export als Datei und das Migrations-Backup bleiben.
+
+**Nicht** in diesem Schritt: Synchronisation (B3), Fotos und Audio, Play Integrity,
+Play-Store-Variante.
+
+## Was es schon gibt (Backend, `client/`)
+| Modul | Liefert | Die App braucht dazu |
+|---|---|---|
+| `protokoll` | `Einrichtung` (Schlüssel neu oder aus dem Backup), `Sicherungsablauf` (sichern, wiederherstellen, löschen, Schutz vor älteren Fassungen, ein sicherndes Gerät), `Diagnose`, `Geraetenachrichten` (was signiert wird) | `LokaleAblage` (Keysets), `SicherungsStand` (Zähler), Signieren mit dem Geräteschlüssel |
+| `verbindung` | Connect-Clients, Adapter `ServerBackupAblage`, `ServerSicherungsAblage`, `ServerGeraete`, `ServerDiagnoseAblage`, Fehler-Übersetzung (auch „Kill-Switch hat gesperrt“) | Anmelden und Sitzung erneuern (heute im Test-Client, wandert nach `verbindung`) |
+
+## Entscheidungen (Empfehlungen)
+
+| # | Frage | Empfehlung | Warum |
+|---|---|---|---|
+| A-1 | Eigene App-Variante? | **Nein, vorerst nicht.** Das Backup kommt in den normalen Build hinter den Schalter aus PS8 (aus = keine Anmeldung, kein Netz). Eine eigene Variante bzw. der interne Test-Track kommt erst mit dem ersten Tester. | Eine eigene Variante hätte eine eigene Datenbank; gesichert würden dann nicht Kevins echte Daten. Das widerspricht E-B2b-11 im Backend nur in der Reihenfolge; dort nachtragen. |
+| A-2 | Einbindung von `client/` | **Gradle Composite Build** (`includeBuild("../avlreminder-backend/client")`), die App hängt von `verbindung` ab (bringt `protokoll` mit). In der CI holt ein **Deploy-Key** (nur lesen, nur Backend-Repo) das Backend-Repo auf einen **festen Commit**, der in `gradle/backend-commit.txt` steht. | Wie in E-B2b-10 entschieden. Ohne festen Commit baute die CI mit einem anderen Stand als lokal. Ein Deploy-Key gilt nur für ein Repo und läuft nicht ab (anders als ein Token). |
+| A-3 | Netz | Neue Berechtigung **`INTERNET`** (normal, ohne Rückfrage). Anf. 8.4 wird präzisiert: Daten verlassen das Gerät nur Ende-zu-Ende verschlüsselt im Backup, und nur, wenn es eingeschaltet ist. | Die App hat bisher gar kein Netz. Die Präzisierung steht für Orte und WLANs schon in Kap. 9 (2026-11-05). |
+| A-4 | Anmeldung | **Credential Manager** mit „Mit Google anmelden“ (`GetSignInWithGoogleOption`), `serverClientId` = Web-Client des Backend-Projekts, `nonce` = `Geraetenachrichten.nonce(Geräteschlüssel)`. Kevin legt dafür im GCP-Projekt einen **Android-Client** (Paket `com.avlreminder`, SHA-1 des Debug-Schlüssels) und einen **Web-Client** an; die Web-Client-ID kommt in `google_client_ids` (OpenTofu, kostenlos). | Der Server prüft `aud` gegen `GOOGLE_CLIENT_IDS`; bei Android ist `aud` der Web-Client. Die Nonce bindet das ID-Token an den Geräteschlüssel (wie im Test-Client). |
+| A-5 | Geräteschlüssel | ECDSA P-256 im **Android Keystore**, nicht exportierbar, StrongBox wenn vorhanden, signiert `SHA256withECDSA`. Geht er verloren (App-Daten gelöscht), meldet sich die App als neues Gerät an. | Wie im Backend vorgesehen (`Geraetenachrichten`). Der private Schlüssel verlässt das Gerät nie, auch Claude sieht ihn nicht. |
+| A-6 | Personen- und Tresorschlüssel (Keysets) | Tink-Keysets **verschlüsselt mit einem AES-GCM-Schlüssel aus dem Android Keystore** (Tink `AndroidKeystore`), Datei in `filesDir/backend/`. Umsetzung von `LokaleAblage`. | Die Keysets brauchen ihren Klartext zum Ver- und Entschlüsseln; der Keystore schützt sie auch gegen Kopieren der Datei. Nach Neuinstallation sind sie weg; dann hilft der Wiederherstellungsschlüssel (gewollt). |
+| A-7 | Sitzung und Zähler | Sitzungs-Token und `GemerkteSicherung` in einem eigenen DataStore `backend` (nicht in den Einstellungen, damit sie nie ins Backup geraten). Abgelaufene Sitzung: vor dem Aufruf erneuern (signiert). | Sandbox reicht für das Token (PS9); es läuft ohnehin ab. Eigener Speicher, weil die Einstellungen selbst gesichert werden (PS8a). |
+| A-8 | Nutzlast | **ZIP** mit zwei Einträgen: `avlreminder.db` (Kopie per `VACUUM INTO`) und `einstellungen.json` (`Settings.backup()`). `schemaVersion` = `AvlDatabase.VERSION`. Zuerst prüft die App die Größe (8 MiB Chiffrat). | ZIP komprimiert (Deflate) und fasst beides zusammen, ohne eigenes Format; `java.util.zip` ist dabei. Das Backend sieht nur Bytes (E-B2b-1). |
+| A-9 | Wann sichern? | **WorkManager**, periodisch **stündlich**, nur mit Netz, nur wenn sich die Nutzlast geändert hat (SHA-256 der unkomprimierten Datenbank und Einstellungen, im DataStore `backend` gemerkt). Dazu *Jetzt sichern* von Hand. | Stündlich ist im Backend entschieden (2026-11-04; backend.md nennt noch 15 min, wird korrigiert). Über den Hash entfällt ein eigener Änderungszähler in der Datenbank. |
+| A-10 | Zwei Geräte | Ablauf aus `protokoll` unverändert: automatisch nur, wenn die letzte Sicherung von diesem Gerät stammt; sonst eine Benachrichtigung „Ein anderes Gerät sichert – übernehmen?“; bei „nein“ ruht das automatische Sichern. | Schon im Backend so entschieden (E-B2b-6, 2026-11-07). |
+| A-11 | Wiederherstellen | Nur auf Wunsch, mit Anzeige „Sicherung vom … von Gerät …“ und Rückfrage. Davor eine **lokale Kopie** der aktuellen Datenbank (`filesDir/backup/vor-wiederherstellung-<Zeit>.db`, wie das Migrations-Backup). Dann Datenbank schließen, Datei ersetzen, Einstellungen ohne *Notaus* und Schnittstelle übernehmen, App-Prozess neu starten; Room migriert, der Start plant alle Alarme neu. Neueres Schema als die App kennt: ablehnen (`NeueresSchema`). | Ersetzen statt Zusammenführen, weil es ohne Sync nur ein sicherndes Gerät gibt. Die lokale Kopie macht einen Fehlgriff rückgängig. |
+| A-12 | Diagnose senden | **Eigener kleiner Logger fürs Backend** (Ereignisname, typisierte Felder, keine freien Texte; E-D-1), nicht `diag.log`. Knopf *Diagnose senden*. | `diag.log` enthält Titel (design.md 13, Ausnahme der Entwicklungsphase). Die Backend-Regel E-D-1 erlaubt keine Inhalte; Claude darf Sendungen nur deshalb lesen. |
+| A-13 | Fehler | Netz weg, Server gesperrt (Kill-Switch), Tageslimit: nichts tun außer Status anzeigen; WorkManager versucht es zur nächsten Stunde. Keine Benachrichtigung, außer das letzte Backup ist älter als 3 Tage. | „Kosten vor Verfügbarkeit“: Ausfälle sind normal und dürfen nicht nerven. Nach 3 Tagen sollte Kevin es aber merken. |
+| A-14 | Oberfläche | Neuer Bereich in den Einstellungen **„Cloud-Backup (experimentell)“**: Einschalten (mit kurzer Erklärung), Anmelden, Einrichtung (neuer Wiederherstellungsschlüssel anzeigen und Bestätigung „aufgeschrieben“ bzw. Eingabe des vorhandenen), Status „letzte Sicherung“, *Jetzt sichern*, *Wiederherstellen*, *Sicherung löschen*, *Diagnose senden*, *Ausschalten*. | Alles an einer Stelle; PS6 (Transparenz). |
+
+## Ablauf Einrichtung (erstes Einschalten)
+1. Schalter an → Geräteschlüssel im Keystore anlegen.
+2. Credential Manager → ID-Token mit Nonce → `Anmelden` (signiert) → Sitzung, Konto, Gerät.
+3. `Einrichtung` aus `protokoll`: Gibt es kein Schlüssel-Backup, entstehen neue Schlüssel,
+   die App zeigt den Wiederherstellungsschlüssel und lädt erst nach „aufgeschrieben“ hoch.
+   Gibt es eins, fragt sie nach dem Wiederherstellungsschlüssel (höchstens drei Versuche).
+4. Erste Sicherung von Hand, danach der stündliche Takt.
+
+Kevins Konto im Backend ist heute mit Test-Schlüsseln belegt (Test-Client, Gerät `r-pc`).
+Vor der Einrichtung in der App räumt Claude das mit dem Test-Client ab (Sicherung und
+Schlüssel-Backup löschen, Testgeräte sperren); dann richtet die App **neue** Schlüssel ein.
+
+## Schritte (jeweils bauen, Tests grün, installieren nach Kevins Go)
+1. **Bauen ohne Verhalten:** Anmelden und Erneuern nach `verbindung` (Backend-Repo, mit
+   Tests), Composite Build, CI mit Deploy-Key, `INTERNET`. Nichts sichtbar. (Das JVM-Ziel
+   ist schon angeglichen: App und `core` bauen seit 2026-11-07 für Java 21 wie `client/`.)
+2. **Anmelden und Einrichten:** Keystore, Credential Manager, `LokaleAblage`, Bereich in den
+   Einstellungen bis „eingerichtet“. Voraussetzung: Kevins OAuth-Clients (siehe unten).
+   Gerätetest: anmelden, Wiederherstellungsschlüssel, Fingerabdruck stimmt mit Server.
+3. **Sichern von Hand und Status**, Backend-Logger, *Diagnose senden*.
+4. **Automatisch** (WorkManager, Hash, zweites Gerät, Hinweis nach 3 Tagen).
+5. **Wiederherstellen und Löschen.** Gerätetest auf einem zweiten Gerät oder Emulator,
+   nicht durch Neuinstallation auf dem S24 (dort nie deinstallieren).
+6. Danach: *Pfeffer offline sichern* im Backend (Kevin), Review-Lauf.
+
+Aufwand grob: Schritt 1 ein halber Tag, 2 ein Tag, 3–5 je ein halber bis ganzer Tag.
+
+## Was Kevin vorab tut
+- Im GCP-Projekt `avlreminder-exp-1ef2` unter *Google Auth Platform → Clients* einen
+  **Web-Client** und einen **Android-Client** anlegen (Paket `com.avlreminder`, SHA-1 aus
+  `keytool -list -v -keystore ~/.android/debug.keystore`, Passwort `android`). Kostenlos.
+  Die Client-IDs sind unbedenklich und dürfen in den Chat; ein Client-Secret braucht es nicht.
+- Im App-Repo einen Deploy-Key fürs Backend-Repo hinterlegen (Anleitung kommt mit Schritt 1).
+
+## Tests
+- Wie gewohnt: Robolectric für Worker, Einstellungen und Oberfläche; die Abläufe selbst
+  sind im Backend getestet. Keystore und Credential Manager stehen hinter Schnittstellen
+  und werden im Test ersetzt; echt geprüft wird auf dem Gerät.
+- Ablehnungsfälle unter anderem: Schalter aus → kein Netz, kein Worker; Nutzlast zu groß
+  → nichts gesendet; Wiederherstellen mit neuerem Schema → abgelehnt, lokale Daten
+  unverändert; Einstellungen aus dem Backup schalten weder *Notaus* noch Schnittstelle;
+  Sitzung abgelaufen → erneuern statt Fehler; gesperrter Dienst → nur Status.
+- Zip-Format mit einem festen Beispiel (ohne echte Inhalte) als Testvektor, damit spätere
+  Versionen alte Sicherungen lesen.
+
+## Bekannte Grenzen
+- Fotos und Audio fehlen im Backup; Verweise darauf zeigen nach dem Wiederherstellen ins
+  Leere (E-B2b-1). Die App muss das aushalten.
+- Debug-Schlüssel signiert die App; ein neuer PC mit anderem `debug.keystore` braucht
+  einen weiteren Android-Client.
+- Im Eigenbetrieb sind die Schlüssel als bekannt zu betrachten (Backend `CLAUDE.md`).

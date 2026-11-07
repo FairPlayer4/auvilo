@@ -92,6 +92,8 @@ class RoomReminderRepository(private val db: AvlDatabase) : ReminderRepository {
         return occurrence.id
     }
 
+    override suspend fun deleteOccurrence(id: Long) = dao.deleteOccurrence(id)
+
     override suspend fun addEvent(event: Event) =
         dao.insert(EventEntity(occurrenceId = event.occurrenceId, at = event.at, type = event.type, detail = event.detail))
 
@@ -127,6 +129,8 @@ class RoomReminderRepository(private val db: AvlDatabase) : ReminderRepository {
 
     override suspend fun addItemDone(done: ItemDone) =
         dao.insert(ItemDoneEntity(occurrenceId = done.occurrenceId, itemId = done.itemId, doneAt = done.doneAt, withProof = done.withProof))
+
+    override suspend fun deleteItemsDone(occurrenceId: Long, from: Instant) = dao.deleteItemsDone(occurrenceId, from)
 
     override suspend fun blockers(reminderId: Long) = dao.blockers(reminderId).map { it.toModel() }
     override suspend fun blocker(id: Long) = dao.blocker(id)?.toModel()
@@ -270,13 +274,13 @@ fun Blocker.toEntity() = BlockerEntity(
 fun OccurrenceEntity.toModel() = Occurrence(
     id = id, reminderId = reminderId, dueAt = dueAt, currentAt = currentAt, state = state,
     postponeCount = postponeCount, resolvedAt = resolvedAt, resolution = resolution, note = note,
-    pausedUntil = pausedUntil, firstProgressAt = firstProgressAt,
+    pausedUntil = pausedUntil, firstProgressAt = firstProgressAt, firedAt = firedAt, awaitsArrival = awaitsArrival,
 )
 
 fun Occurrence.toEntity() = OccurrenceEntity(
     id = id, reminderId = reminderId, dueAt = dueAt, currentAt = currentAt, state = state,
     postponeCount = postponeCount, resolvedAt = resolvedAt, resolution = resolution, note = note,
-    pausedUntil = pausedUntil, firstProgressAt = firstProgressAt,
+    pausedUntil = pausedUntil, firstProgressAt = firstProgressAt, firedAt = firedAt, awaitsArrival = awaitsArrival,
 )
 
 fun PrepAnswerEntity.toModel() = PrepAnswer(id = id, reminderId = reminderId, question = question, text = text, unknown = unknown, at = at)

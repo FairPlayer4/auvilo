@@ -10,7 +10,6 @@ import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.OutlinedButton
-import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
@@ -34,6 +33,7 @@ import com.avlreminder.data.toTime
 import com.avlreminder.ui.AvlIcons
 import com.avlreminder.ui.EntryCard
 import com.avlreminder.ui.Format
+import com.avlreminder.ui.GrowingField
 import com.avlreminder.ui.theme.Avl
 import java.time.Instant
 
@@ -130,7 +130,7 @@ fun TemplateNameDialog(initial: String, title: String, onDismiss: () -> Unit, on
     AlertDialog(
         onDismissRequest = onDismiss,
         title = { Text(title, fontSize = 18.sp) },
-        text = { OutlinedTextField(name, { name = it }, Modifier.testTag("templateName"), singleLine = true, placeholder = { Text("z. B. Training") }) },
+        text = { GrowingField(name, { name = it }, Modifier.testTag("templateName"), "z. B. Training") },
         confirmButton = {
             TextButton(onClick = { onSave(name.trim()); onDismiss() }, Modifier.testTag("templateSave"), enabled = name.isNotBlank()) { Text("Speichern") }
         },

@@ -21,6 +21,8 @@ sealed interface Action {
     data object Arrive : Action
     /** Not at the trigger's place at the planned time: the chance did not come (neutral). */
     data object Drop : Action
+    /** Snoozed or postponed and not at the place at the new time: waits for the arrival (7.29 OZ5). */
+    data object AwaitArrival : Action
     /** Another ringing round without reaction. */
     data object Escalate : Action
     data class Snooze(val duration: Duration) : Action
@@ -47,6 +49,11 @@ sealed interface Action {
     data class DeferRest(val to: Instant) : Action
     /** A deadline's window ended: quiet until the next window at [to]; not a postponement. */
     data class CloseWindow(val to: Instant) : Action
+    /**
+     * "Zurücknehmen" (Anf. 7.31): a done or skipped occurrence is open again and rings at [at].
+     * Not a postponement; whether it may happen at all decides [com.avlreminder.core.usecases.ReminderEngine.reopen].
+     */
+    data class Reopen(val at: Instant) : Action
 }
 
 /** Facts beyond the occurrence itself that limit what is allowed. */
@@ -66,6 +73,8 @@ data class Limits(
     val blockerSolved: Boolean = false,
     /** Several times a day: the next time; postponing must stay before it (VS1). */
     val nextTime: Instant? = null,
+    /** Taken back after a completion with complete proof: that proof counts again (Anf. 7.31). */
+    val proofCarried: Boolean = false,
 )
 
 sealed interface TransitionResult {
@@ -76,6 +85,11 @@ sealed interface TransitionResult {
 object Lifecycle {
     /** Note of an occurrence closed with a solved blocker as the minimum. */
     const val BLOCKER_SOLVED = "Blocker gelöst"
+
+    /** Done in any way, or skipped by hand (not by the system: goal reached, pause, …); missed and dropped stay. */
+    fun canReopen(occurrence: Occurrence): Boolean =
+        occurrence.state == DONE ||
+            (occurrence.state == CLOSED && occurrence.resolution == Resolution.SKIPPED && occurrence.note !in SkipReasons.SYSTEM)
 
     fun canPostpone(reminder: Reminder, occurrence: Occurrence): Boolean =
         reminder.postponeLimit == null || occurrence.postponeCount < reminder.postponeLimit
@@ -103,25 +117,46 @@ object Lifecycle {
         now: Instant,
         limits: Limits = Limits(),
     ): TransitionResult {
-        if (!occurrence.isOpen) return TransitionResult.Rejected("occurrence is already resolved")
         fun ok(o: Occurrence, type: EventType, detail: String? = null) =
             TransitionResult.Ok(o, Event(occurrenceId = occurrence.id, at = now, type = type, detail = detail))
+        if (action is Action.Reopen) {
+            if (!canReopen(occurrence)) return TransitionResult.Rejected("only a done occurrence or one skipped by hand can be taken back")
+            if (action.at <= now) return TransitionResult.Rejected("must ring again in the future")
+            // What the completion itself set goes back: its first progress, its note.
+            val progress = occurrence.firstProgressAt?.takeIf { it != occurrence.resolvedAt }
+            return ok(
+                occurrence.copy(
+                    state = PLANNED, currentAt = action.at, resolution = null, resolvedAt = null, note = null,
+                    pausedUntil = null, awaitsArrival = false, firstProgressAt = progress,
+                ),
+                EventType.REOPENED, occurrence.resolution?.name,
+            )
+        }
+        if (!occurrence.isOpen) return TransitionResult.Rejected("occurrence is already resolved")
 
         return when (action) {
             Action.Fire ->
                 if (occurrence.state != PLANNED) TransitionResult.Rejected("only a planned occurrence can fire")
-                else ok(occurrence.copy(state = DUE), EventType.DUE)
+                else ok(occurrence.copy(state = DUE, firedAt = occurrence.firedAt ?: now, awaitsArrival = false), EventType.DUE)
 
             Action.Arrive ->
                 if (occurrence.state != PLANNED) TransitionResult.Rejected("only a planned occurrence can fire")
-                else ok(occurrence.copy(state = DUE, currentAt = now), EventType.DUE, "Ankunft")
+                else ok(
+                    occurrence.copy(state = DUE, currentAt = now, firedAt = occurrence.firedAt ?: now, awaitsArrival = false),
+                    EventType.DUE, "Ankunft",
+                )
 
+            // Once it rang the chance has come: snoozed or postponed it is not dropped any more (7.29 OZ5).
             Action.Drop ->
-                if (occurrence.state != PLANNED) TransitionResult.Rejected("only a planned occurrence can be dropped")
+                if (occurrence.state != PLANNED || occurrence.rangOrMoved) TransitionResult.Rejected("only a planned occurrence that never rang or moved can be dropped")
                 else ok(
                     occurrence.copy(state = CLOSED, resolution = Resolution.DROPPED, resolvedAt = now),
                     EventType.DROPPED,
                 )
+
+            Action.AwaitArrival ->
+                if (occurrence.state != PLANNED || !occurrence.rangOrMoved) TransitionResult.Rejected("only a snoozed or postponed occurrence awaits the arrival")
+                else ok(occurrence.copy(awaitsArrival = true), EventType.AWAITING_ARRIVAL)
 
             Action.Escalate ->
                 if (occurrence.state == PLANNED) TransitionResult.Rejected("a planned occurrence cannot escalate")
@@ -130,7 +165,7 @@ object Lifecycle {
             is Action.Snooze ->
                 if (occurrence.state == PLANNED) TransitionResult.Rejected("nothing to snooze yet")
                 else ok(
-                    occurrence.copy(state = PLANNED, currentAt = now.plus(action.duration), pausedUntil = null),
+                    occurrence.copy(state = PLANNED, currentAt = now.plus(action.duration), pausedUntil = null, awaitsArrival = false),
                     EventType.SNOOZED, "${action.duration.toMinutes()} min",
                 )
 
@@ -141,7 +176,7 @@ object Lifecycle {
                 limits.nextTime != null && action.to >= limits.nextTime -> TransitionResult.Rejected("postpone target after the next time")
                 else -> ok(
                     occurrence.copy(
-                        state = PLANNED, currentAt = action.to, postponeCount = occurrence.postponeCount + 1, pausedUntil = null,
+                        state = PLANNED, currentAt = action.to, postponeCount = occurrence.postponeCount + 1, pausedUntil = null, awaitsArrival = false,
                     ),
                     EventType.POSTPONED, action.to.toString(),
                 )
@@ -171,7 +206,7 @@ object Lifecycle {
                 if (action.minimumOnly && !canUseMinimum(reminder, limits)) {
                     return TransitionResult.Rejected("minimum not available")
                 }
-                val proofMissing = ProofCheck.problems(reminder.proof, action.evidence, limits.lastProofText).isNotEmpty()
+                val proofMissing = !limits.proofCarried && ProofCheck.problems(reminder.proof, action.evidence, limits.lastProofText).isNotEmpty()
                 val resolution = when {
                     proofMissing -> Resolution.NO_PROOF
                     action.minimumOnly -> Resolution.MINIMUM
@@ -188,7 +223,7 @@ object Lifecycle {
                 val item = reminder.checklist.firstOrNull { it.id == action.itemId }
                     ?: return TransitionResult.Rejected("unknown checklist item")
                 if (item.id in limits.itemsDone) return TransitionResult.Rejected("item already done")
-                val withProof = ProofCheck.problems(reminder.proof, action.evidence, limits.lastProofText).isEmpty()
+                val withProof = limits.proofCarried || ProofCheck.problems(reminder.proof, action.evidence, limits.lastProofText).isEmpty()
                 val done = limits.itemsDone + (item.id to withProof)
                 val progressed = occurrence.copy(firstProgressAt = occurrence.firstProgressAt ?: now, pausedUntil = null)
                 // Several times a day one item is the part of this time; the rest comes at the next (VS1).
@@ -211,7 +246,7 @@ object Lifecycle {
                     counts && !canPostpone(reminder, occurrence) -> TransitionResult.Rejected("postpone limit reached")
                     else -> ok(
                         occurrence.copy(
-                            state = PLANNED, currentAt = action.to, pausedUntil = null,
+                            state = PLANNED, currentAt = action.to, pausedUntil = null, awaitsArrival = false,
                             postponeCount = occurrence.postponeCount + if (counts) 1 else 0,
                         ),
                         EventType.DEFERRED, action.to.toString(),
@@ -221,7 +256,7 @@ object Lifecycle {
 
             is Action.CloseWindow ->
                 if (action.to <= now) TransitionResult.Rejected("next window must lie in the future")
-                else ok(occurrence.copy(state = PLANNED, currentAt = action.to, pausedUntil = null), EventType.WINDOW_CLOSED, action.to.toString())
+                else ok(occurrence.copy(state = PLANNED, currentAt = action.to, pausedUntil = null, awaitsArrival = false), EventType.WINDOW_CLOSED, action.to.toString())
 
             is Action.Skip -> ok(
                 occurrence.copy(state = CLOSED, resolution = Resolution.SKIPPED, resolvedAt = now, note = action.reason),

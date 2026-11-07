@@ -22,6 +22,9 @@
     <uses-permission android:name="android.permission.ACCESS_COARSE_LOCATION" />
     <uses-permission android:name="android.permission.ACCESS_FINE_LOCATION" />
     <uses-permission android:name="android.permission.ACCESS_BACKGROUND_LOCATION" />
+    <!-- WLAN as a place signal (Anf. 7.29): connection and Android's own scan results, no scanning -->
+    <uses-permission android:name="android.permission.ACCESS_WIFI_STATE" />
+    <uses-permission android:name="android.permission.ACCESS_NETWORK_STATE" />
 
     <application
         android:name=".AvlApp"
@@ -78,6 +81,10 @@
 
         <receiver
             android:name=".location.GeofenceReceiver"
+            android:exported="false" />
+
+        <receiver
+            android:name=".location.WifiProbeReceiver"
             android:exported="false" />
 
         <receiver

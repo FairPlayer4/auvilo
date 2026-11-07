@@ -39,6 +39,10 @@ internal class Scheduler(private val c: EngineContext, private val views: AlarmV
         if (!reminder.active) return null
         val now = now()
         if (occurrence.state == OccurrenceState.PLANNED) {
+            if (occurrence.awaitsArrival) {
+                awaitArrival(reminder, occurrence)
+                return null
+            }
             if (occurrence.currentAt > now.plus(ReminderEngine.EARLY_TOLERANCE)) {
                 plan(reminder, occurrence)
                 return null
@@ -81,9 +85,11 @@ internal class Scheduler(private val c: EngineContext, private val views: AlarmV
         val today = now.atZone(zone).toLocalDate()
         return repo.reminders().filter { it.active && it.arrival?.placeId == placeId }.mapNotNull { r ->
             val o = repo.openOccurrence(r.id) ?: return@mapNotNull null
+            // Waits for it: only on arrival, today's not yet rung, or snoozed/postponed and away at its time.
+            // Snoozed or postponed ones before their new time keep it.
             val waiting = o.state == OccurrenceState.PLANNED && (
-                r.schedule == Schedule.OnArrival ||
-                    (o.currentAt == o.dueAt && o.currentAt > now && o.currentAt.atZone(zone).toLocalDate() == today)
+                r.schedule == Schedule.OnArrival || o.awaitsArrival ||
+                    (!o.rangOrMoved && o.currentAt > now && o.currentAt.atZone(zone).toLocalDate() == today)
                 )
             if (waiting) arrive(r, o) else null
         }
@@ -91,11 +97,12 @@ internal class Scheduler(private val c: EngineContext, private val views: AlarmV
 
     suspend fun checkPlaces(): List<Ring> {
         val places = repo.places().associateBy { it.id }
-        val here = mutableMapOf<Long, Boolean?>()
-        return repo.reminders().filter { it.active && it.schedule == Schedule.OnArrival }.mapNotNull { r ->
+        return repo.reminders().filter { it.active && it.arrival != null }.mapNotNull { r ->
             val place = places[r.arrival?.placeId] ?: return@mapNotNull null
-            val o = repo.openOccurrence(r.id)?.takeIf { it.state == OccurrenceState.PLANNED } ?: return@mapNotNull null
-            if (here.getOrPut(place.id) { c.location.isAt(place) } == true) arrive(r, o) else null
+            val o = repo.openOccurrence(r.id)
+                ?.takeIf { it.state == OccurrenceState.PLANNED && (r.schedule == Schedule.OnArrival || it.awaitsArrival) }
+                ?: return@mapNotNull null
+            if (c.isAt(place) == true) arrive(r, o) else null
         }
     }
 
@@ -104,7 +111,7 @@ internal class Scheduler(private val c: EngineContext, private val views: AlarmV
         if (!reminder.active || reminder.schedule != Schedule.OnArrival) return null
         val place = repo.places().firstOrNull { it.id == reminder.arrival?.placeId } ?: return null
         val o = repo.openOccurrence(reminder.id)?.takeIf { it.state == OccurrenceState.PLANNED } ?: return null
-        return if (c.location.isAt(place) == true) arrive(reminder, o) else null
+        return if (c.isAt(place) == true) arrive(reminder, o) else null
     }
 
     suspend fun syncReminder(reminder: Reminder): Ring? {
@@ -121,6 +128,10 @@ internal class Scheduler(private val c: EngineContext, private val views: AlarmV
             // Waits for the arrival, has no alarm of its own.
             open.state == OccurrenceState.PLANNED && reminder.schedule == Schedule.OnArrival -> {
                 cancel(open)
+                null
+            }
+            open.state == OccurrenceState.PLANNED && open.awaitsArrival -> {
+                awaitArrival(reminder, open)
                 null
             }
             open.state == OccurrenceState.PLANNED && open.currentAt < now.minus(ReminderEngine.GRACE) -> {
@@ -145,22 +156,36 @@ internal class Scheduler(private val c: EngineContext, private val views: AlarmV
 
     /**
      * The planned time is reached. With "sonst entfällt" the position decides: not at the place
-     * drops the occurrence; an unknown position rings, so nothing is lost.
+     * drops the occurrence; an unknown position rings, so nothing is lost. Snoozed or postponed it
+     * rang already and the decision is made (7.29 OZ5): only "there" rings, away or unknown waits
+     * for the arrival until the end of the day.
      */
     private suspend fun fire(reminder: Reminder, occurrence: Occurrence): Ring? {
         val arrival = reminder.arrival
         // A rescue reminder rings wherever one is.
         if (arrival?.whenAway == WhenAway.DROP && !views.isRescue(reminder, occurrence)) {
             val place = repo.places().firstOrNull { it.id == arrival.placeId }
-            if (place != null && c.location.isAt(place) == false) {
-                close(reminder, occurrence, Action.Drop)
-                createNext(reminder)?.let { plan(reminder, it) }
-                return null
+            if (place != null) {
+                val here = c.isAt(place)
+                if (occurrence.rangOrMoved && here != true) {
+                    awaitArrival(reminder, apply(reminder, occurrence, Action.AwaitArrival))
+                    return null
+                }
+                if (!occurrence.rangOrMoved && here == false) {
+                    close(reminder, occurrence, Action.Drop)
+                    createNext(reminder)?.let { plan(reminder, it) }
+                    return null
+                }
             }
         }
         val fired = apply(reminder, occurrence, Action.Fire)
         plan(reminder, fired)
         return views.ring(reminder, fired)
+    }
+
+    /** Waiting for the arrival: no alarm but the end of the day, then it is missed. */
+    private suspend fun awaitArrival(reminder: Reminder, occurrence: Occurrence) {
+        if (now() >= views.missedAt(reminder, occurrence)) endDay(reminder, occurrence) else plan(reminder, occurrence)
     }
 
     private suspend fun arrive(reminder: Reminder, occurrence: Occurrence): Ring {
@@ -227,7 +252,9 @@ internal class Scheduler(private val c: EngineContext, private val views: AlarmV
         val now = now()
         val missedAt = views.missedAt(reminder, occurrence)
         val settings = c.settings()
-        val at = if (occurrence.state == OccurrenceState.PLANNED) {
+        val at = if (occurrence.state == OccurrenceState.PLANNED && occurrence.awaitsArrival) {
+            missedAt
+        } else if (occurrence.state == OccurrenceState.PLANNED) {
             occurrence.currentAt
         } else if (views.strictness(reminder, occurrence) == null) {
             // Weekly target reached: no further rounds, only the end of the day.

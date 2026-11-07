@@ -33,6 +33,7 @@ import com.avlreminder.core.rules.Snoozing
 import com.avlreminder.core.rules.TransitionResult
 import com.avlreminder.core.rules.Validation
 import java.time.Duration
+import java.time.Instant
 import java.time.LocalDateTime
 import java.time.LocalTime
 
@@ -88,8 +89,9 @@ internal class Changes(private val c: EngineContext, private val views: AlarmVie
             repo.addEvent(Event(occurrenceId = created, at = now(), type = EventType.CREATED))
         }
         val open = repo.openOccurrence(id)
-        // A changed schedule moves an occurrence that has not started yet.
-        if (open != null && open.state == OccurrenceState.PLANNED && open.postponeCount == 0 && schedule != Schedule.OnArrival && schedule !is Schedule.Deadline) {
+        // A changed schedule moves an occurrence that never rang. One that rang and was snoozed or
+        // postponed keeps its day: editing must not make today's occurrence vanish (Review B1).
+        if (open != null && open.state == OccurrenceState.PLANNED && !open.hasFired && open.postponeCount == 0 && schedule != Schedule.OnArrival && schedule !is Schedule.Deadline) {
             val due = scheduler.nextDue(saved, repo.lastResolved(id))
             if (due == null) {
                 scheduler.close(saved, open, Action.Skip(SkipReasons.SCHEDULE_CHANGED))
@@ -126,7 +128,9 @@ internal class Changes(private val c: EngineContext, private val views: AlarmVie
         if (open != null && open.currentAt < now()) {
             val due = scheduler.nextDue(reminder, repo.lastResolved(reminderId))
             if (due == null || due <= now()) scheduler.close(reminder, open, Action.Skip(SkipReasons.PAUSED))
-            else repo.saveOccurrence(open.copy(state = OccurrenceState.PLANNED, dueAt = due, currentAt = due))
+            else repo.saveOccurrence(
+                open.copy(state = OccurrenceState.PLANNED, dueAt = due, currentAt = due, pausedUntil = null, firedAt = null, awaitsArrival = false),
+            )
         }
         scheduler.syncReminder(reminder.copy(active = true))
         scheduler.watchPlaces()
@@ -169,7 +173,7 @@ internal class Changes(private val c: EngineContext, private val views: AlarmVie
             }
             is Action.CheckItem -> {
                 saveEvidence(occurrence, action.evidence, action.itemId)
-                val withProof = ProofCheck.problems(reminder.proof, action.evidence, limits.lastProofText).isEmpty()
+                val withProof = limits.proofCarried || ProofCheck.problems(reminder.proof, action.evidence, limits.lastProofText).isEmpty()
                 repo.addItemDone(ItemDone(occurrenceId = occurrence.id, itemId = action.itemId, doneAt = now(), withProof = withProof))
             }
             else -> {}
@@ -180,6 +184,45 @@ internal class Changes(private val c: EngineContext, private val views: AlarmVie
                 .forEach { repo.saveBlocker(it.copy(solvedAt = now())) }
         }
         scheduler.cancel(occurrence)
+        scheduler.syncReminder(reminder)
+        return result
+    }
+
+    /**
+     * "Zurücknehmen" after a misclick (Anf. 7.31): the last done or skipped occurrence of the
+     * reminder is open again and rings in [REOPEN_DELAY], without counting as a postponement.
+     * The next occurrence, planned but not yet rung, goes; it comes again once this one is
+     * resolved. What the completion itself did goes back: the checklist items it ticked and a
+     * blocker its preparation task solved. Proofs stay (see [Limits.proofCarried]).
+     */
+    suspend fun reopen(occurrenceId: Long): TransitionResult {
+        val occurrence = repo.occurrence(occurrenceId) ?: return TransitionResult.Rejected("unknown occurrence")
+        val reminder = repo.reminder(occurrence.reminderId) ?: return TransitionResult.Rejected("unknown reminder")
+        val resolvedAt = occurrence.resolvedAt ?: return TransitionResult.Rejected("occurrence is open")
+        if (!reminder.active) return TransitionResult.Rejected("reminder is paused")
+        if (repo.lastResolved(reminder.id)?.id != occurrence.id) return TransitionResult.Rejected("only the last one can be taken back")
+        val next = repo.openOccurrence(reminder.id)
+        if (next != null && (next.state != OccurrenceState.PLANNED || next.hasFired || next.postponeCount > 0)) {
+            return TransitionResult.Rejected("the next one has started already")
+        }
+        // Done or skipped in advance: back to its planned time, not sooner (Anf. 7.32 VB7).
+        val at = maxOf(now().plus(REOPEN_DELAY), if (occurrence.hasFired) Instant.MIN else occurrence.currentAt)
+        val result = Lifecycle.transition(reminder, occurrence, Action.Reopen(at), now())
+        if (result !is TransitionResult.Ok) return result
+        // Past the end of its day (several a day: the next time) it would only be missed (VS1).
+        // Measured on the occurrence as it was: its day, not the day the new time falls on.
+        if (at >= views.missedAt(reminder, occurrence)) return TransitionResult.Rejected("too late for today")
+        next?.let {
+            scheduler.cancel(it)
+            repo.deleteOccurrence(it.id)
+        }
+        repo.saveOccurrence(result.occurrence)
+        repo.addEvent(result.event)
+        repo.deleteItemsDone(occurrence.id, resolvedAt)
+        reminder.prepFor?.let { main ->
+            repo.blockers(main).filter { it.taskReminderId == reminder.id && it.solvedAt == resolvedAt }
+                .forEach { repo.saveBlocker(it.copy(solvedAt = null)) }
+        }
         scheduler.syncReminder(reminder)
         return result
     }
@@ -268,7 +311,8 @@ internal class Changes(private val c: EngineContext, private val views: AlarmVie
 
     suspend fun snoozeHints(): List<SnoozeHint> = repo.reminders().mapNotNull { r ->
         val recent = repo.recentResolved(r.id, Snoozing.IN_A_ROW + Snoozing.IN_A_ROW).map { o ->
-            o to repo.events(o.id).count { it.type == EventType.SNOOZED }
+            // Postponing counts too, also in advance (Anf. 7.32 VB7).
+            o to repo.events(o.id).count { it.type == EventType.SNOOZED || it.type == EventType.POSTPONED }
         }
         Snoozing.hint(r, recent, r.hintQuietUntil, now(), zone)
     }
@@ -293,5 +337,10 @@ internal class Changes(private val c: EngineContext, private val views: AlarmVie
         is Schedule.Weekdays -> Schedule.Weekdays(time, schedule.days)
         is Schedule.AfterDone -> schedule.copy(time = time)
         else -> schedule
+    }
+
+    companion object {
+        /** A taken-back occurrence rings again after this, not right away: one is in the app just now. */
+        val REOPEN_DELAY: Duration = Duration.ofMinutes(10)
     }
 }

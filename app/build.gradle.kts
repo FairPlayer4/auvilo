@@ -14,8 +14,8 @@ android {
         applicationId = "com.avlreminder"
         minSdk = 37
         targetSdk = 37
-        versionCode = 10
-        versionName = "1.3b0-prototyp"
+        versionCode = 14
+        versionName = "1.3b0.4-prototyp"
     }
 
     buildFeatures {
@@ -23,8 +23,8 @@ android {
     }
 
     compileOptions {
-        sourceCompatibility = JavaVersion.VERSION_17
-        targetCompatibility = JavaVersion.VERSION_17
+        sourceCompatibility = JavaVersion.VERSION_21
+        targetCompatibility = JavaVersion.VERSION_21
     }
 
     testOptions {
@@ -74,6 +74,7 @@ dependencies {
     // Compose tests drive Espresso; older versions call InputManager.getInstance(), which SDK 37 no longer has.
     testImplementation("androidx.test.espresso:espresso-core:3.7.0")
     testImplementation("androidx.room:room-testing:2.8.5")
+    testImplementation(testFixtures(project(":core")))
     testImplementation("org.jetbrains.kotlinx:kotlinx-coroutines-test:1.11.0")
     testImplementation(platform("androidx.compose:compose-bom:2026.09.00"))
     testImplementation("androidx.compose.ui:ui-test-junit4")

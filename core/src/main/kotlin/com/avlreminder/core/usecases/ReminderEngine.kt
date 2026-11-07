@@ -46,35 +46,44 @@ class ReminderEngine(
     device: DeviceStatePort = DeviceStatePort { false },
     settings: () -> AlertSettings = { AlertSettings() },
     geofences: GeofencePort = GeofencePort {},
-    location: LocationPort = LocationPort { null },
+    private val location: LocationPort = LocationPort { null },
     preNotices: PreNoticePort = PreNoticePort.NONE,
     private val ringer: RingPort = RingPort {},
 ) {
-    private val c = EngineContext(repo, alarms, clock, device, settings, geofences, location, preNotices)
+    private val c = EngineContext(repo, alarms, clock, device, settings, geofences, preNotices)
     private val views = AlarmViews(c)
     private val scheduler = Scheduler(c, views)
     private val changes = Changes(c, views, scheduler)
     private var depth = 0
 
     /**
-     * Runs a command as a whole: stored in one transaction, then what it found due rings.
-     * A command inside another one joins it.
+     * Runs a command as a whole: stored in one transaction, then its alarm changes take effect and
+     * what it found due rings. A command inside another one joins it.
+     * No slow work inside the transaction (E6): a position it needs is found outside, the command
+     * rolls back and runs again with it. Each place is checked at most once per command.
      */
     private suspend fun <T> command(block: suspend () -> T): T {
         if (depth > 0) return block()
-        depth++
-        val result = try {
-            repo.transaction { block() }
-        } catch (e: Throwable) {
-            c.pending.clear()
-            throw e
-        } finally {
+        c.positions.clear()
+        while (true) {
+            depth++
+            c.begin()
+            val result = try {
+                repo.transaction { block() }
+            } catch (e: PositionNeeded) {
+                c.rollback()
+                depth--
+                c.positions[e.place.id] = location.isAt(e.place)
+                continue
+            } catch (e: Throwable) {
+                c.rollback()
+                depth--
+                throw e
+            }
             depth--
+            c.commit().forEach(ringer::ring)
+            return result
         }
-        val rings = c.pending.toList()
-        c.pending.clear()
-        rings.forEach(ringer::ring)
-        return result
     }
 
     // --- Reminders -------------------------------------------------------------------------
@@ -118,6 +127,13 @@ class ReminderEngine(
 
     /** Applies a user action. On success the next alarm or the next occurrence is planned. */
     suspend fun act(occurrenceId: Long, action: Action): TransitionResult = command { changes.act(occurrenceId, action) }
+
+    /**
+     * "Zurücknehmen" (Anf. 7.31): the last done or skipped occurrence of its reminder is open again
+     * and rings in 10 minutes. Rejected when it is not the last one, the next one has rung already
+     * or it would be past its day (several a day: past the next time).
+     */
+    suspend fun reopen(occurrenceId: Long): TransitionResult = command { changes.reopen(occurrenceId) }
 
     /** The proof screen opened: quiet for the reminder's proof window, at most until the end of the day. */
     suspend fun startProof(occurrenceId: Long): TransitionResult = command { changes.startProof(occurrenceId) }

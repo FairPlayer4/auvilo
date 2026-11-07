@@ -21,7 +21,7 @@ data class Today(
     val resolved: List<Entry>,
     /** Planned for after today, soonest first (for the reminder list and the widget). */
     val upcoming: List<Entry>,
-    /** Waiting for an arrival without a time ("wenn ich zuhause bin"), oldest first. */
+    /** Waiting for an arrival: without a time ("wenn ich zuhause bin") or postponed and away (7.29 OZ5), oldest first. */
     val waiting: List<Entry> = emptyList(),
     /** Deadlines passed but not done yet, oldest first; they ring in their next window. */
     val overdue: List<Entry> = emptyList(),
@@ -41,7 +41,7 @@ object Overview {
         val open = entries.filter { it.occurrence.isOpen && it.reminder.active }
         val fired = open.filter { it.occurrence.state != OccurrenceState.PLANNED }
         val (waiting, timed) = open.filter { it.occurrence.state == OccurrenceState.PLANNED }
-            .partition { it.reminder.schedule == Schedule.OnArrival }
+            .partition { it.reminder.schedule == Schedule.OnArrival || it.occurrence.awaitsArrival }
         val (overdue, planned) = timed.partition { e ->
             (e.reminder.schedule as? Schedule.Deadline)?.let { Deadlines.isOverdue(it, e.occurrence, zone) } == true
         }

@@ -89,14 +89,15 @@ object PreNotices {
         val notice = reminder.preNotice ?: return null
         if (occurrence.state != OccurrenceState.PLANNED || reminder.schedule == Schedule.OnArrival) return null
         return when (notice) {
-            is PreNotice.Evening -> occurrence.dueAt.atZone(zone).toLocalDate().minusDays(1).atTime(notice.time).atZone(zone).toInstant()
-            is PreNotice.Before -> occurrence.dueAt.minusSeconds(notice.minutes * 60L)
+            // Moved in advance, it moves along (Anf. 7.32 VB5).
+            is PreNotice.Evening -> occurrence.plannedAt.atZone(zone).toLocalDate().minusDays(1).atTime(notice.time).atZone(zone).toInstant()
+            is PreNotice.Before -> occurrence.plannedAt.minusSeconds(notice.minutes * 60L)
         }
     }
 
     /** "Morgen 08:00: Training" with the first step and the open blockers. */
     fun text(reminder: Reminder, occurrence: Occurrence, firstStep: String?, blockers: List<Blocker>, now: Instant, zone: ZoneId): Pair<String, List<String>> {
-        val due = occurrence.dueAt.atZone(zone)
+        val due = occurrence.plannedAt.atZone(zone)
         val day = when (due.toLocalDate()) {
             now.atZone(zone).toLocalDate() -> "Heute"
             now.atZone(zone).toLocalDate().plusDays(1) -> "Morgen"

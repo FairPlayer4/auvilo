@@ -51,10 +51,12 @@ import com.avlreminder.core.rules.Prep
 import com.avlreminder.core.rules.Validation
 import com.avlreminder.ui.AvlIcons
 import com.avlreminder.ui.AvlSwitch
+import com.avlreminder.ui.GrowingField
 import com.avlreminder.ui.Fold
 import com.avlreminder.ui.NumberDialog
 import com.avlreminder.ui.Format
 import com.avlreminder.ui.SectionTitle
+import com.avlreminder.ui.TextKeyboard
 import com.avlreminder.ui.TimeDialog
 import com.avlreminder.ui.theme.Avl
 import java.time.DayOfWeek
@@ -99,6 +101,8 @@ fun EditScreen(
     onSaveTemplate: ((String, ReminderForm) -> Unit)? = null,
     blockers: List<Blocker> = emptyList(),
     blockerActions: BlockerActions? = null,
+    /** Checks items of the open occurrence any time ("Vorab erledigen"); null without a checklist. */
+    onCheckItems: (() -> Unit)? = null,
 ) {
     val c = Avl.colors
     var form by remember(initial) { mutableStateOf(initial) }
@@ -119,12 +123,10 @@ fun EditScreen(
         Column(Modifier.verticalScroll(rememberScrollState()).padding(horizontal = 16.dp)) {
             problems.forEach { Text(it, color = c.strict, fontWeight = FontWeight.SemiBold, modifier = Modifier.padding(top = 4.dp)) }
             onStats?.let { TextButton(onClick = it, Modifier.testTag("stats")) { Text("Statistik und Serie ›", color = c.accent) } }
+            onCheckItems?.let { TextButton(onClick = it, Modifier.testTag("checkItems")) { Text("Punkte abhaken ›", color = c.accent) } }
 
             SectionTitle("Was?")
-            OutlinedTextField(
-                form.title, { form = form.copy(title = it) }, Modifier.fillMaxWidth().testTag("title"),
-                placeholder = { Text("z. B. Katzenbrunnen reinigen") }, singleLine = true,
-            )
+            GrowingField(form.title, { form = form.copy(title = it) }, Modifier.fillMaxWidth().testTag("title"), "z. B. Katzenbrunnen reinigen")
 
             Text("Charakter", Modifier.padding(top = 12.dp), color = c.text, fontSize = 14.sp)
             Choice(listOf(Character.DOCUMENT to "Dokumentation", Character.OVERCOME to "Überwindung"), form.character) {
@@ -162,9 +164,9 @@ fun EditScreen(
             }
             Fold("Ziel und Minimum", goalSummary(form), "foldGoal") {
                 Text("Ziel", color = c.text, fontSize = 14.sp)
-                OutlinedTextField(form.goal, { form = form.copy(goal = it) }, Modifier.fillMaxWidth(), placeholder = { Text("z. B. 45 min") }, singleLine = true)
+                GrowingField(form.goal, { form = form.copy(goal = it) }, Modifier.fillMaxWidth(), "z. B. 45 min")
                 Text("Minimum", Modifier.padding(top = 8.dp), color = c.text, fontSize = 14.sp)
-                OutlinedTextField(form.minimum, { form = form.copy(minimum = it) }, Modifier.fillMaxWidth(), placeholder = { Text("leer = kein Minimum") }, singleLine = true)
+                GrowingField(form.minimum, { form = form.copy(minimum = it) }, Modifier.fillMaxWidth(), "leer = kein Minimum")
                 if (form.minimum.isNotBlank()) {
                     Text("Minimum max. pro Woche", Modifier.padding(top = 12.dp), color = c.text, fontSize = 14.sp)
                     NumberChoice(listOf(1, 2, 3), form.minimumLimitPerWeek, 1..7, "Minimum max. pro Woche", unit = "×", unlimited = "unbegrenzt") {
@@ -182,7 +184,7 @@ fun EditScreen(
             Fold("Nachweis", proofSummary(form), "foldProof") { ProofSection(form) { form = it } }
             Fold("Warum und Botschaft", whySummary(form), "foldWhy") {
                 Text("Warum ist mir das wichtig?", color = c.text, fontSize = 14.sp)
-                OutlinedTextField(form.why, { form = form.copy(why = it) }, Modifier.fillMaxWidth(), minLines = 2)
+                OutlinedTextField(form.why, { form = form.copy(why = it) }, Modifier.fillMaxWidth(), minLines = 2, keyboardOptions = TextKeyboard)
                 MotivationAudio(form.motivationAudio, recorder, play) { form = form.copy(motivationAudio = it) }
             }
             // Opens by itself when "Überwindung" makes the questions required.
@@ -344,7 +346,7 @@ private fun PrepSection(form: ReminderForm, onChange: (ReminderForm) -> Unit) {
         OutlinedTextField(
             draft.text, { set(draft.copy(text = it, unknown = false)) },
             Modifier.fillMaxWidth().padding(top = 4.dp).testTag("prep$q"),
-            enabled = !draft.unknown,
+            enabled = !draft.unknown, keyboardOptions = TextKeyboard,
         )
         FlowRow(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
             if (q == Prep.READY) {
@@ -447,10 +449,9 @@ private fun ChecklistSection(items: List<ChecklistItem>, onChange: (List<Checkli
     if (items.isEmpty()) Text("Keine – der Reminder ist eine Aufgabe.", color = c.muted, fontSize = 13.sp)
     items.forEachIndexed { i, item ->
         Row(verticalAlignment = androidx.compose.ui.Alignment.CenterVertically) {
-            OutlinedTextField(
+            GrowingField(
                 item.title, { t -> onChange(items.toMutableList().also { it[i] = item.copy(title = t) }) },
-                Modifier.weight(1f).padding(vertical = 2.dp).testTag("item$i"), singleLine = true,
-                placeholder = { Text("Punkt ${i + 1}") },
+                Modifier.weight(1f).padding(vertical = 2.dp).testTag("item$i"), "Punkt ${i + 1}",
             )
             IconButton(onClick = { onChange(items.toMutableList().also { it.removeAt(i) }) }) { Text("✕", color = c.muted) }
         }
@@ -738,10 +739,7 @@ private fun BlockerSection(form: ReminderForm, blockers: List<Blocker>, actions:
         }
     }
     Row(verticalAlignment = androidx.compose.ui.Alignment.CenterVertically) {
-        OutlinedTextField(
-            text, { text = it }, Modifier.weight(1f).padding(top = 8.dp).testTag("newBlocker"), singleLine = true,
-            placeholder = { Text("Was fehlt noch?") },
-        )
+        GrowingField(text, { text = it }, Modifier.weight(1f).padding(top = 8.dp).testTag("newBlocker"), "Was fehlt noch?")
         TextButton(onClick = { actions.add(text); text = "" }, enabled = text.isNotBlank()) { Text("+", fontSize = 20.sp, color = c.accent) }
     }
     planning?.let { b ->

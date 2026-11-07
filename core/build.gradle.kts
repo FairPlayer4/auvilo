@@ -4,15 +4,17 @@ import org.jetbrains.kotlin.gradle.dsl.JvmTarget
 plugins {
     id("org.jetbrains.kotlin.jvm")
     id("org.jetbrains.kotlinx.kover")
+    // Fakes and the day simulation, shared with the app's tests (real data, RealDataTest).
+    `java-test-fixtures`
 }
 
 java {
-    sourceCompatibility = JavaVersion.VERSION_17
-    targetCompatibility = JavaVersion.VERSION_17
+    sourceCompatibility = JavaVersion.VERSION_21
+    targetCompatibility = JavaVersion.VERSION_21
 }
 
 kotlin {
-    compilerOptions { jvmTarget = JvmTarget.JVM_17 }
+    compilerOptions { jvmTarget = JvmTarget.JVM_21 }
 }
 
 dependencies {

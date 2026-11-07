@@ -1,7 +1,7 @@
 # Anforderungen – avlreminder
 
 > Arbeitsname. AVL = **A**udio / **V**isual / **L**ocation.
-> Stand: 2026-11-03 – umgesetzt bis V1.3a2, V1.3a3 gebaut (Übersicht in Kap. 10). Entscheidungen mit Datum in
+> Stand: 2026-11-05 – umgesetzt bis V1.3b0.2 (gebaut, V1.3b0.1 auf dem Gerät; Übersicht in Kap. 10). Entscheidungen mit Datum in
 > Kap. 9, technisches Design nach Themen in [design.md](design.md). Wird iterativ verfeinert.
 
 ## 1. Vision
@@ -61,7 +61,7 @@ als eigenständige Verwaltungs-App.
 
 | Stufe | Inhalt | Technik |
 |---|---|---|
-| **V1** | Einzelnutzer, komplett lokal, Kernmechanismen | Kein Backend, Sideload-APK; später Play-Store-Release mit Backend (7.28) |
+| **V1** | Einzelnutzer, komplett lokal, Kernmechanismen | Kein Backend, Sideload-APK |
 | V2 | Abgleich mit Zielen, lokale KI, Zahlenwerte, Backup, **Forschung Bewegungsdaten** (7.16), **Räume und Taster über Home Assistant** (7.19), ggf. GPS-Routen (7.17), **Schnittstelle für KI-Agenten** (7.26) | lokal bzw. im Heimnetz |
 | V3 | Mehrere Personen im Haushalt, gemeinsame Reminder (7.18), KI über Backend, ggf. NFC-Kontrollpunkte (7.15), ggf. **Haushaltsinventar und Einkaufsliste** (7.23) | Lokale Synchronisation zwischen den Handys – Backend nur, wenn nötig |
 
@@ -72,7 +72,7 @@ Zielen** (V2), **Abstimmung mehrerer Personen** (V3).
 
 | Reminder | Art | Charakter | Bemerkung |
 |---|---|---|---|
-| Training unter der Woche | Tagesangebot bei Ankunft zuhause / 19 Uhr + **Wochenziel 3–4×** | Überwindung | Nie eine Woche ganz ohne Training; Freitext + Audio |
+| Training unter der Woche | Tagesangebot bei Ankunft zuhause / 19:30 + **Wochenziel 3–4×** | Überwindung | Nie eine Woche ganz ohne Training; Freitext + Audio |
 | Katzenbrunnen reinigen | wiederkehrend ab letzter Erledigung | Dokumentation | Foto als Nachweis naheliegend |
 | Kontaktlinsen wechseln | wiederkehrend ab letzter Erledigung | Dokumentation | |
 | Wartung diverser Dinge | wiederkehrend, teils kalendarisch | Dokumentation | |
@@ -87,14 +87,18 @@ Zielen** (V2), **Abstimmung mehrerer Personen** (V3).
 
 ### 5.1 Beispiel Training (Regeln im Detail)
 - Montag–Freitag wird Training **angeboten**:
-  - Ankunft zuhause vor 19 Uhr → Reminder bei Ankunft.
-  - Schon zuhause (Homeoffice) → Reminder um 19 Uhr.
-  - Um 19 Uhr nicht zuhause → Training **entfällt** für heute (neutral).
+  - Ankunft zuhause im Zeitraum vor 19:30 (18:00–19:30, 7.29) → Reminder bei Ankunft.
+  - Schon zuhause (Homeoffice) → Reminder um 19:30.
+  - Um 19:30 nicht zuhause → Training **entfällt** für heute (neutral).
+  - Schon verschoben oder geschlummert und dann nicht zuhause → klingelt bei Ankunft,
+    sonst zur Tagesgrenze **verpasst** (7.29 OZ5).
 - Tatsächlich bewertet wird das **Wochenziel**: Ziel 3–4×, Minimum 1×.
   Eine Woche ganz ohne Training darf nicht passieren.
 
-Die Regel "um 19 Uhr nicht zuhause → entfällt" macht eine Erkennung von
+Die Regel "um 19:30 nicht zuhause → entfällt" macht eine Erkennung von
 Homeoffice-Tagen überflüssig: Es zählt nur, ob man zum Zeitpunkt am Ort ist.
+Seit 2026-11-04 zählt eine Ankunft nur im Zeitraum vor der Uhrzeit (z. B. 90 min),
+erkannt über das WLAN (7.29; GPS später, 7.30).
 
 ## 6. Reminder-Modell (Entwurf)
 
@@ -130,10 +134,15 @@ Die Einordnung ist vorläufig.
     150 m, Vorbeifahren am Zuhause zählte als Ankunft). Ankunft erst nach einer
     kurzen **Verweildauer** werten (einstellbar, z. B. 2–5 min; Wert zeigt sich in
     der Praxis), optional zusätzlich Verbindung mit dem Heim-WLAN als Bestätigung.
+    Ab 7.29 gilt: **erkannte Ankunft** = WLAN des Orts verbunden oder Geofence-Meldung
+    nach der Verweildauer – je nachdem, was zuerst kommt (GPS später, 7.30). Die
+    Verweildauer gilt nur für den Geofence; der Puffer (OZ4) läuft ab der erkannten
+    Ankunft (2026-11-05).
   - Nach einem Neustart den Standort aktiv prüfen, statt auf die automatische
     Meldung zu warten.
-- T2b Kombination Ort + Uhrzeit: "bei Ankunft, sonst um 19 Uhr falls schon dort,
-  sonst entfällt" **[V1]**
+- T2b Kombination Ort + Uhrzeit: "bei Ankunft, sonst um 19:30 falls schon dort,
+  sonst entfällt" **[V1]**. Wird zum Ankunftszeitraum mit Vorlauf und WLAN
+  (7.29, 2026-11-04; GPS später, 7.30).
 - T3 Kontext: WLAN, Bluetooth-Gerät (Auto, Kopfhörer), Ladegerät [später]
 - T4 Kalender: vor/nach Terminen [später]
 - T5 Aktivität: z. B. Gerät entsperrt, bestimmte App geöffnet [später]
@@ -146,6 +155,10 @@ Die Einordnung ist vorläufig.
 - **Eskalation, wenn es knapp wird** (Ziel nur noch mit allen restlichen Tagen erreichbar) **[V1]**
 - Bei Fristen: häufig erinnern (Intervall pro Reminder), Option **"auf morgen
   verschieben"**, solange die Frist weit genug weg ist **[V1]**
+- **Nach Ablauf der Frist** (2026-11-05): Der Termin zählt als **verpasst** und bleibt
+  als **überfällig** in *Heute*, klingelt in seinem nächsten Fenster weiter, bis er
+  erledigt oder bewusst *verworfen* ist. Der Notaus (7.28 PS7) ändert daran nichts:
+  „Fristen bleiben hart“ heißt, der Notaus macht eine Frist nicht neutral.
 
 ### 7.3 Wahrnehmung sicherstellen (Audio / Visual)
 - **Eskalation** = auffällig oder wirklich blockierend: Vollbild-Reminder oder
@@ -155,8 +168,8 @@ Die Einordnung ist vorläufig.
   - **Sichtbar:** Vollbild (damit man es sieht, wenn das Handy lautlos auf dem
     Tisch liegt) + Signal je nach Einstellung, meist **Vibration**. Gilt
     ausdrücklich auch während der Arbeitszeit.
-  - **Ab 18 Uhr – laut:** zusätzlich richtig laut (Alarmton wie ein Wecker), wenn
-    der Reminder es erlaubt.
+  - **Laut ab** (einstellbar, Standard 18 Uhr): zusätzlich richtig laut (Alarmton
+    wie ein Wecker) – nur bei Strenge *streng* (7.9).
   - **"Nicht stören" statt fester Ruhezeiten** **[V1.1]**: Ist auf dem Handy
     "Nicht stören" aktiv (auch Prioritätsmodus oder ein Samsung-Modus, der es
     einschaltet), kommt nur eine stille Benachrichtigung. Grund: "Nicht stören" ist
@@ -177,6 +190,10 @@ Die Einordnung ist vorläufig.
   - **Tagesgrenze** **[V1.1]**, einstellbar, Standard **23 Uhr**: Was bis dahin ohne
     Reaktion offen ist, gilt als **verpasst** (bisher: Ende des Fensters um 21 Uhr).
     Unabhängig von "Nicht stören".
+- **Mehrere Reminder gleichzeitig fällig** (2026-11-05, geplant mit V1.3b): Es gibt
+  immer nur **ein Vollbild** zur Zeit. Der nächste wartet mit dem Hinweis *+1 wartet*
+  und erscheint, sobald das erste erledigt, verschoben oder ausgelassen ist. Seine
+  Runden laufen derweil weiter, er verliert also keine Eskalation.
 - **Eigene Vibrationsmuster**: länger und ungewöhnlich, damit man sie von normalen
   Benachrichtigungen unterscheidet **[V1]**
 - Besprechungen: kein Kalenderabgleich; Schnellknopf *nach dem Termin* (+30/60 min) reicht.
@@ -189,7 +206,8 @@ Die Einordnung ist vorläufig.
   "auch bei Nicht stören", siehe 7.3), Alarmton wie
   ein Wecker **[V1]**
 - W3 Overlay über anderen Apps [später]
-- W4 Vibrationsmuster, Galaxy Watch **[V1.3 / V1.4]** (siehe 7.14)
+- W4 Vibrationsmuster, Galaxy Watch **[V1.3 / V1.4]** (siehe 7.14; Vollbild-Alarme
+  erreichen die Uhr seit V1.1 über G1b)
 - W5 Sprachausgabe (TTS) mit Aufgabentext [später]
 
 ### 7.4 Aktionen im Reminder/Alarm
@@ -209,6 +227,13 @@ Erster Satz, wird mit der Nutzung angepasst: **[V1]**
     Tagesgrenze (7.3) hinausführen würde, wird ausgeblendet.
 - *Verschieben auf …* (zählt gegen das Limit; "morgen" als Schnellwahl)
 - *Auslassen (mit Grund)* – zählt **neutral**
+- **Drei Knöpfe in der Benachrichtigung** (2026-11-05): Android zeigt höchstens drei.
+  Welche, hängt an der Art des Reminders:
+  - mit Durchführung (7.11): *Ich starte jetzt* · ein *Später* · *Erledigt*
+  - mit Checkliste (7.13): *Erledigt: ‹nächster Punkt›* · ein *Später* · *Rest später*
+  - sonst: *Erledigt* · bis zu zwei *Später*-Knöpfe (wie oben)
+  - *Erledigt* fehlt, wenn ein Nachweis gefordert ist; dann öffnet ein Tippen den Alarm.
+  - Der Vollbild-Alarm zeigt immer alle Aktionen.
 
 ### 7.5 Erledigung nachweisen
 - **Nachweisart pro Reminder wählbar** (keiner, Foto, Text, Ort, Audio,
@@ -229,7 +254,8 @@ Erster Satz, wird mit der Nutzung angepasst: **[V1]**
 - N2 **Foto-Nachweis**, nur mit der App-Kamera aufgenommen (nicht aus der Galerie),
   mit Zeitstempel **[V1]**
 - N4 **Ortsnachweis**: Standort beim Nachweis wird gespeichert und optional gegen
-  einen erwarteten Ort geprüft (kombinierbar mit Foto) **[V1]**
+  einen erwarteten Ort geprüft (kombinierbar mit Foto) **[später]** (2026-11-05: in
+  V1 nicht umgesetzt und nicht vermisst; kommt frühestens mit den Orten aus 7.29)
 - N7 **Audio-Nachweis**: kurze Sprachaufnahme "was habe ich erledigt" **[V1.1]**
   - **Mindestdauer** pro Reminder einstellbar (z. B. 10 s).
   - Im Verlauf abspielbar; später Abschrift per lokaler KI (N8), damit man darin
@@ -247,6 +273,10 @@ Erster Satz, wird mit der Nutzung angepasst: **[V1]**
 - **Fehlender Nachweis:** Wird ein geforderter Nachweis nicht erbracht, gilt der
   Reminder als **nicht erfolgreich** und wird so markiert. Kommt vor und ist in
   Maßen unkritisch – kein Drama, aber ehrlich in der Statistik. **[V1]**
+  - Genauer (2026-11-05): *nicht erfolgreich* entsteht nur, wenn man den Reminder
+    ausdrücklich ohne Nachweis abschließt. Bleibt der Nachweis einfach offen, läuft
+    die Eskalation nach der Nachweis-Frist weiter (N0), und zur Tagesgrenze ist der
+    Termin **verpasst**.
 - N3 NFC-Kontrollpunkte (7.15) [V3]; QR-Codes [später]
 - N10 **Raum** oder **Taster** über Home Assistant als Nachweis – siehe 7.19 [V2]
 - N5 Quiz/Rechenaufgabe gegen "im Halbschlaf wegdrücken" [später]
@@ -287,6 +317,7 @@ Erster Satz, wird mit der Nutzung angepasst: **[V1]**
 ### 7.8 Überblick
 - O1 **Übersicht morgens** (was steht heute an) und **abends** (Rückblick auf heute,
   Stand der Wochenziele, Vorschau auf morgen). Zeiten und Umfang einstellbar. **[V1]**
+  Bei mehreren Uhrzeiten (7.25 VS1) steht jede Uhrzeit einzeln drin (2026-11-04).
 - O2 Rückblick ist Teil der Übersicht (Tag; Woche/Monat in der Statistik) **[V1]**
 
 ### 7.9 Bedienung
@@ -295,7 +326,8 @@ Erster Satz, wird mit der Nutzung angepasst: **[V1]**
   (Startwerte, Refinement mit der Nutzung): **[V1]**
   - *locker*: Banner + Vibration, alle 10 min wiederholt, Quittieren, Verschieben unbegrenzt
   - *normal*: Vollbild-Alarm wie ein Wecker, aber ohne Ton; Nachweis wählbar, 3× Verschieben
-  - *streng*: Vollbild-Alarm, Nachweis Pflicht, 1× Verschieben, Minimum max. 1×/Woche
+  - *streng*: Vollbild-Alarm, ab *laut ab* mit Alarmton (7.3), Nachweis Pflicht,
+    1× Verschieben, Minimum max. 1×/Woche
 - UI wird sich mit der tatsächlichen Nutzung stark anpassen → früh benutzbare
   Version wichtiger als vollständige Planung.
 - **Reminder-Liste aufgeräumt halten** (aus der Nutzung, 2026-10-29): **[V1.2]**
@@ -312,23 +344,31 @@ Erster Satz, wird mit der Nutzung angepasst: **[V1]**
     *Name*, *zuletzt angelegt*. Die Wahl bleibt gespeichert. Weitere Optionen erst,
     wenn sie fehlen.
 
-### 7.10 Lebenszyklus eines Reminders (Entwurf)
+### 7.10 Lebenszyklus eines Reminders
+Der genaue Ablauf mit allen Zuständen steht in [design.md 3](design.md); hier die Sicht
+des Nutzers (Stand 2026-11-05):
 
 ```
-geplant ─► Vorab-Reminder ─► fällig ─► eskaliert
+geplant ─► Vorab-Reminder ─► fällig ─► eskaliert (Runden)
    │                          │
    ├─► vorab erledigt / vorgezogen gestartet (vor der Fälligkeit – siehe 7.20)
+   ├─► entfällt (Gelegenheit trat nicht ein, z. B. um 19:30 nicht zuhause – neutral)
+   ├─► ausgelassen (Wochenziel schon erreicht, Notaus vor der Fälligkeit, pausiert – neutral)
    │                          ├─► läuft (Ich starte jetzt, Timer/Ablauf, Nachfragen – siehe 7.11)
    │                          │     └─► endet wie unten: Ziel / Minimum / abgebrochen (nicht erfolgreich)
    │                          ├─► teilweise erledigt (Checkliste: Restpunkte auf später – siehe 7.13)
-   │                          ├─► erledigt (Ziel)
-   │                          ├─► erledigt (Minimum)
-   │                          ├─► nicht erfolgreich (Nachweis fehlt)
-   │                          ├─► verschoben (neuer Zeitpunkt, zählt gegen Limit)
+   │                          ├─► erledigt (Ziel) / erledigt (Minimum)
+   │                          ├─► nicht erfolgreich (ausdrücklich ohne Nachweis abgeschlossen)
+   │                          ├─► später (+x min, ohne Limit) / verschoben (zählt gegen das Limit)
+   │                          │     └─► klingelt wieder; bei Ankunft-Remindern erst bei Ankunft (7.29 OZ5)
    │                          ├─► ausgelassen (bewusst, mit Grund – neutral)
-   │                          └─► verpasst (keine Reaktion bis Ende der Gelegenheit)
-   └─► entfallen (Gelegenheit trat nicht ein, z. B. um 19 Uhr nicht zuhause – neutral)
+   │                          └─► verpasst (keine Reaktion bis zur Tagesgrenze bzw. zum nächsten Termin)
+   └─► Frist abgelaufen ─► verpasst, bleibt *überfällig* bis erledigt oder verworfen (7.2)
 ```
+
+Pausierte und archivierte Reminder (7.9 L2) erzeugen keine Termine; ein offener Termin
+wird beim Pausieren ausgelassen. Fortsetzen plant den nächsten Termin ab jetzt, ohne
+verpasste Termine nachzumelden.
 
 ### 7.11 Durchführung mit Timer – "Ich starte jetzt"
 Für Reminder, bei denen das Tun selbst Zeit braucht (Training, Aufräumen, Lernen).
@@ -357,6 +397,20 @@ Pro Reminder einschaltbar. **[V1.3]**
   Sitzungen (z. B. "6 min schneller als im Schnitt"). Positive Verstärkung, kein Druck.
 - Technik: Foreground-Service mit laufender Benachrichtigung (wie der Alarm),
   Nachfragen als exakte Alarme – überlebt Bildschirm aus und App im Hintergrund.
+- D7 **Sitzung und andere Regeln** (2026-11-05, Review-Lauf 3; Technik in design.md E.3):
+  - Eine laufende Sitzung wird **nicht verpasst**: weder zur Tagesgrenze noch beim
+    nächsten Termin eines *mehrmals täglich*-Reminders noch am Fensterende einer Frist.
+    Sie endet nur über die Nachfragen oder die maximale Dauer (D5). Über die
+    Tagesgrenze hinaus zählt sie für den Tag, an dem sie begann. Der nächste Termin
+    desselben Reminders wartet, bis die Sitzung endet.
+  - **Notaus** (7.28 PS7): Die Nachfragen kommen still; nach der maximalen Dauer endet
+    die Sitzung wie in D5, mit erledigten Teilschritten als Minimum, sonst *abgebrochen*.
+  - **„Nicht stören“**: Nachfragen kommen still wie jeder andere Alarm (7.3); die
+    Reaktionszeit für die letzte Nachfrage beginnt erst, wenn sie hörbar sein darf.
+  - Pausieren, Archivieren, Bearbeiten und die Schnittstelle ändern eine laufende
+    Sitzung nicht (wie beim klingelnden Reminder, 7.26 AG11).
+  - Klingelt währenddessen ein anderer Reminder, gilt *ein Vollbild zur Zeit* (7.3);
+    die Sitzung läuft im Hintergrund weiter.
 
 ### 7.12 Abläufe – gut geregeltes Training
 Keine Trainings-App, aber der **Mechanismus für ein gut geregeltes Training** gehört
@@ -402,6 +456,10 @@ schafft oder schaffen will. **[V1.1]**
   wenn am selben Tag mindestens ein Punkt erledigt wurde; sonst schon.
 - C6 Nachweis wahlweise **pro Punkt** (Foto je Brunnen) oder einmal für alles.
 - C7 Verlauf zeigt pro Punkt, wann er erledigt wurde.
+- C8 **Punkte jederzeit abhaken** (2026-11-04): im Formular *Punkte abhaken ›* öffnet den
+  offenen Termin wie *Vorab erledigen*; *Fertig für jetzt – Termin bleibt* geht ohne
+  Abschluss zurück, der nächste Zeitpunkt ändert sich nicht. Im Alarm sind die Punkte
+  schlichte Zeilen (kleiner Radius, mehrzeilig), damit lange Punkte lesbar bleiben.
 
 ### 7.14 Galaxy Watch
 Guter Hebel für neue Anforderungen; zuerst so viel wie möglich über
@@ -409,9 +467,9 @@ Guter Hebel für neue Anforderungen; zuerst so viel wie möglich über
 - G1 Erinnerungen, Eskalation und Vibration kommen **auf der Uhr** an.
   ✅ Schon mit V1.0 beobachtet: Benachrichtigung samt *Erledigt* und *+10 min*
   erscheint auf der Uhr – **aber nur bei "locker"** (stille Benachrichtigung).
-  ⚠️ "normal" und "streng" kommen nicht an (beobachtet 2026-10-26). Ursache
-  vermutlich: Der Vollbild-Alarm ist eine laufende Vordergrund-Benachrichtigung,
-  und solche spiegelt Android nicht auf die Uhr.
+  "normal" und "streng" kamen anfangs nicht an (beobachtet 2026-10-26): Der
+  Vollbild-Alarm ist eine laufende Vordergrund-Benachrichtigung, und solche spiegelt
+  Android nicht auf die Uhr. ✅ Gelöst mit G1b (V1.1).
 - G1b **Vollbild-Alarme auch auf der Uhr** **[V1.1]**: Zusätzlich zum Vollbild-Alarm
   eine normale, spiegelbare Benachrichtigung mit *Erledigt* / *+10 min*, die mit dem
   Alarm verschwindet; die Uhr vibriert bei jeder Eskalationsrunde. Auf dem Handy
@@ -543,7 +601,7 @@ das ohne Umweg tun können – und es soll sich gut anfühlen.
   - *fester Kalender-Rhythmus*: Erledigt wird der nächste Termin; der übernächste
     bleibt, wo er ist.
   - *Wochenziel*: Zählt für die Woche, in der es erledigt wurde.
-  - *Tagesangebot mit Bedingung* (Training bei Ankunft / 19 Uhr): Wurde heute schon
+  - *Tagesangebot mit Bedingung* (Training bei Ankunft / 19:30): Wurde heute schon
     trainiert, kommt das Angebot heute nicht mehr.
   - *Checkliste*: Einzelne Punkte vorab abhaken; der Reminder kommt nur mit den
     Restpunkten.
@@ -762,7 +820,8 @@ soll helfen, die Reminder einzuhalten: planen, Vorarbeit erledigen, motivieren.
   - **Freigabe:** Schalter in den Einstellungen, Standard aus, mit Rückfrage. Solange er
     an ist, steht das sichtbar in den Einstellungen; ohne Freigabe antwortet die
     Schnittstelle nur „nicht freigegeben“.
-  - **Lesen:** Reminder, offene Fälligkeiten, Verlauf, Statistik, Blocker, Einstellungen.
+  - **Lesen:** Reminder, offene Fälligkeiten, Verlauf, Statistik, Blocker; Einstellungen
+    später.
   - **Schreiben:** Reminder anlegen, bearbeiten, pausieren, archivieren; Blocker anlegen.
     Immer über dieselben Befehle wie die Oberfläche (Prüfung, Alarme neu planen).
   - **Nicht (AG5):** nichts erledigen oder auslassen, keinen Alarm beenden, keine
@@ -773,7 +832,7 @@ soll helfen, die Reminder einzuhalten: planen, Vorarbeit erledigen, motivieren.
   - **Nur im Debug-Build** (Sideload); der Play-Store-Release bekommt stattdessen die
     Agenten-Schnittstelle aus AG1–AG10.
   - Umsetzung: design.md 15. Einstellungen liest die Schnittstelle vorerst nicht; ein
-    neuer Reminder ohne Angabe ist *festhalten* (Überwinden braucht die vier Startklar-Antworten).
+    neuer Reminder ohne Angabe ist *Dokumentation* (*Überwindung* braucht die vier Startklar-Antworten).
 
 ### 7.27 Nutzung beobachten, Funktionen trimmen, Schlupflöcher bremsen
 Stand 2026-11-02: Die App funktioniert im Alltag sehr gut. Mit V1.2c ist aber viel
@@ -817,6 +876,12 @@ Vordergrund, nicht Reichweite.
   (*ausgelassen – Notaus*) nur, wenn die Pause vor der Fälligkeit begann, sonst
   *verpasst*; Fristen bleiben hart (2026-11-03). Endet die Pause, ob von selbst oder von
   Hand, klingelt eine offene Fälligkeit sofort (2026-11-03).
+  - Genauer (2026-11-05): Ein Termin bleibt unter Notaus **offen** bis zur Tagesgrenze
+    (bzw. bis zum nächsten Termin). Erst dann wird entschieden: Pause noch aktiv und vor
+    der Fälligkeit begonnen → *ausgelassen – Notaus*, neutral für die Serie. Sonst
+    *verpasst* wie jeder andere verpasste Termin (Serie und Joker wie in 7.7).
+  - „Fristen bleiben hart“: Eine abgelaufene Frist ist mit oder ohne Notaus *verpasst*
+    und bleibt *überfällig* (7.2). Der Notaus macht sie nicht neutral.
 - PS8 **Backend nur nach ausdrücklichem Einschalten.** Ohne Zustimmung keine Anmeldung,
   keine Verbindung; die App bleibt vollständig lokal nutzbar.
 - PS8a **Einstellungen im Backup** (2026-11-03): Das Backup B2b enthält neben der
@@ -828,7 +893,181 @@ Vordergrund, nicht Reichweite.
   (2026-11-02)** – Android-Sandbox, dateibasierte Verschlüsselung und `allowBackup=false`
   reichen; der Play-Store-Release ist ein Release-Build (nicht debuggable, kein
   `run-as`). Kein SQLCipher, solange kein konkreter Fall übrig bleibt.
-- Backend-Stand und was es für die App bedeutet: [backend.md](backend.md).
+- Backend-Stand und was es für die App bedeutet: [backend.md](backend.md); Einbindung des
+  Cloud-Backups: [backup-entwurf.md](backup-entwurf.md) (bestätigt 2026-11-07).
+
+### 7.29 Ankunft im Zeitraum mit WLAN (2026-11-04, ohne GPS seit 2026-11-05)
+**Anlass:** Am 2026-11-04 klingelte *Training* (19:30, Ankunft zuhause, sonst entfällt)
+um 07:12, weil der Geofence morgens eine Ankunft meldete. Eine früheste Uhrzeit gibt es
+bisher nicht (T2b). Abends klingelte der auf 20:30 verschobene Termin auf dem Heimweg:
+Die grobe Ortsabfrage ergab vermutlich „unklar“, und dann klingelt die App. Die Ankunft
+wurde erst um 20:34 gemeldet. Ziel: **Man wird zuverlässig ausgelöst, wenn man ankommt**
+(mit Puffer), und nicht, solange man noch nicht da ist.
+
+**Einfach anfangen (Kevin, 2026-11-05):** Den Ort bestimmt zuerst **nur das WLAN**. Für
+Zuhause und Arbeit reicht das, und auch viele andere Orte haben ein eindeutiges WLAN. Die
+genaue Ortsprüfung per GPS ist nach **7.30** ausgelagert und kommt später.
+
+- OZ1 **Ankunftszeitraum pro Reminder:** Statt nur einer Uhrzeit gibt es einen Zeitraum
+  mit einer **spätesten Uhrzeit** und einem **Vorlauf**. Beispiel Training: spätestens
+  19:30, Vorlauf 90 min, also Zeitraum 18:00–19:30.
+  - Ankunft im Zeitraum → der Reminder klingelt bei Ankunft (plus Puffer, OZ4).
+  - Ankunft vor dem Zeitraum (z. B. morgens) zählt nicht als Ankunft. Das
+    Diagnose-Log vermerkt sie als „zu früh“.
+  - Ist man beim Beginn des Zeitraums schon da (Homeoffice), klingelt er zur
+    spätesten Uhrzeit wie bisher (5.1, F2).
+  - Zur spätesten Uhrzeit klar nicht da → entfällt für heute, neutral (5.1, F1).
+  - Im Zeitraum angekommen, wieder weg und wieder da (2026-11-05): Es zählt die erste
+    erkannte Ankunft. Hat der Reminder schon geklungen, läuft er normal weiter;
+    sonst klingelt er bei der nächsten Ankunft im Zeitraum.
+- OZ2 **Prüfung im Zeitraum (nur WLAN):** Innerhalb des Zeitraums prüft die App den Ort
+  alle **15–30 min** (pro Reminder einstellbar, Standard 20 min), dazu beim Beginn und zur
+  spätesten Uhrzeit. Eine Prüfung liest nur den WLAN-Zustand (OZ3) und kostet praktisch
+  keinen Strom. Sie fängt den Fall ab, dass Android eine Verbindung nicht meldet.
+  - Mehrere Reminder am selben Ort teilen sich eine Prüfung. Haben sie verschiedene
+    Prüfabstände, gilt der **kürzeste** (2026-11-05).
+  - Ergebnis *da* → Auslösen (mit Puffer). *Klar weg* → nächste Prüfung. *Unklar* →
+    nächste Prüfung. Ist es zur spätesten Uhrzeit immer noch unklar, gilt der Rückfall
+    wie bisher (Geofence-Stand und grobe Ortsabfrage, design.md 6); bleibt es dann
+    unklar, klingelt er, damit nichts verloren geht.
+- OZ3 **WLAN als Ortssignal:** Jeder Ort kann ein oder mehrere WLANs haben (beim
+  Festlegen des Orts übernehmen: „mit diesem WLAN verbunden“).
+  - Gemerkt wird die **Kennung der Zugangspunkte** (BSSID), nicht nur der Name: Namen
+    wie „FRITZ!Box“ gibt es oft mehrfach. Bei Mesh oder 2,4/5 GHz übernimmt die App alle
+    Zugangspunkte desselben Netzes, die sie beim Festlegen sieht. Der Name dient nur
+    zur Anzeige.
+  - **Da:** mit einem WLAN des Orts verbunden. Android meldet das Verbinden von selbst,
+    auch wenn die App nicht läuft. Im Zeitraum zählt es sofort als Ankunft, ohne auf die
+    nächste Prüfung zu warten.
+  - **Klar weg:** nicht verbunden, und eine aktuelle WLAN-Suche (höchstens 10 min alt)
+    zeigt **kein** WLAN des Orts. Die Suche macht Android selbst, auch bei
+    ausgeschaltetem WLAN, solange die WLAN-Suche in den Standort-Einstellungen an ist.
+  - **Unklar:** nicht verbunden und keine aktuelle Suche, oder ein WLAN des Orts ist in
+    Reichweite, ohne dass sich das Handy verbindet.
+  - Der Geofence bleibt zusätzlich bestehen (Ankunft ohne WLAN), mit Verweildauer (T2).
+- OZ4 **Puffer nach der Ankunft:** Zwischen erkannter Ankunft und Alarm liegt ein
+  Puffer, damit man erst reinkommt (Standard 5 min, pro Reminder 0–30 min). Bei einer
+  Ankunft kurz vor der spätesten Uhrzeit verschiebt der Puffer den Alarm auch über sie
+  hinaus.
+  - Genauer (2026-11-05): **Alarm = erkannte Ankunft + Puffer.** Erkannt heißt: WLAN
+    des Orts verbunden oder Geofence-Meldung nach der Verweildauer (T2).
+    Ist man im Puffer kurz wieder weg (Auto umparken), bricht das den Alarm nicht ab.
+- OZ5 **Verschoben oder geschlummert behält die Ortsbedingung:** Zur neuen Zeit gilt
+  dieselbe Prüfung wie zur spätesten Uhrzeit. Ist man noch nicht da, klingelt der
+  Termin bei Ankunft, spätestens bis zum Tagesende; danach zählt er wie ein nicht
+  erledigter Termin. Wer verschiebt, hat sich für heute entschieden.
+  - Genauer (2026-11-05, Review-Lauf 3, Frage 1): Hat der Termin schon geklungen, gilt
+    zur neuen Zeit: *da* → klingelt; *klar weg* **oder** *unklar* → er wartet auf die
+    Ankunft (Prüfungen im Prüfabstand) und klingelt dann; ohne Ankunft ist er zur
+    Tagesgrenze **verpasst**, nie *entfällt*. Damit klingelt *unklar* nicht mehr auf
+    dem Heimweg.
+  - Umgesetzt in V1.3b0.2 für *klar weg* und *unklar* (Warten auf die Ankunft,
+    *verpasst* zur Tagesgrenze); die Prüfungen im Prüfabstand kommen mit 7.29.
+- OZ6 **Weitere Orte:** Orte sind allgemein (Zuhause, Arbeit, Fitnessstudio, später
+  Geschäfte, 7.23 E2), jeder mit Mittelpunkt, Radius und WLANs. Ein Reminder wählt
+  seinen Ort. Für den Anfang reicht die Oberfläche für Zuhause plus ein weiterer Ort.
+  Ein Ort ohne WLAN funktioniert weiter wie bisher über den Geofence.
+- OZ7 **Strom:** Kein GPS (7.30). WLAN-Zustand und Ergebnisse der WLAN-Suche zu lesen
+  kostet nichts; die App startet keine eigene Suche.
+- OZ8 **Nachvollziehbar:** Das Diagnose-Log schreibt jede Prüfung mit Quelle (WLAN
+  verbunden, WLAN-Suche, Geofence, Rückfall), Ergebnis (da, weg, unklar), Alter der Suche
+  und Grund („zu früh“, „Puffer bis 18:47“), ohne Koordinaten, ohne WLAN-Namen und ohne
+  Kennungen. Später zeigt die App das verständlich an (7.28 PS6: warum es klingelte
+  oder nicht).
+
+- OZ9 **Gilt für** (2026-11-05, Review-Lauf 3, Frage 3):
+  - Ankunft **mit Uhrzeit** (Training): alles aus 7.29.
+  - *Wenn ich zuhause bin* (ohne Uhrzeit): WLAN zählt zusätzlich als Ankunft (OZ3),
+    keine Prüfungen und kein Zeitraum.
+  - Die Option *trotzdem klingeln* (statt *entfällt*, wenn man zur spätesten Uhrzeit
+    nicht da ist) bleibt wie heute: Sie klingelt zur spätesten Uhrzeit, egal wo man ist.
+    Der Zeitraum gilt auch dort für eine frühere Ankunft.
+  - Bestehende Ankunfts-Reminder bekommen die Standardwerte aus F3 (Vorlauf 90 min,
+    Puffer 5 min, Prüfabstand 20 min). Kevin bekommt bei der Umstellung einen Hinweis.
+
+**Entschieden (2026-11-04, Kevin übernimmt die Vorschläge):**
+- F1 Zur spätesten Uhrzeit nicht da: **entfällt** wie bisher, keine Nachfrist.
+- F2 Schon zu Beginn des Zeitraums da: klingelt zur **spätesten Uhrzeit** (wie 5.1).
+- F3 Standardwerte: Puffer 5 min, Prüfabstand 20 min, Vorlauf 90 min.
+
+Kevin hat die Anforderungen am 2026-11-05 im Ganzen gelesen; 7.29 ist damit für das
+Design freigegeben.
+
+### 7.30 Genaue Ortsprüfung per GPS [später] (aus 7.29 ausgelagert, 2026-11-05)
+Für Orte ohne eigenes WLAN (Fitnessstudio, Geschäfte, unterwegs) und als zweite Meinung,
+wenn das WLAN *unklar* sagt. Kommt erst, wenn 7.29 im Alltag läuft und solche Orte
+gebraucht werden; Zuhause und Arbeit brauchen es voraussichtlich nicht.
+- GP1 **Nur im Zeitraum:** GPS mit hoher Genauigkeit nur innerhalb eines
+  Ankunftszeitraums (7.29 OZ1) und nur, wenn das WLAN nichts Eindeutiges sagt.
+  Außerhalb kein GPS.
+- GP2 **Messung mit Genauigkeit:** pro Prüfung mehrere Fixes über höchstens 30 s,
+  Abbruch, sobald die Genauigkeit 20 m oder besser ist. Bewertung: *da*, wenn Entfernung
+  plus Genauigkeit innerhalb des Radius liegt; *klar weg*, wenn Entfernung minus
+  Genauigkeit außerhalb liegt; sonst *unklar*.
+- GP3 **Erst messen:** Vor dem Einsatz eine Ansicht *Orte prüfen* im Debug-Build
+  (Entfernung, Genauigkeit, Quelle und WLAN-Treffer pro Ort) und ein paar Tage Messung
+  im Alltag: Wie genau ist es drinnen, wie lange dauert ein Fix im Hintergrund?
+- GP4 **Hintergrund:** Reicht ein exakter Alarm nicht für einen frischen Fix, ein kurzer
+  Vordergrunddienst vom Typ Standort, der nach dem Fix endet.
+- GP5 **Strom:** höchstens eine Prüfung pro Ort und Intervall, jede mit Zeitlimit; die
+  Diagnose zählt die Fixes pro Tag.
+- GP6 **Datenschutz:** kein Bewegungsprofil. Gespeichert werden nur die festgelegten
+  Orte und Ergebnisse der Prüfungen (Entfernung, Genauigkeit, Quelle, Zeit), keine
+  Koordinaten der Messungen.
+
+### 7.31 Erledigung zurücknehmen (2026-11-07)
+Manchmal verklickt man sich: *Erledigt* statt *Später*, oder bei mehreren Uhrzeiten die
+falsche. Zurücknehmen soll schnell gehen, aber kein Schlupfloch sein.
+- ZR1 **Wo:** Nach *Erledigt* oder *Auslassen* im Alarm, in der Benachrichtigung oder auf
+  der Uhr kommt eine stille Benachrichtigung „‹Titel› erledigt · Rückgängig“, die nach
+  1 min verschwindet. Danach steht auf *Heute* unter *Erledigt* bei jedem Eintrag
+  *Zurücknehmen* (mit Rückfrage). Über die Schnittstelle für Claude gibt es kein
+  Zurücknehmen.
+- ZR2 **Was danach gilt:** Der Termin ist wieder offen und klingelt in 10 min. Das zählt
+  nicht als *Später* oder *Verschieben* (keine Limits verbraucht).
+- ZR3 **Was geht:** *Erledigt* (Ziel, Minimum, ohne Nachweis) und *Auslassen* von Hand.
+  Was die App selbst setzt (*verpasst*, *entfällt*, ausgelassen wegen Pause, Notaus,
+  Planänderung, Verwerfen, Wochenziel erreicht), bleibt.
+- ZR4 **Wie lange:** Nur der letzte erledigte Termin eines Reminders, solange der nächste
+  noch nicht geklungen hat und der zurückgenommene noch vor der Tagesgrenze (mehrmals
+  täglich: vor der nächsten Uhrzeit, Frist: vor dem Fensterende) klingeln kann. Ein
+  pausierter Reminder lässt sich nicht zurücknehmen.
+- ZR5 **Mehrere Uhrzeiten:** Nur diese eine Uhrzeit geht zurück; der schon geplante
+  nächste Termin fällt weg und kommt nach der neuen Erledigung wieder.
+- ZR6 **Checklisten:** Nur der Haken, der die Liste abgeschlossen hat, geht zurück
+  (bei *Alles erledigt* alle dabei gesetzten); frühere Haken bleiben.
+- ZR7 **Nachweise** bleiben gespeichert. War er vollständig, zählt er beim nächsten
+  *Erledigt* wieder; die App fragt nicht noch einmal danach (auch nicht „gleicher Text
+  wie beim letzten Mal“).
+- ZR8 **Verlauf und Zahlen:** Das Ereignisprotokoll bleibt unverändert, dazu kommt das
+  Ereignis *zurückgenommen*. Statistik, Wochenziel und Serie zählen den Termin erst
+  wieder, wenn er neu erledigt ist. Eine Vorbereitungsaufgabe, die zurückgenommen
+  wird, öffnet ihren Blocker wieder.
+
+### 7.32 Vorab verschieben und auslassen – „heute später“ (2026-11-07)
+Oft ist früh klar, dass man erst später dazu kommt. Dann soll man den Reminder schon
+vorher schieben oder auslassen können, wie man Checklisten-Punkte vorab abhakt.
+- VB1 **Vorab-Bildschirm:** *Vorab* (bisher *Erledigen*) auf *Heute* bei *Später heute*
+  und *Wenn du zuhause bist* öffnet den Alarm-Bildschirm vor der Fälligkeit. Er bietet
+  *Erledigt*, *Minimum*, *Verschieben* und *Auslassen*, aber kein *Später* (es klingelt
+  noch nichts). Es klingelt nichts, das Nachweis-Fenster startet nicht.
+- VB2 **Heute später:** *Verschieben* bietet vorab zuerst „+30 min“, „+1 Std“ und „+2 Std“
+  ab der **geplanten** Zeit (18:00 → 19:00, egal wann man tippt), dann wie bisher
+  *Morgen* und *Datum und Uhrzeit wählen*. Die Knöpfe für heute erscheinen nur, wenn die
+  neue Zeit vor der Tagesgrenze liegt (mehrmals täglich: vor der nächsten Uhrzeit, Frist:
+  vor der Frist).
+- VB3 **Konto:** Vorab verschieben zählt wie Verschieben im Alarm (Limit pro Termin);
+  jedes weitere Verschieben zählt wieder. Ist das Limit erreicht, ist *Verschieben*
+  ausgegraut. Bei *streng* fragt die App vorab nach: „Wirklich jetzt schon auf 19:00?“
+- VB4 **Ort:** Ein vorab verschobener Reminder mit Ankunft behält seine neue Zeit, auch
+  wenn man früher ankommt. Ist man zur neuen Zeit nicht da (oder *unklar*), wartet er auf
+  die Ankunft und ist zur Tagesgrenze *verpasst*, er *entfällt* nicht (wie 7.29 OZ5).
+- VB5 **Vorab-Reminder (T6)** wandern mit der neuen Zeit mit und bekommen den Knopf
+  *Verschieben …*, der den Vorab-Bildschirm öffnet.
+- VB6 **Sichtbar:** Auf *Heute* steht bei einem verschobenen Eintrag „verschoben von 18:00“.
+- VB7 **Schlupfloch:** Der Hinweis bei ständigem *Später* (NT2) zählt Verschieben mit,
+  auch vorab. Vorab ausgelassen oder erledigt lässt sich zurücknehmen (7.31); der Termin
+  kommt dann zur geplanten Zeit, nicht schon in 10 min.
 
 ## 8. Zielplattform und Technik
 
@@ -849,8 +1088,10 @@ vom Nutzer in den Systemeinstellungen erteilt werden.
 |---|---|---|---|
 | T1 Zeit, exakt | ✅ | `AlarmManager.setAlarmClock()` | Umgeht Doze; exakte Alarme manuell erlauben |
 | T2 Geofence | ✅ (mit Latenz) | Play Services Geofencing (Dwell-Übergang für Verweildauer) | Hintergrund-Standort nötig; Auslösung oft 1–5 min verzögert – laut Nutzer akzeptabel; Spike: grob, Vorbeifahren kann auslösen |
-| T2b "um 19 Uhr am Ort?" | ✅ | Alarm + aktueller Geofence-Status / Standortabfrage | |
+| T2b "zur spätesten Uhrzeit am Ort?" | ✅ | Alarm + aktueller Geofence-Status / Standortabfrage | |
 | T3 WLAN/BT/Laden | ✅ teilweise | Broadcasts, `ConnectivityManager` Callbacks | Im Hintergrund nur mit Foreground-Service zuverlässig |
+| 7.29 WLAN als Ort | ✅ | `NetworkCallback` mit Standort-Info (WLAN-Name und BSSID brauchen genauen Standort, Standortdienst an); bei jeder Prüfung den aktuellen WLAN-Zustand und die letzten Suchergebnisse (`WifiManager.getScanResults`) lesen, ohne eigene Suche | Wechsel im Hintergrund nicht garantiert sofort, deshalb zusätzlich die Prüfungen im Zeitraum |
+| 7.30 GPS im Zeitraum [später] | ✅ | exakte Alarme alle 15–30 min, `getCurrentLocation` mit hoher Genauigkeit und Zeitlimit; Hintergrund-Standort ist erteilt | Fix drinnen oft langsam; Empfänger hat ~10 s, sonst kurzer Vordergrund-Dienst (Typ Standort) |
 | T4 Kalender | ✅ | `CalendarContract` | Leseberechtigung |
 | T5 App geöffnet | ⚠️ | `UsageStatsManager` / Accessibility-Service | Funktioniert, aber akkuintensiv bzw. heikle Berechtigung |
 | W1/W2 Vollbild, DND-Bypass | ✅ | Full-Screen-Intent, Alarm-Audiostream | Full-Screen-Intent manuell erlauben |
@@ -883,98 +1124,120 @@ früh am S24 Ultra testen (Spike, siehe Abschnitt 10).
   [entwicklungsumgebung.md](entwicklungsumgebung.md)
 
 ### 8.4 Daten
-- Alle Daten inkl. Fotos und Audio **nur lokal** auf dem Gerät.
+- Alle Daten inkl. Fotos und Audio liegen **lokal** auf dem Gerät. Sie verlassen es nur
+  **Ende-zu-Ende verschlüsselt** im Cloud-Backup und nur, wenn es eingeschaltet ist
+  (7.28 PS8, präzisiert 2026-11-07); Fotos und Audio gar nicht. Dafür braucht die App
+  die Berechtigung `INTERNET` ([backup-entwurf.md](backup-entwurf.md) A-3).
 - **Sensible Daten** (Fotos, Audio, Standorte, Bewegungsdaten) bleiben grundsätzlich
-  **nur auf dem Gerät** – auch in späteren Versionen. Synchronisation mit anderen
-  Geräten im Haushalt (7.18) nur für ausdrücklich geteilte Inhalte.
+  **auf dem Gerät**. Gespeicherte Orte und WLANs verlassen es nur **Ende-zu-Ende
+  verschlüsselt** im Backup B2b (2026-11-05); Fotos, Audio und Bewegungsdaten gar nicht.
+  Synchronisation mit anderen Geräten im Haushalt (7.18) nur für ausdrücklich geteilte
+  Inhalte.
 - Inventar (7.23) zählt zu den sensiblen Daten. Was außerhalb der App mit Fotos und
   Cloud-KI für den Import vorbereitet wird, verantwortet der Nutzer selbst.
 - Rohdaten der Bewegungssensoren (7.16) nach einer einstellbaren Frist löschen;
   das Ergebnis (Dauer, erkanntes Muster) bleibt.
-- Kein Backup in V1 (später nachrüstbar, z. B. Export als ZIP). Das Cloud-Backup des
-  Backends (B2b, [backend.md](backend.md)) ist Ende-zu-Ende verschlüsselt, enthält
-  keine Fotos und kein Audio und läuft nur nach ausdrücklichem Einschalten (7.28 PS8).
+- **Nutzer-Backup** ist das Cloud-Backup des Backends (B2b, [backend.md](backend.md),
+  Einbindung [backup-entwurf.md](backup-entwurf.md)): Ende-zu-Ende verschlüsselt, ohne
+  Fotos und Audio, nur nach ausdrücklichem Einschalten (7.28 PS8). Ein Export als Datei
+  ist später nachrüstbar (z. B. als ZIP). Die Kopie der Datenbank vor jeder Migration
+  (design.md 13) ist nur eine Sicherung gegen Datenverlust beim Update, kein Backup.
 - Aufbewahrung: vorerst unbegrenzt.
 
 ## 9. Entscheidungen
 
+Neueste zuerst. Kap. 7 enthält immer den gültigen Stand; diese Tabelle ist die Historie. Überholte Einträge sind mit „→ ersetzt“ bzw. „→ präzisiert“ markiert.
+
 | Datum | Entscheidung |
 |---|---|
-| 2026-10-18 | V1 lokal, nur ein Nutzer, Sideload |
-| 2026-10-18 | Nur Android 17 (API 37), Zielgerät S24 Ultra, nur Privatgeräte |
-| 2026-10-18 | Positive Verstärkung vor negativer; negative nur taktisch und begrenzt |
-| 2026-10-18 | Galaxy Watch nicht in V1 (geändert am 2026-10-25, siehe unten) |
-| 2026-10-18 | KI später: teils lokal, teils über Backend |
-| 2026-10-18 | Feste, flexible und ortsbasierte Reminder in V1 |
-| 2026-10-18 | Minimum entscheidet der Nutzer; Limits für Minimum und Verschieben pro Reminder |
-| 2026-10-18 | Nachweisart pro Reminder; fehlender Nachweis = "nicht erfolgreich" |
-| 2026-10-18 | Motivation über Statistik, Serien, Fortschritt (Woche/Monat/Jahr/gesamt); keine Belohnungssysteme |
-| 2026-10-18 | Motivations-Audio nur auf Klick |
-| 2026-10-18 | Übersicht morgens und abends (einstellbar), inkl. Rückblick |
-| 2026-10-18 | Daten nur lokal, kein Backup in V1 |
-| 2026-10-18 | Eskalation = Vollbild oder wiederholte Benachrichtigung bis Reaktion; **7–21 Uhr sichtbar** (Vollbild + Vibration), **18–21 Uhr laut** |
-| 2026-10-18 | Training: Tagesangebot (Ankunft / 19 Uhr / sonst entfällt) + Wochenziel 3–4×, nie eine Woche ohne |
-| 2026-10-18 | Wiederkehrendes standardmäßig ab letzter Erledigung, kalendarisch optional |
-| 2026-10-18 | Reminder kennen Ausführungsfenster; Fristen erinnern häufig, "auf morgen" möglich |
-| 2026-10-18 | Auslassen zählt neutral; Serie hält bei Minimum; ein Aussetzer pro Woche/Monat erlaubt |
-| 2026-10-18 | Dokumentation per Freitext + Audio; Zahlenwerte später |
-| 2026-10-18 | Widget für Ein-Klick-Erstellung; Strenge-Vorlagen in V1 (Startwerte siehe 7.9) |
-| 2026-10-18 | Besprechungen: Schnellknopf statt Kalenderabgleich |
-| 2026-10-18 | Wochen Mo–So; Rettungs-Erinnerung am Wochenende; Joker 1/Woche (täglich) bzw. 1/Monat (wöchentlich) |
-| 2026-10-18 | V1 in Etappen V1.0 / V1.1 / V1.2 (siehe Abschnitt 10) |
-| 2026-10-24 | Strenge hochgestuft: *locker* = Banner + Vibration alle 10 min, *normal* = Vollbild wie Wecker ohne Ton |
-| 2026-10-25 | Alles bis einschließlich V1.3 kommt vor V2 |
-| 2026-10-25 | Galaxy Watch vorgezogen auf V1.3, zuerst über Benachrichtigungen |
-| 2026-10-25 | Durchführung mit Timer ("Ich starte jetzt") und Nachfrage-Muster; Abläufe für geregeltes Training, begrenzt aufs Wichtigste – keine Trainings-App |
-| 2026-10-25 | Checklisten mit einzeln verschiebbaren Punkten |
-| 2026-10-25 | Checkliste = Block: Intervall ab dem ersten erledigten Punkt, nächste Runde mit allen Punkten |
-| 2026-10-25 | Restpunkte verschieben zählt nicht gegen das Limit, wenn am Tag mindestens ein Punkt erledigt wurde |
-| 2026-10-25 | Nachfragen in Sitzungen zeitbasiert (Standard alle 10 min), Strenge der Nachfragen einstellbar |
-| 2026-10-25 | Maximale Dauer pro Sitzung; danach letzter Reminder so streng wie möglich, kurze Reaktionszeit, dann nicht erfüllt – mit erledigten Teilschritten zählt das Minimum |
-| 2026-10-25 | Dauer wird getrackt und mit früheren Sitzungen verglichen (schnell fertig werden soll sich lohnen) |
-| 2026-10-25 | Training: nur Dauer und erledigte Schritte/Sätze; Wiederholungen/Gewicht bleiben V2 |
-| 2026-10-25 | Watch: Benachrichtigungen samt Aktionen kommen bereits an – kein eigener Spike nötig |
-| 2026-10-27 | Spike abgeschlossen: 13/13 Alarme pünktlich, Update + Neustart überstanden, kein Problem mit Samsungs Akkumanagement. Ankunft zuhause in V1.1 erst nach Verweildauer werten (Geofence grob) |
-| 2026-10-27 | Alarm verstummt, solange der Nachweis läuft (mit Frist, Standard 10 min); Text-Nachweis mit Mindestzeichen und Audio-Nachweis mit Mindestdauer, Nachweise kombinierbar – alles V1.1; Audio von der Uhr in V1.4 |
-| 2026-10-26 | Verschiebe-Knöpfe pro Reminder (1–2, z. B. +10 oder +30/+60 min), V1.1; kurzes Verschieben ohne Limit, aber gezählt, nicht über die Tagesgrenze |
-| 2026-10-26 | Feste Ruhezeit (außerhalb 7–21 Uhr still) entfällt ab V1.1; stattdessen gilt "Nicht stören" des Handys. Pro Reminder "auch bei Nicht stören" für besondere Ereignisse (ersetzt die Aufsteh-Wecker-Ausnahme). Laut weiterhin ab 18 Uhr; verpasst ab Tagesgrenze, Standard 23 Uhr |
-| 2026-10-26 | Vollbild-Alarme ("normal", "streng") erscheinen nicht auf der Uhr → zusätzliche spiegelbare Benachrichtigung in V1.1 (G1b) |
-| 2026-10-25 | NFC-Kontrollpunkte als Nachweis im Haus, V1.3 (geändert, siehe unten) |
-| 2026-10-25 | NFC-Kontrollpunkte nach V3 – zu unflexibel; stattdessen Raumerkennung per Bluetooth und Taster über Home Assistant, V2 (ggf. V3) |
-| 2026-10-25 | Eigene Watch-App in V1.4 – Bedienung laufender Reminder ohne Handy |
-| 2026-10-25 | Leitprinzip 10: nicht ans Handy gebunden |
-| 2026-10-25 | Watch-App ist Fernbedienung und Anzeige, Logik bleibt auf dem Handy (Handy immer in der Nähe); laufende Reminder komplett über die Uhr bedienbar |
-| 2026-10-25 | Raumerkennung über Bluetooth-Empfänger mit der Uhr als Sender, ergänzt um aktive Methoden (Bewegung, Präsenzmelder, Taster) |
-| 2026-10-25 | Reminder vorab erledigen (V1.1) und vorgezogen starten (V1.3); "vor dem Reminder erledigt" wird positiv ausgewiesen |
-| 2026-10-25 | Haushaltsinventar (grob, "zuletzt gesehen", Import aus externer KI-Erfassung) und Einkaufsliste mit Geschäfts-Trigger, V3 – vielleicht nie; keine Anbindung an externe Listen-Apps; geteilte Liste ggf. über Home Assistant, Backend nur wenn wirklich nötig – Entscheidung in V3 |
-| 2026-10-25 | Aufsteh-Wecker zweistufig (normal, dann nicht abschaltbar bis Nachweis), V2; einfachste Variante (Schritte) als PoC früher möglich, Home-Assistant-Varianten später |
-| 2026-10-25 | Startklar-Fragen (Ziel, Hindernisse, Startbereitschaft, erster Schritt) Pflicht bei Überwindung, änderbar mit Verlauf (V1.1); Blocker als Vorbereitungsaufgaben, Nachfragen bei wiederholtem Verschieben, "Blocker gelöst" als Minimum (V1.2) |
-| 2026-10-25 | Bewegungsdaten von Handy und Uhr als Forschungsprojekt (messen, später auswerten), V2 |
-| 2026-10-25 | GPS-Routen erst V2/V3 – punktuelle Ortserkennung reicht vorerst |
-| 2026-10-25 | Sensible Daten grundsätzlich nur lokal auf dem Gerät |
-| 2026-10-25 | Mehrere Personen (V3) möglichst ohne Backend über lokale Synchronisation im Haushalt |
-| 2026-10-28 | "Verbesserung vorschlagen" in der App: von überall erreichbar, Kontext automatisch, lokal gespeichert, als Text teilbar (V1.2) |
-| 2026-10-29 | V1.2 in drei Etappen: a Alltag (Vorschläge, Liste), b Ziele über die Zeit, c Fristen und Blocker; Vorab-Reminder (T6) in V1.2c |
-| 2026-10-29 | Reminder-Liste: abgeschlossene Einmal-Reminder automatisch eingeklappt, Archivieren von Hand, Gruppen und Sortierung (V1.2). Einmal-Reminder mit neuer Zeit wird wieder eingeplant und eingeschaltet (Bugfix, sofort) |
-| 2026-10-31 | V1.2b bestätigt wie Entwurf. UI-Feinschliff aus den ersten Vorschlägen noch vor der Testsession; mehrmals täglich und Wochenend-Zeiten nach V1.3 (7.25) |
-| 2026-10-31 | Mehrmals täglich: Serie hält mit mindestens einem eingehaltenen Termin pro Tag. Wochenend-Zeiten gelten auch für die Tagesgrenze (7.25) |
-| 2026-11-01 | Schnittstelle für KI-Agenten in V2: nur lokal, für alle persönlichen Agenten, freiwillig mit Freigabe pro Agent; Agent erledigt nur als *delegierbar* markierte Reminder, nie Nachweis oder Alarm; App stößt den Agenten an; Datenschutz verantwortet der Nutzer, mit deutlichem Hinweis (7.26) |
-| 2026-11-02 | Testsession erst vor V2 statt vor V1.3 – die App läuft im Alltag gut |
-| 2026-11-02 | V1.2c-Entwurf (design.md 12.4) bestätigt und umgesetzt: Fristen mit Ausführungsfenstern, Vorlagen, Vorab-Reminder, Blocker als Liste mit Vorbereitungsaufgaben, *Blocker gelöst* als Minimum, Nachfragen wenn es hakt |
-| 2026-11-02 | Vor V1.3 erst Nutzung beobachten: Funktionen trimmen statt erweitern, Rückfragen bei Schlupflöchern (7.27) |
-| 2026-11-02 | Hinweis bei wiederholtem *Später* bestätigt (7.27 NT2); Nutzung erst vor V2 mit der Testsession zählen (NT4) |
-| 2026-11-02 | Play Store ohne Eile: erst „fertig“ (mindestens bis V2, ggf. Backend); dafür Transparenz, Notausschalter, Backend nur nach Einschalten; Verschlüsselung auf dem Gerät wird bewertet (7.28 PS5–PS9) |
-| 2026-11-02 | Verschlüsselung auf dem Gerät geklärt: Sandbox + Release-Build reichen, kein SQLCipher (7.28 PS9) |
-| 2026-11-02 | Ziel offizieller Play-Store-Release für eine sehr kleine Zielgruppe, mit Backend (Backup, Sync) und vollem EU-Datenschutz; Android 17 bleibt Minimum (7.28) |
-| 2026-11-02 | V1.3-Entwurf bestätigt (design.md E.5): Aufteilung a/b/c; mehrere Uhrzeiten – verpasst beim nächsten Termin, kein Wochenziel und keine Ankunft; NT2-Schwelle 3×2 (oder einmal 4×), Karte auf *Heute*, *Nein danke* 14 Tage; *Notaus* bricht keine Serie; für V1.3b: *abgebrochen* bricht die Serie, Nachfragen *locker*, max. 90 min. V1.3a gestartet |
-| 2026-11-02 | V1.3a umgesetzt: höchstens 6 Uhrzeiten am Tag; Notaus mit 1 Stunde, bis morgen 06:00 oder bis zum Einschalten; Wochenend-Schalter gilt für Alarmzeiten und Übersicht zusammen |
-| 2026-11-02 | Schnittstelle für Claude vorgezogen (vor V1.3b): Reminder lesen und schreiben über adb, ausdrücklich in der App freizugeben; Entwurf in 7.26 AG11 |
-| 2026-11-02 | AG11 bestätigt und als V1.3a2 umgesetzt: ContentProvider mit `DUMP`, nur Debug-Build, Schalter mit Rückfrage; Claude darf Reminder-Inhalte über die freigegebene Schnittstelle lesen, sie bleiben aber aus Repo und Logs |
-| 2026-11-03 | Antworten auf Review-Lauf 1 (Fragen 1–6): Schnittstelle ändert keinen klingelnden oder überfälligen Reminder (AG11); nach „Handy aus“ klingelt der gerade laufende Termin (VS1); *Notaus* neutral nur bei Pause vor der Fälligkeit, Fristen hart (PS7); NT2-Karte ohne *Minimum*; Titel im Diagnose-Log in der Entwicklungsphase erlaubt, vor einem offiziellen Release entfernen. Umgesetzt in V1.3a3 |
-| 2026-11-03 | Checkliste mit mehreren Uhrzeiten (7.25 VS1, Review-Frage 7a und 7c): pro Termin ein Punkt, der Rest kommt beim nächsten Termin, die Liste behält ihren Stand über verpasste Termine; Minimum-Limit zählt Tage. Umgesetzt in V1.3a3 |
-| 2026-11-03 | Notaus von Hand ausgeschaltet (Review-Frage 7b): eine offene Fälligkeit klingelt sofort wie beim automatischen Pausenende, nicht erst zur nächsten Runde (7.28 PS7). Umgesetzt in V1.3a3 |
+| 2026-11-07 | Cloud-Backup in der App: Entwurf [backup-entwurf.md](backup-entwurf.md) A-1 bis A-14 bestätigt. Keine eigene App-Variante, solange nur Kevin die App nutzt (Schalter aus PS8 im normalen Build); Composite Build mit festem Backend-Commit und Deploy-Key in der CI; neue Berechtigung `INTERNET` (8.4 präzisiert); Credential Manager, Geräteschlüssel und Keysets im Android Keystore; ZIP aus Datenbank und Einstellungen; stündlich per WorkManager nur bei Änderung; Wiederherstellen ersetzt die Datenbank nach lokaler Kopie; Diagnose ans Backend nur mit eigenem Logger ohne Inhalte. App und `core` bauen für Java 21 statt 17 |
+| 2026-11-07 | Vorab verschieben und auslassen (7.32): Alarm-Bildschirm vorab mit *Verschieben* und *Auslassen*, „heute später“ +30 min/+1/+2 Std ab der geplanten Zeit, zählt aufs Verschieben-Konto, bei *streng* mit Rückfrage; Ort behält die neue Zeit, wartet sonst auf die Ankunft; Vorab-Reminder wandert mit; NT2 zählt Verschieben mit. Umgesetzt in V1.3b0.4 |
+| 2026-11-07 | Erledigung zurücknehmen (7.31): Rückgängig-Benachrichtigung 1 min, danach *Zurücknehmen* auf *Heute*; wieder offen, klingelt in 10 min ohne als *Später* zu zählen; nur der letzte Termin, bis der nächste klingelt bzw. bis zur Tagesgrenze; *Auslassen* auch, *verpasst*/*entfällt* nicht; Nachweis zählt wieder; neues Ereignis statt Löschen. Umgesetzt in V1.3b0.4 |
+| 2026-11-05 | 7.29 einfach anfangen: Ort **nur über WLAN** (Verbindung und Ergebnisse der WLAN-Suche, BSSIDs pro Ort), Prüfungen im Zeitraum lesen nur den WLAN-Zustand, sonst Rückfall wie bisher. Genaue Ortsprüfung per GPS nach **7.30** ausgelagert, später und erst nach einer Messung. Kevin hat die Anforderungen im Ganzen gelesen |
+| 2026-11-05 | Review-Lauf 3, Funde B1/B2 und Empfehlungen E5/E6: Ein Termin merkt sich, ob er schon geklungen hat. Speichern beim Schlummern verschiebt den heutigen Termin nicht mehr auf morgen; *Fortsetzen* meldet keine Verpasser. Ortsprüfung außerhalb der Transaktion, Alarme erst nach dem Speichern. Umgesetzt in V1.3b0.2 |
+| 2026-11-05 | Review-Lauf 3, Fragen 1–3 (7.29): Verschoben/geschlummert und *weg* oder *unklar* → wartet auf die Ankunft, zur Tagesgrenze *verpasst*, nie *entfällt* (OZ5, umgesetzt in V1.3b0.2). Alarm = erkannte Ankunft + Puffer, kurz weg im Puffer bricht nicht ab (OZ4). Geltungsbereich OZ9: Ankunft mit Uhrzeit ganz; *Wenn ich zuhause bin* nur WLAN; *trotzdem klingeln* bleibt; Bestand bekommt die Standardwerte. Erste Ankunft im Zeitraum zählt; kürzester Prüfabstand gilt |
+| 2026-11-05 | Review-Lauf 3, Fragen 4–5: ein Vollbild zur Zeit, der nächste wartet mit *+1 wartet* und eskaliert weiter (7.3); Knöpfe der Benachrichtigung je Art (7.4). Geplant mit V1.3b |
+| 2026-11-05 | Review-Lauf 3, Fragen 6–7: Frist nach Ablauf *verpasst* und *überfällig*, auch unter Notaus („hart“ = nicht neutral, 7.2, PS7). Orte und WLANs verlassen das Gerät nur Ende-zu-Ende verschlüsselt im Backup B2b; das Migrations-Backup ist kein Nutzer-Backup (8.4) |
+| 2026-11-05 | Review-Lauf 3, Klarstellungen: *nicht erfolgreich* nur bei ausdrücklichem Abschluss ohne Nachweis, sonst *verpasst* (7.5); Notaus entscheidet zur Tagesgrenze (PS7); *laut ab* nur bei *streng* (7.3); Ortsnachweis N4 auf später; laufende Sitzung wird nicht verpasst (7.11 D7); Kap. 9 neu sortiert, Kap. 7 ist der gültige Stand |
+| 2026-11-04 | Ankunft im Zeitraum (7.29) nach der Diagnose der Training-Fälle (morgens Geofence-Ankunft ohne früheste Zeit, abends grobe Ortsabfrage „unklar“): Ankunftszeitraum mit spätester Uhrzeit und Vorlauf, genaue Ortsprüfung (GPS) nur im Zeitraum alle 15–30 min (→ ersetzt 2026-11-05: erst nur WLAN, GPS in 7.30), WLAN als stärkstes und zusätzliches Ortssignal, Puffer nach der Ankunft, weitere Orte. F1–F3 wie vorgeschlagen entschieden (entfällt ohne Nachfrist, schon da → späteste Uhrzeit, 5/20/90 min); Umsetzung erst nach Kevins Gesamtdurchsicht der Anforderungen |
+| 2026-11-04 | Testdaten aus Kevins Daten: kein JSON-Import/Export in der App, sondern ein Skript über adb (`tools/testdata/export_testdata.py`), das die Tabellen als JSON schreibt, alle freien Texte ersetzt, Medien, Vorschläge und echte Koordinaten weglässt und auf Reste der Originaltexte prüft. Ergebnis in `testdata/`, keine SQLite-Datei im Repo |
+| 2026-11-04 | Tests: Szenario-Tests ganzer Tage in `core` und Verbindungs-Tests der Receiver mit Robolectric, zunächst ohne Emulator. Kevins Datenbank darf als Testdaten ins Repo, aber nur mit pseudonymisierten Texten (Titel, Ziele, Notizen, Nachweise, Orte); umgesetzt mit Kevin am Abend |
+| 2026-11-04 | Kevins Rückmeldungen nach V1.3b0: Checklisten-Punkte jederzeit abhaken (C8), lesbare Punkte im Alarm, Übersicht nennt jede Uhrzeit (O1), Textfelder wachsen mit und bieten Vorschläge der Tastatur. Umgesetzt in V1.3b0.1. Training-Alarm am Morgen und Checklisten-Speichern: Diagnose mit Kevins Szenario und Logs |
+| 2026-11-03 | Umbau-Etappe V1.3b0 vor V1.3b (Review-Lauf 2): Engine als Fassade, Befehle in einer Transaktion, zentrales Klingeln, Alarm-Ansicht in `core`; ein gespeicherter Reminder *Wenn ich zuhause bin* klingelt sofort, wenn man schon da ist, auch über die Schnittstelle. Sonst kein neues Verhalten |
 | 2026-11-03 | Einstellungen kommen mit ins Backup B2b, ohne *Notaus* und Schnittstellen-Schalter (Review-Lauf 2, Frage 2; 7.28 PS8a). Vorbereitet in V1.3b0 |
-| 2026-11-03 | Umbau-Etappe V1.3b0 vor V1.3b (Review-Lauf 2): Engine als Fassade, Befehle in einer Transaktion, zentrales Klingeln, Alarm-Ansicht in `core`; ein gespeicherter Ankunft-Reminder klingelt sofort, wenn man schon da ist, auch über die Schnittstelle. Sonst kein neues Verhalten |
+| 2026-11-03 | Notaus von Hand ausgeschaltet (Review-Frage 7b): eine offene Fälligkeit klingelt sofort wie beim automatischen Pausenende, nicht erst zur nächsten Runde (7.28 PS7). Umgesetzt in V1.3a3 |
+| 2026-11-03 | Checkliste mit mehreren Uhrzeiten (7.25 VS1, Review-Frage 7a und 7c): pro Termin ein Punkt, der Rest kommt beim nächsten Termin, die Liste behält ihren Stand über verpasste Termine; Minimum-Limit zählt Tage. Umgesetzt in V1.3a3 |
+| 2026-11-03 | Antworten auf Review-Lauf 1 (Fragen 1–6): Schnittstelle ändert keinen klingelnden oder überfälligen Reminder (AG11); nach „Handy aus“ klingelt der gerade laufende Termin (VS1); *Notaus* neutral nur bei Pause vor der Fälligkeit, Fristen hart (PS7); NT2-Karte ohne *Minimum*; Titel im Diagnose-Log in der Entwicklungsphase erlaubt, vor einem offiziellen Release entfernen. Umgesetzt in V1.3a3 |
+| 2026-11-02 | AG11 bestätigt und als V1.3a2 umgesetzt: ContentProvider mit `DUMP`, nur Debug-Build, Schalter mit Rückfrage; Claude darf Reminder-Inhalte über die freigegebene Schnittstelle lesen, sie bleiben aber aus Repo und Logs |
+| 2026-11-02 | Schnittstelle für Claude vorgezogen (vor V1.3b): Reminder lesen und schreiben über adb, ausdrücklich in der App freizugeben; Entwurf in 7.26 AG11 |
+| 2026-11-02 | V1.3a umgesetzt: höchstens 6 Uhrzeiten am Tag; Notaus mit 1 Stunde, bis morgen 06:00 oder bis zum Einschalten; Wochenend-Schalter gilt für Alarmzeiten und Übersicht zusammen |
+| 2026-11-02 | V1.3-Entwurf bestätigt (design.md E.5): Aufteilung a/b/c; mehrere Uhrzeiten – verpasst beim nächsten Termin, kein Wochenziel und keine Ankunft; NT2-Schwelle 3×2 (oder einmal 4×), Karte auf *Heute*, *Nein danke* 14 Tage; *Notaus* bricht keine Serie; für V1.3b: *abgebrochen* bricht die Serie, Nachfragen *locker*, max. 90 min. V1.3a gestartet |
+| 2026-11-02 | Ziel offizieller Play-Store-Release für eine sehr kleine Zielgruppe, mit Backend (Backup, Sync) und vollem EU-Datenschutz; Android 17 bleibt Minimum (7.28) |
+| 2026-11-02 | Verschlüsselung auf dem Gerät geklärt: Sandbox + Release-Build reichen, kein SQLCipher (7.28 PS9) |
+| 2026-11-02 | Play Store ohne Eile: erst „fertig“ (mindestens bis V2, ggf. Backend); dafür Transparenz, Notausschalter, Backend nur nach Einschalten; Verschlüsselung auf dem Gerät wird bewertet (7.28 PS5–PS9) |
+| 2026-11-02 | Hinweis bei wiederholtem *Später* bestätigt (7.27 NT2); Nutzung erst vor V2 mit der Testsession zählen (NT4) |
+| 2026-11-02 | Vor V1.3 erst Nutzung beobachten: Funktionen trimmen statt erweitern, Rückfragen bei Schlupflöchern (7.27) |
+| 2026-11-02 | V1.2c-Entwurf (design.md 12.4) bestätigt und umgesetzt: Fristen mit Ausführungsfenstern, Vorlagen, Vorab-Reminder, Blocker als Liste mit Vorbereitungsaufgaben, *Blocker gelöst* als Minimum, Nachfragen wenn es hakt |
+| 2026-11-02 | Testsession erst vor V2 statt vor V1.3 – die App läuft im Alltag gut |
+| 2026-11-01 | Schnittstelle für KI-Agenten in V2: nur lokal, für alle persönlichen Agenten, freiwillig mit Freigabe pro Agent; Agent erledigt nur als *delegierbar* markierte Reminder, nie Nachweis oder Alarm; App stößt den Agenten an; Datenschutz verantwortet der Nutzer, mit deutlichem Hinweis (7.26) |
+| 2026-10-31 | Mehrmals täglich: Serie hält mit mindestens einem eingehaltenen Termin pro Tag. Wochenend-Zeiten gelten auch für die Tagesgrenze (7.25) |
+| 2026-10-31 | V1.2b bestätigt wie Entwurf. UI-Feinschliff aus den ersten Vorschlägen noch vor der Testsession; mehrmals täglich und Wochenend-Zeiten nach V1.3 (7.25) |
+| 2026-10-29 | Reminder-Liste: abgeschlossene Einmal-Reminder automatisch eingeklappt, Archivieren von Hand, Gruppen und Sortierung (V1.2). Einmal-Reminder mit neuer Zeit wird wieder eingeplant und eingeschaltet (Bugfix, sofort) |
+| 2026-10-29 | V1.2 in drei Etappen: a Alltag (Vorschläge, Liste), b Ziele über die Zeit, c Fristen und Blocker; Vorab-Reminder (T6) in V1.2c |
+| 2026-10-28 | "Verbesserung vorschlagen" in der App: von überall erreichbar, Kontext automatisch, lokal gespeichert, als Text teilbar (V1.2) |
+| 2026-10-27 | Alarm verstummt, solange der Nachweis läuft (mit Frist, Standard 10 min); Text-Nachweis mit Mindestzeichen und Audio-Nachweis mit Mindestdauer, Nachweise kombinierbar – alles V1.1; Audio von der Uhr in V1.4 |
+| 2026-10-27 | Spike abgeschlossen: 13/13 Alarme pünktlich, Update + Neustart überstanden, kein Problem mit Samsungs Akkumanagement. Ankunft zuhause in V1.1 erst nach Verweildauer werten (Geofence grob) |
+| 2026-10-26 | Vollbild-Alarme ("normal", "streng") erscheinen nicht auf der Uhr → zusätzliche spiegelbare Benachrichtigung in V1.1 (G1b) |
+| 2026-10-26 | Feste Ruhezeit (außerhalb 7–21 Uhr still) entfällt ab V1.1; stattdessen gilt "Nicht stören" des Handys. Pro Reminder "auch bei Nicht stören" für besondere Ereignisse (ersetzt die Aufsteh-Wecker-Ausnahme). Laut weiterhin ab 18 Uhr; verpasst ab Tagesgrenze, Standard 23 Uhr |
+| 2026-10-26 | Verschiebe-Knöpfe pro Reminder (1–2, z. B. +10 oder +30/+60 min), V1.1; kurzes Verschieben ohne Limit, aber gezählt, nicht über die Tagesgrenze |
+| 2026-10-25 | Mehrere Personen (V3) möglichst ohne Backend über lokale Synchronisation im Haushalt |
+| 2026-10-25 | Sensible Daten grundsätzlich nur lokal auf dem Gerät |
+| 2026-10-25 | GPS-Routen erst V2/V3 – punktuelle Ortserkennung reicht vorerst |
+| 2026-10-25 | Bewegungsdaten von Handy und Uhr als Forschungsprojekt (messen, später auswerten), V2 |
+| 2026-10-25 | Startklar-Fragen (Ziel, Hindernisse, Startbereitschaft, erster Schritt) Pflicht bei Überwindung, änderbar mit Verlauf (V1.1); Blocker als Vorbereitungsaufgaben, Nachfragen bei wiederholtem Verschieben, "Blocker gelöst" als Minimum (V1.2) |
+| 2026-10-25 | Aufsteh-Wecker zweistufig (normal, dann nicht abschaltbar bis Nachweis), V2; einfachste Variante (Schritte) als PoC früher möglich, Home-Assistant-Varianten später |
+| 2026-10-25 | Haushaltsinventar (grob, "zuletzt gesehen", Import aus externer KI-Erfassung) und Einkaufsliste mit Geschäfts-Trigger, V3 – vielleicht nie; keine Anbindung an externe Listen-Apps; geteilte Liste ggf. über Home Assistant, Backend nur wenn wirklich nötig – Entscheidung in V3 |
+| 2026-10-25 | Reminder vorab erledigen (V1.1) und vorgezogen starten (V1.3); "vor dem Reminder erledigt" wird positiv ausgewiesen |
+| 2026-10-25 | Raumerkennung über Bluetooth-Empfänger mit der Uhr als Sender, ergänzt um aktive Methoden (Bewegung, Präsenzmelder, Taster) |
+| 2026-10-25 | Watch-App ist Fernbedienung und Anzeige, Logik bleibt auf dem Handy (Handy immer in der Nähe); laufende Reminder komplett über die Uhr bedienbar |
+| 2026-10-25 | Leitprinzip 10: nicht ans Handy gebunden |
+| 2026-10-25 | Eigene Watch-App in V1.4 – Bedienung laufender Reminder ohne Handy |
+| 2026-10-25 | NFC-Kontrollpunkte nach V3 – zu unflexibel; stattdessen Raumerkennung per Bluetooth und Taster über Home Assistant, V2 (ggf. V3) |
+| 2026-10-25 | ~~NFC-Kontrollpunkte als Nachweis im Haus, V1.3~~ → ersetzt: nach V3, Räume über Home Assistant (2026-10-25) |
+| 2026-10-25 | Watch: Benachrichtigungen samt Aktionen kommen bereits an – kein eigener Spike nötig |
+| 2026-10-25 | Training: nur Dauer und erledigte Schritte/Sätze; Wiederholungen/Gewicht bleiben V2 |
+| 2026-10-25 | Dauer wird getrackt und mit früheren Sitzungen verglichen (schnell fertig werden soll sich lohnen) |
+| 2026-10-25 | Maximale Dauer pro Sitzung; danach letzter Reminder so streng wie möglich, kurze Reaktionszeit, dann nicht erfüllt – mit erledigten Teilschritten zählt das Minimum |
+| 2026-10-25 | Nachfragen in Sitzungen zeitbasiert (Standard alle 10 min), Strenge der Nachfragen einstellbar |
+| 2026-10-25 | Restpunkte verschieben zählt nicht gegen das Limit, wenn am Tag mindestens ein Punkt erledigt wurde |
+| 2026-10-25 | Checkliste = Block: Intervall ab dem ersten erledigten Punkt, nächste Runde mit allen Punkten |
+| 2026-10-25 | Checklisten mit einzeln verschiebbaren Punkten |
+| 2026-10-25 | Durchführung mit Timer ("Ich starte jetzt") und Nachfrage-Muster; Abläufe für geregeltes Training, begrenzt aufs Wichtigste – keine Trainings-App |
+| 2026-10-25 | Galaxy Watch vorgezogen auf V1.3, zuerst über Benachrichtigungen |
+| 2026-10-25 | Alles bis einschließlich V1.3 kommt vor V2 |
+| 2026-10-24 | Strenge hochgestuft: *locker* = Banner + Vibration alle 10 min, *normal* = Vollbild wie Wecker ohne Ton |
+| 2026-10-18 | V1 in Etappen V1.0 / V1.1 / V1.2 → erweitert um V1.3 und V1.4 (2026-10-25), Stand in 10.1 |
+| 2026-10-18 | Wochen Mo–So; Rettungs-Erinnerung am Wochenende; Joker 1/Woche (täglich) bzw. 1/Monat (wöchentlich) |
+| 2026-10-18 | Besprechungen: Schnellknopf statt Kalenderabgleich |
+| 2026-10-18 | Widget für Ein-Klick-Erstellung; Strenge-Vorlagen in V1 (Startwerte siehe 7.9) |
+| 2026-10-18 | Dokumentation per Freitext + Audio; Zahlenwerte später |
+| 2026-10-18 | Auslassen zählt neutral; Serie hält bei Minimum; ein Aussetzer pro Woche/Monat erlaubt |
+| 2026-10-18 | Reminder kennen Ausführungsfenster; Fristen erinnern häufig, "auf morgen" möglich |
+| 2026-10-18 | Wiederkehrendes standardmäßig ab letzter Erledigung, kalendarisch optional |
+| 2026-10-18 | Training: Tagesangebot (Ankunft / 19 Uhr / sonst entfällt) + Wochenziel 3–4×, nie eine Woche ohne → Zeitraum ab 2026-11-04 (7.29) |
+| 2026-10-18 | Eskalation = Vollbild oder wiederholte Benachrichtigung bis Reaktion; **7–21 Uhr sichtbar** (Vollbild + Vibration), **18–21 Uhr laut** → ersetzt durch „Nicht stören“ und Tagesgrenze (2026-10-26) und *laut ab* (7.3) |
+| 2026-10-18 | ~~Daten nur lokal, kein Backup in V1~~ → ersetzt: Backup B2b mit Backend, Ende-zu-Ende verschlüsselt (2026-11-02, 7.28; 8.4) |
+| 2026-10-18 | Übersicht morgens und abends (einstellbar), inkl. Rückblick |
+| 2026-10-18 | Motivations-Audio nur auf Klick |
+| 2026-10-18 | Motivation über Statistik, Serien, Fortschritt (Woche/Monat/Jahr/gesamt); keine Belohnungssysteme |
+| 2026-10-18 | Nachweisart pro Reminder; fehlender Nachweis = "nicht erfolgreich" → präzisiert 2026-11-05 (7.5) |
+| 2026-10-18 | Minimum entscheidet der Nutzer; Limits für Minimum und Verschieben pro Reminder |
+| 2026-10-18 | Feste, flexible und ortsbasierte Reminder in V1 |
+| 2026-10-18 | KI später: teils lokal, teils über Backend |
+| 2026-10-18 | ~~Galaxy Watch nicht in V1~~ → ersetzt: V1.3 (2026-10-25) |
+| 2026-10-18 | Positive Verstärkung vor negativer; negative nur taktisch und begrenzt |
+| 2026-10-18 | Nur Android 17 (API 37), Zielgerät S24 Ultra, nur Privatgeräte |
+| 2026-10-18 | V1 lokal, nur ein Nutzer, Sideload |
 
 ## 10. Nächste Schritte
 
@@ -991,15 +1254,19 @@ früh am S24 Ultra testen (Spike, siehe Abschnitt 10).
 | V1.2c | 2026-11-02 | Fristen mit Fenstern (7.2), Vorlagen, Vorab-Reminder (T6), Blocker als Aufgaben (7.21 S5–S8) |
 | V1.3a | 2026-11-02 | Mehrmals täglich, Wochenend-Zeiten (7.25 VS1, VS2), Hinweis bei ständigem *Später* (7.27 NT2), Notausschalter (7.28 PS7) |
 | V1.3a2 | 2026-11-02 | Schnittstelle für Claude über adb (7.26 AG11) |
-| V1.3a3 | gebaut | Fixes aus Review-Lauf 1 und Antworten darauf, Checkliste über mehrere Uhrzeiten (7.25 VS1) (Kap. 9, 2026-11-03) |
-| V1.3b0 | gebaut | Umbau ohne neues Verhalten (design.md 1), Empfehlungen E1–E4 aus Review-Lauf 2 (Kap. 9, 2026-11-03) |
+| V1.3a3 | ✅ | Fixes aus Review-Lauf 1 und Antworten darauf, Checkliste über mehrere Uhrzeiten (7.25 VS1) (Kap. 9, 2026-11-03) |
+| V1.3b0 | ✅ | Umbau ohne neues Verhalten (design.md 1), Empfehlungen E1–E4 aus Review-Lauf 2 (Kap. 9, 2026-11-03) |
+| V1.3b0.1 | 2026-11-04 | Kevins Rückmeldungen: Checkliste jederzeit, Übersicht mit allen Uhrzeiten, Textfelder (Kap. 9, 2026-11-04) |
+| V1.3b0.2 | 2026-11-05 | Termin merkt sich, ob er geklungen hat; Speichern beim Schlummern verschiebt nicht mehr auf morgen; verschobenes Training wartet auf die Ankunft (7.29 OZ5); Ortsprüfung vor der Transaktion (Kap. 9, 2026-11-05) |
+| V1.3b0.3 | 2026-11-05 | WLAN-Sonde im Debug-Build als Gerätetest für 7.29 |
+| V1.3b0.4 | 2026-11-07 | Erledigung zurücknehmen (7.31), vorab verschieben und auslassen (7.32) |
 
 Details zum Verhalten: [design.md](design.md), Gerätetests: [geraetetest.md](geraetetest.md).
 
 ### 10.2 Plan
 
 1. ✅ **Technischer Spike auf dem S24 Ultra** (Plan: [spike.md](spike.md))
-2. **V1 in Etappen**, damit früh echte Nutzung möglich ist (umgesetzt bis V1.2c, siehe 10.1):
+2. **V1 in Etappen**, damit früh echte Nutzung möglich ist (umgesetzt bis V1.3b0.2, siehe 10.1):
    - **V1.0 (benutzbar):** Zeit-Reminder, Eskalation, Aktionen, Quittieren/Foto,
      Ziel/Minimum, einfache Liste der Erledigungen, Widget
      – ✅ seit 2026-10-24 auf dem Gerät, inkl. Intervall ab letzter Erledigung
@@ -1018,7 +1285,11 @@ Details zum Verhalten: [design.md](design.md), Gerätetests: [geraetetest.md](ge
    - **Jetzt (seit 2026-11-02): Nutzung beobachten und trimmen** (7.27): welche
      Funktionen Kevin wirklich nutzt, Rückfragen bei Schlupflöchern, Hinweis bei
      wiederholtem *Später*. Fehler aus dem Alltag als Fix auf `develop`.
-   - **V1.3:** **Durchführung mit Timer** und Nachfrage-Muster (7.11), **Abläufe**
+   - **Als Nächstes (2026-11-04): Ankunft im Zeitraum** mit WLAN (7.29); F1–F3 und
+     OZ9 entschieden, Entwurf in design.md (Abschnitt *Entwurf 7.29*). Kevin hat die
+     Anforderungen am 2026-11-05 gelesen; vor V1.3b. GPS (7.30) später.
+   - **V1.3:** **Durchführung mit Timer** und Nachfrage-Muster (7.11), ein Vollbild
+     zur Zeit (7.3), Knöpfe je Art (7.4), **Abläufe**
      für Training (7.12), **Galaxy Watch** über Benachrichtigungen (7.14),
      **vorgezogen starten** (7.20)
    - **V1.4:** **eigene Watch-App** für laufende Reminder (7.14, G5–G9)
@@ -1027,17 +1298,24 @@ Details zum Verhalten: [design.md](design.md), Gerätetests: [geraetetest.md](ge
    - **Möglicher Kandidat zum Vorziehen:** Einkaufsliste nur für einen selbst mit
      Geschäfts-Trigger (7.23, E1–E3) – ohne Inventar, KI und Abgleich; Technik
      ab V1.1 vorhanden. Nicht festgelegt.
-3. **Play-Store-Release** mit Backend für Backup und Sync, EU-Datenschutz (7.28);
-   Reihenfolge zu V1.3/V2 noch offen.
+3. **V2** (Kap. 4), danach erst der **Play-Store-Release** mit Backend für Backup und
+   Sync, EU-Datenschutz (7.28 PS5, 2026-11-02).
 4. Weitere Anforderungen ergeben sich aus der Nutzung.
 
 ## 11. Offene Fragen
 
-Aktuell keine großen offenen Fragen; die Fragen vom 2026-10-25 sind entschieden
-(Abschnitt 9). Details (Oberfläche, Vorlagen, Vibrationsmuster, Standardwerte für
-Nachfrage-Intervall und Reaktionszeit) werden mit der Nutzung geklärt. Vor V1.3
-kurz prüfen, ob *Ich starte jetzt* und die Nachfrage-Antworten auf der Uhr genauso
-ankommen wie *Erledigt* / *+10 min*.
+Die Fragen aus Review-Lauf 3 (2026-11-05) sind entschieden (Kap. 9). Offen, aber
+klein (Stand 2026-11-05):
+- Vor V1.3 kurz prüfen, ob *Ich starte jetzt* und die Nachfrage-Antworten auf der Uhr
+  genauso ankommen wie *Erledigt* / *+10 min*.
+- Sommerzeit: Was passiert mit einer Uhrzeit zwischen 02:00 und 03:00 am
+  Umstellungstag, und mit einer Tagesgrenze nach Mitternacht?
+- Handy im Ankunftszeitraum aus und erst nach der spätesten Uhrzeit wieder an (7.29).
+- *Mehrmals täglich* (7.25 VS1): Gilt *Auslassen* für einen Termin oder den ganzen Tag?
+- Begriff „Pause“: Notaus, pausierter Reminder und Pause-Schritt im Ablauf (7.12)
+  heißen gleich; in der Oberfläche bei Gelegenheit unterscheiden.
+- Details (Oberfläche, Vorlagen, Vibrationsmuster, Standardwerte für Nachfrage-Intervall
+  und Reaktionszeit) klären sich mit der Nutzung.
 
 Für später:
 - V2: Welche Home-Assistant-Lösung für Räume (Bermuda mit Bluetooth-Proxys oder

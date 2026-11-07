@@ -20,6 +20,7 @@ import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.platform.testTag
+import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.text.font.FontWeight
@@ -27,6 +28,7 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.avlreminder.core.model.ItemDone
 import com.avlreminder.core.model.Reminder
+import com.avlreminder.core.rules.Lifecycle
 import com.avlreminder.core.rules.SnoozeHint
 import com.avlreminder.core.rules.SnoozeHintChoice
 import com.avlreminder.core.rules.WeekStatus
@@ -64,14 +66,21 @@ fun TodayScreen(
     /** Reminders snoozed again and again (NT2). */
     hints: List<SnoozeHint> = emptyList(),
     onHint: (SnoozeHint, SnoozeHintChoice) -> Unit = { _, _ -> },
+    /** "Zurücknehmen" after a misclick (Anf. 7.31). */
+    onReopen: (Entry) -> Unit = {},
 ) {
     fun progress(e: Entry): String {
         val items = e.reminder.checklist
         return if (items.isEmpty()) "" else " · ${itemsDone[e.occurrence.id].orEmpty().size} von ${items.size}"
     }
 
+    /** "verschoben von 18:00 · " for one moved before it rang (7.32 VB6). */
+    fun moved(e: Entry): String = e.occurrence.takeIf { !it.hasFired && it.postponeCount > 0 }
+        ?.let { "verschoben von ${Format.time(it.dueAt, zone)} · " } ?: ""
+
     val c = Avl.colors
     var discarding by remember { mutableStateOf<Entry?>(null) }
+    var reopening by remember { mutableStateOf<Entry?>(null) }
     val waiting = if (doNotDisturb) today.dueNow.count { !it.reminder.ignoreDnd } else 0
     LazyColumn(modifier.padding(horizontal = 16.dp)) {
         item {
@@ -131,12 +140,12 @@ fun TodayScreen(
             items(today.laterToday, key = { "later" + it.occurrence.id }) { e ->
                 EntryCard(
                     title = e.reminder.title,
-                    detail = (goalLine(e.reminder) ?: Format.plan(e.reminder)) + progress(e),
+                    detail = moved(e) + (goalLine(e.reminder) ?: Format.plan(e.reminder)) + progress(e),
                     time = Format.time(e.occurrence.currentAt, zone),
                     onClick = { onEdit(e.reminder) },
                 ) {
                     StrictnessTag(e.reminder.strictness)
-                    TextButton(onClick = { onCompleteEarly(e) }) { Text("Erledigen", color = c.accent) }
+                    TextButton(onClick = { onCompleteEarly(e) }, Modifier.testTag("early${e.occurrence.id}")) { Text("Vorab", color = c.accent) }
                 }
             }
         }
@@ -145,11 +154,12 @@ fun TodayScreen(
             items(today.waiting, key = { "wait" + it.occurrence.id }) { e ->
                 EntryCard(
                     title = e.reminder.title,
-                    detail = (goalLine(e.reminder) ?: "klingelt bei Ankunft") + progress(e),
+                    detail = if (e.occurrence.awaitsArrival) "verschoben – klingelt bei Ankunft, sonst heute verpasst" + progress(e)
+                    else (goalLine(e.reminder) ?: "klingelt bei Ankunft") + progress(e),
                     onClick = { onEdit(e.reminder) },
                 ) {
                     StrictnessTag(e.reminder.strictness)
-                    TextButton(onClick = { onCompleteEarly(e) }) { Text("Erledigen", color = c.accent) }
+                    TextButton(onClick = { onCompleteEarly(e) }) { Text("Vorab", color = c.accent) }
                 }
             }
         }
@@ -166,10 +176,30 @@ fun TodayScreen(
                     title = e.reminder.title,
                     detail = e.occurrence.resolvedAt?.let { Format.time(it, zone) },
                     dimmed = true,
-                ) { e.occurrence.resolution?.let { ResultBadge(it) } }
+                ) {
+                    Column(horizontalAlignment = Alignment.End) {
+                        e.occurrence.resolution?.let { ResultBadge(it) }
+                        if (Lifecycle.canReopen(e.occurrence)) {
+                            TextButton(onClick = { reopening = e }, Modifier.testTag("reopen${e.occurrence.id}")) {
+                                Text("Zurücknehmen", fontSize = 13.sp)
+                            }
+                        }
+                    }
+                }
             }
         }
         item { Spacer(Modifier.height(96.dp)) }
+    }
+    reopening?.let { e ->
+        AlertDialog(
+            onDismissRequest = { reopening = null },
+            title = { Text("„${e.reminder.title}“ zurücknehmen?") },
+            text = { Text("Er ist wieder offen und klingelt in 10 Minuten. Ein Nachweis bleibt gespeichert und zählt beim nächsten Erledigt.") },
+            confirmButton = {
+                TextButton(onClick = { onReopen(e); reopening = null }, Modifier.testTag("reopenOk")) { Text("Zurücknehmen") }
+            },
+            dismissButton = { TextButton(onClick = { reopening = null }) { Text("Abbrechen") } },
+        )
     }
     discarding?.let { e ->
         AlertDialog(

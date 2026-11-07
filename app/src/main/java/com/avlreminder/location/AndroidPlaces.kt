@@ -12,6 +12,7 @@ import android.util.Log
 import com.avlreminder.core.model.Place
 import com.avlreminder.core.ports.GeofencePort
 import com.avlreminder.core.ports.LocationPort
+import com.avlreminder.AppGraph
 import com.avlreminder.graph
 import com.avlreminder.system.Diag
 import com.google.android.gms.location.Geofence
@@ -137,12 +138,22 @@ class GeofenceReceiver : BroadcastReceiver() {
         val graph = context.graph
         graph.scope.launch {
             try {
-                ids.forEach { id ->
-                    val rings = graph.withEngine { it.onArrival(id) }
-                    Diag.log("arrival place=$id → ${rings.size} ring(s)")
-                }
+                arrived(graph, ids)
             } finally {
                 result.finish()
+            }
+        }
+    }
+
+    companion object {
+        /**
+         * Stayed long enough at [placeIds]: their reminders ring now. The log says which ones and
+         * for which time, so an arrival that rang too early can be traced back.
+         */
+        suspend fun arrived(graph: AppGraph, placeIds: List<Long>) {
+            placeIds.forEach { id ->
+                val rings = graph.withEngine { it.onArrival(id) }
+                Diag.log("arrival place=$id → ${rings.size} ring(s)" + rings.joinToString("") { " \"${it.reminder.title}\" due=${it.occurrence.dueAt}" })
             }
         }
     }

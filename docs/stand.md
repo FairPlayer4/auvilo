@@ -1,6 +1,6 @@
 # Stand und nächste Schritte
 
-Stand: 2026-11-03. Bei jedem größeren Schritt aktualisieren.
+Stand: 2026-11-07. Bei jedem größeren Schritt aktualisieren.
 
 ## In Arbeit
 - **V1.3a3** (`versionName` 1.3a3-prototyp, `versionCode` 9) in `develop`, gebaut,
@@ -22,6 +22,62 @@ Stand: 2026-11-03. Bei jedem größeren Schritt aktualisieren.
   wiederherstellen (`Settings.backup`/`restore`, ohne *Notaus* und Schnittstelle).
   Noch offen aus dem Review (optional): Paket `alarm` aufteilen, Wochenstand einmal
   definieren, *Heute* an einer Stelle laden.
+- **V1.3b0.1** (`versionCode` 11) auf `feature/v1.3b0`, **installiert am 2026-11-04 21:38**:
+  Kevins Rückmeldungen vom 2026-11-04 – Checklisten-Punkte jederzeit abhaken (C8), lesbare
+  Punkte im Alarm, Übersicht nennt jede Uhrzeit, mitwachsende Textfelder mit
+  Tastatur-Vorschlägen (`GrowingField`, `TextKeyboard` in `ui/Inputs.kt`). 333 Tests grün.
+  Offen: Training-Alarm am Morgen und „Checkliste nicht richtig gespeichert“ – Kevin
+  erklärt das Szenario, dann Logs (`diag.log`) und Daten über die Schnittstelle lesen.
+  Dazu bessere Tests (design.md 14): Szenario-Tests in `core` (`scenarios/`, 14 Tage
+  nachgespielt, zwei davon halten die offenen Punkte fest) und `ReceiverGlueTest` in `:app`
+  (8 Tests: Alarm, Knöpfe, Ankunft, Neustart). Das Diagnose-Log nennt bei einer Ankunft
+  jetzt Titel und Fälligkeit der klingelnden Reminder. 355 Tests grün, Kover 98,45 %.
+  Echte Testdaten seit 2026-11-04 abends: `testdata/real-2026-11-04.json` (19 Reminder,
+  87 Termine, pseudonymisiert) und `RealDataTest` (Migration, Alarm-Ansicht, eine Woche,
+  Handy zwei Tage aus). 359 Tests grün, Kover 98,33 %.
+- **Training-Fälle geklärt (2026-11-04, aus `diag.log`):** Morgens meldete der Geofence um
+  07:12 eine Ankunft, und ohne früheste Uhrzeit klingelte das Training sofort. Kevin
+  verschob es auf 20:30. Um 20:30 lieferte die grobe Ortsabfrage auf dem Heimweg
+  vermutlich „unklar“, also klingelte es; die Ankunft kam erst um 20:34. Daraus die
+  Anforderungen 7.29 (Ankunftszeitraum, WLAN, GPS im Zeitraum, Puffer); F1–F3 wie
+  vorgeschlagen entschieden. Kevin liest zuerst alle Anforderungen im Ganzen; bis dahin
+  nur Anforderungsarbeit und Tests. Bis zur Umsetzung kann eine Ankunft am Morgen das
+  Training weiter sofort auslösen.
+- **V1.3b0.2** (`versionName` 1.3b0.2-prototyp, `versionCode` 12) auf `feature/v1.3b0`,
+  **installiert am 2026-11-05 20:10** (Migration 7→8 geprüft: Backup v7, Schema 8, 80
+  Termine mit `firedAt`, `foreign_key_check` leer): Funde und Empfehlungen aus Review-Lauf 3
+  ([.review/runs/2026-11-05.md](../.review/runs/2026-11-05.md)).
+  - E5: Ein Termin merkt sich, ob er geklungen hat (`firedAt`) und ob er nach dem
+    Verschieben auf die Ankunft wartet (`awaitsArrival`). **Migration 7→8** (`ADD COLUMN`,
+    `firedAt` aus dem ersten `DUE`-Ereignis), Backup v7 vor der Migration.
+  - B1: Speichern eines geschlummerten oder verschobenen Reminders verschiebt den
+    heutigen Termin nicht mehr auf morgen.
+  - B2: Verschobenes Training, zur neuen Zeit nicht zuhause (oder *unklar*) → wartet auf
+    die Ankunft, sonst zur Tagesgrenze *verpasst* statt *entfällt* (7.29 OZ5). Das löst
+    auch den Fehlalarm auf dem Heimweg vom 2026-11-04 um 20:30.
+  - E6: Ortsprüfung außerhalb der Transaktion, Alarme erst nach dem Speichern.
+  - Kevins Antworten auf die Fragen 1–7 und die Empfehlungen E7–E10 stehen in
+    anforderungen.md (Kap. 9, 2026-11-05) und design.md (Entwurf 7.29, E.3).
+  - 368 Tests grün, Kover in `core` 98,2 %.
+- **7.29 vereinfacht (2026-11-05):** Kevin hat die Anforderungen im Ganzen gelesen. 7.29
+  bestimmt den Ort zuerst nur über WLAN (Verbindung und Suchergebnisse, BSSIDs pro Ort);
+  GPS ist nach 7.30 ausgelagert und kommt später. Nächster Schritt: Entwurf 7.29 Z.7
+  bestätigen, kleiner Gerätetest zum WLAN im Hintergrund, dann Umsetzung.
+- **V1.3b0.3** (`versionCode` 13, **installiert am 2026-11-05 22:43**, Sonde läuft, Heimnetz
+  als N1 mit 4 Zugangspunkten gelernt, BSSID über den Callback): WLAN-Sonde im Debug-Build (`location/WifiProbe.kt`),
+  nur Diagnose, kein neues Verhalten; Fragen W1–W5 in geraetetest.md. Neue Berechtigungen
+  `ACCESS_WIFI_STATE` und `ACCESS_NETWORK_STATE` (normal, ohne Rückfrage). 375 Tests grün.
+  Nach ein paar Tagen wertet Claude `diag.log` aus, danach 7.29 umsetzen und die Sonde
+  durch die echte Prüfung ersetzen.
+- **V1.3b0.4** (`versionCode` 14) auf `feature/v1.3b0`, **installiert am 2026-11-07 13:05** (Start ok, Berechtigungen ok, alle Alarme neu geplant):
+  Erledigung zurücknehmen (Anf. 7.31, design.md 3): stille Benachrichtigung *Rückgängig*
+  für 1 min nach *Erledigt*/*Auslassen*, danach *Zurücknehmen* auf *Heute*. Wieder offen,
+  klingelt in 10 min; Nachweis zählt wieder; Checkliste verliert nur den letzten Haken.
+  Keine Migration, neues Ereignis `REOPENED`. Gerätetests N20–N23.
+  Dazu vorab verschieben und auslassen (Anf. 7.32): *Vorab* auf *Heute* und *Verschieben …*
+  im Vorab-Reminder öffnen den Alarm-Bildschirm vorab, „heute später“ +30 min/+1/+2 Std ab
+  der geplanten Zeit, zählt aufs Verschieben-Konto; Ankunft-Reminder behält die neue Zeit.
+  Gerätetests N24–N27.
 - Danach: Kevins Wochenplan (Gerätetests V1.3a, Reminder *Gerätetest*), dann V1.3b.
 
 ## Auf dem Gerät
@@ -44,8 +100,11 @@ Stand: 2026-11-03. Bei jedem größeren Schritt aktualisieren.
    aber sinnvolle Rückfragen („Willst du wirklich …?“) bekommen.
    Hinweis bei wiederholtem *Später* (NT2) ist in V1.3a umgesetzt. Gezählt wird erst vor
    V2 mit der Testsession (NT4).
-2. **Backend** (Kevin, parallel, `../avlreminder-backend`): B0–B2 fertig, B2b
-   (Daten-Backup) als Nächstes. Überblick: [backend.md](backend.md).
+2. **Backend** (`../avlreminder-backend`): B0–B2b fertig und in der Cloud getestet.
+   Als Nächstes das **Cloud-Backup in der App**, Entwurf bestätigt am 2026-11-07
+   ([backup-entwurf.md](backup-entwurf.md), fünf Schritte). Vorab legt Kevin die
+   OAuth-Clients (Web und Android) und den Deploy-Key an. Überblick: [backend.md](backend.md).
+   App und `core` bauen seit 2026-11-07 für Java 21 (Voraussetzung für `client/`).
 3. **Play-Store-Release** ohne Eile, erst wenn die App „fertig“ ist (mindestens bis V2);
    dafür Transparenz, Notausschalter (in V1.3a), Backend nur nach Einschalten (7.28 PS5–PS9).
 

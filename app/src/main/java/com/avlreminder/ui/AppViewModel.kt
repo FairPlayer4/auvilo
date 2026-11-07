@@ -16,6 +16,8 @@ import com.avlreminder.core.rules.AlertSettings
 import com.avlreminder.core.rules.Checklists
 import com.avlreminder.core.rules.Prep
 import com.avlreminder.core.rules.SkipReasons
+import com.avlreminder.core.rules.TransitionResult
+import com.avlreminder.system.Diag
 import com.avlreminder.core.rules.SnoozeHint
 import com.avlreminder.core.rules.SnoozeHintChoice
 import com.avlreminder.core.usecases.HistoryDay
@@ -141,6 +143,15 @@ class AppViewModel(app: Application) : AndroidViewModel(app) {
     /** "Verwerfen" for an overdue deadline. */
     fun discard(occurrenceId: Long) {
         viewModelScope.launch { graph.withEngine { it.act(occurrenceId, Action.Skip(SkipReasons.DISCARDED)) } }
+    }
+
+    /** "Zurücknehmen" (Anf. 7.31); [onResult] says what happened. */
+    fun reopen(occurrenceId: Long, onResult: (TransitionResult) -> Unit) {
+        viewModelScope.launch {
+            val result = graph.withEngine { it.reopen(occurrenceId) }
+            Diag.log("today reopen occ=$occurrenceId → ${result::class.simpleName}")
+            onResult(result)
+        }
     }
 
     fun addBlocker(reminderId: Long, text: String) {

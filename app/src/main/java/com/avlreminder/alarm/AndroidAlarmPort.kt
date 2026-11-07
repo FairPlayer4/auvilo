@@ -7,6 +7,7 @@ import android.content.Context
 import android.content.Intent
 import androidx.core.net.toUri
 import com.avlreminder.core.ports.AlarmKind
+import com.avlreminder.core.model.Occurrence
 import com.avlreminder.core.model.OccurrenceState
 import com.avlreminder.core.ports.AlarmPort
 import com.avlreminder.core.rules.Action
@@ -84,6 +85,17 @@ class AlarmReceiver : BroadcastReceiver() {
 class ActionReceiver : BroadcastReceiver() {
     override fun onReceive(context: Context, intent: Intent) {
         val id = intent.getLongExtra(AndroidAlarmPort.EXTRA_OCCURRENCE, -1)
+        if (intent.action == ACTION_REOPEN) {
+            val result = goAsync()
+            context.graph.scope.launch {
+                try {
+                    Undo.reopen(context, id)
+                } finally {
+                    result.finish()
+                }
+            }
+            return
+        }
         val action = when (intent.action) {
             ACTION_DONE -> Action.Complete(minimumOnly = false)
             ACTION_SNOOZE -> Action.Snooze(Duration.ofMinutes(intent.getIntExtra(EXTRA_MINUTES, 10).toLong()))
@@ -99,11 +111,15 @@ class ActionReceiver : BroadcastReceiver() {
                     Diag.log("notification action occ=$id ${action::class.simpleName} → ${acted::class.simpleName}")
                     val o = (acted as? TransitionResult.Ok)?.occurrence
                     // Still open after an item: offer the next one, quietly.
-                    if (action !is Action.CheckItem || o == null || o.state != OccurrenceState.DUE) return@withEngine null
+                    if (action !is Action.CheckItem || o == null || o.state != OccurrenceState.DUE) return@withEngine o
                     e.alarmView(o.id)?.let(AlarmInfo::of)
                 }
                 Ringer.dismiss(context, id)
-                next?.let { Notifications.show(context, it, quiet = true) }
+                when (next) {
+                    is AlarmInfo -> Notifications.show(context, next, quiet = true)
+                    // Done from the notification or the watch: "Rückgängig" for a minute (Anf. 7.31).
+                    is Occurrence -> Undo.offer(context, next)
+                }
             } finally {
                 result.finish()
             }
@@ -114,6 +130,7 @@ class ActionReceiver : BroadcastReceiver() {
         const val ACTION_DONE = "com.avlreminder.DONE"
         const val ACTION_SNOOZE = "com.avlreminder.SNOOZE"
         const val ACTION_CHECK = "com.avlreminder.CHECK"
+        const val ACTION_REOPEN = "com.avlreminder.REOPEN"
         private const val EXTRA_MINUTES = "minutes"
         private const val EXTRA_ITEM = "item"
 

@@ -58,6 +58,10 @@ enum class EventType {
     WINDOW_CLOSED,
     /** "Was hält dich gerade ab?" was asked (answered or skipped) for the occurrence. */
     BLOCKER_ASKED,
+    /** Snoozed or postponed with an arrival: not at the place at the new time, it waits for the arrival (7.29 OZ5). */
+    AWAITING_ARRIVAL,
+    /** "Zurücknehmen" after a misclick (Anf. 7.31): open again; detail = the resolution taken back. */
+    REOPENED,
 }
 
 /** When a reminder is due. */
@@ -236,8 +240,28 @@ data class Occurrence(
     val pausedUntil: Instant? = null,
     /** First checked item; "after done" counts from here for a checklist. */
     val firstProgressAt: Instant? = null,
+    /**
+     * When it first became due (fired or arrived). Null: it never rang yet. A planned occurrence
+     * with it set was snoozed, postponed, deferred or its window closed (E5, Review 2026-11-05).
+     */
+    val firedAt: Instant? = null,
+    /** Planned again after it rang, not at the place at the new time: rings on arrival, missed at the end of the day (7.29 OZ5). */
+    val awaitsArrival: Boolean = false,
 ) {
     val isOpen: Boolean get() = state != OccurrenceState.DONE && state != OccurrenceState.CLOSED
+
+    /** It rang already; planned again it keeps its day and its time. */
+    val hasFired: Boolean get() = firedAt != null
+
+    /**
+     * It rang or was moved (also in advance, Anf. 7.32 VB4): its time is decided. An arrival
+     * before it does not ring it, and away at its time it waits for the arrival instead of
+     * being dropped.
+     */
+    val rangOrMoved: Boolean get() = hasFired || postponeCount > 0
+
+    /** Where it stands now: planned and never rung, the possibly moved time; otherwise its due time. */
+    val plannedAt: Instant get() = if (hasFired) dueAt else currentAt
 }
 
 data class Proof(

@@ -1,7 +1,8 @@
 # avlreminder – Hinweise für Claude
 
 Android-App für sehr wirksame Reminder, zuerst nur für Kevin selbst (V1: ein Nutzer,
-lokal, kein Backend, Sideload auf sein privates S24 Ultra, Android 17 / API 37).
+lokal, Sideload auf sein privates S24 Ultra, Android 17 / API 37). Das Backend kommt
+als Ende-zu-Ende-verschlüsseltes Cloud-Backup dazu, nur nach Einschalten.
 Strenge und invasive Mechanismen sind gewollt. Kommunikation auf **Deutsch, mit ß**.
 
 ## Wo was steht
@@ -10,6 +11,7 @@ Strenge und invasive Mechanismen sind gewollt. Kommunikation auf **Deutsch, mit 
 - [docs/design.md](docs/design.md) – technisches Design je Version
 - [docs/geraetetest.md](docs/geraetetest.md) – Kerntests auf dem echten Gerät (Archiv pro Version: `geraetetest-archiv.md`)
 - [docs/backend.md](docs/backend.md) – Backend (`../avlreminder-backend`) aus Sicht der App
+- [docs/backup-entwurf.md](docs/backup-entwurf.md) – Einbindung des Cloud-Backups (Entscheidungen A-1 bis A-14)
 - [docs/entwicklungsumgebung.md](docs/entwicklungsumgebung.md) – Toolchain und Pfade auf Kevins Rechner
 - Module: `core` (reine Kotlin-Logik, Kover-Abdeckung), `app` (Android, Compose, Room)
 
@@ -46,6 +48,9 @@ Strenge und invasive Mechanismen sind gewollt. Kommunikation auf **Deutsch, mit 
 - Inhalte von Kevins Remindern und Nachweisen sind privat: nicht ins Repo, nicht in
   Logs schreiben, nicht an externe Dienste geben. Lesen über die Schnittstelle ist erlaubt.
   Ausnahme in der Entwicklungsphase: Titel dürfen ins Diagnose-Log (design.md 13).
+  Ausnahme Testdaten: `testdata/real-*.json` aus `tools/testdata/export_testdata.py`
+  (alle Texte ersetzt, keine Medien, Orte verschoben, Leck-Prüfung im Skript) dürfen ins
+  Repo; nur dieses Skript benutzen und das Ergebnis vor dem Commit stichprobenartig ansehen.
 - **Schnittstelle für Claude** (Debug-Build, design.md 15): erst nutzbar, wenn Kevin sie
   in den Einstellungen einschaltet. Lesen ohne Rückfrage; Reminder anlegen, ändern,
   pausieren, archivieren nur nach Absprache mit Kevin.

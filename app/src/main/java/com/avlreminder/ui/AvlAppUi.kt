@@ -131,6 +131,8 @@ interface AppActions {
     fun setOverview(times: OverviewTimes) {}
     /** "Verwerfen" for an overdue deadline. */
     fun discard(occurrenceId: Long) {}
+    /** "Zurücknehmen" after a misclick (Anf. 7.31). */
+    fun reopen(occurrenceId: Long) {}
     fun addBlocker(reminderId: Long, text: String) {}
     fun solveBlocker(blockerId: Long) {}
     /** "Als Aufgabe planen": a relaxed one-off for the blocker. */
@@ -235,6 +237,7 @@ fun AvlAppUi(
                             onResume = { actions.setAlarmsPaused(null) },
                             hints = state.snoozeHints,
                             onHint = { h, choice -> actions.answerSnoozeHint(h.reminder.id, choice) },
+                            onReopen = { actions.reopen(it.occurrence.id) },
                         )
                     }
                 }
@@ -344,6 +347,8 @@ fun AvlAppUi(
                     onArchive = existing?.let { r -> { archived -> actions.setArchived(r.id, archived); go(Routes.REMINDERS) } },
                     archived = existing?.archivedAt != null,
                     onStats = existing?.let { r -> { go(Routes.stats(r.id)) } },
+                    onCheckItems = existing?.takeIf { it.checklist.isNotEmpty() && it.active }
+                        ?.let { state.openByReminder[it.id] }?.let { o -> { actions.completeEarly(o.id) } },
                     onSaveTemplate = { name, form -> actions.saveTemplate(form.toTemplate(name, now)) },
                     blockers = blockers,
                     blockerActions = existing?.let { r ->

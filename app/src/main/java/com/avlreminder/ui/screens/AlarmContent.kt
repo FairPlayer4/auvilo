@@ -1,6 +1,8 @@
 package com.avlreminder.ui.screens
 
 import androidx.compose.foundation.background
+import androidx.compose.foundation.border
+import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -40,6 +42,7 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.avlreminder.core.model.Blocker
 import com.avlreminder.core.model.ChecklistItem
+import com.avlreminder.core.model.Strictness
 import com.avlreminder.core.model.PrepAnswer
 import com.avlreminder.core.model.severalADay
 import com.avlreminder.core.usecases.AlarmView
@@ -48,6 +51,7 @@ import com.avlreminder.core.rules.Evidence
 import com.avlreminder.core.rules.Prep
 import com.avlreminder.core.rules.ProofCheck
 import com.avlreminder.ui.Format
+import com.avlreminder.ui.TextKeyboard
 import com.avlreminder.ui.theme.Avl
 import java.time.Instant
 import java.time.LocalTime
@@ -89,6 +93,8 @@ fun AlarmContent(
     onAnswerAsk: (text: String?, plan: Boolean) -> Unit = { _, _ -> },
     /** "Auf morgen" for a deadline. */
     onTomorrow: (Instant) -> Unit = {},
+    /** Leaves "Vorab erledigen" with the items checked so far; the reminder stays as planned. */
+    onLeave: () -> Unit = {},
 ) {
     val c = Avl.colors
     var view by remember { mutableStateOf(View.MAIN) }
@@ -102,10 +108,13 @@ fun AlarmContent(
     // Several times a day a checklist is done one item per time; the rest comes at the next (VS1).
     val oneItem = checklist && r.schedule.severalADay
 
+    // Taken back after a completion with proof: that proof counts again (Anf. 7.31).
+    val askProof = r.proof.needsEvidence && !ui.proofCarried
+
     fun complete(minimum: Boolean) {
         minimumOnly = minimum
         proofItem = null
-        if (r.proof.needsEvidence) {
+        if (askProof) {
             if (!ui.early) onStartProof()
             view = View.PROOF
         } else {
@@ -114,7 +123,7 @@ fun AlarmContent(
     }
 
     fun check(item: ChecklistItem) {
-        if (r.proof.needsEvidence) {
+        if (askProof) {
             proofItem = item
             if (!ui.early) onStartProof()
             view = View.PROOF
@@ -136,7 +145,7 @@ fun AlarmContent(
         Column(Modifier.fillMaxSize().verticalScroll(rememberScrollState()).imePadding().padding(24.dp)) {
             when (view) {
                 View.MAIN -> {
-                    val head = if (ui.early) "Vorab erledigen · fällig um ${Format.time(ui.occurrence.currentAt, zone)}"
+                    val head = if (ui.early) "Vorab · fällig um ${Format.time(ui.occurrence.currentAt, zone)}"
                     else "${Format.strictness(r.strictness).replaceFirstChar { it.uppercase() }} · fällig seit ${Format.time(ui.occurrence.currentAt, zone)}"
                     Text(head, color = c.muted, fontSize = 14.sp)
                     Text(Format.time(now, zone), color = c.text, fontSize = 56.sp, fontWeight = FontWeight.Light)
@@ -187,6 +196,11 @@ fun AlarmContent(
                             Text("Blocker gelöst – zählt als Minimum")
                         }
                     }
+                    if (ui.early && checklist) {
+                        OutlinedButton(onClick = onLeave, Modifier.fillMaxWidth().padding(top = 8.dp).testTag("leave")) {
+                            Text("Fertig für jetzt – Termin bleibt")
+                        }
+                    }
                     if (!ui.early) {
                         if (checklist && !oneItem) {
                             val time = ui.occurrence.dueAt.atZone(zone).toLocalTime()
@@ -209,12 +223,15 @@ fun AlarmContent(
                                 }
                             }
                         }
-                        Row(Modifier.fillMaxWidth().padding(top = 8.dp), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                            OutlinedButton(onClick = { view = View.POSTPONE }, enabled = ui.canPostpone, modifier = Modifier.weight(1f)) {
-                                Text("Verschieben\n" + (ui.postponesLeft?.let { "noch ${it}×" } ?: "beliebig"))
-                            }
-                            OutlinedButton(onClick = { view = View.SKIP }, modifier = Modifier.weight(1f)) { Text("Auslassen\nmit Grund") }
+                    }
+                    // Also in advance, "heute später" (Anf. 7.32 VB1): no snoozing, nothing rings yet.
+                    Row(Modifier.fillMaxWidth().padding(top = 8.dp), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                        OutlinedButton(
+                            onClick = { view = View.POSTPONE }, enabled = ui.canPostpone, modifier = Modifier.weight(1f).testTag("postpone"),
+                        ) {
+                            Text("Verschieben\n" + (ui.postponesLeft?.let { if (it == 0) "aufgebraucht" else "noch ${it}×" } ?: "beliebig"))
                         }
+                        OutlinedButton(onClick = { view = View.SKIP }, modifier = Modifier.weight(1f).testTag("skip")) { Text("Auslassen\nmit Grund") }
                     }
                     // Unobtrusive at the very end, so it does not distract from reacting (Anf. 7.24, VV1).
                     TextButton(onClick = { suggesting = true }, Modifier.padding(top = 24.dp).testTag("suggest")) {
@@ -254,11 +271,20 @@ private fun Checklist(items: List<ChecklistItem>, done: Set<Long>, onCheck: (Che
     Column(Modifier.fillMaxWidth().padding(vertical = 4.dp).clip(RoundedCornerShape(12.dp)).background(c.surface).padding(14.dp)) {
         Text("Checkliste · ${items.count { it.id in done }} von ${items.size}", color = c.muted, fontSize = 13.sp)
         items.forEach { item ->
+            // Plain rows with a small radius: long items stay readable over several lines.
             if (item.id in done) {
-                Text("✓ ${item.title}", Modifier.padding(vertical = 10.dp), color = c.muted, fontSize = 17.sp)
+                Row(Modifier.fillMaxWidth().padding(horizontal = 12.dp, vertical = 10.dp).testTag("done${item.id}")) {
+                    Text("✓", Modifier.padding(end = 10.dp), color = c.muted, fontSize = 17.sp)
+                    Text(item.title, color = c.muted, fontSize = 17.sp)
+                }
             } else {
-                OutlinedButton(onClick = { onCheck(item) }, Modifier.fillMaxWidth().padding(vertical = 2.dp).testTag("item${item.id}")) {
-                    Text("○  ${item.title}", Modifier.weight(1f), color = c.text, fontSize = 17.sp)
+                Row(
+                    Modifier.fillMaxWidth().padding(vertical = 3.dp).clip(RoundedCornerShape(8.dp))
+                        .border(1.dp, c.line, RoundedCornerShape(8.dp)).clickable { onCheck(item) }
+                        .padding(horizontal = 12.dp, vertical = 12.dp).testTag("item${item.id}"),
+                ) {
+                    Text("○", Modifier.padding(end = 10.dp), color = c.accent, fontSize = 17.sp)
+                    Text(item.title, color = c.text, fontSize = 17.sp)
                 }
             }
         }
@@ -345,7 +371,7 @@ private fun ProofStep(
     spec.textMinChars?.let { min ->
         Text("Was hast du getan?", color = c.text, fontWeight = FontWeight.SemiBold, modifier = Modifier.padding(top = 16.dp))
         OutlinedTextField(
-            text, { text = it }, Modifier.fillMaxWidth().padding(top = 6.dp).testTag("proofText"), minLines = 3,
+            text, { text = it }, Modifier.fillMaxWidth().padding(top = 6.dp).testTag("proofText"), minLines = 3, keyboardOptions = TextKeyboard,
             supportingText = { Text("${ProofCheck.chars(text)} / $min Zeichen · Diktieren über die Tastatur geht auch") },
         )
     }
@@ -360,7 +386,7 @@ private fun ProofStep(
         devices.recorder { path, seconds -> audio = path to seconds }
     }
     if (spec.textMinChars == null) {
-        OutlinedTextField(note, { note = it }, Modifier.fillMaxWidth().padding(top = 12.dp), label = { Text("Notiz (optional)") })
+        OutlinedTextField(note, { note = it }, Modifier.fillMaxWidth().padding(top = 12.dp), label = { Text("Notiz (optional)") }, keyboardOptions = TextKeyboard)
     }
 
     problems.forEach { Text(it, Modifier.padding(top = 8.dp), color = c.muted, fontSize = 14.sp) }
@@ -389,11 +415,23 @@ private fun PostponeStep(ui: AlarmView, now: Instant, zone: ZoneId, onPostpone: 
     )
     val evening = today.atTime(20, 30).atZone(zone).toInstant()
     val tomorrow = today.plusDays(1).atTime(ui.occurrence.dueAt.atZone(zone).toLocalTime()).atZone(zone).toInstant()
+    // In advance from the planned time: 18:00 "+1 Std" is 19:00, whenever one taps (7.32 VB2).
+    val planned = ui.occurrence.currentAt
     val options = buildList {
-        add("In 1 Stunde" to now.plusSeconds(3600))
-        if (evening > now.plusSeconds(1800)) add("Heute Abend" to evening)
+        if (ui.early) {
+            listOf("+30 min" to 30L, "+1 Std" to 60L, "+2 Std" to 120L).forEach { (label, minutes) ->
+                val at = planned.plusSeconds(minutes * 60)
+                if (ui.missedAt == null || at < ui.missedAt) add(label to at)
+            }
+        } else {
+            add("In 1 Stunde" to now.plusSeconds(3600))
+            if (evening > now.plusSeconds(1800)) add("Heute Abend" to evening)
+        }
         add("Morgen" to tomorrow)
-    }.filter { (_, at) -> (ui.deadline == null || at < ui.deadline) && (ui.nextTime == null || at < ui.nextTime) }
+    }.filter { (_, at) -> at > now && (ui.deadline == null || at < ui.deadline) && (ui.nextTime == null || at < ui.nextTime) }
+    // Strict and in advance: one question first (7.32 VB3).
+    var confirm by remember { mutableStateOf<Instant?>(null) }
+    val postpone: (Instant) -> Unit = { at -> if (ui.early && ui.reminder.strictness == Strictness.STRICT) confirm = at else onPostpone(at) }
     ui.nextTime?.let {
         Text("Nur bis vor die nächste Uhrzeit ${Format.moment(it, zone, today)}.", Modifier.padding(bottom = 8.dp), color = c.muted, fontSize = 13.sp)
     }
@@ -401,7 +439,7 @@ private fun PostponeStep(ui: AlarmView, now: Instant, zone: ZoneId, onPostpone: 
         Text("Nur bis zur Frist ${Format.moment(it, zone, today)}.", Modifier.padding(bottom = 8.dp), color = c.muted, fontSize = 13.sp)
     }
     options.forEach { (label, at) ->
-        OutlinedButton(onClick = { onPostpone(at) }, Modifier.fillMaxWidth().padding(vertical = 4.dp)) {
+        OutlinedButton(onClick = { postpone(at) }, Modifier.fillMaxWidth().padding(vertical = 4.dp).testTag("postpone$label")) {
             Text(label, Modifier.weight(1f))
             Text(Format.moment(at, zone, today), color = c.muted)
         }
@@ -411,6 +449,7 @@ private fun PostponeStep(ui: AlarmView, now: Instant, zone: ZoneId, onPostpone: 
         Text("Danach bleiben nur noch Erledigt, Minimum oder Auslassen.", Modifier.padding(top = 12.dp), color = c.muted, fontSize = 13.sp)
     }
     TextButton(onClick = onBack, Modifier.padding(top = 8.dp)) { Text("Abbrechen", color = c.muted) }
+    ConfirmEarlyPostpone(confirm, zone, today, onConfirm = { confirm = null; onPostpone(it) }, onDismiss = { confirm = null })
 
     if (pickDate) {
         val state = rememberDatePickerState(today.atStartOfDay(ZoneOffset.UTC).toInstant().toEpochMilli())
@@ -433,7 +472,7 @@ private fun PostponeStep(ui: AlarmView, now: Instant, zone: ZoneId, onPostpone: 
             confirmButton = {
                 TextButton(onClick = {
                     pickedDate = null
-                    onPostpone(date.atTime(LocalTime.of(state.hour, state.minute)).atZone(zone).toInstant())
+                    postpone(date.atTime(LocalTime.of(state.hour, state.minute)).atZone(zone).toInstant())
                 }) { Text("Verschieben") }
             },
             dismissButton = { TextButton(onClick = { pickedDate = null }) { Text("Abbrechen") } },
@@ -443,11 +482,23 @@ private fun PostponeStep(ui: AlarmView, now: Instant, zone: ZoneId, onPostpone: 
 }
 
 @Composable
+private fun ConfirmEarlyPostpone(at: Instant?, zone: ZoneId, today: java.time.LocalDate, onConfirm: (Instant) -> Unit, onDismiss: () -> Unit) {
+    at ?: return
+    AlertDialog(
+        onDismissRequest = onDismiss,
+        title = { Text("Wirklich jetzt schon auf ${Format.moment(at, zone, today)}?") },
+        text = { Text("Das zählt als Verschieben.") },
+        confirmButton = { TextButton(onClick = { onConfirm(at) }, Modifier.testTag("postponeOk")) { Text("Verschieben") } },
+        dismissButton = { TextButton(onClick = onDismiss) { Text("Abbrechen") } },
+    )
+}
+
+@Composable
 private fun SkipStep(onSkip: (String) -> Unit, onBack: () -> Unit) {
     val c = Avl.colors
     var reason by remember { mutableStateOf("") }
     StepHeader("Auslassen", "Zählt neutral, nicht als verpasst.")
-    OutlinedTextField(reason, { reason = it }, Modifier.fillMaxWidth(), label = { Text("Grund") })
+    OutlinedTextField(reason, { reason = it }, Modifier.fillMaxWidth(), label = { Text("Grund") }, keyboardOptions = TextKeyboard)
     Button(onClick = { onSkip(reason.trim()) }, enabled = reason.isNotBlank(), modifier = Modifier.fillMaxWidth().padding(top = 12.dp)) {
         Text("Auslassen")
     }
@@ -465,7 +516,7 @@ private fun AskDialog(onAnswer: (text: String?, plan: Boolean) -> Unit) {
         text = {
             Column {
                 Text("Das hängt jetzt mehrmals. Was fehlt oder stört?", color = c.muted, fontSize = 14.sp)
-                OutlinedTextField(text, { text = it }, Modifier.fillMaxWidth().padding(top = 8.dp).testTag("askText"), minLines = 2)
+                OutlinedTextField(text, { text = it }, Modifier.fillMaxWidth().padding(top = 8.dp).testTag("askText"), minLines = 2, keyboardOptions = TextKeyboard)
                 TextButton(onClick = { onAnswer(text, true) }, enabled = text.isNotBlank(), modifier = Modifier.testTag("askPlan")) {
                     Text("Speichern und als Aufgabe planen")
                 }

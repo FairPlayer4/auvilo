@@ -3,8 +3,10 @@ package com.avlreminder.core.usecases
 import com.avlreminder.core.model.OccurrenceState
 import com.avlreminder.core.model.Reminder
 import com.avlreminder.core.model.Resolution
+import com.avlreminder.core.rules.ScheduleRules
 import com.avlreminder.core.rules.WeekStatus
 import java.time.Instant
+import java.time.LocalDate
 import java.time.ZoneId
 import java.time.format.DateTimeFormatter
 
@@ -14,13 +16,17 @@ data class Digest(val title: String, val lines: List<String>)
 object Digests {
     private val time = DateTimeFormatter.ofPattern("HH:mm")
 
-    /** What is still due today. */
+    /** What is still due today; several times a day each time still to come (VS1). */
     fun morning(today: Today, zone: ZoneId): Digest {
+        val day = { e: Entry -> e.occurrence.currentAt.atZone(zone).toLocalDate() }
+        val later = today.dueNow.flatMap { e -> times(e, day(e), zone).drop(1).map { it to e } } +
+            today.laterToday.flatMap { e -> times(e, day(e), zone).map { it to e } }
         val lines = today.dueNow.map { "jetzt: ${it.reminder.title}" } +
             today.overdue.map { "überfällig: ${it.reminder.title}" } +
-            today.laterToday.map { "${time.format(it.occurrence.currentAt.atZone(zone))} ${it.reminder.title}" } +
+            later.sortedBy { it.first }.map { (at, e) -> "${time.format(at.atZone(zone))} ${e.reminder.title}" } +
             today.waiting.map { "zuhause: ${it.reminder.title}" }
-        val title = when (val n = lines.size) {
+        val reminders = (today.dueNow + today.overdue + today.laterToday + today.waiting).map { it.reminder.id }.distinct()
+        val title = when (val n = reminders.size) {
             0 -> "Heute steht nichts an"
             1 -> "Heute: 1 Reminder"
             else -> "Heute: $n Reminder"
@@ -39,11 +45,21 @@ object Digests {
             if (open > 0) add("$open offen")
         }.joinToString(", ")
         val tomorrow = now.atZone(zone).toLocalDate().plusDays(1)
-        val next = today.upcoming.filter { it.occurrence.currentAt.atZone(zone).toLocalDate() == tomorrow }
+        val next = (today.dueNow + today.laterToday + today.upcoming).flatMap { e -> times(e, tomorrow, zone).map { it to e } }
         val lines = weeks.map { (r, w) -> "${r.title}: ${week(w)}" } +
-            next.map { "morgen ${time.format(it.occurrence.currentAt.atZone(zone))} ${it.reminder.title}" }
+            next.sortedBy { it.first }.map { (at, e) -> "morgen ${time.format(at.atZone(zone))} ${e.reminder.title}" }
         return Digest(title, lines)
     }
+
+    /**
+     * The times of [e] on [day], from its open occurrence on: once a day just that one, several
+     * times a day also the following ones from the schedule (VS1).
+     */
+    private fun times(e: Entry, day: LocalDate, zone: ZoneId): List<Instant> =
+        generateSequence(e.occurrence.currentAt) { ScheduleRules.nextTime(e.reminder.schedule, it, zone) }
+            .takeWhile { it.atZone(zone).toLocalDate() <= day }
+            .filter { it.atZone(zone).toLocalDate() == day }
+            .toList()
 
     /** "2 von 3–4, Minimum erreicht". */
     fun week(w: WeekStatus): String {
