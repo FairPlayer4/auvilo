@@ -69,7 +69,7 @@ Stand: 2026-11-07. Bei jedem größeren Schritt aktualisieren.
   `ACCESS_WIFI_STATE` und `ACCESS_NETWORK_STATE` (normal, ohne Rückfrage). 375 Tests grün.
   Nach ein paar Tagen wertet Claude `diag.log` aus, danach 7.29 umsetzen und die Sonde
   durch die echte Prüfung ersetzen.
-- **V1.3b0.4** (`versionCode` 14) auf `feature/v1.3b0`, gebaut, **noch nicht installiert**:
+- **V1.3b0.4** (`versionCode` 14) auf `feature/v1.3b0`, **installiert am 2026-11-07 13:05** (Start ok, Berechtigungen ok, alle Alarme neu geplant):
   Erledigung zurücknehmen (Anf. 7.31, design.md 3): stille Benachrichtigung *Rückgängig*
   für 1 min nach *Erledigt*/*Auslassen*, danach *Zurücknehmen* auf *Heute*. Wieder offen,
   klingelt in 10 min; Nachweis zählt wieder; Checkliste verliert nur den letzten Haken.
