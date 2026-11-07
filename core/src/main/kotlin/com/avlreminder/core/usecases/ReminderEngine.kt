@@ -128,6 +128,13 @@ class ReminderEngine(
     /** Applies a user action. On success the next alarm or the next occurrence is planned. */
     suspend fun act(occurrenceId: Long, action: Action): TransitionResult = command { changes.act(occurrenceId, action) }
 
+    /**
+     * "Zurücknehmen" (Anf. 7.31): the last done or skipped occurrence of its reminder is open again
+     * and rings in 10 minutes. Rejected when it is not the last one, the next one has rung already
+     * or it would be past its day (several a day: past the next time).
+     */
+    suspend fun reopen(occurrenceId: Long): TransitionResult = command { changes.reopen(occurrenceId) }
+
     /** The proof screen opened: quiet for the reminder's proof window, at most until the end of the day. */
     suspend fun startProof(occurrenceId: Long): TransitionResult = command { changes.startProof(occurrenceId) }
 

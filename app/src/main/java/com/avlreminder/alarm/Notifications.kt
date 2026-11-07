@@ -47,7 +47,7 @@ data class AlarmInfo(
 object Notifications {
     const val CHANNEL_ALARM = "alarm"
     private const val CHANNEL_BANNER = "banner"
-    private const val CHANNEL_SILENT = "silent"
+    const val CHANNEL_SILENT = "silent"
     private const val CHANNEL_WATCH = "watch"
 
     fun createChannels(context: Context) {

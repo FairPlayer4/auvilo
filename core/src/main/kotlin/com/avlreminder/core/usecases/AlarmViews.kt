@@ -53,7 +53,19 @@ internal class AlarmViews(private val c: EngineContext) {
             deadline = deadline,
             blockerSolved = reminder.solvedBlockerIsMinimum && Blockers.solvedSince(repo.blockers(reminder.id), since),
             nextTime = occurrence?.let { ScheduleRules.nextTime(reminder.schedule, it.dueAt, zone) },
+            proofCarried = occurrence != null && proofCarried(reminder, occurrence),
         )
+    }
+
+    /**
+     * Taken back after a completion whose proof was complete (Anf. 7.31): its photo, text or
+     * audio stays with the occurrence and counts again; the text check would otherwise find it
+     * "the same as last time".
+     */
+    private suspend fun proofCarried(reminder: Reminder, occurrence: Occurrence): Boolean {
+        if (!occurrence.isOpen || !reminder.proof.needsEvidence) return false
+        val back = repo.events(occurrence.id).lastOrNull { it.type == EventType.REOPENED } ?: return false
+        return back.detail == Resolution.GOAL.name || back.detail == Resolution.MINIMUM.name
     }
 
     suspend fun limits(reminder: Reminder, occurrence: Occurrence? = null): Limits =
@@ -157,6 +169,7 @@ internal class AlarmViews(private val c: EngineContext) {
             deadline = limits.deadline,
             nextTime = limits.nextTime,
             blockers = repo.blockers(reminder.id).filter { it.isOpen },
+            proofCarried = limits.proofCarried,
         )
     }
 

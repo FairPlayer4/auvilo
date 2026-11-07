@@ -60,6 +60,8 @@ enum class EventType {
     BLOCKER_ASKED,
     /** Snoozed or postponed with an arrival: not at the place at the new time, it waits for the arrival (7.29 OZ5). */
     AWAITING_ARRIVAL,
+    /** "Zurücknehmen" after a misclick (Anf. 7.31): open again; detail = the resolution taken back. */
+    REOPENED,
 }
 
 /** When a reminder is due. */

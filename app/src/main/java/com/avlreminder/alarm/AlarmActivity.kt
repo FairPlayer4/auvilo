@@ -181,6 +181,8 @@ class AlarmActivity : ComponentActivity() {
                 return@launch
             }
             AudioPlayer.stop()
+            // A misclick happens: "Rückgängig" for a minute (Anf. 7.31).
+            Undo.offer(applicationContext, result.occurrence)
             finish()
         }
     }

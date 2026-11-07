@@ -159,6 +159,27 @@ class ReceiverGlueTest {
         assertEquals(OccurrenceState.DUE, repo.occurrence(o)?.state)
     }
 
+    @Test
+    fun doneFromTheNotificationOffersUndoForAMinuteAndUndoOpensItAgain() = runBlocking {
+        val id = repo.saveReminder(reminder())
+        val o = occurrence(id, OccurrenceState.DUE, Duration.ofMinutes(1))
+        Notifications.show(context, AlarmInfo(o, "Katzenbrunnen", null, quickDone = true), quiet = false)
+
+        broadcast(Intent(context, ActionReceiver::class.java).setAction(ActionReceiver.ACTION_DONE).putExtra(AndroidAlarmPort.EXTRA_OCCURRENCE, o))
+        waitFor("undo offered") { shadowOf(notifications).getNotification(Undo.id(o)) != null }
+        assertEquals(OccurrenceState.DONE, repo.occurrence(o)?.state)
+        val offer = shadowOf(notifications).getNotification(Undo.id(o))
+        assertEquals("„Katzenbrunnen“ erledigt", offer.extras.getString("android.title"))
+        assertEquals("Rückgängig", offer.actions.single().title)
+        assertEquals(Undo.TIMEOUT_MS, offer.timeoutAfter)
+
+        broadcast(Intent(context, ActionReceiver::class.java).setAction(ActionReceiver.ACTION_REOPEN).putExtra(AndroidAlarmPort.EXTRA_OCCURRENCE, o))
+        waitFor("reopened") { repo.occurrence(o)?.state == OccurrenceState.PLANNED }
+        waitFor("told") { shadowOf(notifications).getNotification(Undo.id(o))?.extras?.getString("android.title") == "„Katzenbrunnen“ wieder offen" }
+        assertNull(shadowOf(notifications).getNotification(Undo.id(o)).actions)
+        assertEquals(o, repo.openOccurrence(id)?.id)
+    }
+
     // --- Arrival ------------------------------------------------------------------------------
 
     /** Waits for the arrival only, so the test does not depend on the time of day. */

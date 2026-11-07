@@ -107,10 +107,13 @@ fun AlarmContent(
     // Several times a day a checklist is done one item per time; the rest comes at the next (VS1).
     val oneItem = checklist && r.schedule.severalADay
 
+    // Taken back after a completion with proof: that proof counts again (Anf. 7.31).
+    val askProof = r.proof.needsEvidence && !ui.proofCarried
+
     fun complete(minimum: Boolean) {
         minimumOnly = minimum
         proofItem = null
-        if (r.proof.needsEvidence) {
+        if (askProof) {
             if (!ui.early) onStartProof()
             view = View.PROOF
         } else {
@@ -119,7 +122,7 @@ fun AlarmContent(
     }
 
     fun check(item: ChecklistItem) {
-        if (r.proof.needsEvidence) {
+        if (askProof) {
             proofItem = item
             if (!ui.early) onStartProof()
             view = View.PROOF

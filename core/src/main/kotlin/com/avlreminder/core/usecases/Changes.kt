@@ -172,7 +172,7 @@ internal class Changes(private val c: EngineContext, private val views: AlarmVie
             }
             is Action.CheckItem -> {
                 saveEvidence(occurrence, action.evidence, action.itemId)
-                val withProof = ProofCheck.problems(reminder.proof, action.evidence, limits.lastProofText).isEmpty()
+                val withProof = limits.proofCarried || ProofCheck.problems(reminder.proof, action.evidence, limits.lastProofText).isEmpty()
                 repo.addItemDone(ItemDone(occurrenceId = occurrence.id, itemId = action.itemId, doneAt = now(), withProof = withProof))
             }
             else -> {}
@@ -183,6 +183,44 @@ internal class Changes(private val c: EngineContext, private val views: AlarmVie
                 .forEach { repo.saveBlocker(it.copy(solvedAt = now())) }
         }
         scheduler.cancel(occurrence)
+        scheduler.syncReminder(reminder)
+        return result
+    }
+
+    /**
+     * "Zurücknehmen" after a misclick (Anf. 7.31): the last done or skipped occurrence of the
+     * reminder is open again and rings in [REOPEN_DELAY], without counting as a postponement.
+     * The next occurrence, planned but not yet rung, goes; it comes again once this one is
+     * resolved. What the completion itself did goes back: the checklist items it ticked and a
+     * blocker its preparation task solved. Proofs stay (see [Limits.proofCarried]).
+     */
+    suspend fun reopen(occurrenceId: Long): TransitionResult {
+        val occurrence = repo.occurrence(occurrenceId) ?: return TransitionResult.Rejected("unknown occurrence")
+        val reminder = repo.reminder(occurrence.reminderId) ?: return TransitionResult.Rejected("unknown reminder")
+        val resolvedAt = occurrence.resolvedAt ?: return TransitionResult.Rejected("occurrence is open")
+        if (!reminder.active) return TransitionResult.Rejected("reminder is paused")
+        if (repo.lastResolved(reminder.id)?.id != occurrence.id) return TransitionResult.Rejected("only the last one can be taken back")
+        val next = repo.openOccurrence(reminder.id)
+        if (next != null && (next.state != OccurrenceState.PLANNED || next.hasFired || next.postponeCount > 0)) {
+            return TransitionResult.Rejected("the next one has started already")
+        }
+        val at = now().plus(REOPEN_DELAY)
+        val result = Lifecycle.transition(reminder, occurrence, Action.Reopen(at), now())
+        if (result !is TransitionResult.Ok) return result
+        // Past the end of its day (several a day: the next time) it would only be missed (VS1).
+        // Measured on the occurrence as it was: its day, not the day the new time falls on.
+        if (at >= views.missedAt(reminder, occurrence)) return TransitionResult.Rejected("too late for today")
+        next?.let {
+            scheduler.cancel(it)
+            repo.deleteOccurrence(it.id)
+        }
+        repo.saveOccurrence(result.occurrence)
+        repo.addEvent(result.event)
+        repo.deleteItemsDone(occurrence.id, resolvedAt)
+        reminder.prepFor?.let { main ->
+            repo.blockers(main).filter { it.taskReminderId == reminder.id && it.solvedAt == resolvedAt }
+                .forEach { repo.saveBlocker(it.copy(solvedAt = null)) }
+        }
         scheduler.syncReminder(reminder)
         return result
     }
@@ -296,5 +334,10 @@ internal class Changes(private val c: EngineContext, private val views: AlarmVie
         is Schedule.Weekdays -> Schedule.Weekdays(time, schedule.days)
         is Schedule.AfterDone -> schedule.copy(time = time)
         else -> schedule
+    }
+
+    companion object {
+        /** A taken-back occurrence rings again after this, not right away: one is in the app just now. */
+        val REOPEN_DELAY: Duration = Duration.ofMinutes(10)
     }
 }

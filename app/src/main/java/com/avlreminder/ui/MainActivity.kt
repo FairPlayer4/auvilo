@@ -181,6 +181,9 @@ class MainActivity : ComponentActivity() {
         override fun updateSuggestion(suggestion: SuggestionEntity) = vm.updateSuggestion(suggestion)
         override fun deleteSuggestion(id: Long) = vm.deleteSuggestion(id)
         override fun discard(occurrenceId: Long) = vm.discard(occurrenceId)
+        override fun reopen(occurrenceId: Long) = vm.reopen(occurrenceId) { result ->
+            android.widget.Toast.makeText(this@MainActivity, com.avlreminder.alarm.Undo.message(result), android.widget.Toast.LENGTH_LONG).show()
+        }
         override fun addBlocker(reminderId: Long, text: String) = vm.addBlocker(reminderId, text)
         override fun solveBlocker(blockerId: Long) = vm.solveBlocker(blockerId)
         override fun planTask(blockerId: Long, at: java.time.LocalDateTime) = vm.planTask(blockerId, at)

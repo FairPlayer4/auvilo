@@ -1,6 +1,6 @@
 # Stand und nächste Schritte
 
-Stand: 2026-11-05. Bei jedem größeren Schritt aktualisieren.
+Stand: 2026-11-07. Bei jedem größeren Schritt aktualisieren.
 
 ## In Arbeit
 - **V1.3a3** (`versionName` 1.3a3-prototyp, `versionCode` 9) in `develop`, gebaut,
@@ -69,6 +69,11 @@ Stand: 2026-11-05. Bei jedem größeren Schritt aktualisieren.
   `ACCESS_WIFI_STATE` und `ACCESS_NETWORK_STATE` (normal, ohne Rückfrage). 375 Tests grün.
   Nach ein paar Tagen wertet Claude `diag.log` aus, danach 7.29 umsetzen und die Sonde
   durch die echte Prüfung ersetzen.
+- **V1.3b0.4** (`versionCode` 14) auf `feature/v1.3b0`, gebaut, **noch nicht installiert**:
+  Erledigung zurücknehmen (Anf. 7.31, design.md 3): stille Benachrichtigung *Rückgängig*
+  für 1 min nach *Erledigt*/*Auslassen*, danach *Zurücknehmen* auf *Heute*. Wieder offen,
+  klingelt in 10 min; Nachweis zählt wieder; Checkliste verliert nur den letzten Haken.
+  Keine Migration, neues Ereignis `REOPENED`. Gerätetests N20–N23.
 - Danach: Kevins Wochenplan (Gerätetests V1.3a, Reminder *Gerätetest*), dann V1.3b.
 
 ## Auf dem Gerät

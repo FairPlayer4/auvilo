@@ -110,7 +110,7 @@ nach dem Abschluss legt die Engine die nächste an.
 ### 2.4 Weitere Tabellen
 | Tabelle | Inhalt |
 |---|---|
-| `event` | unveränderliches Protokoll pro Fälligkeit: `CREATED`, `DUE`, `ESCALATED`, `SNOOZED`, `POSTPONED`, `COMPLETED`, `SKIPPED`, `MISSED`, `MISSED_DETECTED`, `PROOF_STARTED`, `PROOF_ABORTED`, `DROPPED`, `ITEM_DONE`, `DEFERRED`, `WINDOW_CLOSED`, `BLOCKER_ASKED`, `AWAITING_ARRIVAL` |
+| `event` | unveränderliches Protokoll pro Fälligkeit: `CREATED`, `DUE`, `ESCALATED`, `SNOOZED`, `POSTPONED`, `COMPLETED`, `SKIPPED`, `MISSED`, `MISSED_DETECTED`, `PROOF_STARTED`, `PROOF_ABORTED`, `DROPPED`, `ITEM_DONE`, `DEFERRED`, `WINDOW_CLOSED`, `BLOCKER_ASKED`, `AWAITING_ARRIVAL`, `REOPENED` (Detail: die zurückgenommene Auflösung) |
 | `proof` | Foto, Text oder Audio pro Fälligkeit, optional pro Checklistenpunkt (`itemId`) |
 | `checklist_item`, `item_done` | Punkte eines Reminders; erledigte Punkte pro Fälligkeit mit `withProof` |
 | `prep_answer` | Startklar-Antworten, nur anhängen; aktuell ist die neueste pro Frage |
@@ -156,6 +156,24 @@ PLANNED ──(Zeit/Ankunft)──► DUE ──(keine Reaktion)──► ESCALA
 - **Fortsetzen** eines pausierten Reminders (`setActive`): Der offene Termin startet neu
   ab der nächsten Fälligkeit (`firedAt`, `awaitsArrival`, `pausedUntil` zurückgesetzt).
   Für die pausierte Zeit werden keine Verpasser nachgemeldet.
+- **Zurücknehmen** (`ReminderEngine.reopen`, V1.3b0.4, Anf. 7.31): `Action.Reopen(at)`
+  macht aus `DONE` oder von Hand `SKIPPED` wieder `PLANNED` mit `currentAt = jetzt + 10 min`
+  (`Changes.REOPEN_DELAY`); `postponeCount`, `firedAt` und der Fortschritt einer Checkliste
+  aus früheren Haken bleiben, Ereignis `REOPENED`. `Lifecycle.canReopen` sagt, was geht.
+  `Changes.reopen` lehnt ab, wenn es nicht der letzte aufgelöste Termin ist, der nächste
+  schon geklungen hat oder verschoben ist, der Reminder pausiert ist oder die neue Zeit
+  hinter `missedAt` des ursprünglichen Termins läge (Tagesgrenze, nächste Uhrzeit,
+  Fensterende). Sonst in einer Transaktion: nächsten Termin löschen
+  (`deleteOccurrence`, mit Alarm und Vorab-Reminder), Haken ab `resolvedAt` löschen
+  (`deleteItemsDone`), einen dabei gelösten Blocker der Hauptaufgabe wieder öffnen,
+  `syncReminder`. Nachweise bleiben; `Limits.proofCarried` (letztes `REOPENED` mit Detail
+  `GOAL`/`MINIMUM`) lässt das nächste *Erledigt* ohne neuen Nachweis als Ziel zählen, die
+  Alarm-Ansicht überspringt dann den Nachweis (`AlarmView.proofCarried`).
+- **Rückgängig in der App** (`alarm/Undo.kt`): Nach *Erledigt*/*Auslassen* im Alarm oder
+  in der Benachrichtigung eine stille Benachrichtigung mit *Rückgängig*, eigene Id,
+  `setTimeoutAfter(60 s)`; das Ergebnis kommt als zweite stille Benachrichtigung. Auf
+  *Heute* unter *Erledigt* *Zurücknehmen* mit Rückfrage, Ergebnis als Toast. Keine
+  Migration (Ereignistypen stehen als Name in der Datenbank).
 
 ## 4. Alarm und Eskalation
 
