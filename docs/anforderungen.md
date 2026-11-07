@@ -1014,6 +1014,35 @@ gebraucht werden; Zuhause und Arbeit brauchen es voraussichtlich nicht.
   Orte und Ergebnisse der Prüfungen (Entfernung, Genauigkeit, Quelle, Zeit), keine
   Koordinaten der Messungen.
 
+### 7.31 Erledigung zurücknehmen (2026-11-07)
+Manchmal verklickt man sich: *Erledigt* statt *Später*, oder bei mehreren Uhrzeiten die
+falsche. Zurücknehmen soll schnell gehen, aber kein Schlupfloch sein.
+- ZR1 **Wo:** Nach *Erledigt* oder *Auslassen* im Alarm, in der Benachrichtigung oder auf
+  der Uhr kommt eine stille Benachrichtigung „‹Titel› erledigt · Rückgängig“, die nach
+  1 min verschwindet. Danach steht auf *Heute* unter *Erledigt* bei jedem Eintrag
+  *Zurücknehmen* (mit Rückfrage). Über die Schnittstelle für Claude gibt es kein
+  Zurücknehmen.
+- ZR2 **Was danach gilt:** Der Termin ist wieder offen und klingelt in 10 min. Das zählt
+  nicht als *Später* oder *Verschieben* (keine Limits verbraucht).
+- ZR3 **Was geht:** *Erledigt* (Ziel, Minimum, ohne Nachweis) und *Auslassen* von Hand.
+  Was die App selbst setzt (*verpasst*, *entfällt*, ausgelassen wegen Pause, Notaus,
+  Planänderung, Verwerfen, Wochenziel erreicht), bleibt.
+- ZR4 **Wie lange:** Nur der letzte erledigte Termin eines Reminders, solange der nächste
+  noch nicht geklungen hat und der zurückgenommene noch vor der Tagesgrenze (mehrmals
+  täglich: vor der nächsten Uhrzeit, Frist: vor dem Fensterende) klingeln kann. Ein
+  pausierter Reminder lässt sich nicht zurücknehmen.
+- ZR5 **Mehrere Uhrzeiten:** Nur diese eine Uhrzeit geht zurück; der schon geplante
+  nächste Termin fällt weg und kommt nach der neuen Erledigung wieder.
+- ZR6 **Checklisten:** Nur der Haken, der die Liste abgeschlossen hat, geht zurück
+  (bei *Alles erledigt* alle dabei gesetzten); frühere Haken bleiben.
+- ZR7 **Nachweise** bleiben gespeichert. War er vollständig, zählt er beim nächsten
+  *Erledigt* wieder; die App fragt nicht noch einmal danach (auch nicht „gleicher Text
+  wie beim letzten Mal“).
+- ZR8 **Verlauf und Zahlen:** Das Ereignisprotokoll bleibt unverändert, dazu kommt das
+  Ereignis *zurückgenommen*. Statistik, Wochenziel und Serie zählen den Termin erst
+  wieder, wenn er neu erledigt ist. Eine Vorbereitungsaufgabe, die zurückgenommen
+  wird, öffnet ihren Blocker wieder.
+
 ## 8. Zielplattform und Technik
 
 ### 8.1 Zielgerät
@@ -1092,6 +1121,7 @@ Neueste zuerst. Kap. 7 enthält immer den gültigen Stand; diese Tabelle ist die
 
 | Datum | Entscheidung |
 |---|---|
+| 2026-11-07 | Erledigung zurücknehmen (7.31): Rückgängig-Benachrichtigung 1 min, danach *Zurücknehmen* auf *Heute*; wieder offen, klingelt in 10 min ohne als *Später* zu zählen; nur der letzte Termin, bis der nächste klingelt bzw. bis zur Tagesgrenze; *Auslassen* auch, *verpasst*/*entfällt* nicht; Nachweis zählt wieder; neues Ereignis statt Löschen. Umgesetzt in V1.3b0.4 |
 | 2026-11-05 | 7.29 einfach anfangen: Ort **nur über WLAN** (Verbindung und Ergebnisse der WLAN-Suche, BSSIDs pro Ort), Prüfungen im Zeitraum lesen nur den WLAN-Zustand, sonst Rückfall wie bisher. Genaue Ortsprüfung per GPS nach **7.30** ausgelagert, später und erst nach einer Messung. Kevin hat die Anforderungen im Ganzen gelesen |
 | 2026-11-05 | Review-Lauf 3, Funde B1/B2 und Empfehlungen E5/E6: Ein Termin merkt sich, ob er schon geklungen hat. Speichern beim Schlummern verschiebt den heutigen Termin nicht mehr auf morgen; *Fortsetzen* meldet keine Verpasser. Ortsprüfung außerhalb der Transaktion, Alarme erst nach dem Speichern. Umgesetzt in V1.3b0.2 |
 | 2026-11-05 | Review-Lauf 3, Fragen 1–3 (7.29): Verschoben/geschlummert und *weg* oder *unklar* → wartet auf die Ankunft, zur Tagesgrenze *verpasst*, nie *entfällt* (OZ5, umgesetzt in V1.3b0.2). Alarm = erkannte Ankunft + Puffer, kurz weg im Puffer bricht nicht ab (OZ4). Geltungsbereich OZ9: Ankunft mit Uhrzeit ganz; *Wenn ich zuhause bin* nur WLAN; *trotzdem klingeln* bleibt; Bestand bekommt die Standardwerte. Erste Ankunft im Zeitraum zählt; kürzester Prüfabstand gilt |
@@ -1196,7 +1226,9 @@ Neueste zuerst. Kap. 7 enthält immer den gültigen Stand; diese Tabelle ist die
 | V1.3a3 | ✅ | Fixes aus Review-Lauf 1 und Antworten darauf, Checkliste über mehrere Uhrzeiten (7.25 VS1) (Kap. 9, 2026-11-03) |
 | V1.3b0 | ✅ | Umbau ohne neues Verhalten (design.md 1), Empfehlungen E1–E4 aus Review-Lauf 2 (Kap. 9, 2026-11-03) |
 | V1.3b0.1 | 2026-11-04 | Kevins Rückmeldungen: Checkliste jederzeit, Übersicht mit allen Uhrzeiten, Textfelder (Kap. 9, 2026-11-04) |
-| V1.3b0.2 | gebaut | Termin merkt sich, ob er geklungen hat; Speichern beim Schlummern verschiebt nicht mehr auf morgen; verschobenes Training wartet auf die Ankunft (7.29 OZ5); Ortsprüfung vor der Transaktion (Kap. 9, 2026-11-05) |
+| V1.3b0.2 | 2026-11-05 | Termin merkt sich, ob er geklungen hat; Speichern beim Schlummern verschiebt nicht mehr auf morgen; verschobenes Training wartet auf die Ankunft (7.29 OZ5); Ortsprüfung vor der Transaktion (Kap. 9, 2026-11-05) |
+| V1.3b0.3 | 2026-11-05 | WLAN-Sonde im Debug-Build als Gerätetest für 7.29 |
+| V1.3b0.4 | gebaut | Erledigung zurücknehmen (7.31) |
 
 Details zum Verhalten: [design.md](design.md), Gerätetests: [geraetetest.md](geraetetest.md).
 

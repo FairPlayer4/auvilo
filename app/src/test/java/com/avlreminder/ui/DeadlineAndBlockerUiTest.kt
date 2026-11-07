@@ -21,6 +21,8 @@ import com.avlreminder.core.model.OccurrenceState
 import com.avlreminder.core.model.PreNotice
 import com.avlreminder.core.model.PrepAnswer
 import com.avlreminder.core.model.ProofKind
+import com.avlreminder.core.model.ProofSpec
+import com.avlreminder.core.model.Resolution
 import com.avlreminder.core.model.Reminder
 import com.avlreminder.core.model.Schedule
 import com.avlreminder.core.model.Strictness
@@ -79,6 +81,8 @@ class DeadlineAndBlockerUiTest {
         override fun completeEarly(occurrenceId: Long) {}
         override fun play(path: String) {}
         override fun discard(occurrenceId: Long) { discarded += occurrenceId }
+        val reopened = mutableListOf<Long>()
+        override fun reopen(occurrenceId: Long) { reopened += occurrenceId }
         override fun addBlocker(reminderId: Long, text: String) { blockers += reminderId to text }
         override fun solveBlocker(blockerId: Long) { solved += blockerId }
         override fun planTask(blockerId: Long, at: LocalDateTime) { planned += blockerId to at }
@@ -284,5 +288,42 @@ class DeadlineAndBlockerUiTest {
         compose.onNodeWithText("In 1 Stunde").assertExists()
         compose.onNodeWithText("Heute Abend").assertDoesNotExist()
         compose.onNodeWithText("Morgen").assertDoesNotExist()
+    }
+
+    // --- "Zurücknehmen" (Anf. 7.31), here because this test has the app state at hand -----------
+
+    @Test
+    fun todayTakesBackADoneOneAfterAskingButNotAMissedOne() {
+        val actions = FakeActions()
+        val done = Occurrence(id = 7, reminderId = 1, dueAt = now.minusSeconds(3600), state = OccurrenceState.DONE, resolution = Resolution.GOAL, resolvedAt = now.minusSeconds(60))
+        val missed = Occurrence(id = 8, reminderId = 1, dueAt = now.minusSeconds(7200), state = OccurrenceState.CLOSED, resolution = Resolution.MISSED, resolvedAt = now.minusSeconds(1800))
+        val today = Today(emptyList(), emptyList(), listOf(Entry(tax, done), Entry(tax, missed)), emptyList())
+        compose.setContent { AvlTheme(dark = false) { AvlAppUi(state(today = today), actions, now, zone) } }
+
+        compose.onNodeWithTag("reopen8").assertDoesNotExist()
+        compose.onNodeWithTag("reopen7").performScrollTo().performClick()
+        compose.onNodeWithText("klingelt in 10 Minuten", substring = true).assertIsDisplayed()
+        compose.onNodeWithTag("reopenOk").performClick()
+        assertEquals(listOf(7L), actions.reopened)
+    }
+
+    @Test
+    fun aTakenBackOneWithProofIsDoneWithoutAskingForItAgain() {
+        var completed = 0
+        var proofStarted = 0
+        val withProof = tax.copy(proof = ProofSpec(ProofKind.EVIDENCE, textMinChars = 5))
+        compose.setContent {
+            AvlTheme(dark = true) {
+                AlarmContent(
+                    ui = alarmUi(withProof).copy(proofCarried = true), now = now, zone = zone,
+                    onComplete = { _, _, _ -> completed++ }, onSnooze = {}, onPostpone = {}, onSkip = {},
+                    onStartProof = { proofStarted++ }, onAbortProof = {}, devices = devices,
+                )
+            }
+        }
+        compose.onNodeWithText("Erledigt").performScrollTo().performClick()
+        assertEquals(1, completed)
+        assertEquals(0, proofStarted)
+        compose.onNodeWithTag("proofText").assertDoesNotExist()
     }
 }

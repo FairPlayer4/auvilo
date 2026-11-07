@@ -34,6 +34,8 @@ interface ReminderRepository {
     suspend fun recentResolved(reminderId: Long, limit: Int): List<Occurrence>
     suspend fun countResolved(reminderId: Long, resolution: Resolution, from: Instant, until: Instant): Int
     suspend fun saveOccurrence(occurrence: Occurrence): Long
+    /** Deletes the occurrence with its events, proofs and checklist progress. */
+    suspend fun deleteOccurrence(id: Long)
 
     suspend fun addEvent(event: Event)
     /** Events of the occurrence, oldest first. */
@@ -55,6 +57,8 @@ interface ReminderRepository {
     /** Checklist items done in any occurrence of the reminder, in the order they were done. */
     suspend fun itemsDoneOfReminder(reminderId: Long): List<ItemDone>
     suspend fun addItemDone(done: ItemDone)
+    /** Removes the checklist items done in the occurrence at or after [from]. */
+    suspend fun deleteItemsDone(occurrenceId: Long, from: Instant)
 
     /** Blockers of the reminder, oldest first. */
     suspend fun blockers(reminderId: Long): List<Blocker>

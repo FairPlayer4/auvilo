@@ -358,6 +358,13 @@ interface AvlDao {
     @Query("SELECT * FROM item_done WHERE occurrenceId = :occurrenceId ORDER BY doneAt, id")
     suspend fun itemsDone(occurrenceId: Long): List<ItemDoneEntity>
 
+    @Query("DELETE FROM item_done WHERE occurrenceId = :occurrenceId AND doneAt >= :from")
+    suspend fun deleteItemsDone(occurrenceId: Long, from: Instant)
+
+    /** Events, proofs and checklist progress go with the foreign-key cascade. */
+    @Query("DELETE FROM occurrence WHERE id = :id")
+    suspend fun deleteOccurrence(id: Long)
+
     @Query(
         "SELECT item_done.* FROM item_done JOIN occurrence ON occurrence.id = item_done.occurrenceId " +
             "WHERE occurrence.reminderId = :reminderId ORDER BY item_done.doneAt, item_done.id",

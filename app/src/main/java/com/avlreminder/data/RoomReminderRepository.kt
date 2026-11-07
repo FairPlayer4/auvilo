@@ -92,6 +92,8 @@ class RoomReminderRepository(private val db: AvlDatabase) : ReminderRepository {
         return occurrence.id
     }
 
+    override suspend fun deleteOccurrence(id: Long) = dao.deleteOccurrence(id)
+
     override suspend fun addEvent(event: Event) =
         dao.insert(EventEntity(occurrenceId = event.occurrenceId, at = event.at, type = event.type, detail = event.detail))
 
@@ -127,6 +129,8 @@ class RoomReminderRepository(private val db: AvlDatabase) : ReminderRepository {
 
     override suspend fun addItemDone(done: ItemDone) =
         dao.insert(ItemDoneEntity(occurrenceId = done.occurrenceId, itemId = done.itemId, doneAt = done.doneAt, withProof = done.withProof))
+
+    override suspend fun deleteItemsDone(occurrenceId: Long, from: Instant) = dao.deleteItemsDone(occurrenceId, from)
 
     override suspend fun blockers(reminderId: Long) = dao.blockers(reminderId).map { it.toModel() }
     override suspend fun blocker(id: Long) = dao.blocker(id)?.toModel()

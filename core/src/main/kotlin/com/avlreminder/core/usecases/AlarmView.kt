@@ -47,6 +47,8 @@ data class AlarmView(
     val nextTime: Instant? = null,
     /** Open blockers of the reminder. */
     val blockers: List<Blocker> = emptyList(),
+    /** Taken back after a completion with complete proof: done again without a new one (Anf. 7.31). */
+    val proofCarried: Boolean = false,
 ) {
     /** The first open checklist item. */
     val nextItem: ChecklistItem? get() = reminder.checklist.firstOrNull { it.id !in done }

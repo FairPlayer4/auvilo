@@ -100,6 +100,15 @@ hilfreich ist, wenn er notiert, wann er ungefähr nach Hause kam und wegging.
 
 Welches Netz N1 ist, sieht man an der Zeile `learned N1` und der Uhrzeit.
 
+## Neu in V1.3b0.4: Erledigung zurücknehmen (7.31)
+
+| # | Test | Erwartung |
+|---|---|---|
+| N20 | Reminder einmalig in 2 min; beim Alarm *Erledigt*, dann in der stillen Benachrichtigung *Rückgängig* | „‹Titel› wieder offen · Klingelt wieder um …“ (jetzt + 10 min); zur Zeit klingelt er normal; die Rückgängig-Meldung ist nach 1 min von selbst weg |
+| N21 | *Gerätetest* (12:30 und 19:15): um 12:30 *Erledigt*, auf *Heute* unter *Erledigt* *Zurücknehmen* | Rückfrage; danach wieder offen, klingelt in 10 min; im Verlauf steht 12:30 erst nach dem neuen *Erledigt* |
+| N22 | Nach 19:15 versuchen, den Termin von 12:30 zurückzunehmen | Toast „Geht nicht mehr …“, nichts ändert sich |
+| N23 | Auf der Uhr *Erledigt* tippen | Rückgängig-Meldung auch auf der Uhr (wenn nicht: nur am Handy, ist ok) |
+
 ### Wochenplan V1.3a (03.–08.11.2026)
 Reminder *Gerätetest*: täglich 12:30 und 19:15, *normal*, Minimum „Test nur
 vorbereiten“ (legt Claude nach N9 über die Schnittstelle an). Pro Alarm ein Test, freie Termine zum Nachholen.

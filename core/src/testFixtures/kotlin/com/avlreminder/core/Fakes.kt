@@ -155,6 +155,13 @@ class FakeRepository : ReminderRepository {
         return id
     }
 
+    override suspend fun deleteOccurrence(id: Long) {
+        occurrences.remove(id)
+        events.removeAll { it.occurrenceId == id }
+        proofs.removeAll { it.occurrenceId == id }
+        done.removeAll { it.occurrenceId == id }
+    }
+
     override suspend fun addEvent(event: Event) {
         events += event
     }
@@ -183,6 +190,9 @@ class FakeRepository : ReminderRepository {
     override suspend fun itemsDoneOfReminder(reminderId: Long) = done.filter { occurrences[it.occurrenceId]?.reminderId == reminderId }
     override suspend fun addItemDone(done: ItemDone) {
         this.done += done.copy(id = nextId++)
+    }
+    override suspend fun deleteItemsDone(occurrenceId: Long, from: Instant) {
+        done.removeAll { it.occurrenceId == occurrenceId && it.doneAt >= from }
     }
 
     override suspend fun blockers(reminderId: Long) = blockers.values.filter { it.reminderId == reminderId }
