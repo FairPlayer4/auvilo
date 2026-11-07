@@ -17,6 +17,7 @@ import com.avlreminder.core.model.Reminder
 import com.avlreminder.core.model.Schedule
 import com.avlreminder.core.model.WhenAway
 import com.avlreminder.core.usecases.SaveResult
+import com.avlreminder.AvlApp
 import com.avlreminder.graph
 import com.avlreminder.location.GeofenceReceiver
 import com.avlreminder.system.SystemReceiver
@@ -56,7 +57,9 @@ class ReceiverGlueTest {
         // minutes ago would already count as missed (23:00) and the checks would not apply.
         val now = LocalTime.now()
         assumeTrue("not shortly before or after midnight", now > LocalTime.of(0, 30) && now < LocalTime.of(22, 30))
-        // The app syncs on start; let that finish so it does not race with the test.
+        // The app syncs on start (on Dispatchers.Default); let that finish so it does not race
+        // with the test. Idling the main looper alone did not wait for it.
+        runBlocking { (context as AvlApp).started.join() }
         ShadowLooper.idleMainLooper()
     }
 

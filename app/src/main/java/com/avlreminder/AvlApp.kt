@@ -39,6 +39,7 @@ import com.avlreminder.location.AndroidLocation
 import com.avlreminder.location.WifiProbe
 import com.avlreminder.widget.AvlWidget
 import kotlinx.coroutines.CoroutineScope
+import kotlinx.coroutines.Job
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.SupervisorJob
 import kotlinx.coroutines.flow.first
@@ -53,12 +54,15 @@ class AvlApp : Application() {
     lateinit var graph: AppGraph
         private set
 
+    /** The work at start (rebuilding alarms, reading the cloud backup state); tests wait for it. */
+    lateinit var started: Job
+        private set
+
     override fun onCreate() {
         super.onCreate()
         Diag.init(this)
         Diag.state(this, "app start ${packageManager.getPackageInfo(packageName, 0).versionName}")
         graph = AppGraph(this)
-        graph.cloud.load()
         Notifications.createChannels(this)
         OverviewNotifications.createChannel(this)
         PreNotices.createChannel(this)
@@ -66,9 +70,10 @@ class AvlApp : Application() {
         // WLAN device test before 7.29, debug build only (design.md *Entwurf 7.29*).
         if (graph.debuggable) runCatching { WifiProbe.start(this) }
         // Alarms may have been lost (reboot, force-stop, update): rebuild them from the database.
-        graph.scope.launch {
+        started = graph.scope.launch {
             graph.syncAndRing()
             graph.scheduleOverview()
+            graph.cloud.load().join()
         }
     }
 }
