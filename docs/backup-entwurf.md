@@ -66,6 +66,22 @@ Schlüssel-Backup löschen, Testgeräte sperren); dann richtet die App **neue** 
 2. **Anmelden und Einrichten:** Keystore, Credential Manager, `LokaleAblage`, Bereich in den
    Einstellungen bis „eingerichtet“. Voraussetzung: Kevins OAuth-Clients (siehe unten).
    Gerätetest: anmelden, Wiederherstellungsschlüssel, Fingerabdruck stimmt mit Server.
+   **Gebaut am 2026-11-07** (Paket `cloud`, noch kein Gerätetest):
+   - `KeystoreDeviceKey` (A-5, StrongBox wenn vorhanden), `KeyFile` mit `KeystoreSealer`
+     (A-6: Tink `AndroidKeystore`, AES-256-GCM; das Konto ist Teil der zugehörigen Daten),
+     `CloudStore` (A-7: DataStore `backend` mit Schalter, Sitzung, freigeschaltet),
+     `CredentialManagerSignIn` (A-4), `CloudBackup` (Zustände für die Oberfläche, immer nur
+     ein Schritt zur Zeit; Fehler werden zu Text, nie zum Absturz).
+   - Ausgeschaltet entsteht weder ein Schlüssel noch eine Verbindung (Test mit Mutationsprobe).
+     Ausschalten behält Schlüssel und Sitzung; wieder eingeschaltet ist das Gerät ohne Netz
+     sofort „eingerichtet“.
+   - Wiederherstellungsschlüssel: Bestätigen braucht zwei Tipps („Aufgeschrieben“, „Ja“);
+     solange er angezeigt oder eingegeben wird, sind Bildschirmfotos gesperrt
+     (`FLAG_SECURE`). Er steht nie im Log.
+   - Im Backend dafür: `SitzungsAblage` und die Rückfragen der `Einrichtung` sind `suspend`
+     (die Oberfläche wartet auf die Eingabe, ohne einen Thread zu blockieren).
+   - Die Web-Client-ID steht in `google_client_ids` (Backend `infra/variablen.tf`), ist aber
+     **noch nicht angewendet**.
 3. **Sichern von Hand und Status**, Backend-Logger, *Diagnose senden*.
 4. **Automatisch** (WorkManager, Hash, zweites Gerät, Hinweis nach 3 Tagen).
 5. **Wiederherstellen und Löschen.** Gerätetest auf einem zweiten Gerät oder Emulator,

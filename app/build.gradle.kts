@@ -45,6 +45,10 @@ dependencies {
     // Cloud-Backup: protokoll und verbindung aus ../avlreminder-backend/client
     // (Composite Build, settings.gradle.kts; docs/backup-entwurf.md A-2).
     implementation("com.avlreminder.client:verbindung")
+    // "Mit Google anmelden" for the cloud backup (A-4).
+    implementation("androidx.credentials:credentials:1.6.0")
+    implementation("androidx.credentials:credentials-play-services-auth:1.6.0")
+    implementation("com.google.android.libraries.identity.googleid:googleid:1.2.1")
 
     implementation("androidx.core:core-ktx:1.19.1")
     implementation("androidx.activity:activity-compose:1.13.0")

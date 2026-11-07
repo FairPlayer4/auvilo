@@ -1,5 +1,8 @@
 package com.avlreminder.ui
 
+import com.avlreminder.graph
+import com.avlreminder.ui.screens.CloudActions
+
 import android.Manifest
 import android.app.NotificationManager
 import android.content.Context
@@ -95,6 +98,7 @@ class MainActivity : ComponentActivity() {
             val templates by vm.templates.collectAsStateWithLifecycle()
             val snoozeHints by vm.snoozeHints.collectAsStateWithLifecycle()
             val claudeAccess by vm.claudeAccess.collectAsStateWithLifecycle()
+            val cloud by vm.cloud.collectAsStateWithLifecycle()
             var now by androidx.compose.runtime.remember { mutableStateOf(Instant.now()) }
             var dnd by androidx.compose.runtime.remember { mutableStateOf(device.isDoNotDisturb()) }
             LaunchedEffect(Unit) {
@@ -115,7 +119,7 @@ class MainActivity : ComponentActivity() {
                             home = home, dwellMinutes = dwell, itemsDone = itemsDone,
                             reminderSort = reminderSort, suggestions = suggestions, overview = overview,
                             blockers = blockers, templates = templates, snoozeHints = snoozeHints,
-                            claudeAccess = claudeAccess,
+                            claudeAccess = claudeAccess, cloud = cloud,
                         ),
                         actions = actions,
                         now = now,
@@ -174,6 +178,14 @@ class MainActivity : ComponentActivity() {
         override fun setOverview(times: OverviewTimes) = vm.setOverview(times)
         override fun setAlarmsPaused(until: Instant?) = vm.setAlarmsPaused(until)
         override fun setClaudeAccess(on: Boolean) = vm.setClaudeAccess(on)
+        override val cloud = object : CloudActions {
+            override fun setEnabled(on: Boolean) { graph.cloud.setEnabled(on) }
+            // Credential Manager shows Google's account picker over this activity.
+            override fun signIn() { graph.cloud.signIn(this@MainActivity) }
+            override fun continueSetup() { graph.cloud.continueSetup() }
+            override fun confirmKey(writtenDown: Boolean) = graph.cloud.confirmKey(writtenDown)
+            override fun submitKey(text: String?) = graph.cloud.submitKey(text)
+        }
         override fun answerSnoozeHint(reminderId: Long, choice: SnoozeHintChoice) = vm.answerSnoozeHint(reminderId, choice)
         override fun setArchived(reminderId: Long, archived: Boolean) = vm.setArchived(reminderId, archived)
         override fun addSuggestion(text: String, important: Boolean, screen: String, reminderId: Long?) =

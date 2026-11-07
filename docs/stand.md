@@ -107,7 +107,13 @@ Stand: 2026-11-07. Bei jedem größeren Schritt aktualisieren.
    App und `core` bauen seit 2026-11-07 für Java 21 (Voraussetzung für `client/`).
    **Schritt 1 umgesetzt** am 2026-11-07 auf `feature/backup` (nichts sichtbar, noch nicht
    installiert): Composite Build mit festem Backend-Commit, `INTERNET`, CI mit zweitem
-   Checkout. Die CI braucht noch den Deploy-Key (backup-entwurf.md, *Was Kevin vorab tut*).
+   Checkout; CI mit Deploy-Key grün seit 2026-11-07.
+   **Schritt 2 gebaut** am 2026-11-07 (noch nicht installiert, kein Gerätetest): Bereich
+   *Cloud-Backup (experimentell)* in den Einstellungen bis „eingerichtet“ (Paket `cloud`:
+   Geräteschlüssel und Schlüsseldatei im Keystore, DataStore `backend`, Credential Manager).
+   Vor dem Gerätetest: Web-Client-ID im Backend anwenden (`tofu apply`, Kevins Go) und
+   Kevins Backend-Konto von den Test-Schlüsseln befreien (Test-Client, Kevin meldet sich
+   im Browser an).
 3. **Play-Store-Release** ohne Eile, erst wenn die App „fertig“ ist (mindestens bis V2);
    dafür Transparenz, Notausschalter (in V1.3a), Backend nur nach Einschalten (7.28 PS5–PS9).
 

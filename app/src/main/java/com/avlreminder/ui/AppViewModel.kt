@@ -244,6 +244,9 @@ class AppViewModel(app: Application) : AndroidViewModel(app) {
     /** null in a release build, which has no interface for Claude. */
     val claudeAccess: StateFlow<Boolean?> = state(null, graph.settings.claudeAccess.map { on -> on.takeIf { graph.debuggable } })
 
+    /** Cloud backup (A-14). */
+    val cloud: StateFlow<com.avlreminder.cloud.CloudStatus> = graph.cloud.status
+
     fun setClaudeAccess(on: Boolean) {
         viewModelScope.launch { graph.setClaudeAccess(on) }
     }

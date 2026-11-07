@@ -13,6 +13,16 @@ import com.avlreminder.alarm.PreNotices
 import com.avlreminder.alarm.Ringer
 import com.avlreminder.core.model.Place
 import com.avlreminder.claude.ClaudeApi
+import com.avlreminder.cloud.CloudBackup
+import com.avlreminder.cloud.CloudConfig
+import com.avlreminder.cloud.CloudStore
+import com.avlreminder.cloud.ConnectCloudServer
+import com.avlreminder.cloud.CredentialManagerSignIn
+import com.avlreminder.cloud.KeyFile
+import com.avlreminder.cloud.KeystoreDeviceKey
+import com.avlreminder.cloud.KeystoreSealer
+import com.avlreminder.verbindung.Verbindung
+import java.io.File
 import com.avlreminder.core.model.Occurrence
 import com.avlreminder.core.model.Reminder
 import com.avlreminder.data.toModel
@@ -48,6 +58,7 @@ class AvlApp : Application() {
         Diag.init(this)
         Diag.state(this, "app start ${packageManager.getPackageInfo(packageName, 0).versionName}")
         graph = AppGraph(this)
+        graph.cloud.load()
         Notifications.createChannels(this)
         OverviewNotifications.createChannel(this)
         PreNotices.createChannel(this)
@@ -88,6 +99,18 @@ class AppGraph(private val context: Context) : ClaudeApi.Access {
     @Volatile private var alert = AlertSettings()
     @Volatile private var dwell = Settings.DEFAULT_DWELL
     val location = AndroidLocation(context)
+
+    /** Cloud backup (backup-entwurf.md); nothing touches the network until it is switched on. */
+    private val cloudStore = CloudStore(context)
+    private val connection by lazy { Verbindung(CloudConfig.SERVER_URL) }
+    val cloud = CloudBackup(
+        cloudStore,
+        server = { ConnectCloudServer(connection, KeystoreDeviceKey(), cloudStore) },
+        keys = { account -> KeyFile(File(context.filesDir, "backend"), KeystoreSealer(), account) },
+        google = CredentialManagerSignIn(),
+        scope = scope,
+        log = Diag::log,
+    )
     private val engine = ReminderEngine(
         repository, AndroidAlarmPort(context), SystemZoneClock, AndroidDeviceState(context),
         settings = { alert },
