@@ -105,6 +105,9 @@ Stand: 2026-11-07. Bei jedem größeren Schritt aktualisieren.
    ([backup-entwurf.md](backup-entwurf.md), fünf Schritte). Vorab legt Kevin die
    OAuth-Clients (Web und Android) und den Deploy-Key an. Überblick: [backend.md](backend.md).
    App und `core` bauen seit 2026-11-07 für Java 21 (Voraussetzung für `client/`).
+   **Schritt 1 umgesetzt** am 2026-11-07 auf `feature/backup` (nichts sichtbar, noch nicht
+   installiert): Composite Build mit festem Backend-Commit, `INTERNET`, CI mit zweitem
+   Checkout. Die CI braucht noch den Deploy-Key (backup-entwurf.md, *Was Kevin vorab tut*).
 3. **Play-Store-Release** ohne Eile, erst wenn die App „fertig“ ist (mindestens bis V2);
    dafür Transparenz, Notausschalter (in V1.3a), Backend nur nach Einschalten (7.28 PS5–PS9).
 

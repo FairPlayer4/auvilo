@@ -30,6 +30,11 @@ Strenge und invasive Mechanismen sind gewollt. Kommunikation auf **Deutsch, mit 
 - `JAVA_HOME` und `ANDROID_HOME` sind auf dem Rechner gesetzt, nichts exportieren
   (Pfade in entwicklungsumgebung.md).
 - Gradle, adb und `git push` brauchen in Claude Code Netz/Geräte außerhalb der Sandbox.
+- Der Build braucht das Backend-Repo daneben (`../avlreminder-backend`, Composite Build,
+  [backup-entwurf.md](docs/backup-entwurf.md) A-2). Steht dort ein anderer Commit als in
+  `gradle/backend-commit.txt` oder gibt es uncommittete Änderungen in `client/`/`proto/`,
+  warnt der Build: **eine solche APK nicht installieren**. Nach Änderungen im Backend den
+  Commit dort pushen und in `gradle/backend-commit.txt` eintragen.
 - Vor jeder Installation: alle Tests grün. UI-Tests laufen mit Robolectric/Compose
   (`app/src/test`), Migrationen haben einen eigenen `MigrationTest`.
 

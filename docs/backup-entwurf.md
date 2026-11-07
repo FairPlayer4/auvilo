@@ -30,7 +30,7 @@ Play-Store-Variante.
 | # | Frage | Empfehlung | Warum |
 |---|---|---|---|
 | A-1 | Eigene App-Variante? | **Nein, vorerst nicht.** Das Backup kommt in den normalen Build hinter den Schalter aus PS8 (aus = keine Anmeldung, kein Netz). Eine eigene Variante bzw. der interne Test-Track kommt erst mit dem ersten Tester. | Eine eigene Variante hätte eine eigene Datenbank; gesichert würden dann nicht Kevins echte Daten. Das widerspricht E-B2b-11 im Backend nur in der Reihenfolge; dort nachtragen. |
-| A-2 | Einbindung von `client/` | **Gradle Composite Build** (`includeBuild("../avlreminder-backend/client")`), die App hängt von `verbindung` ab (bringt `protokoll` mit). In der CI holt ein **Deploy-Key** (nur lesen, nur Backend-Repo) das Backend-Repo auf einen **festen Commit**, der in `gradle/backend-commit.txt` steht. | Wie in E-B2b-10 entschieden. Ohne festen Commit baute die CI mit einem anderen Stand als lokal. Ein Deploy-Key gilt nur für ein Repo und läuft nicht ab (anders als ein Token). |
+| A-2 | Einbindung von `client/` | **Gradle Composite Build** (`includeBuild("../avlreminder-backend/client")`), die App hängt von `verbindung` ab (bringt `protokoll` mit). In der CI holt ein **Deploy-Key** (nur lesen, nur Backend-Repo) das Backend-Repo auf einen **festen Commit**, der in `gradle/backend-commit.txt` steht. | Wie in E-B2b-10 entschieden. Ohne festen Commit baute die CI mit einem anderen Stand als lokal. Ein Deploy-Key gilt nur für ein Repo und läuft nicht ab (anders als ein Token). **Ergänzt 2026-11-07:** Lokal baut Gradle, was im Nachbarordner liegt. Weicht er vom festgehaltenen Commit ab oder hat er uncommittete Änderungen in `client/` oder `proto/`, warnt der Build („diese APK nicht installieren“); mit `-PbackendStreng=true` (CI) bricht er ab. Langfristig: neu entscheiden mit der Sicherheitsphase (Monorepo oder veröffentlichte Versionen). |
 | A-3 | Netz | Neue Berechtigung **`INTERNET`** (normal, ohne Rückfrage). Anf. 8.4 wird präzisiert: Daten verlassen das Gerät nur Ende-zu-Ende verschlüsselt im Backup, und nur, wenn es eingeschaltet ist. | Die App hat bisher gar kein Netz. Die Präzisierung steht für Orte und WLANs schon in Kap. 9 (2026-11-05). |
 | A-4 | Anmeldung | **Credential Manager** mit „Mit Google anmelden“ (`GetSignInWithGoogleOption`), `serverClientId` = Web-Client des Backend-Projekts, `nonce` = `Geraetenachrichten.nonce(Geräteschlüssel)`. Kevin legt dafür im GCP-Projekt einen **Android-Client** (Paket `com.avlreminder`, SHA-1 des Debug-Schlüssels) und einen **Web-Client** an; die Web-Client-ID kommt in `google_client_ids` (OpenTofu, kostenlos). | Der Server prüft `aud` gegen `GOOGLE_CLIENT_IDS`; bei Android ist `aud` der Web-Client. Die Nonce bindet das ID-Token an den Geräteschlüssel (wie im Test-Client). |
 | A-5 | Geräteschlüssel | ECDSA P-256 im **Android Keystore**, nicht exportierbar, StrongBox wenn vorhanden, signiert `SHA256withECDSA`. Geht er verloren (App-Daten gelöscht), meldet sich die App als neues Gerät an. | Wie im Backend vorgesehen (`Geraetenachrichten`). Der private Schlüssel verlässt das Gerät nie, auch Claude sieht ihn nicht. |
@@ -57,9 +57,12 @@ Vor der Einrichtung in der App räumt Claude das mit dem Test-Client ab (Sicheru
 Schlüssel-Backup löschen, Testgeräte sperren); dann richtet die App **neue** Schlüssel ein.
 
 ## Schritte (jeweils bauen, Tests grün, installieren nach Kevins Go)
-1. **Bauen ohne Verhalten:** Anmelden und Erneuern nach `verbindung` (Backend-Repo, mit
-   Tests), Composite Build, CI mit Deploy-Key, `INTERNET`. Nichts sichtbar. (Das JVM-Ziel
-   ist schon angeglichen: App und `core` bauen seit 2026-11-07 für Java 21 wie `client/`.)
+1. **Bauen ohne Verhalten** – umgesetzt am 2026-11-07 (Branch `feature/backup`):
+   Anmelden und Erneuern liegen in `verbindung` (`Anmeldung`, mit Tests), Composite Build
+   mit Prüfung des Backend-Commits, CI mit zweitem Checkout per Deploy-Key, `INTERNET`.
+   Nichts sichtbar. App und `core` bauen für Java 21 wie `client/`. Gefunden dabei: Beide
+   Backend-Module erzeugten alle Protobuf-Klassen (D8: „defined multiple times“); im
+   Backend behoben, `ModulgrenzeTest` hält es fest.
 2. **Anmelden und Einrichten:** Keystore, Credential Manager, `LokaleAblage`, Bereich in den
    Einstellungen bis „eingerichtet“. Voraussetzung: Kevins OAuth-Clients (siehe unten).
    Gerätetest: anmelden, Wiederherstellungsschlüssel, Fingerabdruck stimmt mit Server.
@@ -76,7 +79,16 @@ Aufwand grob: Schritt 1 ein halber Tag, 2 ein Tag, 3–5 je ein halber bis ganze
   **Web-Client** und einen **Android-Client** anlegen (Paket `com.avlreminder`, SHA-1 aus
   `keytool -list -v -keystore ~/.android/debug.keystore`, Passwort `android`). Kostenlos.
   Die Client-IDs sind unbedenklich und dürfen in den Chat; ein Client-Secret braucht es nicht.
-- Im App-Repo einen Deploy-Key fürs Backend-Repo hinterlegen (Anleitung kommt mit Schritt 1).
+- **Deploy-Key für die CI** (in einem eigenen Terminal, nicht in Claude Code: der private
+  Schlüssel ist ein Zugang und gehört nicht in den Gesprächsverlauf). Im Ordner, in dem
+  `gh` angemeldet ist, z. B. dem Home-Verzeichnis:
+  ```bash
+  ssh-keygen -t ed25519 -N "" -C "avlreminder-ci" -f avlreminder-ci
+  gh repo deploy-key add avlreminder-ci.pub -R FairPlayer4/avlreminder-backend -t "avlreminder-ci (App-CI, nur lesen)"
+  gh secret set BACKEND_DEPLOY_KEY -R FairPlayer4/avlreminder < avlreminder-ci
+  rm avlreminder-ci avlreminder-ci.pub
+  ```
+  `deploy-key add` ohne `--allow-write` legt einen Schlüssel an, der nur lesen darf.
 
 ## Tests
 - Wie gewohnt: Robolectric für Worker, Einstellungen und Oberfläche; die Abläufe selbst

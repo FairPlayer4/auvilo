@@ -42,6 +42,9 @@ ksp {
 
 dependencies {
     implementation(project(":core"))
+    // Cloud-Backup: protokoll und verbindung aus ../avlreminder-backend/client
+    // (Composite Build, settings.gradle.kts; docs/backup-entwurf.md A-2).
+    implementation("com.avlreminder.client:verbindung")
 
     implementation("androidx.core:core-ktx:1.19.1")
     implementation("androidx.activity:activity-compose:1.13.0")
