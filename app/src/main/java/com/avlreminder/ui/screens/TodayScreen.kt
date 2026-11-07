@@ -74,6 +74,10 @@ fun TodayScreen(
         return if (items.isEmpty()) "" else " · ${itemsDone[e.occurrence.id].orEmpty().size} von ${items.size}"
     }
 
+    /** "verschoben von 18:00 · " for one moved before it rang (7.32 VB6). */
+    fun moved(e: Entry): String = e.occurrence.takeIf { !it.hasFired && it.postponeCount > 0 }
+        ?.let { "verschoben von ${Format.time(it.dueAt, zone)} · " } ?: ""
+
     val c = Avl.colors
     var discarding by remember { mutableStateOf<Entry?>(null) }
     var reopening by remember { mutableStateOf<Entry?>(null) }
@@ -136,12 +140,12 @@ fun TodayScreen(
             items(today.laterToday, key = { "later" + it.occurrence.id }) { e ->
                 EntryCard(
                     title = e.reminder.title,
-                    detail = (goalLine(e.reminder) ?: Format.plan(e.reminder)) + progress(e),
+                    detail = moved(e) + (goalLine(e.reminder) ?: Format.plan(e.reminder)) + progress(e),
                     time = Format.time(e.occurrence.currentAt, zone),
                     onClick = { onEdit(e.reminder) },
                 ) {
                     StrictnessTag(e.reminder.strictness)
-                    TextButton(onClick = { onCompleteEarly(e) }) { Text("Erledigen", color = c.accent) }
+                    TextButton(onClick = { onCompleteEarly(e) }, Modifier.testTag("early${e.occurrence.id}")) { Text("Vorab", color = c.accent) }
                 }
             }
         }
@@ -155,7 +159,7 @@ fun TodayScreen(
                     onClick = { onEdit(e.reminder) },
                 ) {
                     StrictnessTag(e.reminder.strictness)
-                    TextButton(onClick = { onCompleteEarly(e) }) { Text("Erledigen", color = c.accent) }
+                    TextButton(onClick = { onCompleteEarly(e) }) { Text("Vorab", color = c.accent) }
                 }
             }
         }

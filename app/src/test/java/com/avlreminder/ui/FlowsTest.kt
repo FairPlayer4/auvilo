@@ -312,7 +312,7 @@ class FlowsTest {
         val later = Occurrence(id = 21, reminderId = 1, dueAt = now.plusSeconds(3600))
         val state = emptyState.copy(today = Today(emptyList(), listOf(Entry(strict, later)), emptyList(), emptyList()))
         compose.setContent { AvlTheme(dark = false) { AvlAppUi(state, actions, now, zone) } }
-        compose.onNodeWithText("Erledigen").performClick()
+        compose.onNodeWithText("Vorab").performClick()
         assertEquals(21L, actions.early)
     }
 
@@ -381,5 +381,87 @@ class FlowsTest {
         compose.onNodeWithTag("timeOk").performClick()
         assertEquals(AlertSettings(loudFrom = LocalTime.of(19, 0)), actions.chosenAlert)
         assertTrue(actions.saved.isEmpty())
+    }
+
+    // --- In advance, "heute später" (Anf. 7.32) ---------------------------------------------------
+
+    private fun earlyUi(reminder: Reminder) = AlarmView(
+        reminder = reminder,
+        // Saturday 18:30 now, planned for 20:00.
+        occurrence = Occurrence(id = 9, reminderId = 1, dueAt = now.plusSeconds(5400)),
+        minimumAllowed = true, minimumsLeft = 1, canPostpone = true, postponesLeft = 1,
+        early = true, missedAt = Instant.parse("2026-10-24T21:00:00Z"),
+    )
+
+    @Test
+    fun inAdvanceLaterTodayCountsFromThePlannedTimeAndStaysBeforeTheEndOfTheDay() {
+        var postponed: Instant? = null
+        var skipped: String? = null
+        val relaxed = strict.copy(strictness = Strictness.NORMAL)
+        compose.setContent {
+            AvlTheme(dark = true) {
+                AlarmContent(
+                    ui = earlyUi(relaxed), now = now, zone = zone, onComplete = { _, _, _ -> }, onSnooze = {},
+                    onPostpone = { postponed = it }, onSkip = { skipped = it }, onStartProof = {}, onAbortProof = {}, devices = devices,
+                )
+            }
+        }
+        compose.onNodeWithText("Vorab · fällig um 20:00").assertExists()
+        compose.onNodeWithText("Später", substring = true).assertDoesNotExist()
+        compose.onNodeWithTag("postpone").performScrollTo().performClick()
+        // 20:00 + 30 min and + 1 h stay before 23:00; + 2 h would be 22:00 too, + more not offered.
+        compose.onNodeWithTag("postpone+30 min").assertExists()
+        compose.onNodeWithTag("postpone+2 Std").assertExists()
+        compose.onNodeWithTag("postponeIn 1 Stunde").assertDoesNotExist()
+        compose.onNodeWithTag("postpone+1 Std").performClick()
+        assertEquals(Instant.parse("2026-10-24T19:00:00Z"), postponed)
+    }
+
+    @Test
+    fun inAdvanceLaterTodayOnlyBeforeTheEndOfTheDayAndStrictAsksFirst() {
+        var postponed: Instant? = null
+        val late = earlyUi(strict).let { it.copy(occurrence = it.occurrence.copy(dueAt = Instant.parse("2026-10-24T20:00:00Z"), currentAt = Instant.parse("2026-10-24T20:00:00Z"))) }
+        compose.setContent {
+            AvlTheme(dark = true) {
+                AlarmContent(
+                    ui = late, now = now, zone = zone, onComplete = { _, _, _ -> }, onSnooze = {},
+                    onPostpone = { postponed = it }, onSkip = {}, onStartProof = {}, onAbortProof = {}, devices = devices,
+                )
+            }
+        }
+        compose.onNodeWithTag("postpone").performScrollTo().performClick()
+        // Planned 22:00, the day ends at 23:00: only + 30 min fits today.
+        compose.onNodeWithTag("postpone+30 min").assertExists()
+        compose.onNodeWithTag("postpone+1 Std").assertDoesNotExist()
+        compose.onNodeWithTag("postpone+30 min").performClick()
+        assertEquals(null, postponed)
+        compose.onNodeWithText("Wirklich jetzt schon auf", substring = true).assertExists()
+        compose.onNodeWithTag("postponeOk").performClick()
+        assertEquals(Instant.parse("2026-10-24T20:30:00Z"), postponed)
+    }
+
+    @Test
+    fun inAdvanceItCanBeSkipped() {
+        var skipped: String? = null
+        compose.setContent {
+            AvlTheme(dark = true) {
+                AlarmContent(
+                    ui = earlyUi(strict), now = now, zone = zone, onComplete = { _, _, _ -> }, onSnooze = {},
+                    onPostpone = {}, onSkip = { skipped = it }, onStartProof = {}, onAbortProof = {}, devices = devices,
+                )
+            }
+        }
+        compose.onNodeWithTag("skip").performScrollTo().performClick()
+        // On the skip step now: the main buttons are gone.
+        compose.onNodeWithTag("skip").assertDoesNotExist()
+        compose.onNodeWithTag("postpone").assertDoesNotExist()
+    }
+
+    @Test
+    fun todayShowsWhereAMovedOneCameFrom() {
+        val moved = Occurrence(id = 22, reminderId = 1, dueAt = now.plusSeconds(1800), currentAt = now.plusSeconds(5400), postponeCount = 1)
+        val state = emptyState.copy(today = Today(emptyList(), listOf(Entry(strict, moved)), emptyList(), emptyList()))
+        compose.setContent { AvlTheme(dark = false) { AvlAppUi(state, FakeActions(), now, zone) } }
+        compose.onNodeWithText("verschoben von 19:00", substring = true).assertExists()
     }
 }

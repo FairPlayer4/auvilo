@@ -33,6 +33,7 @@ import com.avlreminder.core.rules.Snoozing
 import com.avlreminder.core.rules.TransitionResult
 import com.avlreminder.core.rules.Validation
 import java.time.Duration
+import java.time.Instant
 import java.time.LocalDateTime
 import java.time.LocalTime
 
@@ -204,7 +205,8 @@ internal class Changes(private val c: EngineContext, private val views: AlarmVie
         if (next != null && (next.state != OccurrenceState.PLANNED || next.hasFired || next.postponeCount > 0)) {
             return TransitionResult.Rejected("the next one has started already")
         }
-        val at = now().plus(REOPEN_DELAY)
+        // Done or skipped in advance: back to its planned time, not sooner (Anf. 7.32 VB7).
+        val at = maxOf(now().plus(REOPEN_DELAY), if (occurrence.hasFired) Instant.MIN else occurrence.currentAt)
         val result = Lifecycle.transition(reminder, occurrence, Action.Reopen(at), now())
         if (result !is TransitionResult.Ok) return result
         // Past the end of its day (several a day: the next time) it would only be missed (VS1).
@@ -309,7 +311,8 @@ internal class Changes(private val c: EngineContext, private val views: AlarmVie
 
     suspend fun snoozeHints(): List<SnoozeHint> = repo.reminders().mapNotNull { r ->
         val recent = repo.recentResolved(r.id, Snoozing.IN_A_ROW + Snoozing.IN_A_ROW).map { o ->
-            o to repo.events(o.id).count { it.type == EventType.SNOOZED }
+            // Postponing counts too, also in advance (Anf. 7.32 VB7).
+            o to repo.events(o.id).count { it.type == EventType.SNOOZED || it.type == EventType.POSTPONED }
         }
         Snoozing.hint(r, recent, r.hintQuietUntil, now(), zone)
     }

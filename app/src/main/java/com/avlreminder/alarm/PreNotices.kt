@@ -56,6 +56,13 @@ object PreNotices {
             .setStyle(Notification.BigTextStyle().bigText(lines.joinToString("\n")))
             .setContentIntent(open)
             .setAutoCancel(true)
+            // "Heute später" right where one notices it (Anf. 7.32 VB5).
+            .addAction(
+                Notification.Action.Builder(
+                    null, "Verschieben …",
+                    PendingIntent.getActivity(context, occurrenceId.toInt(), AlarmActivity.intent(context, occurrenceId, early = true), PendingIntent.FLAG_IMMUTABLE),
+                ).build(),
+            )
             .build()
         context.getSystemService(NotificationManager::class.java).notify(tag(occurrenceId), 0, notification)
     }

@@ -148,14 +148,14 @@ object Lifecycle {
 
             // Once it rang the chance has come: snoozed or postponed it is not dropped any more (7.29 OZ5).
             Action.Drop ->
-                if (occurrence.state != PLANNED || occurrence.hasFired) TransitionResult.Rejected("only a planned occurrence that never rang can be dropped")
+                if (occurrence.state != PLANNED || occurrence.rangOrMoved) TransitionResult.Rejected("only a planned occurrence that never rang or moved can be dropped")
                 else ok(
                     occurrence.copy(state = CLOSED, resolution = Resolution.DROPPED, resolvedAt = now),
                     EventType.DROPPED,
                 )
 
             Action.AwaitArrival ->
-                if (occurrence.state != PLANNED || !occurrence.hasFired) TransitionResult.Rejected("only a snoozed or postponed occurrence awaits the arrival")
+                if (occurrence.state != PLANNED || !occurrence.rangOrMoved) TransitionResult.Rejected("only a snoozed or postponed occurrence awaits the arrival")
                 else ok(occurrence.copy(awaitsArrival = true), EventType.AWAITING_ARRIVAL)
 
             Action.Escalate ->

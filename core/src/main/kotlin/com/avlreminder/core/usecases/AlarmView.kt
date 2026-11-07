@@ -47,6 +47,8 @@ data class AlarmView(
     val nextTime: Instant? = null,
     /** Open blockers of the reminder. */
     val blockers: List<Blocker> = emptyList(),
+    /** When it would count as missed (end of the day, next time, end of the window): "heute später" stays before (7.32 VB2). */
+    val missedAt: Instant? = null,
     /** Taken back after a completion with complete proof: done again without a new one (Anf. 7.31). */
     val proofCarried: Boolean = false,
 ) {
