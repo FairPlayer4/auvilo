@@ -74,6 +74,10 @@ Stand: 2026-11-07. Bei jedem größeren Schritt aktualisieren.
   für 1 min nach *Erledigt*/*Auslassen*, danach *Zurücknehmen* auf *Heute*. Wieder offen,
   klingelt in 10 min; Nachweis zählt wieder; Checkliste verliert nur den letzten Haken.
   Keine Migration, neues Ereignis `REOPENED`. Gerätetests N20–N23.
+  Dazu vorab verschieben und auslassen (Anf. 7.32): *Vorab* auf *Heute* und *Verschieben …*
+  im Vorab-Reminder öffnen den Alarm-Bildschirm vorab, „heute später“ +30 min/+1/+2 Std ab
+  der geplanten Zeit, zählt aufs Verschieben-Konto; Ankunft-Reminder behält die neue Zeit.
+  Gerätetests N24–N27.
 - Danach: Kevins Wochenplan (Gerätetests V1.3a, Reminder *Gerätetest*), dann V1.3b.
 
 ## Auf dem Gerät

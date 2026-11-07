@@ -169,6 +169,16 @@ PLANNED ──(Zeit/Ankunft)──► DUE ──(keine Reaktion)──► ESCALA
   `syncReminder`. Nachweise bleiben; `Limits.proofCarried` (letztes `REOPENED` mit Detail
   `GOAL`/`MINIMUM`) lässt das nächste *Erledigt* ohne neuen Nachweis als Ziel zählen, die
   Alarm-Ansicht überspringt dann den Nachweis (`AlarmView.proofCarried`).
+- **Vorab verschieben und auslassen** (V1.3b0.4, Anf. 7.32): `Postpone` und `Skip` gelten
+  auch für einen geplanten Termin, der noch nicht geklungen hat. `Occurrence.rangOrMoved`
+  (geklungen oder verschoben) ersetzt `hasFired` bei der Ortsentscheidung: Eine Ankunft vor
+  der verschobenen Zeit lässt ihn nicht klingeln, zur Zeit nicht da → `AwaitArrival` statt
+  `Drop`. `Occurrence.plannedAt` (nie geklungen: `currentAt`, sonst `dueAt`) ist die Basis
+  für den Vorab-Reminder, er wandert also mit. NT2 zählt `POSTPONED` wie `SNOOZED`.
+  Zurücknehmen eines vorab erledigten oder ausgelassenen Termins setzt ihn auf die geplante
+  Zeit, wenn die später als in 10 min liegt. Die Alarm-Ansicht vorab bietet *Verschieben*
+  mit +30 min/+1/+2 Std ab `currentAt`, nur vor `AlarmView.missedAt`; bei *streng* mit
+  Rückfrage.
 - **Rückgängig in der App** (`alarm/Undo.kt`): Nach *Erledigt*/*Auslassen* im Alarm oder
   in der Benachrichtigung eine stille Benachrichtigung mit *Rückgängig*, eigene Id,
   `setTimeoutAfter(60 s)`; das Ergebnis kommt als zweite stille Benachrichtigung. Auf

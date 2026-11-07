@@ -170,6 +170,7 @@ internal class AlarmViews(private val c: EngineContext) {
             nextTime = limits.nextTime,
             blockers = repo.blockers(reminder.id).filter { it.isOpen },
             proofCarried = limits.proofCarried,
+            missedAt = missedAt(reminder, occurrence),
         )
     }
 

@@ -1043,6 +1043,31 @@ falsche. Zurücknehmen soll schnell gehen, aber kein Schlupfloch sein.
   wieder, wenn er neu erledigt ist. Eine Vorbereitungsaufgabe, die zurückgenommen
   wird, öffnet ihren Blocker wieder.
 
+### 7.32 Vorab verschieben und auslassen – „heute später“ (2026-11-07)
+Oft ist früh klar, dass man erst später dazu kommt. Dann soll man den Reminder schon
+vorher schieben oder auslassen können, wie man Checklisten-Punkte vorab abhakt.
+- VB1 **Vorab-Bildschirm:** *Vorab* (bisher *Erledigen*) auf *Heute* bei *Später heute*
+  und *Wenn du zuhause bist* öffnet den Alarm-Bildschirm vor der Fälligkeit. Er bietet
+  *Erledigt*, *Minimum*, *Verschieben* und *Auslassen*, aber kein *Später* (es klingelt
+  noch nichts). Es klingelt nichts, das Nachweis-Fenster startet nicht.
+- VB2 **Heute später:** *Verschieben* bietet vorab zuerst „+30 min“, „+1 Std“ und „+2 Std“
+  ab der **geplanten** Zeit (18:00 → 19:00, egal wann man tippt), dann wie bisher
+  *Morgen* und *Datum und Uhrzeit wählen*. Die Knöpfe für heute erscheinen nur, wenn die
+  neue Zeit vor der Tagesgrenze liegt (mehrmals täglich: vor der nächsten Uhrzeit, Frist:
+  vor der Frist).
+- VB3 **Konto:** Vorab verschieben zählt wie Verschieben im Alarm (Limit pro Termin);
+  jedes weitere Verschieben zählt wieder. Ist das Limit erreicht, ist *Verschieben*
+  ausgegraut. Bei *streng* fragt die App vorab nach: „Wirklich jetzt schon auf 19:00?“
+- VB4 **Ort:** Ein vorab verschobener Reminder mit Ankunft behält seine neue Zeit, auch
+  wenn man früher ankommt. Ist man zur neuen Zeit nicht da (oder *unklar*), wartet er auf
+  die Ankunft und ist zur Tagesgrenze *verpasst*, er *entfällt* nicht (wie 7.29 OZ5).
+- VB5 **Vorab-Reminder (T6)** wandern mit der neuen Zeit mit und bekommen den Knopf
+  *Verschieben …*, der den Vorab-Bildschirm öffnet.
+- VB6 **Sichtbar:** Auf *Heute* steht bei einem verschobenen Eintrag „verschoben von 18:00“.
+- VB7 **Schlupfloch:** Der Hinweis bei ständigem *Später* (NT2) zählt Verschieben mit,
+  auch vorab. Vorab ausgelassen oder erledigt lässt sich zurücknehmen (7.31); der Termin
+  kommt dann zur geplanten Zeit, nicht schon in 10 min.
+
 ## 8. Zielplattform und Technik
 
 ### 8.1 Zielgerät
@@ -1121,6 +1146,7 @@ Neueste zuerst. Kap. 7 enthält immer den gültigen Stand; diese Tabelle ist die
 
 | Datum | Entscheidung |
 |---|---|
+| 2026-11-07 | Vorab verschieben und auslassen (7.32): Alarm-Bildschirm vorab mit *Verschieben* und *Auslassen*, „heute später“ +30 min/+1/+2 Std ab der geplanten Zeit, zählt aufs Verschieben-Konto, bei *streng* mit Rückfrage; Ort behält die neue Zeit, wartet sonst auf die Ankunft; Vorab-Reminder wandert mit; NT2 zählt Verschieben mit. Umgesetzt in V1.3b0.4 |
 | 2026-11-07 | Erledigung zurücknehmen (7.31): Rückgängig-Benachrichtigung 1 min, danach *Zurücknehmen* auf *Heute*; wieder offen, klingelt in 10 min ohne als *Später* zu zählen; nur der letzte Termin, bis der nächste klingelt bzw. bis zur Tagesgrenze; *Auslassen* auch, *verpasst*/*entfällt* nicht; Nachweis zählt wieder; neues Ereignis statt Löschen. Umgesetzt in V1.3b0.4 |
 | 2026-11-05 | 7.29 einfach anfangen: Ort **nur über WLAN** (Verbindung und Ergebnisse der WLAN-Suche, BSSIDs pro Ort), Prüfungen im Zeitraum lesen nur den WLAN-Zustand, sonst Rückfall wie bisher. Genaue Ortsprüfung per GPS nach **7.30** ausgelagert, später und erst nach einer Messung. Kevin hat die Anforderungen im Ganzen gelesen |
 | 2026-11-05 | Review-Lauf 3, Funde B1/B2 und Empfehlungen E5/E6: Ein Termin merkt sich, ob er schon geklungen hat. Speichern beim Schlummern verschiebt den heutigen Termin nicht mehr auf morgen; *Fortsetzen* meldet keine Verpasser. Ortsprüfung außerhalb der Transaktion, Alarme erst nach dem Speichern. Umgesetzt in V1.3b0.2 |
@@ -1228,7 +1254,7 @@ Neueste zuerst. Kap. 7 enthält immer den gültigen Stand; diese Tabelle ist die
 | V1.3b0.1 | 2026-11-04 | Kevins Rückmeldungen: Checkliste jederzeit, Übersicht mit allen Uhrzeiten, Textfelder (Kap. 9, 2026-11-04) |
 | V1.3b0.2 | 2026-11-05 | Termin merkt sich, ob er geklungen hat; Speichern beim Schlummern verschiebt nicht mehr auf morgen; verschobenes Training wartet auf die Ankunft (7.29 OZ5); Ortsprüfung vor der Transaktion (Kap. 9, 2026-11-05) |
 | V1.3b0.3 | 2026-11-05 | WLAN-Sonde im Debug-Build als Gerätetest für 7.29 |
-| V1.3b0.4 | gebaut | Erledigung zurücknehmen (7.31) |
+| V1.3b0.4 | gebaut | Erledigung zurücknehmen (7.31), vorab verschieben und auslassen (7.32) |
 
 Details zum Verhalten: [design.md](design.md), Gerätetests: [geraetetest.md](geraetetest.md).
 

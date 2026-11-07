@@ -109,6 +109,15 @@ Welches Netz N1 ist, sieht man an der Zeile `learned N1` und der Uhrzeit.
 | N22 | Nach 19:15 versuchen, den Termin von 12:30 zurückzunehmen | Toast „Geht nicht mehr …“, nichts ändert sich |
 | N23 | Auf der Uhr *Erledigt* tippen | Rückgängig-Meldung auch auf der Uhr (wenn nicht: nur am Handy, ist ok) |
 
+## Neu in V1.3b0.4: Vorab verschieben (7.32)
+
+| # | Test | Erwartung |
+|---|---|---|
+| N24 | Morgens auf *Heute* beim Training *Vorab* → *Verschieben* → „+1 Std“ | Training steht auf 20:00 mit „verschoben von 19:00“; `dumpsys alarm` zeigt 20:00; bei *streng* vorher die Rückfrage |
+| N25 | Danach um 19:30 nach Hause kommen | klingelt nicht vor 20:00; um 20:00 zuhause klingelt es |
+| N26 | Reminder mit Vorab-Reminder (15 min): in der Vorab-Benachrichtigung *Verschieben …* | Vorab-Bildschirm öffnet sich; nach „+30 min“ kommt der Vorab-Reminder 15 min vor der neuen Zeit wieder |
+| N27 | *Vorab* → *Auslassen* mit Grund, dann *Rückgängig* | Termin wieder zur geplanten Zeit, nicht in 10 min |
+
 ### Wochenplan V1.3a (03.–08.11.2026)
 Reminder *Gerätetest*: täglich 12:30 und 19:15, *normal*, Minimum „Test nur
 vorbereiten“ (legt Claude nach N9 über die Schnittstelle an). Pro Alarm ein Test, freie Termine zum Nachholen.

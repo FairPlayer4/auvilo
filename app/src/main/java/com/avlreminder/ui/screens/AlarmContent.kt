@@ -42,6 +42,7 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.avlreminder.core.model.Blocker
 import com.avlreminder.core.model.ChecklistItem
+import com.avlreminder.core.model.Strictness
 import com.avlreminder.core.model.PrepAnswer
 import com.avlreminder.core.model.severalADay
 import com.avlreminder.core.usecases.AlarmView
@@ -144,7 +145,7 @@ fun AlarmContent(
         Column(Modifier.fillMaxSize().verticalScroll(rememberScrollState()).imePadding().padding(24.dp)) {
             when (view) {
                 View.MAIN -> {
-                    val head = if (ui.early) "Vorab erledigen · fällig um ${Format.time(ui.occurrence.currentAt, zone)}"
+                    val head = if (ui.early) "Vorab · fällig um ${Format.time(ui.occurrence.currentAt, zone)}"
                     else "${Format.strictness(r.strictness).replaceFirstChar { it.uppercase() }} · fällig seit ${Format.time(ui.occurrence.currentAt, zone)}"
                     Text(head, color = c.muted, fontSize = 14.sp)
                     Text(Format.time(now, zone), color = c.text, fontSize = 56.sp, fontWeight = FontWeight.Light)
@@ -222,12 +223,15 @@ fun AlarmContent(
                                 }
                             }
                         }
-                        Row(Modifier.fillMaxWidth().padding(top = 8.dp), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                            OutlinedButton(onClick = { view = View.POSTPONE }, enabled = ui.canPostpone, modifier = Modifier.weight(1f)) {
-                                Text("Verschieben\n" + (ui.postponesLeft?.let { "noch ${it}×" } ?: "beliebig"))
-                            }
-                            OutlinedButton(onClick = { view = View.SKIP }, modifier = Modifier.weight(1f)) { Text("Auslassen\nmit Grund") }
+                    }
+                    // Also in advance, "heute später" (Anf. 7.32 VB1): no snoozing, nothing rings yet.
+                    Row(Modifier.fillMaxWidth().padding(top = 8.dp), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                        OutlinedButton(
+                            onClick = { view = View.POSTPONE }, enabled = ui.canPostpone, modifier = Modifier.weight(1f).testTag("postpone"),
+                        ) {
+                            Text("Verschieben\n" + (ui.postponesLeft?.let { if (it == 0) "aufgebraucht" else "noch ${it}×" } ?: "beliebig"))
                         }
+                        OutlinedButton(onClick = { view = View.SKIP }, modifier = Modifier.weight(1f).testTag("skip")) { Text("Auslassen\nmit Grund") }
                     }
                     // Unobtrusive at the very end, so it does not distract from reacting (Anf. 7.24, VV1).
                     TextButton(onClick = { suggesting = true }, Modifier.padding(top = 24.dp).testTag("suggest")) {
@@ -411,11 +415,23 @@ private fun PostponeStep(ui: AlarmView, now: Instant, zone: ZoneId, onPostpone: 
     )
     val evening = today.atTime(20, 30).atZone(zone).toInstant()
     val tomorrow = today.plusDays(1).atTime(ui.occurrence.dueAt.atZone(zone).toLocalTime()).atZone(zone).toInstant()
+    // In advance from the planned time: 18:00 "+1 Std" is 19:00, whenever one taps (7.32 VB2).
+    val planned = ui.occurrence.currentAt
     val options = buildList {
-        add("In 1 Stunde" to now.plusSeconds(3600))
-        if (evening > now.plusSeconds(1800)) add("Heute Abend" to evening)
+        if (ui.early) {
+            listOf("+30 min" to 30L, "+1 Std" to 60L, "+2 Std" to 120L).forEach { (label, minutes) ->
+                val at = planned.plusSeconds(minutes * 60)
+                if (ui.missedAt == null || at < ui.missedAt) add(label to at)
+            }
+        } else {
+            add("In 1 Stunde" to now.plusSeconds(3600))
+            if (evening > now.plusSeconds(1800)) add("Heute Abend" to evening)
+        }
         add("Morgen" to tomorrow)
-    }.filter { (_, at) -> (ui.deadline == null || at < ui.deadline) && (ui.nextTime == null || at < ui.nextTime) }
+    }.filter { (_, at) -> at > now && (ui.deadline == null || at < ui.deadline) && (ui.nextTime == null || at < ui.nextTime) }
+    // Strict and in advance: one question first (7.32 VB3).
+    var confirm by remember { mutableStateOf<Instant?>(null) }
+    val postpone: (Instant) -> Unit = { at -> if (ui.early && ui.reminder.strictness == Strictness.STRICT) confirm = at else onPostpone(at) }
     ui.nextTime?.let {
         Text("Nur bis vor die nächste Uhrzeit ${Format.moment(it, zone, today)}.", Modifier.padding(bottom = 8.dp), color = c.muted, fontSize = 13.sp)
     }
@@ -423,7 +439,7 @@ private fun PostponeStep(ui: AlarmView, now: Instant, zone: ZoneId, onPostpone: 
         Text("Nur bis zur Frist ${Format.moment(it, zone, today)}.", Modifier.padding(bottom = 8.dp), color = c.muted, fontSize = 13.sp)
     }
     options.forEach { (label, at) ->
-        OutlinedButton(onClick = { onPostpone(at) }, Modifier.fillMaxWidth().padding(vertical = 4.dp)) {
+        OutlinedButton(onClick = { postpone(at) }, Modifier.fillMaxWidth().padding(vertical = 4.dp).testTag("postpone$label")) {
             Text(label, Modifier.weight(1f))
             Text(Format.moment(at, zone, today), color = c.muted)
         }
@@ -433,6 +449,7 @@ private fun PostponeStep(ui: AlarmView, now: Instant, zone: ZoneId, onPostpone: 
         Text("Danach bleiben nur noch Erledigt, Minimum oder Auslassen.", Modifier.padding(top = 12.dp), color = c.muted, fontSize = 13.sp)
     }
     TextButton(onClick = onBack, Modifier.padding(top = 8.dp)) { Text("Abbrechen", color = c.muted) }
+    ConfirmEarlyPostpone(confirm, zone, today, onConfirm = { confirm = null; onPostpone(it) }, onDismiss = { confirm = null })
 
     if (pickDate) {
         val state = rememberDatePickerState(today.atStartOfDay(ZoneOffset.UTC).toInstant().toEpochMilli())
@@ -455,13 +472,25 @@ private fun PostponeStep(ui: AlarmView, now: Instant, zone: ZoneId, onPostpone: 
             confirmButton = {
                 TextButton(onClick = {
                     pickedDate = null
-                    onPostpone(date.atTime(LocalTime.of(state.hour, state.minute)).atZone(zone).toInstant())
+                    postpone(date.atTime(LocalTime.of(state.hour, state.minute)).atZone(zone).toInstant())
                 }) { Text("Verschieben") }
             },
             dismissButton = { TextButton(onClick = { pickedDate = null }) { Text("Abbrechen") } },
             text = { TimeInput(state) },
         )
     }
+}
+
+@Composable
+private fun ConfirmEarlyPostpone(at: Instant?, zone: ZoneId, today: java.time.LocalDate, onConfirm: (Instant) -> Unit, onDismiss: () -> Unit) {
+    at ?: return
+    AlertDialog(
+        onDismissRequest = onDismiss,
+        title = { Text("Wirklich jetzt schon auf ${Format.moment(at, zone, today)}?") },
+        text = { Text("Das zählt als Verschieben.") },
+        confirmButton = { TextButton(onClick = { onConfirm(at) }, Modifier.testTag("postponeOk")) { Text("Verschieben") } },
+        dismissButton = { TextButton(onClick = onDismiss) { Text("Abbrechen") } },
+    )
 }
 
 @Composable

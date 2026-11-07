@@ -89,7 +89,7 @@ internal class Scheduler(private val c: EngineContext, private val views: AlarmV
             // Snoozed or postponed ones before their new time keep it.
             val waiting = o.state == OccurrenceState.PLANNED && (
                 r.schedule == Schedule.OnArrival || o.awaitsArrival ||
-                    (!o.hasFired && o.currentAt > now && o.currentAt.atZone(zone).toLocalDate() == today)
+                    (!o.rangOrMoved && o.currentAt > now && o.currentAt.atZone(zone).toLocalDate() == today)
                 )
             if (waiting) arrive(r, o) else null
         }
@@ -167,11 +167,11 @@ internal class Scheduler(private val c: EngineContext, private val views: AlarmV
             val place = repo.places().firstOrNull { it.id == arrival.placeId }
             if (place != null) {
                 val here = c.isAt(place)
-                if (occurrence.hasFired && here != true) {
+                if (occurrence.rangOrMoved && here != true) {
                     awaitArrival(reminder, apply(reminder, occurrence, Action.AwaitArrival))
                     return null
                 }
-                if (!occurrence.hasFired && here == false) {
+                if (!occurrence.rangOrMoved && here == false) {
                     close(reminder, occurrence, Action.Drop)
                     createNext(reminder)?.let { plan(reminder, it) }
                     return null

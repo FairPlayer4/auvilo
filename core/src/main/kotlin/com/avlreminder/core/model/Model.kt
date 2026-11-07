@@ -252,6 +252,16 @@ data class Occurrence(
 
     /** It rang already; planned again it keeps its day and its time. */
     val hasFired: Boolean get() = firedAt != null
+
+    /**
+     * It rang or was moved (also in advance, Anf. 7.32 VB4): its time is decided. An arrival
+     * before it does not ring it, and away at its time it waits for the arrival instead of
+     * being dropped.
+     */
+    val rangOrMoved: Boolean get() = hasFired || postponeCount > 0
+
+    /** Where it stands now: planned and never rung, the possibly moved time; otherwise its due time. */
+    val plannedAt: Instant get() = if (hasFired) dueAt else currentAt
 }
 
 data class Proof(
