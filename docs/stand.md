@@ -100,8 +100,11 @@ Stand: 2026-11-07. Bei jedem größeren Schritt aktualisieren.
    aber sinnvolle Rückfragen („Willst du wirklich …?“) bekommen.
    Hinweis bei wiederholtem *Später* (NT2) ist in V1.3a umgesetzt. Gezählt wird erst vor
    V2 mit der Testsession (NT4).
-2. **Backend** (Kevin, parallel, `../avlreminder-backend`): B0–B2 fertig, B2b
-   (Daten-Backup) als Nächstes. Überblick: [backend.md](backend.md).
+2. **Backend** (`../avlreminder-backend`): B0–B2b fertig und in der Cloud getestet.
+   Als Nächstes das **Cloud-Backup in der App**, Entwurf bestätigt am 2026-11-07
+   ([backup-entwurf.md](backup-entwurf.md), fünf Schritte). Vorab legt Kevin die
+   OAuth-Clients (Web und Android) und den Deploy-Key an. Überblick: [backend.md](backend.md).
+   App und `core` bauen seit 2026-11-07 für Java 21 (Voraussetzung für `client/`).
 3. **Play-Store-Release** ohne Eile, erst wenn die App „fertig“ ist (mindestens bis V2);
    dafür Transparenz, Notausschalter (in V1.3a), Backend nur nach Einschalten (7.28 PS5–PS9).
 

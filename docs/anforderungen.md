@@ -893,7 +893,8 @@ Vordergrund, nicht Reichweite.
   (2026-11-02)** – Android-Sandbox, dateibasierte Verschlüsselung und `allowBackup=false`
   reichen; der Play-Store-Release ist ein Release-Build (nicht debuggable, kein
   `run-as`). Kein SQLCipher, solange kein konkreter Fall übrig bleibt.
-- Backend-Stand und was es für die App bedeutet: [backend.md](backend.md).
+- Backend-Stand und was es für die App bedeutet: [backend.md](backend.md); Einbindung des
+  Cloud-Backups: [backup-entwurf.md](backup-entwurf.md) (bestätigt 2026-11-07).
 
 ### 7.29 Ankunft im Zeitraum mit WLAN (2026-11-04, ohne GPS seit 2026-11-05)
 **Anlass:** Am 2026-11-04 klingelte *Training* (19:30, Ankunft zuhause, sonst entfällt)
@@ -1123,7 +1124,10 @@ früh am S24 Ultra testen (Spike, siehe Abschnitt 10).
   [entwicklungsumgebung.md](entwicklungsumgebung.md)
 
 ### 8.4 Daten
-- Alle Daten inkl. Fotos und Audio **nur lokal** auf dem Gerät.
+- Alle Daten inkl. Fotos und Audio liegen **lokal** auf dem Gerät. Sie verlassen es nur
+  **Ende-zu-Ende verschlüsselt** im Cloud-Backup und nur, wenn es eingeschaltet ist
+  (7.28 PS8, präzisiert 2026-11-07); Fotos und Audio gar nicht. Dafür braucht die App
+  die Berechtigung `INTERNET` ([backup-entwurf.md](backup-entwurf.md) A-3).
 - **Sensible Daten** (Fotos, Audio, Standorte, Bewegungsdaten) bleiben grundsätzlich
   **auf dem Gerät**. Gespeicherte Orte und WLANs verlassen es nur **Ende-zu-Ende
   verschlüsselt** im Backup B2b (2026-11-05); Fotos, Audio und Bewegungsdaten gar nicht.
@@ -1133,11 +1137,11 @@ früh am S24 Ultra testen (Spike, siehe Abschnitt 10).
   Cloud-KI für den Import vorbereitet wird, verantwortet der Nutzer selbst.
 - Rohdaten der Bewegungssensoren (7.16) nach einer einstellbaren Frist löschen;
   das Ergebnis (Dauer, erkanntes Muster) bleibt.
-- Kein **Nutzer-Backup** in V1 (später nachrüstbar, z. B. Export als ZIP). Die Kopie
-  der Datenbank vor jeder Migration (design.md 13) ist nur eine Sicherung gegen
-  Datenverlust beim Update, kein Backup. Das Cloud-Backup des
-  Backends (B2b, [backend.md](backend.md)) ist Ende-zu-Ende verschlüsselt, enthält
-  keine Fotos und kein Audio und läuft nur nach ausdrücklichem Einschalten (7.28 PS8).
+- **Nutzer-Backup** ist das Cloud-Backup des Backends (B2b, [backend.md](backend.md),
+  Einbindung [backup-entwurf.md](backup-entwurf.md)): Ende-zu-Ende verschlüsselt, ohne
+  Fotos und Audio, nur nach ausdrücklichem Einschalten (7.28 PS8). Ein Export als Datei
+  ist später nachrüstbar (z. B. als ZIP). Die Kopie der Datenbank vor jeder Migration
+  (design.md 13) ist nur eine Sicherung gegen Datenverlust beim Update, kein Backup.
 - Aufbewahrung: vorerst unbegrenzt.
 
 ## 9. Entscheidungen
@@ -1146,6 +1150,7 @@ Neueste zuerst. Kap. 7 enthält immer den gültigen Stand; diese Tabelle ist die
 
 | Datum | Entscheidung |
 |---|---|
+| 2026-11-07 | Cloud-Backup in der App: Entwurf [backup-entwurf.md](backup-entwurf.md) A-1 bis A-14 bestätigt. Keine eigene App-Variante, solange nur Kevin die App nutzt (Schalter aus PS8 im normalen Build); Composite Build mit festem Backend-Commit und Deploy-Key in der CI; neue Berechtigung `INTERNET` (8.4 präzisiert); Credential Manager, Geräteschlüssel und Keysets im Android Keystore; ZIP aus Datenbank und Einstellungen; stündlich per WorkManager nur bei Änderung; Wiederherstellen ersetzt die Datenbank nach lokaler Kopie; Diagnose ans Backend nur mit eigenem Logger ohne Inhalte. App und `core` bauen für Java 21 statt 17 |
 | 2026-11-07 | Vorab verschieben und auslassen (7.32): Alarm-Bildschirm vorab mit *Verschieben* und *Auslassen*, „heute später“ +30 min/+1/+2 Std ab der geplanten Zeit, zählt aufs Verschieben-Konto, bei *streng* mit Rückfrage; Ort behält die neue Zeit, wartet sonst auf die Ankunft; Vorab-Reminder wandert mit; NT2 zählt Verschieben mit. Umgesetzt in V1.3b0.4 |
 | 2026-11-07 | Erledigung zurücknehmen (7.31): Rückgängig-Benachrichtigung 1 min, danach *Zurücknehmen* auf *Heute*; wieder offen, klingelt in 10 min ohne als *Später* zu zählen; nur der letzte Termin, bis der nächste klingelt bzw. bis zur Tagesgrenze; *Auslassen* auch, *verpasst*/*entfällt* nicht; Nachweis zählt wieder; neues Ereignis statt Löschen. Umgesetzt in V1.3b0.4 |
 | 2026-11-05 | 7.29 einfach anfangen: Ort **nur über WLAN** (Verbindung und Ergebnisse der WLAN-Suche, BSSIDs pro Ort), Prüfungen im Zeitraum lesen nur den WLAN-Zustand, sonst Rückfall wie bisher. Genaue Ortsprüfung per GPS nach **7.30** ausgelagert, später und erst nach einer Messung. Kevin hat die Anforderungen im Ganzen gelesen |
