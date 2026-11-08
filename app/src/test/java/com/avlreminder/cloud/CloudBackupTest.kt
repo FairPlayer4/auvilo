@@ -101,7 +101,10 @@ class CloudBackupTest {
         server = { serversCreated++; server },
         keys = { acc ->
             object : LokaleAblage {
-                override fun laden() = local[acc]
+                override fun laden(): LokalerStand? {
+                    brokenKeys?.let { throw it }
+                    return local[acc]
+                }
                 override fun speichern(stand: LokalerStand) { local[acc] = stand }
             }
         },
@@ -114,6 +117,7 @@ class CloudBackupTest {
         log = { logged += it },
     )
     private val logged = mutableListOf<String>()
+    private var brokenKeys: Throwable? = null
 
     private fun <T> blocking(block: suspend () -> T): T = runBlocking { withTimeout(10_000) { block() } }
 
@@ -199,6 +203,20 @@ class CloudBackupTest {
         val restored = Schluesselbund.ausBackup(requireNotNull(server.backup).chiffrat, Wiederherstellungsschluessel.ausText(shown), account)
         assertEquals(restored.person.oeffentlich.fingerabdruck(), ready.fingerprint)
         assertNull(local.getValue(account).offenesBackup)
+    }
+
+    // KRITISCH: the backup may fail, the app may not (backend.md).
+    @Test
+    fun anUnreadableKeyFileAtStartIsAnErrorNotACrash() {
+        val cloud = cloud()
+        blocking {
+            store.setEnabled(true)
+            store.speichern(Sitzung(account, "geraet-1", "token", 4_000_000_000))
+        }
+        brokenKeys = KeysOfOtherAccount()
+        blocking { cloud.load().join() }
+        assertEquals(CloudPhase.NotSetUp, cloud.status.value.phase)
+        assertNotNull(cloud.status.value.error)
     }
 
     @Test

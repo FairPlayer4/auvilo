@@ -1,8 +1,10 @@
 package com.avlreminder.cloud
 
 import android.content.Context
+import androidx.datastore.core.handlers.ReplaceFileCorruptionHandler
 import androidx.datastore.preferences.core.booleanPreferencesKey
 import androidx.datastore.preferences.core.edit
+import androidx.datastore.preferences.core.emptyPreferences
 import androidx.datastore.preferences.core.longPreferencesKey
 import androidx.datastore.preferences.core.stringPreferencesKey
 import androidx.datastore.preferences.preferencesDataStore
@@ -10,7 +12,12 @@ import com.avlreminder.verbindung.Sitzung
 import com.avlreminder.verbindung.SitzungsAblage
 import kotlinx.coroutines.flow.first
 
-private val Context.backendStore by preferencesDataStore("backend")
+// A damaged file counts as empty (switched off, signed out) instead of crashing the app at
+// every start: the backup may fail, the app may not (backend.md). The keys are in another file.
+private val Context.backendStore by preferencesDataStore(
+    "backend",
+    corruptionHandler = ReplaceFileCorruptionHandler { emptyPreferences() },
+)
 
 /**
  * What the app keeps for the backend besides the keys (A-7): the switch, the session and whether

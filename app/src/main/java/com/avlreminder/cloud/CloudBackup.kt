@@ -206,7 +206,8 @@ class CloudBackup(
             }
             val phase = runCatching { current() }.getOrElse { e ->
                 if (error == null) error = describe(e)
-                if (store.enabled()) CloudPhase.NotSetUp else CloudPhase.Off
+                // Even the switch may be unreadable here; the app must not crash over the backup.
+                if (runCatching { store.enabled() }.getOrDefault(false)) CloudPhase.NotSetUp else CloudPhase.Off
             }
             state.update { it.copy(phase = phase, error = error) }
         }
