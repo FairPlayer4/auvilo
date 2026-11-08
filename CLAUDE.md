@@ -45,6 +45,7 @@ Strenge und invasive Mechanismen sind gewollt. Kommunikation auf **Deutsch, mit 
 - Ohne Rückfrage erlaubt: lesende Geräteinfos, App installieren/deinstallieren, Logs
   lesen, App-Berechtigungen setzen. Alles andere vorher fragen, auch `logcat -c`.
 - Immer `adb install -r`, **nie vorher deinstallieren** (sonst sind Kevins Daten weg).
+- Starten mit `adb shell am start -n com.avlreminder/.ui.MainActivity`, **nie mit `adb shell monkey`** (schaltet die Auto-Rotation ein, 2026-11-08).
 - Bei Gerätetests genau sagen, wann Kevin sperren, entsperren oder etwas tun soll.
   Simulationen danach zurücksetzen.
 - Diagnose: `adb exec-out run-as com.avlreminder cat files/diag/diag.log` und
