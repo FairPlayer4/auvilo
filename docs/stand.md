@@ -124,7 +124,9 @@ Stand: 2026-11-08. Bei jedem größeren Schritt aktualisieren.
    `CloudLog` und *Diagnose senden* (siehe backup-entwurf.md, Schritt 3). Gerätetest nach
    der Installation: einmal sichern (Größe und Dauer stehen im Logger), dann Diagnose
    senden und mit `werkzeuge/diagnose-holen.sh` im Backend lesen.
-   **Schritt 4 gebaut** am 2026-11-08 (noch nicht installiert, mit dem Netzfehler-Fix):
+   **Schritt 4 gebaut** am 2026-11-08, **installiert** am 2026-11-08 um 23:06 mit dem
+   Netzfehler-Fix (Alarme vorher und nachher 167, Job `CloudBackupWorker` geplant;
+   Bestätigung im Diagnose-Log steht aus):
    stündlich per WorkManager (`CloudWorker.kt`), nur mit Netz und nur, wenn sich der SHA-256
    der Nutzlast geändert hat; startet nach der ersten Sicherung von Hand, endet mit
    Ausschalten und Zurücksetzen. Hat ein anderes Gerät zuletzt gesichert, bleibt dessen
@@ -132,6 +134,11 @@ Stand: 2026-11-08. Bei jedem größeren Schritt aktualisieren.
    fragt dann wie bisher. Nach 3 Tagen ohne aktuelle Sicherung kommt einmal ein Hinweis.
    Dazu Android Lint in der CI (Baseline) aus der CI-Sitzung. Gerätetest nach der
    Installation: siehe backup-entwurf.md, Schritt 4.
+   **Schritt 5 entworfen** am 2026-11-08 (noch nicht bestätigt):
+   [wiederherstellen-entwurf.md](wiederherstellen-entwurf.md) mit *Sicherung prüfen* ohne
+   Ersetzen, Wiederherstellen über eine Prüfdatei, Bewertung der Idee mehrerer Datenbanken
+   und Vorschlägen gegen Datenverlust (R-1 bis R-5). Als Nächstes: manuelle Sicherung der
+   Datenbank vom S24 (R-5), dann Kevins Antworten auf die Fragen im Entwurf.
 3. **Play-Store-Release** ohne Eile, erst wenn die App „fertig“ ist (mindestens bis V2);
    dafür Transparenz, Notausschalter (in V1.3a), Backend nur nach Einschalten (7.28 PS5–PS9).
 
