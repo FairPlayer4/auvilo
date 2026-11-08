@@ -79,7 +79,8 @@ object WifiProbe {
             connectedBssid = info?.bssid,
             source = source,
             wifiOn = wifi.isWifiEnabled,
-            scanAlways = runCatching { wifi.isScanAlwaysAvailable }.getOrDefault(false),
+            // Deprecated without a replacement for apps; the probe only logs it for diagnosis.
+            scanAlways = runCatching { @Suppress("DEPRECATION") wifi.isScanAlwaysAvailable }.getOrDefault(false),
             locationOn = context.getSystemService(LocationManager::class.java).isLocationEnabled,
             scan = scan,
         )

@@ -59,7 +59,7 @@ class AlarmGlueTest {
         val port = AndroidAlarmPort(context)
         // Without the WLAN probe's tick (debug build, elapsed-time alarm); the overview from the
         // app start is already planned, so count what the port adds.
-        fun reminderAlarms() = shadowOf(alarmManager).scheduledAlarms.filter { it.type != AlarmManager.ELAPSED_REALTIME_WAKEUP }
+        fun reminderAlarms() = shadowOf(alarmManager).scheduledAlarms.filter { it.getType() != AlarmManager.ELAPSED_REALTIME_WAKEUP }
         val before = reminderAlarms().size
         port.set(1, at, AlarmKind.ALARM_CLOCK)
         assertEquals(at.toEpochMilli(), alarmManager.nextAlarmClock?.triggerTime)

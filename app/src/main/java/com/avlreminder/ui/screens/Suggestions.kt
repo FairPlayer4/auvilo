@@ -1,5 +1,6 @@
 package com.avlreminder.ui.screens
 
+import android.content.ClipData
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
@@ -23,15 +24,16 @@ import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.focus.FocusRequester
 import androidx.compose.ui.focus.focusRequester
-import androidx.compose.ui.platform.LocalClipboardManager
+import androidx.compose.ui.platform.ClipEntry
+import androidx.compose.ui.platform.LocalClipboard
 import androidx.compose.ui.platform.testTag
-import androidx.compose.ui.text.AnnotatedString
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
@@ -43,6 +45,7 @@ import com.avlreminder.ui.EntryCard
 import com.avlreminder.ui.SectionTitle
 import com.avlreminder.ui.TextKeyboard
 import com.avlreminder.ui.theme.Avl
+import kotlinx.coroutines.launch
 import java.time.ZoneId
 
 /** The light bulb that opens [SuggestionDialog]; on every screen (Anf. 7.24, VV1). */
@@ -104,7 +107,8 @@ fun SuggestionsScreen(
     modifier: Modifier = Modifier,
 ) {
     val c = Avl.colors
-    val clipboard = LocalClipboardManager.current
+    val clipboard = LocalClipboard.current
+    val scope = rememberCoroutineScope()
     var showClosed by rememberSaveable { mutableStateOf(false) }
     var editing by remember { mutableStateOf<SuggestionEntity?>(null) }
     var copied by remember { mutableStateOf(false) }
@@ -121,7 +125,8 @@ fun SuggestionsScreen(
                 item {
                     Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                         OutlinedButton(onClick = {
-                            clipboard.setText(AnnotatedString(SuggestionExport.markdown(suggestions, zone)))
+                            val text = SuggestionExport.markdown(suggestions, zone)
+                            scope.launch { clipboard.setClipEntry(ClipEntry(ClipData.newPlainText("Verbesserungen", text))) }
                             copied = true
                         }) { Text("Alle offenen kopieren") }
                         OutlinedButton(onClick = { onShare(SuggestionExport.markdown(suggestions, zone)) }) { Text("Teilen") }
