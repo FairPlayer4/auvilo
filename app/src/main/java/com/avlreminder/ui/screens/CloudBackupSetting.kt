@@ -98,6 +98,17 @@ fun CloudBackupSetting(status: CloudStatus, actions: CloudActions) {
                     phase.lastBackup?.let { "Zuletzt gesichert: ${shortTime(it)}" } ?: "Noch nicht gesichert",
                     Modifier.padding(top = 4.dp).testTag("cloudLastBackup"), color = c.text, fontSize = 14.sp,
                 )
+                when {
+                    phase.paused -> Text(
+                        "Automatisches Sichern pausiert: Ein anderes Gerät hat zuletzt gesichert. „Jetzt sichern“ fragt, " +
+                            "ob seine Sicherung ersetzt werden soll.",
+                        Modifier.testTag("cloudPaused"), color = c.strict, fontSize = 13.sp,
+                    )
+                    phase.automatic -> Text(
+                        "Sichert stündlich von selbst, wenn sich etwas geändert hat und Netz da ist.",
+                        Modifier.testTag("cloudAutomatic"), color = c.muted, fontSize = 13.sp,
+                    )
+                }
                 if (phase.unlocked) {
                     Row(Modifier.padding(top = 4.dp), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                         Button(onClick = actions::backUp, Modifier.testTag("cloudBackUp")) { Text("Jetzt sichern") }

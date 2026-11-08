@@ -50,10 +50,16 @@ class MainActivity : ComponentActivity() {
     companion object {
         private const val EXTRA_NEW = "new"
         private const val EXTRA_EDIT = "edit"
+        private const val EXTRA_SETTINGS = "settings"
 
         /** Opens "Neuer Reminder" directly (widget). */
         fun newReminder(context: Context): Intent =
             Intent(context, MainActivity::class.java).putExtra(EXTRA_NEW, true)
+                .addFlags(Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_CLEAR_TOP)
+
+        /** Opens the settings (tap on a notification of the cloud backup). */
+        fun openSettings(context: Context): Intent =
+            Intent(context, MainActivity::class.java).putExtra(EXTRA_SETTINGS, true)
                 .addFlags(Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_CLEAR_TOP)
 
         /** Opens a reminder's form (tap on the notice before it). */
@@ -154,6 +160,11 @@ class MainActivity : ComponentActivity() {
         if (intent?.getBooleanExtra(EXTRA_NEW, false) == true) {
             intent.removeExtra(EXTRA_NEW)
             startRoute = Routes.CHOOSE
+            launch++
+        }
+        if (intent?.getBooleanExtra(EXTRA_SETTINGS, false) == true) {
+            intent.removeExtra(EXTRA_SETTINGS)
+            startRoute = Routes.SETTINGS
             launch++
         }
         val edit = intent?.getLongExtra(EXTRA_EDIT, 0L) ?: 0L

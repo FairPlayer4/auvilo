@@ -21,6 +21,7 @@ enum class CloudEvent(val area: String, val id: String, val level: LogLevel) {
     FAILED("cloud", "fehlgeschlagen", LogLevel.WARN),
     BACKED_UP("sicherung", "gesichert", LogLevel.INFO),
     OTHER_DEVICE("sicherung", "anderes_geraet", LogLevel.WARN),
+    STALE("sicherung", "veraltet", LogLevel.WARN),
     DIAGNOSIS_SENT("diagnose", "gesendet", LogLevel.INFO),
 }
 

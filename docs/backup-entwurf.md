@@ -105,7 +105,31 @@ Schlüssel-Backup löschen, Testgeräte sperren); dann richtet die App **neue** 
      und Ereignisse nach formate.md, erst nach einer Rückfrage; `diag.log` bleibt davon
      getrennt. Der Server nimmt sie nur an, wenn die Konto-ID in `diagnose_konten` steht
      (Backend `infra/diagnose.tf`, E-D-3).
-4. **Automatisch** (WorkManager, Hash, zweites Gerät, Hinweis nach 3 Tagen).
+4. **Automatisch** (WorkManager, Hash, zweites Gerät, Hinweis nach 3 Tagen). Umgesetzt am
+   2026-11-08 (`CloudWorker.kt`, `CloudBackup.backUpAutomatically`):
+   - Stündlich (`PeriodicWorkRequest`, eindeutig `cloud-backup`, `KEEP`), nur mit Netz. Der
+     Takt startet, sobald das Gerät eingerichtet und freigeschaltet ist und einmal von Hand
+     gesichert hat; Ausschalten und *Zurücksetzen* beenden ihn. Der Worker endet immer mit
+     Erfolg: Ein Fehler wird zur nächsten Stunde wiederholt, nicht mit dem Backoff von
+     WorkManager (A-13).
+   - Die Nutzlast wird jede Stunde gebaut; ist ihr SHA-256 gleich dem der letzten Sicherung
+     (DataStore `backend`), geht nichts ans Netz.
+   - **Ergänzung zu A-10:** Die Benachrichtigung fragt nicht selbst. Trifft das automatische
+     Sichern auf die Sicherung eines anderen Geräts, bleibt diese, und das automatische
+     Sichern ruht sofort (`GemerkteSicherung.abgelehnt`, wie nach einem „Nein“). Eine
+     Benachrichtigung „Cloud-Backup pausiert“ führt in die Einstellungen; dort steht
+     „Automatisches Sichern pausiert“, und *Jetzt sichern* fragt wie in Schritt 3. Warum:
+     Knöpfe in der Benachrichtigung bräuchten den Entscheid ohne Datum und Gerät vor Augen,
+     und bis zur Antwort fragte jede Stunde den Server erneut (Tageslimit).
+   - Hinweis nach 3 Tagen (A-13): Gezählt wird ab dem letzten Zeitpunkt, an dem die
+     Sicherung die Daten dieses Geräts enthielt (hochgeladen oder unverändert). Er kommt
+     einmal und verschwindet mit der nächsten Sicherung. Ohne Netz läuft der Worker nicht;
+     dann kommt der Hinweis erst, wenn wieder Netz da ist.
+   - Logger: `gesichert` und `anderes_geraet` haben das Feld `automatisch`, neu ist
+     `veraltet` (Feld `tage`). Unveränderte Stunden werden nicht geloggt.
+   - Gerätetest: nach einer Änderung (z. B. Reminder abhaken) höchstens eine Stunde warten,
+     „Zuletzt gesichert“ ist weitergerückt; ohne Änderung bleibt es stehen (im Server-Log
+     zu sehen). `adb shell dumpsys jobscheduler | grep -A3 com.avlreminder` zeigt den Job.
 5. **Wiederherstellen und Löschen.** Gerätetest auf einem zweiten Gerät oder Emulator,
    nicht durch Neuinstallation auf dem S24 (dort nie deinstallieren).
 6. Danach: *Pfeffer offline sichern* im Backend (Kevin), Review-Lauf.

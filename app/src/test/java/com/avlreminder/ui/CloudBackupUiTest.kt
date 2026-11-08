@@ -1,7 +1,11 @@
 package com.avlreminder.ui
 
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.test.assertIsNotEnabled
-import androidx.compose.ui.test.junit4.createComposeRule
+import androidx.compose.ui.test.junit4.v2.createComposeRule
+import androidx.compose.ui.test.onAllNodesWithTag
 import androidx.compose.ui.test.onNodeWithTag
 import androidx.compose.ui.test.onNodeWithText
 import androidx.compose.ui.test.performClick
@@ -191,5 +195,25 @@ class CloudBackupUiTest {
         compose.onNodeWithTag("cloudKeep").performClick()
         compose.onNodeWithTag("cloudOverwrite").performClick()
         assertEquals(listOf("overwrite false", "overwrite true"), actions.calls)
+    }
+
+    // Step 4: the status says whether it backs up by itself, or rests because of another device.
+    @Test
+    fun theStatusSaysWhetherItBacksUpByItself() {
+        val at = Instant.parse("2026-11-08T10:00:00Z")
+        var shown by mutableStateOf(CloudStatus(CloudPhase.Off))
+        compose.setContent { AvlTheme(dark = false) { CloudBackupSetting(shown, Recorder()) } }
+        for ((case, phase, tag) in listOf(
+            Triple("noch nie von Hand gesichert", CloudPhase.Ready("konto-1", "geraet-1", "AB12", unlocked = true), null),
+            Triple("stündlich", CloudPhase.Ready("konto-1", "geraet-1", "AB12", unlocked = true, lastBackup = at), "cloudAutomatic"),
+            Triple("pausiert", CloudPhase.Ready("konto-1", "geraet-1", "AB12", unlocked = true, lastBackup = at, paused = true), "cloudPaused"),
+            Triple("nicht freigeschaltet", CloudPhase.Ready("konto-1", "geraet-1", "AB12", unlocked = false, lastBackup = at), null),
+        )) {
+            shown = CloudStatus(phase)
+            compose.waitForIdle()
+            for (t in listOf("cloudAutomatic", "cloudPaused")) {
+                assertEquals("$case: $t", if (t == tag) 1 else 0, compose.onAllNodesWithTag(t).fetchSemanticsNodes().size)
+            }
+        }
     }
 }

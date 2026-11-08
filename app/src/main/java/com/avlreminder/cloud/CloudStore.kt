@@ -33,6 +33,9 @@ class CloudStore(private val context: Context) : SitzungsAblage {
     private val unlockedKey = booleanPreferencesKey("unlocked")
     private val lastBackupKey = longPreferencesKey("lastBackupUnix")
     private val lastBackupAccountKey = stringPreferencesKey("lastBackupAccount")
+    private val hashKey = stringPreferencesKey("lastBackupHash")
+    private val currentKey = longPreferencesKey("currentUnix")
+    private val staleNoticeKey = booleanPreferencesKey("staleNoticeShown")
 
     private suspend fun prefs() = context.backendStore.data.first()
 
@@ -56,11 +59,50 @@ class CloudStore(private val context: Context) : SitzungsAblage {
         return if (p[lastBackupAccountKey] == account) p[lastBackupKey] else null
     }
 
-    suspend fun setLastBackup(account: String, unix: Long) {
+    /**
+     * [account] backed up at [unix]; [hash] is the SHA-256 of what went up, so the automatic
+     * backup can skip an unchanged payload (A-9). The backup is current from then on.
+     */
+    suspend fun setLastBackup(account: String, unix: Long, hash: String) {
         context.backendStore.edit {
             it[lastBackupAccountKey] = account
             it[lastBackupKey] = unix
+            it[hashKey] = hash
+            it[currentKey] = unix
+            it.remove(staleNoticeKey)
         }
+    }
+
+    /** The SHA-256 of the last payload [account] uploaded from here. */
+    suspend fun lastHash(account: String): String? {
+        val p = prefs()
+        return if (p[lastBackupAccountKey] == account) p[hashKey] else null
+    }
+
+    /**
+     * When the backup of [account] last held this device's data: uploaded, or the data were
+     * unchanged since. The notice after 3 days (A-13) counts from here.
+     */
+    suspend fun current(account: String): Long? {
+        val p = prefs()
+        return if (p[lastBackupAccountKey] == account) p[currentKey] ?: p[lastBackupKey] else null
+    }
+
+    /** The data of [account] are unchanged since its last backup, checked at [unix]. */
+    suspend fun setCurrent(account: String, unix: Long) {
+        context.backendStore.edit {
+            if (it[lastBackupAccountKey] == account) {
+                it[currentKey] = unix
+                it.remove(staleNoticeKey)
+            }
+        }
+    }
+
+    /** Whether the notice "no backup for 3 days" was shown since the backup was last current. */
+    suspend fun staleNoticeShown(): Boolean = prefs()[staleNoticeKey] == true
+
+    suspend fun setStaleNoticeShown() {
+        context.backendStore.edit { it[staleNoticeKey] = true }
     }
 
     override suspend fun lesen(): Sitzung? {

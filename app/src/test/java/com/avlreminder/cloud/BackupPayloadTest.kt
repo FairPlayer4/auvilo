@@ -7,13 +7,17 @@ import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
 import org.junit.Assert.assertNull
 import org.junit.Assert.assertThrows
+import org.junit.Assert.assertTrue
 import org.junit.Rule
 import org.junit.Test
 import org.junit.rules.TemporaryFolder
 import org.junit.runner.RunWith
+import java.io.ByteArrayInputStream
 import java.io.ByteArrayOutputStream
 import java.io.File
+import java.time.Instant
 import java.util.zip.ZipEntry
+import java.util.zip.ZipInputStream
 import java.util.zip.ZipOutputStream
 
 /** The payload of a backup (A-8) and what the device remembers about its backups. */
@@ -36,12 +40,16 @@ class BackupPayloadTest {
         assertEquals(contents.settings, back.settings)
     }
 
-    // KRITISCH: same data, same bytes (the automatic backup compares them in step 4).
+    // KRITISCH: same data, same bytes (the automatic backup compares their hash, step 4). The
+    // entries carry no time of packing; with today's time, a later backup would differ.
     @Test
     fun theSameDataGiveTheSameBytesLater() {
         val first = BackupZip.pack(contents)
-        Thread.sleep(2100) // ZIP times have 2 s steps; a changing time would show now
         assertArrayEquals(first, BackupZip.pack(BackupContents(contents.database.copyOf(), contents.settings)))
+        ZipInputStream(ByteArrayInputStream(first)).use { zip ->
+            val year2000 = Instant.parse("2000-01-01T00:00:00Z").toEpochMilli()
+            generateSequence { zip.nextEntry }.forEach { assertTrue(it.name, it.time < year2000) }
+        }
     }
 
     @Test

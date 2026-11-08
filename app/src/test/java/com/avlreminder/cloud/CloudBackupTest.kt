@@ -57,6 +57,7 @@ import org.junit.rules.TemporaryFolder
 import org.junit.runner.RunWith
 import org.robolectric.Robolectric
 import java.io.ByteArrayInputStream
+import java.time.Duration
 import java.time.Instant
 import java.util.zip.GZIPInputStream
 
@@ -163,7 +164,24 @@ class CloudBackupTest {
     private var googleError: Throwable? = null
     private val local = mutableMapOf<String, LokalerStand>()
     private val remembered = mutableMapOf<String, GemerkteSicherung>()
-    private val payload = "die Daten".toByteArray()
+    private var payload = "die Daten".toByteArray()
+    private var now = Instant.parse("2026-11-08T12:00:00Z")
+
+    /** The hourly backup: how often it was started and stopped. */
+    private val schedule = object : CloudSchedule {
+        var starts = 0
+        var stops = 0
+        override fun start() { starts++ }
+        override fun stop() { stops++ }
+    }
+
+    /** The notifications of the automatic backup, as text. */
+    private val notices = object : CloudNotices {
+        val shown = mutableListOf<String>()
+        override fun otherDevice(created: Instant) { shown += "otherDevice $created" }
+        override fun stale(lastBackup: Instant) { shown += "stale $lastBackup" }
+        override fun clear() { shown.clear() }
+    }
     private var payloadReads = 0
 
     @get:Rule val tmp = TemporaryFolder()
@@ -203,7 +221,10 @@ class CloudBackupTest {
         },
         source = { payloadReads++; payload },
         events = events,
+        schedule = schedule,
+        notices = notices,
         log = { logged += it },
+        clock = { now },
     )
 
     /** The password service; by default the phone has none (as the older tests assume). */
@@ -833,8 +854,199 @@ class CloudBackupTest {
 
     @Test
     fun theLastBackupOfAnotherAccountIsNotShown() = blocking {
-        store.setLastBackup("konto-2", 1_700_000_000)
+        store.setLastBackup("konto-2", 1_700_000_000, "hash")
         assertNull(store.lastBackup(account))
         assertEquals(1_700_000_000L, store.lastBackup("konto-2"))
+    }
+
+    // --- Step 4: the hourly backup (A-9, A-10, A-13) ---
+
+    private fun auto(cloud: CloudBackup) = blocking { cloud.backUpAutomatically() }
+
+    /** Another device backs up over this one's backup: higher counter, next server version. */
+    private fun anotherDeviceBacksUpOver(created: Instant) {
+        val before = requireNotNull(server.data)
+        val c = Datensicherung.verschluesseln(
+            Sicherung(Sicherungskopf(onServer().kopf.zaehler + 1, created, "geraet-2", 8), "fremd".toByteArray()),
+            local.getValue(account).bund.tresor,
+            account,
+        )
+        server.data = GeholteSicherung(c, before.version + 1)
+    }
+
+    // KRITISCH: the hourly backup touches nothing unless it may: switched on, set up, unlocked and
+    // backed up by hand once.
+    @Test
+    fun theAutomaticBackupDoesNothingUnlessItMay() {
+        val cases = listOf<Pair<String, (CloudBackup) -> Unit>>(
+            "ausgeschaltet" to { _ -> },
+            "eingeschaltet, nicht angemeldet" to { c -> blocking { c.setEnabled(true).join() } },
+            "eingerichtet, noch nie von Hand gesichert" to { c -> ready(c) },
+            "nicht freigeschaltet" to { c ->
+                ready(c)
+                blocking { c.backUp().join() }
+                blocking { store.setUnlocked(false) }
+            },
+            "von Hand gesichert, dann ausgeschaltet" to { c ->
+                ready(c)
+                blocking { c.backUp().join() }
+                blocking { c.setEnabled(false).join() }
+            },
+        )
+        for ((case, prepare) in cases) {
+            blocking { store.clear() }
+            local.clear()
+            remembered.clear()
+            server.data = null
+            server.backup = null
+            val cloud = cloud()
+            prepare(cloud)
+            val servers = serversCreated
+            val reads = payloadReads
+            val before = server.data
+            payload = "geändert $case".toByteArray()
+            auto(cloud)
+            assertEquals(case, servers, serversCreated)
+            assertEquals(case, reads, payloadReads)
+            assertEquals(case, before, server.data)
+        }
+    }
+
+    // KRITISCH: unchanged data are not uploaded again (A-9); changed ones are.
+    @Test
+    fun theAutomaticBackupUploadsOnlyChangedData() {
+        val cloud = cloud()
+        ready(cloud)
+        blocking { cloud.backUp().join() }
+        val first = server.data
+        now = now.plusSeconds(3600)
+        auto(cloud)
+        assertEquals(first, server.data)
+        assertEquals(Instant.parse("2026-11-08T12:00:00Z"), (cloud.status.value.phase as CloudPhase.Ready).lastBackup)
+
+        payload = "neue Daten".toByteArray()
+        now = now.plusSeconds(3600)
+        auto(cloud)
+        assertTrue(onServer().nutzlast.contentEquals(payload))
+        assertEquals(2L, onServer().kopf.zaehler)
+        assertEquals(now, (cloud.status.value.phase as CloudPhase.Ready).lastBackup)
+        val backedUp = events().filter { it.getString("ereignis") == "gesichert" }.map { it.getJSONObject("felder").getBoolean("automatisch") }
+        assertEquals(listOf(false, true), backedUp)
+    }
+
+    // KRITISCH: another device's backup is never replaced without the person (E-B2b-6); the
+    // automatic backup rests, says so once and does not ask the server again every hour.
+    @Test
+    fun anotherDevicesBackupMakesTheAutomaticBackupRest() {
+        val cloud = cloud()
+        ready(cloud)
+        blocking { cloud.backUp().join() }
+        val created = Instant.parse("2026-11-08T12:30:00Z")
+        anotherDeviceBacksUpOver(created)
+        val theirs = server.data
+        payload = "neue Daten".toByteArray()
+        auto(cloud)
+        assertEquals(theirs, server.data)
+        assertEquals(listOf("otherDevice $created"), notices.shown)
+        assertTrue((cloud.status.value.phase as CloudPhase.Ready).paused)
+        assertNull(cloud.status.value.error)
+
+        val servers = serversCreated
+        val reads = payloadReads
+        auto(cloud)
+        assertEquals(servers, serversCreated)
+        assertEquals(reads, payloadReads)
+        assertEquals(1, notices.shown.size)
+
+        // By hand it asks; on yes it backs up from here again and the rest ends.
+        val job = cloud.backUp()
+        cloud.awaitPhase(CloudPhase.AskOverwrite::class.java)
+        cloud.answerOverwrite(true)
+        blocking { job.join() }
+        val phase = cloud.status.value.phase as CloudPhase.Ready
+        assertFalse(phase.paused)
+        assertTrue(phase.automatic)
+        assertEquals("geraet-1", onServer().kopf.geraetId)
+        assertTrue(notices.shown.isEmpty())
+    }
+
+    // A-13: an outage only shows as status; the next hour tries again.
+    @Test
+    fun aFailedAutomaticBackupOnlyShowsAsStatus() {
+        val cloud = cloud()
+        ready(cloud)
+        blocking { cloud.backUp().join() }
+        payload = "neue Daten".toByteArray()
+        server.sessionError = Serverfehler(ConnectException(Code.UNAVAILABLE), vomDienst = false)
+        auto(cloud)
+        assertTrue(cloud.status.value.error.orEmpty(), cloud.status.value.error.orEmpty().contains("nicht erreichbar"))
+        assertEquals("AUTO_BACKUP", events().last().getJSONObject("felder").getString("schritt"))
+        assertTrue(notices.shown.isEmpty())
+
+        server.sessionError = null
+        auto(cloud)
+        assertNull(cloud.status.value.error)
+        assertTrue(onServer().nutzlast.contentEquals(payload))
+    }
+
+    // A-13: after 3 days without a current backup a notice comes, once; unchanged data count as current.
+    @Test
+    fun theNoticeComesAfterThreeDaysWithoutACurrentBackup() {
+        val cloud = cloud()
+        ready(cloud)
+        blocking { cloud.backUp().join() }
+        val backedUp = now
+
+        // Unchanged for 4 days: the backup is current, no notice.
+        now = now.plus(Duration.ofDays(4))
+        auto(cloud)
+        assertTrue(notices.shown.isEmpty())
+
+        // Changed, but the server is out: just under 3 days no notice, after that one.
+        payload = "neue Daten".toByteArray()
+        server.sessionError = SicherungTageslimit()
+        val unchangedUntil = now
+        now = unchangedUntil.plus(Duration.ofDays(3))
+        auto(cloud)
+        assertTrue(notices.shown.isEmpty())
+        now = unchangedUntil.plus(Duration.ofDays(3)).plusSeconds(3600)
+        auto(cloud)
+        assertEquals(listOf("stale $backedUp"), notices.shown)
+        now = now.plusSeconds(3600)
+        auto(cloud)
+        assertEquals(1, notices.shown.size)
+        assertEquals(1, events().count { it.getString("ereignis") == "veraltet" })
+
+        // Backed up again: the notice goes.
+        server.sessionError = null
+        auto(cloud)
+        assertTrue(notices.shown.isEmpty())
+        assertFalse(blocking { store.staleNoticeShown() })
+    }
+
+    // KRITISCH: the hourly rhythm runs only after the first backup by hand; switching off and
+    // resetting stop it.
+    @Test
+    fun theScheduleRunsOnlyWhileTheAutomaticBackupMay() {
+        val cloud = cloud()
+        ready(cloud)
+        blocking { cloud.load().join() }
+        assertEquals(0, schedule.starts)
+
+        blocking { cloud.backUp().join() }
+        assertEquals(1, schedule.starts)
+        blocking { cloud.load().join() } // app start
+        assertEquals(2, schedule.starts)
+
+        blocking { cloud.setEnabled(false).join() }
+        assertEquals(1, schedule.stops)
+        assertEquals(2, schedule.starts)
+
+        blocking { cloud.setEnabled(true).join() }
+        assertEquals(3, schedule.starts)
+        blocking { cloud.reset().join() }
+        assertEquals(2, schedule.stops)
+        assertEquals(CloudPhase.Off, cloud.status.value.phase)
+        assertEquals(3, schedule.starts)
     }
 }

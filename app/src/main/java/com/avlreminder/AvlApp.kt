@@ -15,6 +15,7 @@ import com.avlreminder.alarm.PreNotices
 import com.avlreminder.alarm.Ringer
 import com.avlreminder.core.model.Place
 import com.avlreminder.claude.ClaudeApi
+import com.avlreminder.cloud.AndroidCloudNotices
 import com.avlreminder.cloud.AppBackupSource
 import com.avlreminder.cloud.BackupStateFile
 import com.avlreminder.cloud.CloudBackup
@@ -27,6 +28,7 @@ import com.avlreminder.cloud.CredentialManagerSignIn
 import com.avlreminder.cloud.KeyFile
 import com.avlreminder.cloud.KeystoreDeviceKey
 import com.avlreminder.cloud.KeystoreSealer
+import com.avlreminder.cloud.WorkManagerSchedule
 import com.avlreminder.cloud.deleteBackendKeystoreEntries
 import com.avlreminder.verbindung.Verbindung
 import java.io.File
@@ -74,6 +76,7 @@ class AvlApp : Application() {
         OverviewNotifications.createChannel(this)
         PreNotices.createChannel(this)
         AlarmPause.createChannel(this)
+        AndroidCloudNotices.createChannel(this)
         // WLAN device test before 7.29, debug build only (design.md *Entwurf 7.29*).
         if (graph.debuggable) runCatching { WifiProbe.start(this) }
         // Alarms may have been lost (reboot, force-stop, update): rebuild them from the database.
@@ -129,6 +132,8 @@ class AppGraph(private val context: Context) : ClaudeApi.Access {
         backupState = { account -> BackupStateFile(File(context.filesDir, "backend"), account) },
         source = AppBackupSource(db, settings, context.cacheDir),
         events = CloudLog(File(context.filesDir, "cloud-diag"), header = ::diagnosisHeader),
+        schedule = WorkManagerSchedule(context, Diag::log),
+        notices = AndroidCloudNotices(context),
         log = Diag::log,
     )
 

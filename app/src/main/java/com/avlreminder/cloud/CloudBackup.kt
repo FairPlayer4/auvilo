@@ -27,6 +27,7 @@ import com.avlreminder.protokoll.Sicherungsablauf
 import com.avlreminder.protokoll.SicherungsAblage
 import com.avlreminder.protokoll.SicherungsStand
 import com.avlreminder.protokoll.Sicherungskopf
+import com.avlreminder.protokoll.SymmetrischerSchluessel
 import com.avlreminder.protokoll.VersionVeraltet
 import com.avlreminder.verbindung.Angemeldet
 import com.avlreminder.verbindung.Anmeldung
@@ -53,6 +54,7 @@ import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.sync.Mutex
 import java.io.IOException
+import java.security.MessageDigest
 import java.time.Duration
 import java.time.Instant
 import java.util.concurrent.atomic.AtomicBoolean
@@ -88,7 +90,8 @@ sealed interface CloudPhase {
 
     /**
      * Set up. [fingerprint] of the person key, to compare with another device; [lastBackup]: when
-     * this device last backed up, null = not yet.
+     * this device last backed up, null = not yet. [paused]: another device backs up and the
+     * automatic backup rests until the person backs up by hand (A-10).
      */
     data class Ready(
         val account: String,
@@ -96,7 +99,11 @@ sealed interface CloudPhase {
         val fingerprint: String,
         val unlocked: Boolean,
         val lastBackup: Instant? = null,
-    ) : CloudPhase
+        val paused: Boolean = false,
+    ) : CloudPhase {
+        /** The hourly backup runs: unlocked and backed up by hand once (A-9). */
+        val automatic get() = unlocked && lastBackup != null
+    }
 }
 
 /** [notes]: what the setup told the person; [error]: why the last step failed. */
@@ -131,6 +138,26 @@ interface CloudServer {
     suspend fun lock(token: String, device: String)
 }
 
+/** Starts and stops the hourly backup (WorkManager); replaced in tests. */
+interface CloudSchedule {
+    /** Starts it; already running, it keeps its rhythm. */
+    fun start()
+
+    fun stop()
+}
+
+/** The two notifications of the automatic backup (A-10, A-13); replaced in tests. */
+interface CloudNotices {
+    /** Another device backed up last ([created]); the automatic backup rests. */
+    fun otherDevice(created: Instant)
+
+    /** The backup has not held this device's data for over 3 days; [lastBackup] = last upload. */
+    fun stale(lastBackup: Instant)
+
+    /** Both are done with (backed up by hand). */
+    fun clear()
+}
+
 /** [CloudServer] over Connect ([Verbindung], from the backend's `verbindung`). */
 class ConnectCloudServer(private val verbindung: Verbindung, key: Geraeteschluessel, sessions: SitzungsAblage) : CloudServer {
     private val anmeldung = Anmeldung(verbindung, key, sessions)
@@ -163,6 +190,8 @@ class ConnectCloudServer(private val verbindung: Verbindung, key: Geraeteschlues
  * @param backupState what this device remembers about the backups of an account.
  * @param source the app's data for a backup.
  * @param events the backend logger, the only thing [sendDiagnosis] sends.
+ * @param schedule the hourly backup; runs only while [CloudPhase.Ready.automatic].
+ * @param notices the notifications of the automatic backup.
  */
 class CloudBackup(
     private val store: CloudStore,
@@ -175,6 +204,8 @@ class CloudBackup(
     private val backupState: (account: String) -> SicherungsStand,
     private val source: BackupSource,
     private val events: CloudLog,
+    private val schedule: CloudSchedule,
+    private val notices: CloudNotices,
     private val log: (String) -> Unit = {},
     private val clock: () -> Instant = Instant::now,
 ) {
@@ -195,6 +226,7 @@ class CloudBackup(
 
     fun setEnabled(on: Boolean): Job = work(CloudStep.SWITCH) {
         store.setEnabled(on)
+        if (!on) schedule.stop()
         events.record(if (on) CloudEvent.SWITCHED_ON else CloudEvent.SWITCHED_OFF)
         log("cloud: ${if (on) "on" else "off"}")
     }
@@ -267,33 +299,121 @@ class CloudBackup(
         busy("Sichern …")
         val started = clock()
         val payload = source.payload()
-        val server = server()
-        val session = server.session()
-        if (session.kontoId != known.kontoId) error("Die Sitzung gehört zu einem anderen Konto")
-        val result = Sicherungsablauf(
-            session.kontoId,
-            session.geraetId,
-            local.bund.tresor,
-            server.dataBackups(session.token),
-            backupState(session.kontoId),
-            uebernehmen = ::askOverwrite,
-            uhr = clock,
-        ).sichern(payload, AvlDatabase.VERSION, automatisch = false)
-        when (result) {
+        when (val result = upload(known.kontoId, local.bund.tresor, payload, automatic = false, ask = ::askOverwrite)) {
             is Gesichert.Ja -> {
-                store.setLastBackup(session.kontoId, clock().epochSecond)
-                val ms = Duration.between(started, clock()).toMillis()
-                events.record(CloudEvent.BACKED_UP, mapOf("kib" to kib(payload.size), "dauer_ms" to ms, "zaehler" to result.zaehler))
-                log("cloud: backed up (#${result.zaehler}, ${kib(payload.size)} KiB, $ms ms)")
+                notices.clear()
+                done(known.kontoId, payload, result, started, automatic = false)
             }
             is Gesichert.AnderesGeraet -> {
-                events.record(CloudEvent.OTHER_DEVICE, mapOf("zaehler" to result.kopf.zaehler))
+                events.record(CloudEvent.OTHER_DEVICE, mapOf("zaehler" to result.kopf.zaehler, "automatisch" to false))
                 log("cloud: not backed up, another device backed up last")
                 note("Nicht gesichert: Die Sicherung des anderen Geräts bleibt auf dem Server.")
             }
-            // Only the automatic backup rests (step 4); by hand it asks again.
+            // Only the automatic backup rests; by hand it asks again.
             Gesichert.Ruht -> Unit
         }
+    }
+
+    /**
+     * The hourly backup (backup-entwurf.md, step 4), called by the worker: like [backUp], but
+     * without anyone to ask. Afterwards it checks whether the backup is older than 3 days.
+     *
+     * KRITISCH:
+     *  - Switched off, not set up, not unlocked or never backed up by hand: nothing is read and
+     *    the network is not touched.
+     *  - Unchanged data (same SHA-256 as the last upload) are not uploaded (A-9); that spares the
+     *    daily limit and the battery.
+     *  - Did another device back up last, the backup of that device stays. The automatic backup
+     *    then rests and a notification says so, until the person backs up by hand (A-10); it does
+     *    not ask the server again every hour.
+     *  - Errors (no network, kill switch, limit) only show as status; the next try is an hour
+     *    later (A-13).
+     */
+    suspend fun backUpAutomatically() {
+        work(CloudStep.AUTO_BACKUP, clearNotes = false) { automatic() }.join()
+        try {
+            checkStale()
+        } catch (e: CancellationException) {
+            throw e
+        } catch (e: Throwable) {
+            log("cloud: stale check failed (${logDetail(e)})")
+        }
+    }
+
+    private suspend fun automatic() {
+        if (!store.enabled() || !store.unlocked()) return
+        val known = store.lesen() ?: return
+        val account = known.kontoId
+        if (store.lastBackup(account) == null) return
+        val local = keys(account).laden() ?: return
+        if (local.offenesBackup != null) return
+        // Resting: not even the data are read.
+        if (backupState(account).laden()?.abgelehnt == true) return
+        val started = clock()
+        val payload = source.payload()
+        if (sha256(payload) == store.lastHash(account)) {
+            store.setCurrent(account, clock().epochSecond)
+            return
+        }
+        busy("Sichern …")
+        when (val result = upload(account, local.bund.tresor, payload, automatic = true, ask = { false })) {
+            is Gesichert.Ja -> {
+                notices.clear()
+                done(account, payload, result, started, automatic = true)
+            }
+            is Gesichert.AnderesGeraet -> {
+                events.record(CloudEvent.OTHER_DEVICE, mapOf("zaehler" to result.kopf.zaehler, "automatisch" to true))
+                log("cloud: automatic backup rests, another device backed up last")
+                notices.otherDevice(result.kopf.erstellt)
+            }
+            Gesichert.Ruht -> Unit
+        }
+    }
+
+    /** Shows the notice once when the backup has not held this device's data for 3 days (A-13). */
+    private suspend fun checkStale() {
+        if (!store.enabled()) return
+        val known = store.lesen() ?: return
+        val current = Instant.ofEpochSecond(store.current(known.kontoId) ?: return)
+        if (store.staleNoticeShown()) return
+        val age = Duration.between(current, clock())
+        if (age <= STALE_AFTER) return
+        notices.stale(store.lastBackup(known.kontoId)?.let(Instant::ofEpochSecond) ?: current)
+        store.setStaleNoticeShown()
+        events.record(CloudEvent.STALE, mapOf("tage" to age.toDays()))
+        log("cloud: stale notice shown")
+    }
+
+    /** One upload through `Sicherungsablauf` (backend); [ask] answers "back up over another device?". */
+    private suspend fun upload(
+        account: String,
+        vault: SymmetrischerSchluessel,
+        payload: ByteArray,
+        automatic: Boolean,
+        ask: suspend (Sicherungskopf) -> Boolean,
+    ): Gesichert {
+        val server = server()
+        val session = server.session()
+        if (session.kontoId != account) error("Die Sitzung gehört zu einem anderen Konto")
+        return Sicherungsablauf(
+            session.kontoId,
+            session.geraetId,
+            vault,
+            server.dataBackups(session.token),
+            backupState(session.kontoId),
+            uebernehmen = ask,
+            uhr = clock,
+        ).sichern(payload, AvlDatabase.VERSION, automatisch = automatic)
+    }
+
+    private suspend fun done(account: String, payload: ByteArray, result: Gesichert.Ja, started: Instant, automatic: Boolean) {
+        store.setLastBackup(account, clock().epochSecond, sha256(payload))
+        val ms = Duration.between(started, clock()).toMillis()
+        events.record(
+            CloudEvent.BACKED_UP,
+            mapOf("kib" to kib(payload.size), "dauer_ms" to ms, "zaehler" to result.zaehler, "automatisch" to automatic),
+        )
+        log("cloud: backed up${if (automatic) " automatically" else ""} (#${result.zaehler}, ${kib(payload.size)} KiB, $ms ms)")
     }
 
     /**
@@ -352,6 +472,8 @@ class CloudBackup(
             }
         }
         busy("Auf dem Handy löschen …")
+        schedule.stop()
+        notices.clear()
         wipe()
         store.clear()
         events.record(CloudEvent.RESET, mapOf("server_geleert" to cleared))
@@ -436,6 +558,9 @@ class CloudBackup(
                 if (runCatching { store.enabled() }.getOrDefault(false)) CloudPhase.NotSetUp else CloudPhase.Off
             }
             state.update { it.copy(phase = phase, error = error) }
+            // KRITISCH: The hourly backup runs only while it may (switched on, set up, unlocked,
+            // backed up by hand once); switching off and resetting stop it.
+            if (phase is CloudPhase.Ready && phase.automatic) schedule.start()
         }
     }
 
@@ -451,6 +576,7 @@ class CloudBackup(
             local.bund.person.oeffentlich.fingerabdruck(),
             store.unlocked(),
             store.lastBackup(session.kontoId)?.let(Instant::ofEpochSecond),
+            paused = backupState(session.kontoId).laden()?.abgelehnt == true,
         )
     }
 
@@ -502,6 +628,13 @@ class CloudBackup(
 
     companion object {
         private fun kib(bytes: Int) = (bytes + 1023) / 1024
+
+        /** After this long without a current backup the notice comes (A-13). */
+        val STALE_AFTER: Duration = Duration.ofDays(3)
+
+        /** Same data, same hash: the ZIP has fixed entry times ([BackupZip]). */
+        fun sha256(bytes: ByteArray): String =
+            MessageDigest.getInstance("SHA-256").digest(bytes).joinToString("") { "%02x".format(it) }
 
         /** The fields of a [CloudEvent.FAILED]: only the step and the kind, no message. */
         fun failure(step: CloudStep, e: Throwable): Map<String, Any> = buildMap {
@@ -557,7 +690,7 @@ class CloudBackup(
 }
 
 /** The step a [CloudEvent.FAILED] happened in. */
-enum class CloudStep { LOAD, SWITCH, SIGN_IN, SETUP, BACKUP, DIAGNOSIS, RESET }
+enum class CloudStep { LOAD, SWITCH, SIGN_IN, SETUP, BACKUP, AUTO_BACKUP, DIAGNOSIS, RESET }
 
 /** How the setup ended, for [CloudEvent.SET_UP]. */
 enum class SetupKind {
