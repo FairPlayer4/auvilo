@@ -1,6 +1,7 @@
 package com.avlreminder.cloud
 
 import android.app.Activity
+import androidx.credentials.exceptions.CreateCredentialException
 import androidx.credentials.exceptions.GetCredentialCancellationException
 import androidx.credentials.exceptions.GetCredentialException
 import androidx.credentials.exceptions.NoCredentialException
@@ -34,6 +35,7 @@ import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.sync.Mutex
 import java.io.IOException
+import java.util.concurrent.atomic.AtomicBoolean
 
 /** Where the cloud backup stands, for the settings (A-14). */
 sealed interface CloudPhase {
@@ -50,10 +52,10 @@ sealed interface CloudPhase {
     data object NotSetUp : CloudPhase
 
     /**
-     * New keys: the person must write down [key] before anything is stored. Never logged, and the
-     * screen blocks screenshots while it shows.
+     * New keys: the person must keep [key] before anything is stored. Never logged, and the
+     * screen blocks screenshots while it shows. [saved]: it is in the password service (7.33).
      */
-    data class ShowKey(val key: String) : CloudPhase
+    data class ShowKey(val key: String, val saved: Boolean = false) : CloudPhase
 
     /** The account has keys already: the person types the recovery key. */
     data object AskKey : CloudPhase
@@ -107,6 +109,7 @@ class CloudBackup(
     private val server: () -> CloudServer,
     private val keys: (account: String) -> LokaleAblage,
     private val google: GoogleSignIn,
+    private val passwords: PasswordSafe,
     private val scope: CoroutineScope,
     private val log: (String) -> Unit = {},
 ) {
@@ -116,6 +119,10 @@ class CloudBackup(
     private val running = Mutex()
     @Volatile private var confirm: CompletableDeferred<Boolean>? = null
     @Volatile private var typed: CompletableDeferred<String?>? = null
+
+    /** The key on screen ([CloudPhase.ShowKey]) and its account, for [saveKey]. */
+    @Volatile private var shown: Pair<String, String>? = null
+    private val safeBusy = AtomicBoolean(false)
 
     /** Reads where things stand (at start and after each step); no network. */
     fun load(): Job = work(clearNotes = false) {}
@@ -133,15 +140,30 @@ class CloudBackup(
         val signedIn = server.signIn(google.idToken(activity, server.nonce))
         store.setUnlocked(signedIn.freigeschaltet)
         log("cloud: signed in" + if (signedIn.neuesKonto) " (new account)" else "")
-        setUp(server, signedIn.sitzung)
+        setUp(server, signedIn.sitzung, activity)
     }
 
-    /** Continues a setup that did not finish (e.g. upload failed, app closed). */
-    fun continueSetup(): Job = work {
+    /**
+     * Continues a setup that did not finish (e.g. upload failed, app closed). Without
+     * [activity] the password service is not asked.
+     */
+    fun continueSetup(activity: Activity? = null): Job = work {
         if (!store.enabled()) return@work
         busy("Verbinden …")
         val server = server()
-        setUp(server, server.session())
+        setUp(server, server.session(), activity)
+    }
+
+    /** Offers the key on screen to the password service again (the first offer was declined). */
+    fun saveKey(activity: Activity): Job = scope.launch {
+        val (account, key) = shown ?: return@launch
+        if (offer(activity, account, key)) state.update { if (it.phase == CloudPhase.ShowKey(key)) it.copy(phase = CloudPhase.ShowKey(key, saved = true)) else it }
+    }
+
+    /** Fetches the key from the password service while [CloudPhase.AskKey] shows. */
+    fun fetchKey(activity: Activity): Job = scope.launch {
+        val answer = typed ?: return@launch
+        fetch(activity)?.let { answer.complete(it) }
     }
 
     /** The answer to [CloudPhase.ShowKey]: true = written down. */
@@ -156,8 +178,10 @@ class CloudBackup(
 
     fun dismissNotes() = state.update { it.copy(notes = emptyList(), error = null) }
 
-    private suspend fun setUp(server: CloudServer, session: Sitzung) {
+    private suspend fun setUp(server: CloudServer, session: Sitzung, activity: Activity?) {
         busy("Schlüssel einrichten …")
+        // The password service is asked once by itself; a wrong key from it asks the person.
+        var trySafe = activity != null
         val result = Einrichtung(
             session.kontoId,
             session.geraetId,
@@ -166,14 +190,32 @@ class CloudBackup(
             server.unlocking(session.token),
             keys(session.kontoId),
             frageSchluessel = {
-                val answer = CompletableDeferred<String?>().also { typed = it }
-                phase(CloudPhase.AskKey)
-                answer.await().also { busy("Prüfen …") }
+                val fromSafe = if (trySafe && activity != null) {
+                    trySafe = false
+                    busy("Passwortmanager …")
+                    fetch(activity)
+                } else {
+                    null
+                }
+                if (fromSafe != null) {
+                    busy("Prüfen …")
+                    fromSafe
+                } else {
+                    val answer = CompletableDeferred<String?>().also { typed = it }
+                    phase(CloudPhase.AskKey)
+                    answer.await().also { busy("Prüfen …") }
+                }
             },
             zeigeWiederherstellung = { key ->
+                val text = key.alsText()
                 val answer = CompletableDeferred<Boolean>().also { confirm = it }
-                phase(CloudPhase.ShowKey(key.alsText()))
-                answer.await().also { busy("Hochladen …") }
+                shown = session.kontoId to text
+                phase(CloudPhase.ShowKey(text))
+                // Offered right away (7.33); declined, the person writes it down as before.
+                if (activity != null && offer(activity, session.kontoId, text)) {
+                    state.update { if (it.phase == CloudPhase.ShowKey(text)) it.copy(phase = CloudPhase.ShowKey(text, saved = true)) else it }
+                }
+                answer.await().also { shown = null; busy("Hochladen …") }
             },
             meldung = { text -> state.update { it.copy(notes = it.notes + text) } },
         ).ausfuehren()
@@ -202,6 +244,7 @@ class CloudBackup(
             } finally {
                 confirm = null
                 typed = null
+                shown = null
                 running.unlock()
             }
             val phase = runCatching { current() }.getOrElse { e ->
@@ -222,6 +265,41 @@ class CloudBackup(
         return CloudPhase.Ready(session.kontoId, session.geraetId, local.bund.person.oeffentlich.fingerabdruck(), store.unlocked())
     }
 
+    /**
+     * KRITISCH: The key goes only to the password service. A failure is no error of the setup:
+     * the log names its kind, never the key.
+     */
+    private suspend fun offer(activity: Activity, account: String, key: String): Boolean {
+        if (!safeBusy.compareAndSet(false, true)) return false
+        return try {
+            passwords.save(activity, account, key)
+            log("cloud: key saved in the password service")
+            true
+        } catch (e: CancellationException) {
+            throw e
+        } catch (e: Throwable) {
+            log("cloud: key not saved in the password service (${logDetail(e)})")
+            false
+        } finally {
+            safeBusy.set(false)
+        }
+    }
+
+    /** The key from the password service, or null (declined, none stored, failed). */
+    private suspend fun fetch(activity: Activity): String? {
+        if (!safeBusy.compareAndSet(false, true)) return null
+        return try {
+            passwords.read(activity).also { log(if (it == null) "cloud: no key in the password service" else "cloud: key from the password service") }
+        } catch (e: CancellationException) {
+            throw e
+        } catch (e: Throwable) {
+            log("cloud: no key from the password service (${logDetail(e)})")
+            null
+        } finally {
+            safeBusy.set(false)
+        }
+    }
+
     private fun busy(what: String) = phase(CloudPhase.Busy(what))
     private fun phase(p: CloudPhase) = state.update { it.copy(phase = p) }
 
@@ -233,6 +311,7 @@ class CloudBackup(
          */
         fun logDetail(e: Throwable): String = when (e) {
             is GetCredentialException -> "${e::class.simpleName} ${e.type}: ${e.errorMessage}"
+            is CreateCredentialException -> "${e::class.simpleName} ${e.type}: ${e.errorMessage}"
             is Serverfehler -> "Serverfehler ${e.code.codeName}, vomDienst=${e.vomDienst}"
             else -> e::class.simpleName.orEmpty()
         }

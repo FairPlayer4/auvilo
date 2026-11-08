@@ -109,7 +109,7 @@ Stand: 2026-11-08. Bei jedem größeren Schritt aktualisieren.
    installiert): Composite Build mit festem Backend-Commit, `INTERNET`, CI mit zweitem
    Checkout; CI mit Deploy-Key grün seit 2026-11-07.
    **Schritt 2 installiert** am 2026-11-08 17:32 (`versionCode` 14, Backend-Pin `7b994a4`;
-   Start ok, 162 Alarme vorher und nachher; Einrichtung auf dem Handy ok (neues Konto-Backup, Fingerabdruck `74P4-R84D-XB60-D79W-SSDJ-JQGG-Z0`), restliche Gerätetests offen; neu: 7.33 Schlüssel im Passwortdienst): Bereich
+   Start ok, 162 Alarme vorher und nachher; Einrichtung auf dem Handy ok (neues Konto-Backup, Fingerabdruck `74P4-R84D-XB60-D79W-SSDJ-JQGG-Z0`), restliche Gerätetests offen; 7.33 Schlüssel im Passwortdienst gebaut am 2026-11-08, noch nicht installiert): Bereich
    *Cloud-Backup (experimentell)* in den Einstellungen bis „eingerichtet“ (Paket `cloud`:
    Geräteschlüssel und Schlüsseldatei im Keystore, DataStore `backend`, Credential Manager).
    Vorab am 2026-11-08 erledigt: Web-Client-ID im Backend angewendet, Kevins

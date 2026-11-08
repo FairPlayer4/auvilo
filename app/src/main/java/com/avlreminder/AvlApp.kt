@@ -17,6 +17,7 @@ import com.avlreminder.cloud.CloudBackup
 import com.avlreminder.cloud.CloudConfig
 import com.avlreminder.cloud.CloudStore
 import com.avlreminder.cloud.ConnectCloudServer
+import com.avlreminder.cloud.CredentialManagerSafe
 import com.avlreminder.cloud.CredentialManagerSignIn
 import com.avlreminder.cloud.KeyFile
 import com.avlreminder.cloud.KeystoreDeviceKey
@@ -113,6 +114,7 @@ class AppGraph(private val context: Context) : ClaudeApi.Access {
         server = { ConnectCloudServer(connection, KeystoreDeviceKey(), cloudStore) },
         keys = { account -> KeyFile(File(context.filesDir, "backend"), KeystoreSealer(), account) },
         google = CredentialManagerSignIn(),
+        passwords = CredentialManagerSafe(),
         scope = scope,
         log = Diag::log,
     )

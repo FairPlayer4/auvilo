@@ -43,6 +43,8 @@ interface CloudActions {
     fun continueSetup() {}
     fun confirmKey(writtenDown: Boolean) {}
     fun submitKey(text: String?) {}
+    fun saveKey() {}
+    fun fetchKey() {}
 }
 
 /**
@@ -77,7 +79,7 @@ fun CloudBackupSetting(status: CloudStatus, actions: CloudActions) {
                 Text("Die Einrichtung ist nicht abgeschlossen.", Modifier.padding(top = 8.dp), color = c.text, fontSize = 14.sp)
                 Button(onClick = actions::continueSetup, Modifier.padding(top = 4.dp).testTag("cloudContinue")) { Text("Einrichtung fortsetzen") }
             }
-            is CloudPhase.ShowKey -> ShowKey(phase.key, actions)
+            is CloudPhase.ShowKey -> ShowKey(phase.key, phase.saved, actions)
             CloudPhase.AskKey -> AskKey(actions)
             is CloudPhase.Ready -> {
                 Text("Fingerabdruck ${phase.fingerprint}", Modifier.padding(top = 8.dp).testTag("cloudFingerprint"), color = c.text, fontSize = 14.sp, fontFamily = FontFamily.Monospace)
@@ -126,21 +128,44 @@ private fun SecureScreen() {
     }
 }
 
-/** A new recovery key; nothing is stored until it is written down (Einrichtung, KRITISCH). */
+/**
+ * A new recovery key; nothing is stored until it is kept (Einrichtung, KRITISCH). In the password
+ * service ([saved], 7.33) one tap confirms; written down only, a second question makes sure.
+ */
 @Composable
-private fun ShowKey(key: String, actions: CloudActions) {
+private fun ShowKey(key: String, saved: Boolean, actions: CloudActions) {
     val c = Avl.colors
     var sure by remember { mutableStateOf(false) }
     SecureScreen()
-    Text(
-        "Diesen Wiederherstellungsschlüssel auf Papier aufschreiben. Ohne ihn sind die gesicherten Daten weg, wenn " +
-            "das Handy verloren geht. Nicht fotografieren, nicht in die Cloud.",
-        Modifier.padding(top = 8.dp), color = c.text, fontSize = 14.sp,
-    )
+    if (saved) {
+        Text(
+            "Der Wiederherstellungsschlüssel ist im Passwortmanager gespeichert. Ohne ihn sind die gesicherten Daten " +
+                "weg, wenn das Handy verloren geht.",
+            Modifier.padding(top = 8.dp).testTag("cloudKeySaved"), color = c.text, fontSize = 14.sp,
+        )
+        Text(
+            "Im Google Passwortmanager ist er nur mit eingeschalteter Geräteverschlüsselung Ende-zu-Ende geschützt. " +
+                "Zusätzlich auf Papier aufschreiben ist am sichersten.",
+            Modifier.padding(top = 4.dp), color = c.muted, fontSize = 13.sp,
+        )
+    } else {
+        Text(
+            "Diesen Wiederherstellungsschlüssel im Passwortmanager speichern oder auf Papier aufschreiben. Ohne ihn " +
+                "sind die gesicherten Daten weg, wenn das Handy verloren geht. Nicht fotografieren.",
+            Modifier.padding(top = 8.dp), color = c.text, fontSize = 14.sp,
+        )
+    }
     Text(key, Modifier.padding(vertical = 12.dp).testTag("cloudKey"), color = c.text, fontSize = 17.sp, fontFamily = FontFamily.Monospace)
     Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-        Button(onClick = { sure = true }, Modifier.testTag("cloudWritten")) { Text("Aufgeschrieben") }
+        if (saved) {
+            Button(onClick = { actions.confirmKey(true) }, Modifier.testTag("cloudDone")) { Text("Fertig") }
+        } else {
+            Button(onClick = { sure = true }, Modifier.testTag("cloudWritten")) { Text("Aufgeschrieben") }
+        }
         OutlinedButton(onClick = { actions.confirmKey(false) }, Modifier.testTag("cloudKeyCancel")) { Text("Abbrechen") }
+    }
+    if (!saved) {
+        TextButton(onClick = actions::saveKey, Modifier.testTag("cloudSaveKey")) { Text("Im Passwortmanager speichern") }
     }
     if (sure) {
         AlertDialog(
@@ -170,4 +195,5 @@ private fun AskKey(actions: CloudActions) {
         Button(onClick = { actions.submitKey(text) }, enabled = text.isNotBlank(), modifier = Modifier.testTag("cloudKeySubmit")) { Text("Prüfen") }
         OutlinedButton(onClick = { actions.submitKey(null) }) { Text("Abbrechen") }
     }
+    TextButton(onClick = actions::fetchKey, Modifier.testTag("cloudFetchKey")) { Text("Aus dem Passwortmanager holen") }
 }

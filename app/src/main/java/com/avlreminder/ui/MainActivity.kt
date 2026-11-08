@@ -182,9 +182,12 @@ class MainActivity : ComponentActivity() {
             override fun setEnabled(on: Boolean) { graph.cloud.setEnabled(on) }
             // Credential Manager shows Google's account picker over this activity.
             override fun signIn() { graph.cloud.signIn(this@MainActivity) }
-            override fun continueSetup() { graph.cloud.continueSetup() }
+            override fun continueSetup() { graph.cloud.continueSetup(this@MainActivity) }
             override fun confirmKey(writtenDown: Boolean) = graph.cloud.confirmKey(writtenDown)
             override fun submitKey(text: String?) = graph.cloud.submitKey(text)
+            // The password service (7.33) shows its dialog over this activity, too.
+            override fun saveKey() { graph.cloud.saveKey(this@MainActivity) }
+            override fun fetchKey() { graph.cloud.fetchKey(this@MainActivity) }
         }
         override fun answerSnoozeHint(reminderId: Long, choice: SnoozeHintChoice) = vm.answerSnoozeHint(reminderId, choice)
         override fun setArchived(reminderId: Long, archived: Boolean) = vm.setArchived(reminderId, archived)

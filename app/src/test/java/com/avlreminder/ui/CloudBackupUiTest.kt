@@ -30,6 +30,8 @@ class CloudBackupUiTest {
         override fun continueSetup() { calls += "continue" }
         override fun confirmKey(writtenDown: Boolean) { calls += "confirm $writtenDown" }
         override fun submitKey(text: String?) { calls += "key $text" }
+        override fun saveKey() { calls += "saveKey" }
+        override fun fetchKey() { calls += "fetchKey" }
     }
 
     private fun show(status: CloudStatus): Recorder {
@@ -87,5 +89,31 @@ class CloudBackupUiTest {
         compose.onNodeWithText("Fingerabdruck AB12 CD34").assertExists()
         compose.onNodeWithText("Nicht freigeschaltet: dieses Gerät kann nichts sichern.").assertExists()
         compose.onNodeWithTag("cloudError").assertExists()
+    }
+
+    // KRITISCH: one tap is enough only when the key is in the password service (7.33).
+    @Test
+    fun aSavedKeyNeedsOneTapAndTellsAboutDeviceEncryption() {
+        val actions = show(CloudStatus(CloudPhase.ShowKey("ABCD-EFGH", saved = true)))
+        compose.onNodeWithTag("cloudKeySaved").assertExists()
+        compose.onNodeWithText("Geräteverschlüsselung", substring = true).assertExists()
+        compose.onNodeWithTag("cloudWritten").assertDoesNotExist()
+        compose.onNodeWithTag("cloudDone").performClick()
+        assertEquals(listOf("confirm true"), actions.calls)
+    }
+
+    @Test
+    fun anUnsavedKeyCanBeOfferedToThePasswordServiceAgain() {
+        val actions = show(CloudStatus(CloudPhase.ShowKey("ABCD-EFGH")))
+        compose.onNodeWithTag("cloudDone").assertDoesNotExist()
+        compose.onNodeWithTag("cloudSaveKey").performClick()
+        assertEquals(listOf("saveKey"), actions.calls)
+    }
+
+    @Test
+    fun theKeyCanBeFetchedFromThePasswordService() {
+        val actions = show(CloudStatus(CloudPhase.AskKey))
+        compose.onNodeWithTag("cloudFetchKey").performClick()
+        assertEquals(listOf("fetchKey"), actions.calls)
     }
 }

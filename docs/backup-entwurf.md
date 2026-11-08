@@ -43,7 +43,7 @@ Play-Store-Variante.
 | A-12 | Diagnose senden | **Eigener kleiner Logger fürs Backend** (Ereignisname, typisierte Felder, keine freien Texte; E-D-1), nicht `diag.log`. Knopf *Diagnose senden*. | `diag.log` enthält Titel (design.md 13, Ausnahme der Entwicklungsphase). Die Backend-Regel E-D-1 erlaubt keine Inhalte; Claude darf Sendungen nur deshalb lesen. |
 | A-13 | Fehler | Netz weg, Server gesperrt (Kill-Switch), Tageslimit: nichts tun außer Status anzeigen; WorkManager versucht es zur nächsten Stunde. Keine Benachrichtigung, außer das letzte Backup ist älter als 3 Tage. | „Kosten vor Verfügbarkeit“: Ausfälle sind normal und dürfen nicht nerven. Nach 3 Tagen sollte Kevin es aber merken. |
 | A-14 | Oberfläche | Neuer Bereich in den Einstellungen **„Cloud-Backup (experimentell)“**: Einschalten (mit kurzer Erklärung), Anmelden, Einrichtung (neuer Wiederherstellungsschlüssel anzeigen und Bestätigung „aufgeschrieben“ bzw. Eingabe des vorhandenen), Status „letzte Sicherung“, *Jetzt sichern*, *Wiederherstellen*, *Sicherung löschen*, *Diagnose senden*, *Ausschalten*. | Alles an einer Stelle; PS6 (Transparenz). |
-| A-15 | Schlüssel sichern | **Neu (2026-11-08), noch nicht gebaut:** Neuer Wiederherstellungsschlüssel → sofort Speicher-Dialog des Passwortdienstes (Credential Manager, `CreatePasswordRequest`); bei Abfrage zuerst `GetPasswordOption`, Eintippen als Ausweichweg (Anf. 7.33). Hinter einer Schnittstelle wie `GoogleSignIn`, damit die Tests einen Nachbau nutzen. Vorschlag: vor Schritt 3 bauen, weil ab dort echte Daten am Schlüssel hängen. | Abtippen eines langen Codes ist fehleranfällig und lästig (erster Gerätetest). Der Passwortdienst ist auf dem Handy ohnehin da. |
+| A-15 | Schlüssel sichern | **Gebaut am 2026-11-08** (`cloud/PasswordSafe.kt`): Neuer Wiederherstellungsschlüssel → sofort Speicher-Dialog des Passwortdienstes (Credential Manager, `CreatePasswordRequest`); bei Abfrage zuerst `GetPasswordOption`, Eintippen als Ausweichweg (Anf. 7.33). Hinter einer Schnittstelle wie `GoogleSignIn`, damit die Tests einen Nachbau nutzen. Gespeichert genügt *Fertig*, sonst *Aufgeschrieben* mit Rückfrage; *Im Passwortmanager speichern* und *Aus dem Passwortmanager holen* als Knöpfe. Der Passwortdienst wird von selbst nur einmal gefragt; ein falscher Schlüssel von dort führt zur Eingabe. Eintrag „avlreminder Wiederherstellung <Konto-Anfang>“. | Abtippen eines langen Codes ist fehleranfällig und lästig (erster Gerätetest). Der Passwortdienst ist auf dem Handy ohnehin da. |
 
 ## Ablauf Einrichtung (erstes Einschalten)
 1. Schalter an → Geräteschlüssel im Keystore anlegen.
@@ -124,3 +124,6 @@ Aufwand grob: Schritt 1 ein halber Tag, 2 ein Tag, 3–5 je ein halber bis ganze
 - Debug-Schlüssel signiert die App; ein neuer PC mit anderem `debug.keystore` braucht
   einen weiteren Android-Client.
 - Im Eigenbetrieb sind die Schlüssel als bekannt zu betrachten (Backend `CLAUDE.md`).
+- Bricht man die Einrichtung nach dem Speichern im Passwortdienst ab, bleibt dort ein
+  Eintrag ohne Backup; die nächste Einrichtung legt einen weiteren an (7.33). Löschen
+  kann die App ihn nicht, das macht man im Passwortmanager.
