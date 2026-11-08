@@ -22,6 +22,7 @@ import com.avlreminder.cloud.CredentialManagerSignIn
 import com.avlreminder.cloud.KeyFile
 import com.avlreminder.cloud.KeystoreDeviceKey
 import com.avlreminder.cloud.KeystoreSealer
+import com.avlreminder.cloud.deleteBackendKeystoreEntries
 import com.avlreminder.verbindung.Verbindung
 import java.io.File
 import com.avlreminder.core.model.Occurrence
@@ -115,6 +116,10 @@ class AppGraph(private val context: Context) : ClaudeApi.Access {
         keys = { account -> KeyFile(File(context.filesDir, "backend"), KeystoreSealer(), account) },
         google = CredentialManagerSignIn(),
         passwords = CredentialManagerSafe(),
+        wipe = {
+            File(context.filesDir, "backend").deleteRecursively()
+            deleteBackendKeystoreEntries()
+        },
         scope = scope,
         log = Diag::log,
     )

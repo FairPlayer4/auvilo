@@ -12,6 +12,7 @@ import androidx.test.ext.junit.runners.AndroidJUnit4
 import com.avlreminder.protokoll.BackupAblage
 import com.avlreminder.protokoll.GeholtesBackup
 import com.avlreminder.protokoll.GeraeteFreischaltung
+import com.avlreminder.protokoll.GeraetNichtFreigeschaltet
 import com.avlreminder.protokoll.LokaleAblage
 import com.avlreminder.protokoll.LokalerStand
 import com.avlreminder.protokoll.Schluesselbund
@@ -93,6 +94,23 @@ class CloudBackupTest {
         }
 
         override fun unlocking(token: String) = GeraeteFreischaltung { unlocks++ }
+
+        var deleteError: Throwable? = null
+        var dataBackup = true
+        val locked = mutableListOf<String>()
+
+        override suspend fun deleteDataBackup(token: String) {
+            deleteError?.let { throw it }
+            dataBackup = false
+        }
+
+        override suspend fun deleteKeyBackup(token: String) {
+            backup = null
+        }
+
+        override suspend fun lock(token: String, device: String) {
+            locked += device
+        }
     }
 
     private val server = FakeServer()
@@ -119,6 +137,10 @@ class CloudBackupTest {
             "id-token-for-$nonce"
         },
         passwords = safe,
+        wipe = {
+            wiped++
+            local.clear()
+        },
         scope = scope,
         log = { logged += it },
     )
@@ -145,6 +167,17 @@ class CloudBackupTest {
         }
     }
     private val safe = FakeSafe()
+    private var wiped = 0
+
+    /** A new account, set up on this phone. */
+    private fun ready(cloud: CloudBackup): CloudPhase.Ready {
+        blocking { cloud.setEnabled(true).join() }
+        val job = cloud.signIn(activity)
+        cloud.awaitPhase(CloudPhase.ShowKey::class.java)
+        cloud.confirmKey(true)
+        blocking { job.join() }
+        return cloud.status.value.phase as CloudPhase.Ready
+    }
     private val logged = java.util.Collections.synchronizedList(mutableListOf<String>())
     private var brokenKeys: Throwable? = null
 
@@ -521,5 +554,71 @@ class CloudBackupTest {
         blocking { job.join() }
         assertTrue(cloud.status.value.phase is CloudPhase.Ready)
         assertEquals(2, safe.reads)
+    }
+
+    // --- Reset ---------------------------------------------------------------------------
+
+    // KRITISCH: after a reset nothing of the old setup is left, and it can be set up anew.
+    @Test
+    fun aResetDeletesOnTheServerAndOnThePhoneAndAllowsANewSetup() {
+        val cloud = cloud()
+        val before = ready(cloud)
+        blocking { cloud.reset().join() }
+        assertEquals(CloudPhase.Off, cloud.status.value.phase)
+        assertNull(cloud.status.value.error)
+        assertNull("key backup", server.backup)
+        assertFalse("data backup", server.dataBackup)
+        assertEquals(listOf("geraet-1"), server.locked)
+        assertEquals(1, wiped)
+        assertTrue(local.isEmpty())
+        assertNull(blocking { store.lesen() })
+
+        val again = ready(cloud)
+        assertTrue("new keys", again.fingerprint != before.fingerprint)
+    }
+
+    // KRITISCH: the server just not reachable, nothing is deleted on the phone.
+    @Test
+    fun aResetWithoutTheServerDeletesNothingOnThePhone() {
+        val cloud = cloud()
+        val before = ready(cloud)
+        server.deleteError = Serverfehler(ConnectException(Code.UNAVAILABLE), vomDienst = false)
+        blocking { cloud.reset().join() }
+        assertEquals(before, cloud.status.value.phase)
+        assertTrue(cloud.status.value.error.orEmpty().contains("nicht erreichbar"))
+        assertEquals(0, wiped)
+        assertTrue(local.isNotEmpty())
+        assertNotNull(blocking { store.lesen() })
+        assertTrue(server.locked.isEmpty())
+    }
+
+    @Test
+    fun aDeviceThatMayNotDeleteResetsThePhoneLocksItselfAndSaysSo() {
+        val cloud = cloud()
+        ready(cloud)
+        server.deleteError = GeraetNichtFreigeschaltet()
+        blocking { cloud.reset().join() }
+        assertEquals(CloudPhase.Off, cloud.status.value.phase)
+        assertEquals(1, wiped)
+        assertEquals(listOf("geraet-1"), server.locked)
+        assertTrue(cloud.status.value.notes.toString(), cloud.status.value.notes.any { "nichts löschen" in it })
+    }
+
+    @Test
+    fun signedOutAResetOnlyClearsThePhone() {
+        val cloud = cloud()
+        blocking { cloud.setEnabled(true).join() }
+        blocking { cloud.reset().join() }
+        assertEquals(CloudPhase.Off, cloud.status.value.phase)
+        assertEquals(1, wiped)
+        assertEquals(0, serversCreated)
+    }
+
+    @Test
+    fun switchedOffAResetDoesNothing() {
+        val cloud = cloud()
+        blocking { cloud.reset().join() }
+        assertEquals(0, wiped)
+        assertEquals(0, serversCreated)
     }
 }

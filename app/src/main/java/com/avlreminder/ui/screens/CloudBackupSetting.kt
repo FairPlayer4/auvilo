@@ -45,6 +45,7 @@ interface CloudActions {
     fun submitKey(text: String?) {}
     fun saveKey() {}
     fun fetchKey() {}
+    fun reset() {}
 }
 
 /**
@@ -56,6 +57,7 @@ fun CloudBackupSetting(status: CloudStatus, actions: CloudActions) {
     val c = Avl.colors
     val phase = status.phase
     var asking by remember { mutableStateOf(false) }
+    var resetting by remember { mutableStateOf(false) }
     val busy = phase is CloudPhase.Busy || phase is CloudPhase.ShowKey || phase is CloudPhase.AskKey
     Column(Modifier.padding(16.dp)) {
         Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
@@ -90,6 +92,11 @@ fun CloudBackupSetting(status: CloudStatus, actions: CloudActions) {
                 Text("Sichern folgt mit dem nächsten Schritt.", Modifier.padding(top = 4.dp), color = c.muted, fontSize = 13.sp)
             }
         }
+        if (phase is CloudPhase.Ready || phase == CloudPhase.NotSetUp || phase == CloudPhase.SignedOut) {
+            TextButton(onClick = { resetting = true }, Modifier.padding(top = 4.dp).testTag("cloudReset")) {
+                Text("Cloud-Konto zurücksetzen", color = c.strict)
+            }
+        }
         status.notes.forEach { Text(it, Modifier.padding(top = 6.dp), color = c.muted, fontSize = 13.sp) }
         status.error?.let { Text(it, Modifier.padding(top = 6.dp).testTag("cloudError"), color = c.strict, fontSize = 14.sp) }
     }
@@ -106,6 +113,23 @@ fun CloudBackupSetting(status: CloudStatus, actions: CloudActions) {
             },
             confirmButton = { TextButton(onClick = { actions.setEnabled(true); asking = false }, Modifier.testTag("cloudOk")) { Text("Einschalten") } },
             dismissButton = { TextButton(onClick = { asking = false }) { Text("Abbrechen") } },
+        )
+    }
+    if (resetting) {
+        AlertDialog(
+            onDismissRequest = { resetting = false },
+            title = { Text("Cloud-Konto zurücksetzen?") },
+            text = {
+                Text(
+                    "Löscht auf dem Server das Schlüssel-Backup und die Sicherung und sperrt dort dieses Handy. Auf dem " +
+                        "Handy werden die Schlüssel gelöscht. Reminder und Einstellungen bleiben. Danach lässt sich alles " +
+                        "neu einrichten, mit neuem Wiederherstellungsschlüssel; den alten Eintrag im Passwortmanager selbst löschen.",
+                )
+            },
+            confirmButton = {
+                TextButton(onClick = { resetting = false; actions.reset() }, Modifier.testTag("cloudResetOk")) { Text("Zurücksetzen", color = c.strict) }
+            },
+            dismissButton = { TextButton(onClick = { resetting = false }) { Text("Abbrechen") } },
         )
     }
 }

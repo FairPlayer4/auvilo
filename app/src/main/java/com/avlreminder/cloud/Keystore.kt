@@ -89,3 +89,14 @@ class KeystoreSealer(private val alias: String = ALIAS) : Sealer {
         const val ALIAS = "backend-keys"
     }
 }
+
+/**
+ * Deletes the device key and the key of the key file from the Keystore (reset). The next
+ * sign-in creates a new device key, which the server needs: a locked device key stays locked.
+ */
+fun deleteBackendKeystoreEntries() {
+    val keyStore = KeyStore.getInstance("AndroidKeyStore").apply { load(null) }
+    for (alias in listOf(KeystoreDeviceKey.ALIAS, KeystoreSealer.ALIAS)) {
+        if (keyStore.containsAlias(alias)) keyStore.deleteEntry(alias)
+    }
+}

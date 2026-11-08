@@ -32,6 +32,7 @@ class CloudBackupUiTest {
         override fun submitKey(text: String?) { calls += "key $text" }
         override fun saveKey() { calls += "saveKey" }
         override fun fetchKey() { calls += "fetchKey" }
+        override fun reset() { calls += "reset" }
     }
 
     private fun show(status: CloudStatus): Recorder {
@@ -108,6 +109,30 @@ class CloudBackupUiTest {
         compose.onNodeWithTag("cloudDone").assertDoesNotExist()
         compose.onNodeWithTag("cloudSaveKey").performClick()
         assertEquals(listOf("saveKey"), actions.calls)
+    }
+
+    @Test
+    fun resettingAsksFirstAndCancelDoesNothing() {
+        val actions = show(CloudStatus(CloudPhase.Ready("konto-1", "geraet-1", "AB12", unlocked = true)))
+        compose.onNodeWithTag("cloudReset").performClick()
+        compose.onNodeWithText("Abbrechen").performClick()
+        assertEquals(emptyList<String>(), actions.calls)
+
+        compose.onNodeWithTag("cloudReset").performClick()
+        compose.onNodeWithTag("cloudResetOk").performClick()
+        assertEquals(listOf("reset"), actions.calls)
+    }
+
+    @Test
+    fun noResetWhileOff() {
+        show(CloudStatus(CloudPhase.Off))
+        compose.onNodeWithTag("cloudReset").assertDoesNotExist()
+    }
+
+    @Test
+    fun noResetWhileTheKeyShows() {
+        show(CloudStatus(CloudPhase.ShowKey("ABCD-EFGH")))
+        compose.onNodeWithTag("cloudReset").assertDoesNotExist()
     }
 
     @Test

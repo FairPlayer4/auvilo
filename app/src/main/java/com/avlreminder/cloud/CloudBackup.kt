@@ -20,6 +20,7 @@ import com.avlreminder.verbindung.Geraeteschluessel
 import com.avlreminder.verbindung.NichtAngemeldet
 import com.avlreminder.verbindung.ServerBackupAblage
 import com.avlreminder.verbindung.ServerGeraete
+import com.avlreminder.verbindung.ServerSicherungsAblage
 import com.avlreminder.verbindung.Serverfehler
 import com.avlreminder.verbindung.Sitzung
 import com.avlreminder.verbindung.SitzungsAblage
@@ -80,6 +81,15 @@ interface CloudServer {
 
     fun keyBackups(token: String): BackupAblage
     fun unlocking(token: String): GeraeteFreischaltung
+
+    /** Deletes the account's data backup with all older versions (none is no error). */
+    suspend fun deleteDataBackup(token: String)
+
+    /** Deletes the account's key backup (none is no error). */
+    suspend fun deleteKeyBackup(token: String)
+
+    /** Locks [device] for good; the own device may always lock itself. */
+    suspend fun lock(token: String, device: String)
 }
 
 /** [CloudServer] over Connect ([Verbindung], from the backend's `verbindung`). */
@@ -91,6 +101,9 @@ class ConnectCloudServer(private val verbindung: Verbindung, key: Geraeteschlues
     override suspend fun session(): Sitzung = anmeldung.sitzung()
     override fun keyBackups(token: String): BackupAblage = ServerBackupAblage(verbindung, token)
     override fun unlocking(token: String): GeraeteFreischaltung = ServerGeraete(verbindung, token)
+    override suspend fun deleteDataBackup(token: String) = ServerSicherungsAblage(verbindung, token).loeschen()
+    override suspend fun deleteKeyBackup(token: String) = ServerBackupAblage(verbindung, token).loeschen()
+    override suspend fun lock(token: String, device: String) = ServerGeraete(verbindung, token).sperren(device)
 }
 
 /**
@@ -103,6 +116,7 @@ class ConnectCloudServer(private val verbindung: Verbindung, key: Geraeteschlues
  *
  * @param server creates the device key on first use, hence a function.
  * @param keys the key file of an account.
+ * @param wipe deletes the key file and the Keystore keys of the backend (reset).
  */
 class CloudBackup(
     private val store: CloudStore,
@@ -110,6 +124,7 @@ class CloudBackup(
     private val keys: (account: String) -> LokaleAblage,
     private val google: GoogleSignIn,
     private val passwords: PasswordSafe,
+    private val wipe: () -> Unit,
     private val scope: CoroutineScope,
     private val log: (String) -> Unit = {},
 ) {
@@ -177,6 +192,49 @@ class CloudBackup(
     }
 
     fun dismissNotes() = state.update { it.copy(notes = emptyList(), error = null) }
+
+    /**
+     * Resets the cloud backup so it can be set up again: on the server the data backup and the
+     * key backup are deleted and this device is locked; on the phone the key file, the session
+     * and the Keystore keys go. Reminders and settings stay. Afterwards it is off.
+     *
+     * KRITISCH: Is the server just not reachable (no network, kill switch, limit), nothing is
+     * deleted on the phone: otherwise "reset" would leave the backup on the server unnoticed. Only
+     * when this device may not delete there anymore (locked, not unlocked, session rejected) the
+     * phone is reset anyway, with a note: waiting would not help.
+     */
+    fun reset(): Job = work {
+        if (!store.enabled()) return@work
+        val session = store.lesen()
+        if (session != null) {
+            busy("Auf dem Server löschen …")
+            val server = server()
+            var token: String? = null
+            try {
+                token = server.session().token
+                server.deleteDataBackup(token)
+                server.deleteKeyBackup(token)
+                server.lock(token, session.geraetId)
+            } catch (e: CancellationException) {
+                throw e
+            } catch (e: Throwable) {
+                if (!cannotActOnServer(e)) throw e
+                // Not unlocked: it cannot delete, but it can still lock itself.
+                if (token != null) runCatching { server.lock(token, session.geraetId) }
+                log("cloud: reset, server not cleared (${logDetail(e)})")
+                state.update {
+                    it.copy(
+                        notes = it.notes + "Auf dem Server ließ sich nichts löschen (${describe(e)}). Ein Backup dort " +
+                            "bleibt mit dem Wiederherstellungsschlüssel erreichbar.",
+                    )
+                }
+            }
+        }
+        busy("Auf dem Handy löschen …")
+        wipe()
+        store.clear()
+        log("cloud: reset")
+    }
 
     private suspend fun setUp(server: CloudServer, session: Sitzung, activity: Activity?) {
         busy("Schlüssel einrichten …")
@@ -304,6 +362,10 @@ class CloudBackup(
     private fun phase(p: CloudPhase) = state.update { it.copy(phase = p) }
 
     companion object {
+        /** Errors after which this device can do nothing more on the server (see [reset]). */
+        fun cannotActOnServer(e: Throwable): Boolean =
+            e is GeraetNichtFreigeschaltet || e is GeraetGesperrt || e is AnmeldungAbgelehnt || e is NichtAngemeldet
+
         /**
          * For the diag log: the kind of error and what Google or the server said about it. The
          * cause of a failed Google sign-in (wrong SHA-1, client not set up) is only in
