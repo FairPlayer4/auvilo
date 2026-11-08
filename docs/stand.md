@@ -1,6 +1,6 @@
 # Stand und nächste Schritte
 
-Stand: 2026-11-07. Bei jedem größeren Schritt aktualisieren.
+Stand: 2026-11-08. Bei jedem größeren Schritt aktualisieren.
 
 ## In Arbeit
 - **V1.3a3** (`versionName` 1.3a3-prototyp, `versionCode` 9) in `develop`, gebaut,
@@ -108,12 +108,12 @@ Stand: 2026-11-07. Bei jedem größeren Schritt aktualisieren.
    **Schritt 1 umgesetzt** am 2026-11-07 auf `feature/backup` (nichts sichtbar, noch nicht
    installiert): Composite Build mit festem Backend-Commit, `INTERNET`, CI mit zweitem
    Checkout; CI mit Deploy-Key grün seit 2026-11-07.
-   **Schritt 2 gebaut** am 2026-11-07 (noch nicht installiert, kein Gerätetest): Bereich
+   **Schritt 2 installiert** am 2026-11-08 17:32 (`versionCode` 14, Backend-Pin `7b994a4`;
+   Start ok, 162 Alarme vorher und nachher; Gerätetest durch Kevin offen): Bereich
    *Cloud-Backup (experimentell)* in den Einstellungen bis „eingerichtet“ (Paket `cloud`:
    Geräteschlüssel und Schlüsseldatei im Keystore, DataStore `backend`, Credential Manager).
-   Vor dem Gerätetest: Web-Client-ID im Backend anwenden (`tofu apply`, Kevins Go) und
-   Kevins Backend-Konto von den Test-Schlüsseln befreien (Test-Client, Kevin meldet sich
-   im Browser an).
+   Vorab am 2026-11-08 erledigt: Web-Client-ID im Backend angewendet, Kevins
+   Backend-Konto von den Test-Schlüsseln befreit (Sicherung, Schlüssel-Backup, Geräte).
 3. **Play-Store-Release** ohne Eile, erst wenn die App „fertig“ ist (mindestens bis V2);
    dafür Transparenz, Notausschalter (in V1.3a), Backend nur nach Einschalten (7.28 PS5–PS9).
 
