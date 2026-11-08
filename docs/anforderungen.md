@@ -1069,6 +1069,25 @@ vorher schieben oder auslassen können, wie man Checklisten-Punkte vorab abhakt.
   auch vorab. Vorab ausgelassen oder erledigt lässt sich zurücknehmen (7.31); der Termin
   kommt dann zur geplanten Zeit, nicht schon in 10 min.
 
+### 7.33 Wiederherstellungsschlüssel im Passwortdienst (2026-11-08)
+Beim ersten Gerätetest war das Aufschreiben des Wiederherstellungsschlüssels umständlich
+(langen Code abtippen). Die App soll das Sichern deshalb selbst anbieten.
+- WS1 **Automatisch angeboten:** Zeigt die App einen neuen Wiederherstellungsschlüssel,
+  öffnet sie sofort den Speicher-Dialog des Passwortdienstes (Credential Manager,
+  `CreatePasswordRequest`; Standard ist der Google Passwortmanager, andere Dienste wie
+  Bitwarden gehen genauso). Name: „avlreminder Wiederherstellung“, als Nutzername das
+  Konto-Pseudonym. Gespeichert → fertig, eine Bestätigung genügt. Abgelehnt oder kein
+  Dienst → wie bisher anzeigen und „aufgeschrieben“ bestätigen.
+- WS2 **Automatisch geholt:** Fragt die App nach dem Schlüssel (neues Gerät, App-Daten
+  gelöscht), bietet sie zuerst den gespeicherten aus dem Passwortdienst an
+  (`GetPasswordOption`); Eintippen bleibt möglich.
+- WS3 **Nie anders:** Der Schlüssel geht nur an den Passwortdienst, nie ins Log, in die
+  Zwischenablage oder ans Backend.
+- WS4 **Hinweis:** Der Google Passwortmanager verschlüsselt nur mit eingeschalteter
+  **Geräteverschlüsselung** Ende-zu-Ende; ohne sie könnte Google Schlüssel und (in GCP
+  liegende) Sicherung zusammenbringen. Die App sagt das in einem Satz; Papier bleibt als
+  zusätzliche Kopie empfohlen.
+
 ## 8. Zielplattform und Technik
 
 ### 8.1 Zielgerät
@@ -1150,6 +1169,7 @@ Neueste zuerst. Kap. 7 enthält immer den gültigen Stand; diese Tabelle ist die
 
 | Datum | Entscheidung |
 |---|---|
+| 2026-11-08 | Wiederherstellungsschlüssel: Die App bietet automatisch an, ihn im Passwortdienst zu sichern, und holt ihn von dort beim Wiederherstellen (7.33, Wunsch aus dem ersten Gerätetest von Backup Schritt 2). Papier bleibt der Weg ohne Passwortdienst |
 | 2026-11-07 | Cloud-Backup in der App: Entwurf [backup-entwurf.md](backup-entwurf.md) A-1 bis A-14 bestätigt. Keine eigene App-Variante, solange nur Kevin die App nutzt (Schalter aus PS8 im normalen Build); Composite Build mit festem Backend-Commit und Deploy-Key in der CI; neue Berechtigung `INTERNET` (8.4 präzisiert); Credential Manager, Geräteschlüssel und Keysets im Android Keystore; ZIP aus Datenbank und Einstellungen; stündlich per WorkManager nur bei Änderung; Wiederherstellen ersetzt die Datenbank nach lokaler Kopie; Diagnose ans Backend nur mit eigenem Logger ohne Inhalte. App und `core` bauen für Java 21 statt 17 |
 | 2026-11-07 | Vorab verschieben und auslassen (7.32): Alarm-Bildschirm vorab mit *Verschieben* und *Auslassen*, „heute später“ +30 min/+1/+2 Std ab der geplanten Zeit, zählt aufs Verschieben-Konto, bei *streng* mit Rückfrage; Ort behält die neue Zeit, wartet sonst auf die Ankunft; Vorab-Reminder wandert mit; NT2 zählt Verschieben mit. Umgesetzt in V1.3b0.4 |
 | 2026-11-07 | Erledigung zurücknehmen (7.31): Rückgängig-Benachrichtigung 1 min, danach *Zurücknehmen* auf *Heute*; wieder offen, klingelt in 10 min ohne als *Später* zu zählen; nur der letzte Termin, bis der nächste klingelt bzw. bis zur Tagesgrenze; *Auslassen* auch, *verpasst*/*entfällt* nicht; Nachweis zählt wieder; neues Ereignis statt Löschen. Umgesetzt in V1.3b0.4 |
