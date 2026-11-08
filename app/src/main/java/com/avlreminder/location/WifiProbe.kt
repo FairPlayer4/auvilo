@@ -13,6 +13,7 @@ import android.net.NetworkRequest
 import android.net.wifi.WifiInfo
 import android.net.wifi.WifiManager
 import android.os.SystemClock
+import androidx.core.content.edit
 import com.avlreminder.graph
 import com.avlreminder.system.Diag
 import kotlinx.coroutines.CompletableDeferred
@@ -86,7 +87,7 @@ object WifiProbe {
         )
         val prefs = context.getSharedPreferences(PREFS, Context.MODE_PRIVATE)
         val (networks, line) = WifiProbeLogic.evaluate(decode(prefs.getString(KEY, null)), sample)
-        prefs.edit().putString(KEY, encode(networks)).apply()
+        prefs.edit { putString(KEY, encode(networks)) }
         Diag.log(line)
     }
 

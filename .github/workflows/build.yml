@@ -54,7 +54,7 @@ jobs:
 
       - name: Build und Tests
         # backendStreng: bricht ab, falls der Backend-Stand nicht zum festgehaltenen passt.
-        run: ./gradlew -PbackendStreng=true :core:check :core:koverLog :app:testDebugUnitTest :app:assembleDebug
+        run: ./gradlew -PbackendStreng=true :core:check :core:koverLog :app:testDebugUnitTest :app:lintDebug :app:assembleDebug
 
       - name: Testberichte
         if: failure()

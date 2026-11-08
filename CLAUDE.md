@@ -25,7 +25,7 @@ Strenge und invasive Mechanismen sind gewollt. Kommunikation auf **Deutsch, mit 
 
 ## Bauen und testen (Git Bash)
 ```bash
-./gradlew -q :core:check :core:koverLog :app:testDebugUnitTest :app:assembleDebug
+./gradlew -q :core:check :core:koverLog :app:testDebugUnitTest :app:lintDebug :app:assembleDebug
 ```
 - `JAVA_HOME` und `ANDROID_HOME` sind auf dem Rechner gesetzt, nichts exportieren
   (Pfade in entwicklungsumgebung.md).
@@ -35,6 +35,9 @@ Strenge und invasive Mechanismen sind gewollt. Kommunikation auf **Deutsch, mit 
   `gradle/backend-commit.txt` oder gibt es uncommittete Änderungen in `client/`/`proto/`,
   warnt der Build: **eine solche APK nicht installieren**. Nach Änderungen im Backend den
   Commit dort pushen und in `gradle/backend-commit.txt` eintragen.
+- Android Lint (`:app:lintDebug`) bricht bei jedem neuen Fund ab, auch bei Warnungen. Funde
+  beheben statt in die Baseline (`app/lint-baseline.xml`) zu schieben; nur wenn ein Fund
+  bewusst so bleibt, mit Begründung `@SuppressLint` setzen.
 - Vor jeder Installation: alle Tests grün. UI-Tests laufen mit Robolectric/Compose
   (`app/src/test`), Migrationen haben einen eigenen `MigrationTest`.
 

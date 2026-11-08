@@ -34,6 +34,17 @@ android {
             it.jvmArgs("--add-exports=java.base/jdk.internal.access=ALL-UNNAMED", "--add-opens=java.base/java.io=ALL-UNNAMED")
         }
     }
+
+    // Android Lint (Berechtigungen, API-Level, Compose, Manifest). Was beim Einführen schon da
+    // war, steht in lint-baseline.xml; jeder neue Fund, auch eine Warnung, macht den Build rot.
+    // Die Baseline schrumpft, wenn Funde behoben werden (lintDebug meldet dann "fixed").
+    lint {
+        baseline = file("lint-baseline.xml")
+        warningsAsErrors = true
+        // Diese Funde entstehen ohne Codeänderung, sobald neue Versionen erscheinen; Updates
+        // macht Kevin bewusst, sie sollen die CI nicht von allein rot machen.
+        disable += setOf("GradleDependency", "NewerVersionAvailable", "AndroidGradlePluginVersion", "OldTargetApi")
+    }
 }
 
 ksp {

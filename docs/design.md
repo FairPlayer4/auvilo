@@ -508,7 +508,7 @@ umgesetzt / verworfen. Liste in den Einstellungen, *Teilen* als Markdown.
 
 - Tests entstehen mit dem Code; Regeln haben sprechende Testnamen.
 - Ein Befehl für alles, lokal wie in CI:
-  `./gradlew :core:check :core:koverLog :app:testDebugUnitTest :app:assembleDebug`.
+  `./gradlew :core:check :core:koverLog :app:testDebugUnitTest :app:lintDebug :app:assembleDebug`.
 
 ## 15. Schnittstelle für Claude (V1.3a2, Anf. 7.26 AG11)
 
