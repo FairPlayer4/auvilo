@@ -70,11 +70,14 @@ data class CloudStatus(val phase: CloudPhase, val notes: List<String> = emptyLis
 
 /** The server as far as signing in and setting up need it; replaced in tests. */
 interface CloudServer {
-    /** Goes with the Google sign-in ([GoogleSignIn.idToken]). */
-    val nonce: String
-
-    /** Signs in with an ID token and stores the session. */
-    suspend fun signIn(idToken: String): Angemeldet
+    /**
+     * Signs in and stores the session. [idToken] fetches the Google ID token for the given
+     * nonce ([GoogleSignIn.idToken]).
+     *
+     * KRITISCH: every sign-in gets a fresh nonce; with the same one Google hands back a cached
+     * token for up to an hour, which the server rejects as too old after 5 minutes.
+     */
+    suspend fun signIn(idToken: suspend (nonce: String) -> String): Angemeldet
 
     /** A valid session, renewed when it is about to expire. */
     suspend fun session(): Sitzung
@@ -96,8 +99,10 @@ interface CloudServer {
 class ConnectCloudServer(private val verbindung: Verbindung, key: Geraeteschluessel, sessions: SitzungsAblage) : CloudServer {
     private val anmeldung = Anmeldung(verbindung, key, sessions)
 
-    override val nonce: String get() = anmeldung.nonce
-    override suspend fun signIn(idToken: String): Angemeldet = anmeldung.anmelden(idToken)
+    override suspend fun signIn(idToken: suspend (nonce: String) -> String): Angemeldet {
+        val attempt = anmeldung.versuch()
+        return anmeldung.anmelden(attempt, idToken(attempt.nonce))
+    }
     override suspend fun session(): Sitzung = anmeldung.sitzung()
     override fun keyBackups(token: String): BackupAblage = ServerBackupAblage(verbindung, token)
     override fun unlocking(token: String): GeraeteFreischaltung = ServerGeraete(verbindung, token)
@@ -152,7 +157,7 @@ class CloudBackup(
         if (!store.enabled()) return@work
         busy("Anmelden …")
         val server = server()
-        val signedIn = server.signIn(google.idToken(activity, server.nonce))
+        val signedIn = server.signIn { nonce -> google.idToken(activity, nonce) }
         store.setUnlocked(signedIn.freigeschaltet)
         log("cloud: signed in" + if (signedIn.neuesKonto) " (new account)" else "")
         setUp(server, signedIn.sitzung, activity)

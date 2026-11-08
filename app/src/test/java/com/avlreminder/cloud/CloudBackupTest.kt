@@ -66,9 +66,8 @@ class CloudBackupTest {
         var signIns = 0
         var unlocks = 0
 
-        override val nonce = "nonce-of-the-device-key"
-
-        override suspend fun signIn(idToken: String): Angemeldet {
+        override suspend fun signIn(idToken: suspend (nonce: String) -> String): Angemeldet {
+            idToken("nonce-${signIns + 1}")
             signInError?.let { throw it }
             signIns++
             val session = Sitzung(account, "geraet-1", "token-$signIns", 4_000_000_000)

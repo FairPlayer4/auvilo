@@ -11,7 +11,7 @@ import com.google.android.libraries.identity.googleid.GoogleIdTokenCredential
 fun interface GoogleSignIn {
     /**
      * Shows Google's account picker. [nonce] binds the token to the device key
-     * (`Geraetenachrichten.nonce`), the server checks it. Throws when the person cancels
+     * (`Anmeldung.versuch`, new for every sign-in), the server checks it. Throws when the person cancels
      * (`GetCredentialCancellationException`) or there is no account.
      */
     suspend fun idToken(activity: Activity, nonce: String): String
