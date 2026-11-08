@@ -189,6 +189,9 @@ class MainActivity : ComponentActivity() {
             override fun saveKey() { graph.cloud.saveKey(this@MainActivity) }
             override fun fetchKey() { graph.cloud.fetchKey(this@MainActivity) }
             override fun reset() { graph.cloud.reset() }
+            override fun backUp() { graph.cloud.backUp() }
+            override fun sendDiagnosis() { graph.cloud.sendDiagnosis() }
+            override fun answerOverwrite(yes: Boolean) = graph.cloud.answerOverwrite(yes)
         }
         override fun answerSnoozeHint(reminderId: Long, choice: SnoozeHintChoice) = vm.answerSnoozeHint(reminderId, choice)
         override fun setArchived(reminderId: Long, archived: Boolean) = vm.setArchived(reminderId, archived)

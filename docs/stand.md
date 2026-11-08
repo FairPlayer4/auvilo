@@ -114,6 +114,12 @@ Stand: 2026-11-08. Bei jedem größeren Schritt aktualisieren.
    Geräteschlüssel und Schlüsseldatei im Keystore, DataStore `backend`, Credential Manager).
    Vorab am 2026-11-08 erledigt: Web-Client-ID im Backend angewendet, Kevins
    Backend-Konto von den Test-Schlüsseln befreit (Sicherung, Schlüssel-Backup, Geräte).
+   **Schritt 3 gebaut** am 2026-11-08 auf `feature/backup`, **noch nicht installiert**
+   (Backend-Pin `e114120`, `versionCode` 14): *Jetzt sichern* mit Rückfrage, wenn ein
+   anderes Gerät zuletzt gesichert hat, „Zuletzt gesichert“ im Status, Backend-Logger
+   `CloudLog` und *Diagnose senden* (siehe backup-entwurf.md, Schritt 3). Gerätetest nach
+   der Installation: einmal sichern (Größe und Dauer stehen im Logger), dann Diagnose
+   senden und mit `werkzeuge/diagnose-holen.sh` im Backend lesen.
 3. **Play-Store-Release** ohne Eile, erst wenn die App „fertig“ ist (mindestens bis V2);
    dafür Transparenz, Notausschalter (in V1.3a), Backend nur nach Einschalten (7.28 PS5–PS9).
 

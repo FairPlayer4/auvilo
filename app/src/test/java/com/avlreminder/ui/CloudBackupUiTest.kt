@@ -16,8 +16,9 @@ import org.junit.Assert.assertEquals
 import org.junit.Rule
 import org.junit.Test
 import org.junit.runner.RunWith
+import java.time.Instant
 
-/** "Cloud-Backup (experimentell)" in the settings (A-14), up to "eingerichtet". */
+/** "Cloud-Backup (experimentell)" in the settings (A-14): setting up, backing up by hand, diagnosis. */
 @RunWith(AndroidJUnit4::class)
 class CloudBackupUiTest {
     @get:Rule
@@ -33,6 +34,9 @@ class CloudBackupUiTest {
         override fun saveKey() { calls += "saveKey" }
         override fun fetchKey() { calls += "fetchKey" }
         override fun reset() { calls += "reset" }
+        override fun backUp() { calls += "backUp" }
+        override fun sendDiagnosis() { calls += "diagnosis" }
+        override fun answerOverwrite(yes: Boolean) { calls += "overwrite $yes" }
     }
 
     private fun show(status: CloudStatus): Recorder {
@@ -140,5 +144,52 @@ class CloudBackupUiTest {
         val actions = show(CloudStatus(CloudPhase.AskKey))
         compose.onNodeWithTag("cloudFetchKey").performClick()
         assertEquals(listOf("fetchKey"), actions.calls)
+    }
+
+    @Test
+    fun readyAndUnlockedBacksUpWithOneTapAndSaysWhenItLastDid() {
+        val actions = show(CloudStatus(CloudPhase.Ready("konto-1", "geraet-1", "AB12", unlocked = true, lastBackup = Instant.parse("2026-11-08T10:00:00Z"))))
+        compose.onNodeWithText("Zuletzt gesichert:", substring = true).assertExists()
+        compose.onNodeWithTag("cloudBackUp").performClick()
+        assertEquals(listOf("backUp"), actions.calls)
+    }
+
+    @Test
+    fun neverBackedUpSaysSo() {
+        show(CloudStatus(CloudPhase.Ready("konto-1", "geraet-1", "AB12", unlocked = true)))
+        compose.onNodeWithText("Noch nicht gesichert").assertExists()
+    }
+
+    // KRITISCH: a device that is not unlocked offers neither backing up nor a diagnosis.
+    @Test
+    fun notUnlockedOffersNoBackupAndNoDiagnosis() {
+        show(CloudStatus(CloudPhase.Ready("konto-1", "geraet-1", "AB12", unlocked = false)))
+        compose.onNodeWithTag("cloudBackUp").assertDoesNotExist()
+        compose.onNodeWithTag("cloudDiagnosis").assertDoesNotExist()
+    }
+
+    @Test
+    fun aDiagnosisIsSentOnlyAfterAskingAndSaysWhatGoesOut() {
+        val actions = show(CloudStatus(CloudPhase.Ready("konto-1", "geraet-1", "AB12", unlocked = true)))
+        compose.onNodeWithTag("cloudDiagnosis").performClick()
+        compose.onNodeWithText("Keine Reminder", substring = true).assertExists()
+        compose.onNodeWithText("Abbrechen").performClick()
+        assertEquals(emptyList<String>(), actions.calls)
+
+        compose.onNodeWithTag("cloudDiagnosis").performClick()
+        compose.onNodeWithTag("cloudDiagnosisOk").performClick()
+        assertEquals(listOf("diagnosis"), actions.calls)
+    }
+
+    // KRITISCH: overwriting another device's backup needs the person's tap (E-B2b-6).
+    @Test
+    fun anotherDevicesBackupIsOverwrittenOrKeptByTap() {
+        val actions = show(CloudStatus(CloudPhase.AskOverwrite(Instant.parse("2026-11-01T08:00:00Z"))))
+        compose.onNodeWithTag("cloudOverwriteText").assertExists()
+        compose.onNodeWithTag("cloudSwitch").assertIsNotEnabled()
+        compose.onNodeWithTag("cloudReset").assertDoesNotExist()
+        compose.onNodeWithTag("cloudKeep").performClick()
+        compose.onNodeWithTag("cloudOverwrite").performClick()
+        assertEquals(listOf("overwrite false", "overwrite true"), actions.calls)
     }
 }

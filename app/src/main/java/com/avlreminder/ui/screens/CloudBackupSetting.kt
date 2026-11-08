@@ -35,6 +35,9 @@ import androidx.compose.ui.unit.sp
 import com.avlreminder.cloud.CloudPhase
 import com.avlreminder.cloud.CloudStatus
 import com.avlreminder.ui.theme.Avl
+import java.time.Instant
+import java.time.ZoneId
+import java.time.format.DateTimeFormatter
 
 /** What the settings can do with the cloud backup; the app wires it to `CloudBackup`. */
 interface CloudActions {
@@ -46,11 +49,14 @@ interface CloudActions {
     fun saveKey() {}
     fun fetchKey() {}
     fun reset() {}
+    fun backUp() {}
+    fun sendDiagnosis() {}
+    fun answerOverwrite(yes: Boolean) {}
 }
 
 /**
- * "Cloud-Backup (experimentell)" (A-14), up to "eingerichtet". Backing up, restoring and
- * deleting follow in the next steps.
+ * "Cloud-Backup (experimentell)" (A-14): setting up, backing up by hand and sending a diagnosis.
+ * Automatic backups, restoring and deleting follow in the next steps.
  */
 @Composable
 fun CloudBackupSetting(status: CloudStatus, actions: CloudActions) {
@@ -58,7 +64,8 @@ fun CloudBackupSetting(status: CloudStatus, actions: CloudActions) {
     val phase = status.phase
     var asking by remember { mutableStateOf(false) }
     var resetting by remember { mutableStateOf(false) }
-    val busy = phase is CloudPhase.Busy || phase is CloudPhase.ShowKey || phase is CloudPhase.AskKey
+    var diagnosing by remember { mutableStateOf(false) }
+    val busy = phase is CloudPhase.Busy || phase is CloudPhase.ShowKey || phase is CloudPhase.AskKey || phase is CloudPhase.AskOverwrite
     Column(Modifier.padding(16.dp)) {
         Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
             Column(Modifier.weight(1f)) {
@@ -83,13 +90,22 @@ fun CloudBackupSetting(status: CloudStatus, actions: CloudActions) {
             }
             is CloudPhase.ShowKey -> ShowKey(phase.key, phase.saved, actions)
             CloudPhase.AskKey -> AskKey(actions)
+            is CloudPhase.AskOverwrite -> AskOverwrite(phase.created, actions)
             is CloudPhase.Ready -> {
                 Text("Fingerabdruck ${phase.fingerprint}", Modifier.padding(top = 8.dp).testTag("cloudFingerprint"), color = c.text, fontSize = 14.sp, fontFamily = FontFamily.Monospace)
                 Text("Gerät ${phase.device.take(12)}", color = c.muted, fontSize = 13.sp, fontFamily = FontFamily.Monospace)
-                if (!phase.unlocked) {
+                Text(
+                    phase.lastBackup?.let { "Zuletzt gesichert: ${shortTime(it)}" } ?: "Noch nicht gesichert",
+                    Modifier.padding(top = 4.dp).testTag("cloudLastBackup"), color = c.text, fontSize = 14.sp,
+                )
+                if (phase.unlocked) {
+                    Row(Modifier.padding(top = 4.dp), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                        Button(onClick = actions::backUp, Modifier.testTag("cloudBackUp")) { Text("Jetzt sichern") }
+                        OutlinedButton(onClick = { diagnosing = true }, Modifier.testTag("cloudDiagnosis")) { Text("Diagnose senden") }
+                    }
+                } else {
                     Text("Nicht freigeschaltet: dieses Gerät kann nichts sichern.", color = c.strict, fontSize = 13.sp)
                 }
-                Text("Sichern folgt mit dem nächsten Schritt.", Modifier.padding(top = 4.dp), color = c.muted, fontSize = 13.sp)
             }
         }
         if (phase is CloudPhase.Ready || phase == CloudPhase.NotSetUp || phase == CloudPhase.SignedOut) {
@@ -115,6 +131,22 @@ fun CloudBackupSetting(status: CloudStatus, actions: CloudActions) {
             dismissButton = { TextButton(onClick = { asking = false }) { Text("Abbrechen") } },
         )
     }
+    if (diagnosing) {
+        AlertDialog(
+            onDismissRequest = { diagnosing = false },
+            title = { Text("Diagnose senden?") },
+            text = {
+                Text(
+                    "Sendet das Protokoll des Cloud-Backups an den Server: Zeitpunkte, Schritte, Fehlerarten, Größen und " +
+                        "App-Version. Keine Reminder, keine Einstellungen, keine Schlüssel. Der Server löscht es nach 14 Tagen.",
+                )
+            },
+            confirmButton = {
+                TextButton(onClick = { diagnosing = false; actions.sendDiagnosis() }, Modifier.testTag("cloudDiagnosisOk")) { Text("Senden") }
+            },
+            dismissButton = { TextButton(onClick = { diagnosing = false }) { Text("Abbrechen") } },
+        )
+    }
     if (resetting) {
         AlertDialog(
             onDismissRequest = { resetting = false },
@@ -138,6 +170,7 @@ private fun headline(phase: CloudPhase): String = when (phase) {
     CloudPhase.Off -> "Aus"
     CloudPhase.SignedOut -> "Nicht angemeldet"
     is CloudPhase.Busy -> "Bitte warten"
+    is CloudPhase.AskOverwrite -> "Sichern"
     CloudPhase.NotSetUp, is CloudPhase.ShowKey, CloudPhase.AskKey -> "Einrichtung"
     is CloudPhase.Ready -> "Eingerichtet"
 }
@@ -220,4 +253,26 @@ private fun AskKey(actions: CloudActions) {
         OutlinedButton(onClick = { actions.submitKey(null) }) { Text("Abbrechen") }
     }
     TextButton(onClick = actions::fetchKey, Modifier.testTag("cloudFetchKey")) { Text("Aus dem Passwortmanager holen") }
+}
+
+private val SHORT_TIME = DateTimeFormatter.ofPattern("dd.MM.yyyy HH:mm")
+
+private fun shortTime(t: Instant): String = SHORT_TIME.format(t.atZone(ZoneId.systemDefault()))
+
+/**
+ * Another device backed up last (E-B2b-6). Overwriting replaces its backup on the server; its data
+ * are then only on that device.
+ */
+@Composable
+private fun AskOverwrite(created: Instant, actions: CloudActions) {
+    val c = Avl.colors
+    Text(
+        "Die Sicherung auf dem Server stammt von einem anderen Gerät (${shortTime(created)}). Mit diesem Handy " +
+            "überschreiben? Die Daten des anderen Geräts sind dann nur noch dort.",
+        Modifier.padding(top = 8.dp).testTag("cloudOverwriteText"), color = c.text, fontSize = 14.sp,
+    )
+    Row(Modifier.padding(top = 8.dp), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+        Button(onClick = { actions.answerOverwrite(true) }, Modifier.testTag("cloudOverwrite")) { Text("Überschreiben") }
+        OutlinedButton(onClick = { actions.answerOverwrite(false) }, Modifier.testTag("cloudKeep")) { Text("Nicht sichern") }
+    }
 }

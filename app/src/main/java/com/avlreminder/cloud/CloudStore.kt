@@ -31,6 +31,8 @@ class CloudStore(private val context: Context) : SitzungsAblage {
     private val tokenKey = stringPreferencesKey("token")
     private val expiresKey = longPreferencesKey("expiresUnix")
     private val unlockedKey = booleanPreferencesKey("unlocked")
+    private val lastBackupKey = longPreferencesKey("lastBackupUnix")
+    private val lastBackupAccountKey = stringPreferencesKey("lastBackupAccount")
 
     private suspend fun prefs() = context.backendStore.data.first()
 
@@ -46,6 +48,19 @@ class CloudStore(private val context: Context) : SitzungsAblage {
 
     suspend fun setUnlocked(on: Boolean) {
         context.backendStore.edit { it[unlockedKey] = on }
+    }
+
+    /** When [account] last backed up from this device; another account's time does not count. */
+    suspend fun lastBackup(account: String): Long? {
+        val p = prefs()
+        return if (p[lastBackupAccountKey] == account) p[lastBackupKey] else null
+    }
+
+    suspend fun setLastBackup(account: String, unix: Long) {
+        context.backendStore.edit {
+            it[lastBackupAccountKey] = account
+            it[lastBackupKey] = unix
+        }
     }
 
     override suspend fun lesen(): Sitzung? {

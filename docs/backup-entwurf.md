@@ -83,7 +83,28 @@ Schlüssel-Backup löschen, Testgeräte sperren); dann richtet die App **neue** 
      (die Oberfläche wartet auf die Eingabe, ohne einen Thread zu blockieren).
    - Die Web-Client-ID steht in `google_client_ids` (Backend `infra/variablen.tf`), ist aber
      **noch nicht angewendet**.
-3. **Sichern von Hand und Status**, Backend-Logger, *Diagnose senden*.
+3. **Sichern von Hand und Status**, Backend-Logger, *Diagnose senden*. Plan (2026-11-08),
+   umgesetzt am 2026-11-08 (`BackupPayload.kt`, `BackupStateFile.kt`, `CloudLog.kt`):
+   - *Jetzt sichern* (nur eingerichtet und freigeschaltet): Nutzlast nach A-8 als ZIP mit
+     `avlreminder.db` (`VACUUM INTO` in den Cache, danach gelöscht) und `einstellungen.json`;
+     Einträge mit fester Zeit, damit gleiche Daten gleiche Bytes ergeben (Hash in Schritt 4).
+     Dann `Sicherungsablauf.sichern(…, automatisch = false)` aus `protokoll`.
+   - `SicherungsStand` als kleine Datei `filesDir/backend/sicherung.json` mit Konto-ID (eine
+     fremde Konto-ID gilt als „kein Stand“). Liegt bei den Schlüsseln, damit *Zurücksetzen*
+     ihn mitlöscht.
+   - Status unter dem Fingerabdruck: „Zuletzt gesichert: <Datum, Uhrzeit>“ bzw. „Noch nicht
+     gesichert“, im DataStore `backend` gemerkt; ein Fehler steht wie bisher als Text darunter.
+   - Stammt die Sicherung auf dem Server von einem anderen Gerät: Rückfrage „Überschreiben?“
+     mit Datum der fremden Sicherung (A-10). Dafür werden die Rückfragen von
+     `Sicherungsablauf` im Backend `suspend` (wie bei `Einrichtung`).
+   - Backend-Logger `CloudLog` (A-12): feste Ereignisnamen und Felder nur als Zahl,
+     Wahrheitswert oder Aufzählung (anderes lehnt er ab), Fehler als Schritt und Art aus
+     Aufzählungen, bei Serverfehlern mit Connect-Code; von einer Ausnahme nur Klasse und
+     höchstens 20 Stapelzeilen, nie die Meldung; höchstens 500
+     Ereignisse in `filesDir/cloud-diag/`. *Diagnose senden* (nur freigeschaltet) schickt Kopf
+     und Ereignisse nach formate.md, erst nach einer Rückfrage; `diag.log` bleibt davon
+     getrennt. Der Server nimmt sie nur an, wenn die Konto-ID in `diagnose_konten` steht
+     (Backend `infra/diagnose.tf`, E-D-3).
 4. **Automatisch** (WorkManager, Hash, zweites Gerät, Hinweis nach 3 Tagen).
 5. **Wiederherstellen und Löschen.** Gerätetest auf einem zweiten Gerät oder Emulator,
    nicht durch Neuinstallation auf dem S24 (dort nie deinstallieren).

@@ -10,12 +10,22 @@ import androidx.credentials.exceptions.NoCredentialException
 import androidx.test.core.app.ApplicationProvider
 import androidx.test.ext.junit.runners.AndroidJUnit4
 import com.avlreminder.protokoll.BackupAblage
+import com.avlreminder.protokoll.Datensicherung
+import com.avlreminder.protokoll.DiagnoseAblage
+import com.avlreminder.protokoll.DiagnoseNichtFreigeschaltet
+import com.avlreminder.protokoll.GemerkteSicherung
+import com.avlreminder.protokoll.GeholteSicherung
 import com.avlreminder.protokoll.GeholtesBackup
 import com.avlreminder.protokoll.GeraeteFreischaltung
 import com.avlreminder.protokoll.GeraetNichtFreigeschaltet
 import com.avlreminder.protokoll.LokaleAblage
 import com.avlreminder.protokoll.LokalerStand
 import com.avlreminder.protokoll.Schluesselbund
+import com.avlreminder.protokoll.Sicherung
+import com.avlreminder.protokoll.SicherungTageslimit
+import com.avlreminder.protokoll.SicherungsAblage
+import com.avlreminder.protokoll.SicherungsStand
+import com.avlreminder.protokoll.Sicherungskopf
 import com.avlreminder.protokoll.VersionVeraltet
 import com.avlreminder.protokoll.Wiederherstellungsschluessel
 import com.avlreminder.verbindung.Angemeldet
@@ -39,10 +49,16 @@ import org.junit.Assert.assertFalse
 import org.junit.Assert.assertNotNull
 import org.junit.Assert.assertNull
 import org.junit.Assert.assertTrue
+import org.json.JSONObject
 import org.junit.Before
+import org.junit.Rule
 import org.junit.Test
+import org.junit.rules.TemporaryFolder
 import org.junit.runner.RunWith
 import org.robolectric.Robolectric
+import java.io.ByteArrayInputStream
+import java.time.Instant
+import java.util.zip.GZIPInputStream
 
 /**
  * Switching on, signing in and setting up (backup-entwurf.md "Ablauf Einrichtung"). Server and
@@ -94,6 +110,35 @@ class CloudBackupTest {
 
         override fun unlocking(token: String) = GeraeteFreischaltung { unlocks++ }
 
+        /** The data backup on the server. */
+        var data: GeholteSicherung? = null
+        var dataError: Throwable? = null
+
+        override fun dataBackups(token: String) = object : SicherungsAblage {
+            override suspend fun holen() = data
+
+            override suspend fun speichern(chiffrat: ByteArray, erwartet: Long): Long {
+                dataError?.let { throw it }
+                if ((data?.version ?: 0) != erwartet) throw VersionVeraltet()
+                data = GeholteSicherung(chiffrat, erwartet + 1)
+                return erwartet + 1
+            }
+
+            override suspend fun loeschen() {
+                data = null
+            }
+        }
+
+        val diagnoses = mutableListOf<ByteArray>()
+        var diagnosisError: Throwable? = null
+
+        override fun diagnosis(token: String) = object : DiagnoseAblage {
+            override suspend fun senden(nutzlast: ByteArray) {
+                diagnosisError?.let { throw it }
+                diagnoses += nutzlast
+            }
+        }
+
         var deleteError: Throwable? = null
         var dataBackup = true
         val locked = mutableListOf<String>()
@@ -117,6 +162,15 @@ class CloudBackupTest {
     private var googleCalls = 0
     private var googleError: Throwable? = null
     private val local = mutableMapOf<String, LokalerStand>()
+    private val remembered = mutableMapOf<String, GemerkteSicherung>()
+    private val payload = "die Daten".toByteArray()
+    private var payloadReads = 0
+
+    @get:Rule val tmp = TemporaryFolder()
+    private val events by lazy { CloudLog(tmp.newFolder("cloud-diag"), header = { mapOf("app" to "test") }) }
+
+    /** The logged events after the header, as JSON. */
+    private fun events() = events.lines().drop(1).map(::JSONObject)
 
     private fun cloud() = CloudBackup(
         store,
@@ -141,6 +195,14 @@ class CloudBackupTest {
             local.clear()
         },
         scope = scope,
+        backupState = { acc ->
+            object : SicherungsStand {
+                override fun laden() = remembered[acc]
+                override fun speichern(stand: GemerkteSicherung) { remembered[acc] = stand }
+            }
+        },
+        source = { payloadReads++; payload },
+        events = events,
         log = { logged += it },
     )
 
@@ -619,5 +681,149 @@ class CloudBackupTest {
         blocking { cloud.reset().join() }
         assertEquals(0, wiped)
         assertEquals(0, serversCreated)
+    }
+
+    /** The data backup on the server, decrypted with this phone's vault key. */
+    private fun onServer(): Sicherung =
+        Datensicherung.entschluesseln(requireNotNull(server.data).chiffrat, local.getValue(account).bund.tresor, account)
+
+    /** A backup of another device, already on the server. */
+    private fun backupOfAnotherDevice(created: Instant): ByteArray {
+        val c = Datensicherung.verschluesseln(
+            Sicherung(Sicherungskopf(1, created, "geraet-2", 8), "fremd".toByteArray()), local.getValue(account).bund.tresor, account,
+        )
+        server.data = GeholteSicherung(c, 1)
+        return c
+    }
+
+    // KRITISCH: switched off or not set up, nothing is read and nothing reaches the server.
+    @Test
+    fun switchedOffOrSignedOutBackingUpAndSendingDoNothing() {
+        val cloud = cloud()
+        blocking { cloud.backUp().join() }
+        blocking { cloud.sendDiagnosis().join() }
+        blocking { cloud.setEnabled(true).join() }
+        blocking { cloud.backUp().join() }
+        assertEquals(CloudPhase.SignedOut, cloud.status.value.phase)
+        assertEquals(0, serversCreated)
+        assertEquals(0, payloadReads)
+        assertTrue(server.diagnoses.isEmpty())
+    }
+
+    @Test
+    fun backingUpUploadsTheEncryptedDataAndShowsWhen() {
+        val cloud = cloud()
+        assertNull(ready(cloud).lastBackup)
+        blocking { cloud.backUp().join() }
+        val phase = cloud.status.value.phase as CloudPhase.Ready
+        assertNotNull(phase.lastBackup)
+        assertNull(cloud.status.value.error)
+        val backup = onServer()
+        assertTrue(backup.nutzlast.contentEquals(payload))
+        assertEquals("geraet-1", backup.kopf.geraetId)
+        assertEquals(1L, backup.kopf.zaehler)
+        assertEquals(GemerkteSicherung(1, 1), remembered[account])
+        assertEquals(listOf("gesichert"), events().map { it.getString("ereignis") }.filter { it == "gesichert" })
+    }
+
+    @Test
+    fun aSecondBackupCountsOn() {
+        val cloud = cloud()
+        ready(cloud)
+        blocking { cloud.backUp().join() }
+        blocking { cloud.backUp().join() }
+        assertEquals(2L, onServer().kopf.zaehler)
+        assertEquals(2L, server.data?.version)
+    }
+
+    // KRITISCH: another device's backup is replaced only on yes (E-B2b-6).
+    @Test
+    fun anotherDevicesBackupStaysWhenThePersonSaysNo() {
+        val cloud = cloud()
+        ready(cloud)
+        val created = Instant.parse("2026-11-01T08:00:00Z")
+        val before = backupOfAnotherDevice(created)
+        val job = cloud.backUp()
+        assertEquals(CloudPhase.AskOverwrite(created), cloud.awaitPhase(CloudPhase.AskOverwrite::class.java).phase)
+        cloud.answerOverwrite(false)
+        blocking { job.join() }
+        assertTrue(server.data!!.chiffrat.contentEquals(before))
+        assertNull((cloud.status.value.phase as CloudPhase.Ready).lastBackup)
+        assertTrue(cloud.status.value.notes.toString(), cloud.status.value.notes.any { "Nicht gesichert" in it })
+        assertEquals(true, remembered[account]?.abgelehnt)
+    }
+
+    @Test
+    fun anotherDevicesBackupIsReplacedWhenThePersonSaysYes() {
+        val cloud = cloud()
+        ready(cloud)
+        backupOfAnotherDevice(Instant.parse("2026-11-01T08:00:00Z"))
+        val job = cloud.backUp()
+        cloud.awaitPhase(CloudPhase.AskOverwrite::class.java)
+        cloud.answerOverwrite(true)
+        blocking { job.join() }
+        val backup = onServer()
+        assertEquals("geraet-1", backup.kopf.geraetId)
+        assertTrue(backup.nutzlast.contentEquals(payload))
+        assertEquals(2L, backup.kopf.zaehler)
+        assertNotNull((cloud.status.value.phase as CloudPhase.Ready).lastBackup)
+    }
+
+    @Test
+    fun theDailyLimitIsShownAndLoggedWithoutText() {
+        val cloud = cloud()
+        ready(cloud)
+        server.dataError = SicherungTageslimit()
+        blocking { cloud.backUp().join() }
+        assertTrue(cloud.status.value.error.orEmpty(), cloud.status.value.error.orEmpty().contains("Limit"))
+        assertNull((cloud.status.value.phase as CloudPhase.Ready).lastBackup)
+        val failed = events().last()
+        assertEquals("fehlgeschlagen", failed.getString("ereignis"))
+        assertEquals("BACKUP", failed.getJSONObject("felder").getString("schritt"))
+        assertEquals("DAILY_LIMIT", failed.getJSONObject("felder").getString("art"))
+        assertFalse(failed.toString(), "morgen" in failed.toString())
+    }
+
+    @Test
+    fun aServerOutageIsLoggedWithItsCode() {
+        val cloud = cloud()
+        ready(cloud)
+        server.sessionError = Serverfehler(ConnectException(Code.UNAVAILABLE), vomDienst = false)
+        blocking { cloud.backUp().join() }
+        val fields = events().last().getJSONObject("felder")
+        assertEquals("SERVER", fields.getString("art"))
+        assertEquals("UNAVAILABLE", fields.getString("code"))
+        assertFalse(fields.getBoolean("vom_dienst"))
+        assertNull(server.data)
+    }
+
+    // KRITISCH: only the backend logger's lines go out, never diag.log (it may hold titles).
+    @Test
+    fun aDiagnosisSendsTheLoggerAndNothingElse() {
+        val cloud = cloud()
+        ready(cloud)
+        blocking { cloud.backUp().join() }
+        blocking { cloud.sendDiagnosis().join() }
+        val sent = GZIPInputStream(ByteArrayInputStream(server.diagnoses.single())).readBytes().toString(Charsets.UTF_8).trim().lines()
+        assertEquals(events.lines().dropLast(1), sent) // the last event is "gesendet" itself
+        assertEquals("kopf", JSONObject(sent[0]).getString("art"))
+        assertTrue(sent.none { line -> logged.any { it in line } })
+        assertTrue(cloud.status.value.notes.toString(), cloud.status.value.notes.any { "Diagnose gesendet" in it })
+    }
+
+    @Test
+    fun anAccountWithoutDiagnosisSaysSo() {
+        val cloud = cloud()
+        ready(cloud)
+        server.diagnosisError = DiagnoseNichtFreigeschaltet()
+        blocking { cloud.sendDiagnosis().join() }
+        assertEquals("Dieses Konto darf keine Diagnose senden.", cloud.status.value.error)
+    }
+
+    @Test
+    fun theLastBackupOfAnotherAccountIsNotShown() = blocking {
+        store.setLastBackup("konto-2", 1_700_000_000)
+        assertNull(store.lastBackup(account))
+        assertEquals(1_700_000_000L, store.lastBackup("konto-2"))
     }
 }

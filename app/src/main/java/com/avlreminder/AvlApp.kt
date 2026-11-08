@@ -3,6 +3,8 @@ package com.avlreminder
 import android.app.Application
 import android.app.NotificationManager
 import android.content.Context
+import android.content.pm.ApplicationInfo
+import android.os.Build
 import androidx.glance.appwidget.updateAll
 import com.avlreminder.alarm.AlarmPause
 import com.avlreminder.alarm.AlarmService
@@ -13,7 +15,10 @@ import com.avlreminder.alarm.PreNotices
 import com.avlreminder.alarm.Ringer
 import com.avlreminder.core.model.Place
 import com.avlreminder.claude.ClaudeApi
+import com.avlreminder.cloud.AppBackupSource
+import com.avlreminder.cloud.BackupStateFile
 import com.avlreminder.cloud.CloudBackup
+import com.avlreminder.cloud.CloudLog
 import com.avlreminder.cloud.CloudConfig
 import com.avlreminder.cloud.CloudStore
 import com.avlreminder.cloud.ConnectCloudServer
@@ -121,7 +126,19 @@ class AppGraph(private val context: Context) : ClaudeApi.Access {
             deleteBackendKeystoreEntries()
         },
         scope = scope,
+        backupState = { account -> BackupStateFile(File(context.filesDir, "backend"), account) },
+        source = AppBackupSource(db, settings, context.cacheDir),
+        events = CloudLog(File(context.filesDir, "cloud-diag"), header = ::diagnosisHeader),
         log = Diag::log,
+    )
+
+    /** The first line of a diagnosis (formate.md): which app on which phone, nothing personal. */
+    private fun diagnosisHeader(): Map<String, Any> = mapOf(
+        "app" to "$appVersion ($appVersionCode)",
+        "variante" to if (context.applicationInfo.flags and ApplicationInfo.FLAG_DEBUGGABLE != 0) "debug" else "release",
+        "android" to Build.VERSION.SDK_INT,
+        "modell" to Build.MODEL,
+        "schema" to AvlDatabase.VERSION,
     )
     private val engine = ReminderEngine(
         repository, AndroidAlarmPort(context), SystemZoneClock, AndroidDeviceState(context),
@@ -135,6 +152,10 @@ class AppGraph(private val context: Context) : ClaudeApi.Access {
 
     val appVersion: String by lazy {
         runCatching { context.packageManager.getPackageInfo(context.packageName, 0).versionName }.getOrNull() ?: "?"
+    }
+
+    private val appVersionCode: Long by lazy {
+        runCatching { context.packageManager.getPackageInfo(context.packageName, 0).longVersionCode }.getOrDefault(0L)
     }
 
     /** Notes an improvement (Anf. 7.24) with where it came from; stays on the phone. */
