@@ -797,6 +797,17 @@ class CloudBackupTest {
         assertNull(server.data)
     }
 
+    @Test
+    fun withoutNetworkItSaysSoAndLogsANetworkError() {
+        val cloud = cloud()
+        ready(cloud)
+        server.sessionError = java.net.ConnectException("Failed to connect")
+        blocking { cloud.backUp().join() }
+        assertEquals("Kein Netz oder Server nicht erreichbar.", cloud.status.value.error)
+        assertEquals("NETWORK", events().last().getJSONObject("felder").getString("art"))
+        assertTrue(cloud.status.value.phase is CloudPhase.Ready)
+    }
+
     // KRITISCH: only the backend logger's lines go out, never diag.log (it may hold titles).
     @Test
     fun aDiagnosisSendsTheLoggerAndNothingElse() {

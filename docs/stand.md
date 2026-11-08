@@ -115,7 +115,11 @@ Stand: 2026-11-08. Bei jedem größeren Schritt aktualisieren.
    Vorab am 2026-11-08 erledigt: Web-Client-ID im Backend angewendet, Kevins
    Backend-Konto von den Test-Schlüsseln befreit (Sicherung, Schlüssel-Backup, Geräte).
    **Schritt 3 installiert** am 2026-11-08 20:25 (Backend-Pin `b9c702d`, `versionCode` 14;
-   Start ok, 162 Alarme vorher und nachher; Gerätetest offen): *Jetzt sichern* mit Rückfrage, wenn ein
+   Start ok, 162 Alarme vorher und nachher; Gerätetest am 2026-11-08 20:36–20:39: drei
+   Sicherungen mit 33 KiB in 0,4–2,2 s, Status nach Neustart ok; Diagnose abgelehnt, weil
+   das Konto nicht in `diagnose_konten` stand (angewendet, Server `server-00015-q9f`, neu
+   testen); im Flugmodus kam „Server gesperrt oder gestört“ statt „Kein Netz“, behoben im
+   Backend `c289c1b`, gebaut, noch nicht installiert): *Jetzt sichern* mit Rückfrage, wenn ein
    anderes Gerät zuletzt gesichert hat, „Zuletzt gesichert“ im Status, Backend-Logger
    `CloudLog` und *Diagnose senden* (siehe backup-entwurf.md, Schritt 3). Gerätetest nach
    der Installation: einmal sichern (Größe und Dauer stehen im Logger), dann Diagnose
