@@ -114,8 +114,8 @@ Stand: 2026-11-08. Bei jedem größeren Schritt aktualisieren.
    Geräteschlüssel und Schlüsseldatei im Keystore, DataStore `backend`, Credential Manager).
    Vorab am 2026-11-08 erledigt: Web-Client-ID im Backend angewendet, Kevins
    Backend-Konto von den Test-Schlüsseln befreit (Sicherung, Schlüssel-Backup, Geräte).
-   **Schritt 3 gebaut** am 2026-11-08 auf `feature/backup`, **noch nicht installiert**
-   (Backend-Pin `e114120`, `versionCode` 14): *Jetzt sichern* mit Rückfrage, wenn ein
+   **Schritt 3 installiert** am 2026-11-08 20:25 (Backend-Pin `b9c702d`, `versionCode` 14;
+   Start ok, 162 Alarme vorher und nachher; Gerätetest offen): *Jetzt sichern* mit Rückfrage, wenn ein
    anderes Gerät zuletzt gesichert hat, „Zuletzt gesichert“ im Status, Backend-Logger
    `CloudLog` und *Diagnose senden* (siehe backup-entwurf.md, Schritt 3). Gerätetest nach
    der Installation: einmal sichern (Größe und Dauer stehen im Logger), dann Diagnose
