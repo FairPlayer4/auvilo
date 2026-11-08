@@ -3,6 +3,7 @@ package com.avlreminder.cloud
 import android.app.Activity
 import android.content.Context
 import androidx.credentials.exceptions.GetCredentialCancellationException
+import androidx.credentials.exceptions.GetCredentialUnknownException
 import androidx.test.core.app.ApplicationProvider
 import androidx.test.ext.junit.runners.AndroidJUnit4
 import com.avlreminder.protokoll.BackupAblage
@@ -54,6 +55,8 @@ class CloudBackupTest {
         var unlockedAtSignIn = false
         var signInError: Throwable? = null
         var sessionError: Throwable? = null
+        var uploadError: Throwable? = null
+        var uploads = 0
         var signIns = 0
         var unlocks = 0
 
@@ -76,6 +79,8 @@ class CloudBackupTest {
             override suspend fun holen() = backup
 
             override suspend fun speichern(chiffrat: ByteArray, freischaltschluessel: ByteArray, erwartet: Long): Long {
+                uploadError?.let { throw it }
+                uploads++
                 if ((backup?.version ?: 0) != erwartet) throw VersionVeraltet()
                 backup = GeholtesBackup(chiffrat, erwartet + 1)
                 return erwartet + 1
@@ -106,7 +111,9 @@ class CloudBackupTest {
             "id-token-for-$nonce"
         },
         scope = scope,
+        log = { logged += it },
     )
+    private val logged = mutableListOf<String>()
 
     private fun <T> blocking(block: suspend () -> T): T = runBlocking { withTimeout(10_000) { block() } }
 
@@ -168,6 +175,49 @@ class CloudBackupTest {
         assertEquals(ready.fingerprint, local.getValue(account).bund.person.oeffentlich.fingerabdruck())
         assertNull(local.getValue(account).offenesBackup)
         assertTrue(ready.unlocked)
+    }
+
+    // KRITISCH: keys whose backup is not on the server yet are not "set up"; continuing uploads
+    // the same backup, so the key already written down stays valid.
+    @Test
+    fun aFailedUploadIsNotSetUpAndContinuingUploadsTheSameKeys() {
+        val cloud = cloud()
+        blocking { cloud.setEnabled(true).join() }
+        server.uploadError = Serverfehler(ConnectException(Code.UNAVAILABLE), vomDienst = false)
+        val job = cloud.signIn(activity)
+        val shown = (cloud.awaitPhase(CloudPhase.ShowKey::class.java).phase as CloudPhase.ShowKey).key
+        cloud.confirmKey(true)
+        blocking { job.join() }
+        assertEquals(CloudPhase.NotSetUp, cloud.status.value.phase)
+        assertNull(server.backup)
+        assertNotNull("kept locally with the open backup", local[account]?.offenesBackup)
+
+        server.uploadError = null
+        blocking { cloud.continueSetup().join() }
+        val ready = cloud.status.value.phase as CloudPhase.Ready
+        assertEquals(1, server.uploads)
+        val restored = Schluesselbund.ausBackup(requireNotNull(server.backup).chiffrat, Wiederherstellungsschluessel.ausText(shown), account)
+        assertEquals(restored.person.oeffentlich.fingerabdruck(), ready.fingerprint)
+        assertNull(local.getValue(account).offenesBackup)
+    }
+
+    @Test
+    fun aFailedGoogleSignInLogsWhatGoogleSaid() {
+        googleError = GetCredentialUnknownException("[28444] Developer console is not set up correctly.")
+        val cloud = cloud()
+        blocking { cloud.setEnabled(true).join() }
+        blocking { cloud.signIn(activity).join() }
+        assertEquals(CloudPhase.SignedOut, cloud.status.value.phase)
+        assertTrue(logged.toString(), logged.any { "28444" in it })
+    }
+
+    @Test
+    fun aServerErrorIsLoggedWithItsCode() {
+        server.signInError = Serverfehler(ConnectException(Code.RESOURCE_EXHAUSTED), vomDienst = true)
+        val cloud = cloud()
+        blocking { cloud.setEnabled(true).join() }
+        blocking { cloud.signIn(activity).join() }
+        assertTrue(logged.toString(), logged.any { "resource_exhausted" in it && "vomDienst=true" in it })
     }
 
     @Test

@@ -198,7 +198,7 @@ class CloudBackup(
             } catch (e: Throwable) {
                 if (e is AnmeldungAbgelehnt) store.forgetSession()
                 error = describe(e)
-                log("cloud: failed (${e::class.simpleName})")
+                log("cloud: failed (${logDetail(e)})")
             } finally {
                 confirm = null
                 typed = null
@@ -225,6 +225,17 @@ class CloudBackup(
     private fun phase(p: CloudPhase) = state.update { it.copy(phase = p) }
 
     companion object {
+        /**
+         * For the diag log: the kind of error and what Google or the server said about it. The
+         * cause of a failed Google sign-in (wrong SHA-1, client not set up) is only in
+         * [GetCredentialException.errorMessage]. No tokens, keys or contents.
+         */
+        fun logDetail(e: Throwable): String = when (e) {
+            is GetCredentialException -> "${e::class.simpleName} ${e.type}: ${e.errorMessage}"
+            is Serverfehler -> "Serverfehler ${e.code.codeName}, vomDienst=${e.vomDienst}"
+            else -> e::class.simpleName.orEmpty()
+        }
+
         /** A short text for the person; null = nothing to show (cancelled at Google). */
         fun describe(e: Throwable): String? = when (e) {
             is GetCredentialCancellationException -> null
