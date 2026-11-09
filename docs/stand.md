@@ -189,6 +189,13 @@ Stand: 2026-11-09. Bei jedem größeren Schritt aktualisieren.
    seit 2026-11-02). Branch-Regel für `main` setzt Kevin.
 4. **V1.3**: Entwurf bestätigt (design.md *Entwurf V1.3*, E.5). V1.3a ist gebaut (siehe
    oben); danach V1.3b (Sitzung mit Timer, Uhr) und V1.3c (Abläufe).
+5. **Gerätetests überarbeiten** (Kevin, 2026-11-09; Backend-Review Lauf 9 R5): nach jeder
+   Änderung ein kleines festes Set manueller Tests auf dem S24, größere Testschleifen mit
+   dem Emulator. `geraetetest.md` wird dafür gesondert überarbeitet, mit den Cloud-Fällen.
+6. **Später, stört aktuell nicht:** Checklisten mit mehreren Uhrzeiten täglich – Kevin
+   vermutet dort einen Fehler (noch nicht beschrieben); WLAN-Sonde (V1.3b0.3) auslesen.
+7. **Versionsname** je installiertem Stand `1.3b0.<n>-backup<Schritt>`, `versionCode` +1
+   (ab Code 15, Kap. 9 vom 2026-11-09).
 
 ## Doku
 - [design.md](design.md) beschreibt seit 2026-11-02 nur den aktuellen Stand, nach

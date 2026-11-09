@@ -4,18 +4,18 @@ Letztes Architektur-Review: Lauf 2 (2026-11-03)
 
 ## Beabsichtigte Architektur
 - **Schichten:** `:core` ist reines Kotlin (model, rules, ports, usecases) und kennt kein Android. `:app` ist Android (ui, alarm, data, location, system, widget, claude) und hängt von `:core` ab, nie umgekehrt. Regeln gehören nach `:core`, `:app` setzt sie nur um.
-- **Änderungen:** Alle Änderungen an Remindern und Fälligkeiten laufen über `ReminderEngine`, auch aus UI, Receivern, Benachrichtigungen und der Claude-Schnittstelle.
-- **Wahrheit:** Die Room-DB ist die einzige Wahrheit. Alarme, Geofences, Übersicht und Vorab-Reminder werden daraus abgeleitet und per `sync` neu aufgebaut.
-- **Zeit und Container:** Zeit kommt nur über `Clock`. Es gibt keine DI-Bibliothek, nur den Container `AppGraph`. Engine-Aufrufe laufen nacheinander über `withEngine`.
+- **Änderungen:** Alle Änderungen an Remindern und Fälligkeiten laufen über `ReminderEngine`, auch aus UI, Receivern, Benachrichtigungen und der Claude-Schnittstelle. Die Engine ist eine Fassade mit internen Teilen (`Scheduler`, `AlarmViews`, `Changes`).
+- **Wahrheit:** Die Room-DB und die Einstellungen im DataStore (die mit ins Backup gehen) sind die Wahrheit. Alarme, Geofences, Übersicht und Vorab-Reminder werden daraus abgeleitet und per `sync` neu aufgebaut.
+- **Zeit und Container:** In `:core` kommt Zeit nur über `Clock`; in `:app` ist das ein Ziel, keine Regel. Es gibt keine DI-Bibliothek, nur den Container `AppGraph`. Engine-Aufrufe laufen nacheinander über `withEngine`.
 - **Vertrauensgrenzen:**
   - adb-Provider `com.avlreminder.claude`: `DUMP`, nur im Debug-Build, Schalter in der App.
   - Exportierte Receiver und PendingIntents.
   - Migrationen (Datenverlust), mit Backup vor jeder Migration.
   - Private Inhalte (Nachweise, Positionen) dürfen nicht ins Log.
 
-Vom Entwickler bestätigt am 2026-11-03.
+Vom Entwickler bestätigt am 2026-11-03, die Anpassungen aus Lauf 2 (Wahrheit, Zeit, Fassade) am 2026-11-09.
 
-Anpassungsvorschläge aus Lauf 2 (noch nicht bestätigt): „Wahrheit“ = Room plus DataStore-Einstellungen; „Zeit nur über `Clock`“ gilt bisher nur in `:core`; Engine als Fassade mit internen Teilen.
+Das Cloud-Backup (`app/…/cloud`, `restore`) prüft der review-loop des Backend-Repos mit (Bereich „App: Wiederherstellen“, zuletzt Lauf 10 am 2026-11-09).
 
 ## Bereiche
 | Bereich | Pfade | Anforderungen/Doku | Tests | Zuletzt reviewt | Zustand |
@@ -50,7 +50,7 @@ Keine. Kleine offene Unklarheiten (Sommerzeit, Handy aus im Zeitraum, *Auslassen
 
 ## Getroffene Entscheidungen
 - 2026-11-03: `.review/` liegt im Repository.
-- 2026-11-03: Das Architekturbild oben ist bestätigt.
+- 2026-11-03: Das Architekturbild oben ist bestätigt; 2026-11-09 die Anpassungen aus Lauf 2.
 - 2026-11-03 (Fragen 1–4, nach Vorschlag, umgesetzt in V1.3a3): Die Schnittstelle ändert, pausiert und archiviert keinen klingelnden oder überfälligen Reminder. Nach „Handy aus“ klingelt der heute zuletzt begonnene Termin. *Notaus* ist nur neutral, wenn die Pause vor der Fälligkeit begann. Fristen bleiben im Notaus hart.
 - 2026-11-03 (Frage 5): Die NT2-Karte braucht kein *Minimum*; keine Abweichung mehr.
 - 2026-11-03 (Frage 7a, 7c, umgesetzt in V1.3a3): Checkliste mit mehreren Uhrzeiten läuft über die Termine, ein Punkt pro Termin; das Minimum-Limit zählt Tage.

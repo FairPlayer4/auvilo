@@ -55,7 +55,7 @@ App, bevor irgendetwas die Datenbank öffnet.
 | W-4 | Ältere Sicherung als die App (Schema kleiner) | Die Prüfdatei wird mit Room **in der Datei selbst** migriert, nie die laufende Datenbank. Neueres Schema: ablehnen (`NeueresSchema`), wie in A-11. | Die Migration ist der riskanteste Teil; sie läuft so auf einer Kopie, und ein Fehler lässt die echten Daten unberührt. |
 | W-5 | Ablauf Wiederherstellen | (1) wie W-1 holen und prüfen, mit Room öffnen (prüft das Schema) und `PRAGMA foreign_key_check`; (2) Übersicht zeigen: „Sicherung vom … von Gerät …, 42 Reminder (hier: 40)“, Rückfrage mit zwei Tipps wie beim Schlüssel; (3) Datei als `restore/bereit.db` ablegen und Merker `restore/auftrag.json` schreiben; (4) App-Prozess neu starten; (5) in `AvlDatabase.create`, **bevor Room öffnet**: laufende Datenbank per `VACUUM INTO` nach `backup/vor-wiederherstellung-<Zeit>.db` kopieren, `bereit.db` per Umbenennen an ihre Stelle setzen, `-wal` und `-shm` löschen, Einstellungen übernehmen (ohne *Notaus* und Schnittstelle), Merker löschen; (6) der normale Start plant alle Alarme neu. | Umbenennen ist auf demselben Dateisystem atomar (`filesDir` und `databases` liegen beide im App-Ordner). Über den Merker setzt ein Absturz an jeder Stelle beim nächsten Start sauber fort oder bricht ab (Tests für jeden Schritt). |
 | W-6 | Rückgängig | Nach einem Wiederherstellen steht 7 Tage lang *Wiederherstellen rückgängig machen* in den Einstellungen. Es setzt `vor-wiederherstellung-*.db` mit demselben Ablauf (Merker, Neustart) wieder ein, ohne Netz. | Ein Fehlgriff ist dann ohne Cloud rückgängig zu machen. |
-| W-7 | Was passiert danach mit dem Takt? | Nach dem Wiederherstellen ist die Sicherung auf dem Server „von einem anderen Gerät“ (wenn sie von dort stammt); das automatische Sichern startet erst nach einem Sichern von Hand, das wie in Schritt 3 fragt. Auf dem Gerät, von dem die Sicherung stammt, ändert sich nichts. | Verhindert, dass ein frisch wiederhergestelltes Testgerät (Emulator) die Sicherung des S24 überschreibt. |
+| W-7 | Was passiert danach mit dem Takt? | Nach dem Wiederherstellen ist die Sicherung auf dem Server „von einem anderen Gerät“ (wenn sie von dort stammt); das automatische Sichern startet erst nach einem Sichern von Hand, das wie in Schritt 3 fragt. Auf dem Gerät, von dem die Sicherung stammt, ändert sich nichts. **Ergänzt 2026-11-09:** Nach einem lokalen Wiederherstellen (Tageskopie, *Rückgängig*) gilt dasselbe, sonst lädt das stündliche Sichern die älteren Daten über die neuere Cloud-Fassung. | Verhindert, dass ein frisch wiederhergestelltes Testgerät (Emulator) die Sicherung des S24 überschreibt. |
 | W-8 | *Sicherung löschen* | Löscht nur die Daten-Sicherung (alle Fassungen, so baut es der Server), nicht das Schlüssel-Backup; der Takt stoppt. Rückfrage mit Datum der Sicherung und dem Satz „Auch die älteren Fassungen der letzten 7 Tage werden gelöscht“. | DSGVO Art. 17. Der Schlüssel bleibt, damit ein späteres Sichern ohne neue Einrichtung geht. |
 
 ## Risiko von Datenverlust verringern
@@ -84,6 +84,9 @@ Tippt man das auf dem Emulator, ist die Cloud-Sicherung des S24 endgültig weg. 
   Server-Daten bleiben. Das ist der normale Weg für Testgeräte.
 - *Cloud-Daten löschen*: wie heute, aber nur mit Eingabe des Wortes „löschen“ und dem
   Hinweis, dass es nicht rückgängig zu machen ist.
+- **Ergänzt 2026-11-09 (Review-Lauf 10):** *Cloud-Daten löschen* sperrt alle Geräte des
+  Kontos, nicht nur dieses (Ablauf in `protokoll`). Sonst legt ein zweites Gerät die
+  Sicherung ohne Schlüssel-Backup neu an, und ein neues Gerät scheitert an der Einrichtung.
 
 ### R-4 Ältere Fassung holen (später, Backend)
 Ein Aufruf „Fassungen auflisten / Fassung holen“ im Backend, damit die App eine Sicherung
