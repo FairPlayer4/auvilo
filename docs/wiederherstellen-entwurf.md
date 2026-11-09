@@ -195,6 +195,12 @@ Wiederherstellen, Bremse, Löschen, Abmelden). Abweichungen und Ergänzungen zum
 - **Gefunden im Emulator (2026-11-09):** Die Tageskopie beim Start entstand erst, nachdem der
   Status geladen war; die Einstellungen zeigten bis zum nächsten Start „Noch keine Kopie“.
   `LocalRestore.takeSnapshot` legt sie jetzt an und zeigt sie sofort (auch aus dem Worker).
+- **Gefunden im Emulator, Cloud (2026-11-09):** Der Bericht von *Sicherung prüfen* nannte
+  die Sicherung eines anderen Geräts „seit der Sicherung geändert“ und bot *Jetzt sichern und
+  erneut prüfen* an (das hätte vor dem Überschreiben gefragt). Jetzt: „Sicherung vom … von
+  einem anderen Gerät:“ und kein Sichern-Knopf. Die Aufforderung, den
+  Wiederherstellungsschlüssel einzugeben, blieb nach dem Einrichten stehen; sie verschwindet
+  jetzt.
 - **Gefunden beim Testen:** `VACUUM INTO` auf der laufenden Datenbank öffnete sie ohne WAL
   und schaltete so ihren Journalmodus um (die Datei änderte sich, die Daten nicht). Beide
   Kopien (vor dem Tausch und vor einer Migration) öffnen sie jetzt im WAL-Modus wie Room.

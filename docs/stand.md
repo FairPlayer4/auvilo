@@ -153,10 +153,19 @@ Stand: 2026-11-09. Bei jedem größeren Schritt aktualisieren.
    alle erkannt. **Emulator** (`Pixel_API37`, Android 37 mit Google Play, nur Testdaten):
    Tageskopie beim Start, Vergleich (1 Reminder nur in der Kopie), Wiederherstellen mit
    Neustart und *Rückgängig* mit Neustart bestanden; dabei gefunden und behoben: die
-   Tageskopie erschien erst nach dem nächsten Start. Offen: das Wiederherstellen aus der
-   Cloud im Emulator (braucht Kevins Google-Anmeldung und Schlüssel), dann nach Kevins Go
-   auf dem S24 installieren und dort nur *Prüfen* und einen Probelauf ohne Tausch
-   (Gerätetest im Entwurf). adb im Emulator: Der Dialog „USB-Debugging zulassen“ lässt sich
+   Tageskopie erschien erst nach dem nächsten Start. **Wiederherstellen aus der Cloud** im
+   Emulator mit Kevins Konto bestanden: Einrichten mit dem Wiederherstellungsschlüssel,
+   *Prüfen* (21 Reminder, 131 Termine, 1308 Ereignisse und alle übrigen Tabellen der
+   Sicherung des S24), Tausch mit Neustart; danach entsprach die Sicherung den Daten bis auf
+   7 Termine und 21 Ereignisse, die der Start neu angelegt hat (siehe offener Punkt
+   Zeitzone). Danach *Dieses Gerät abmelden* und Emulator zurückgesetzt. Dabei gefunden und
+   behoben: Bericht bei fremder Sicherung, stehengebliebene Schlüssel-Aufforderung.
+   **Offener Punkt Zeitzone (alt, nicht Schritt 5):** Ein einmaliger Reminder gilt als neu
+   fällig, wenn sein Zeitpunkt in der aktuellen Zeitzone vom letzten Termin abweicht
+   (`ScheduleRules`, `Schedule.Once`). In einer anderen Zeitzone (Emulator GMT, S24 MEZ;
+   ebenso auf Reisen) legt der Start für erledigte einmalige Reminder je einen „verpasst“-
+   Termin an. Nächster Schritt: nach Kevins Go auf dem S24 installieren und dort nur
+   *Prüfen* und einen Probelauf ohne Tausch (Gerätetest im Entwurf). adb im Emulator: Der Dialog „USB-Debugging zulassen“ lässt sich
    nur per Touch-Ereignis der Konsole bestätigen (Koordinaten auf 0–32767 skaliert);
    `-skip-adb-auth` wirkt bei Play-Abbildern nicht.
 3. **Play-Store-Release** ohne Eile, erst wenn die App „fertig“ ist (mindestens bis V2);

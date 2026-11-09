@@ -227,8 +227,18 @@ class CloudBackupUiTest {
         compose.onNodeWithTag("restoreDiff").assertExists()
         compose.onNodeWithText("Reminder: 1 geändert").assertExists()
         compose.onNodeWithTag("cloudChangedSince").assertExists()
+        compose.onNodeWithTag("cloudOtherDevice").assertDoesNotExist()
         compose.onNodeWithTag("cloudBackUpAndCheck").performClick()
         assertEquals(listOf("backUpAndCheck"), actions.calls)
+
+        // KRITISCH: another device's backup is no "change since", and checking it never offers to
+        // back up over it (found on the emulator).
+        status = CloudStatus(readyUnlocked, report = BackupReport(at, fromThisDevice = false, unchanged = false, comparison = oneReminderChanged()))
+        compose.waitForIdle()
+        compose.onNodeWithTag("cloudOtherDevice").assertExists()
+        compose.onNodeWithTag("restoreDiff").assertExists()
+        compose.onNodeWithTag("cloudChangedSince").assertDoesNotExist()
+        compose.onNodeWithTag("cloudBackUpAndCheck").assertDoesNotExist()
     }
 
     // KRITISCH: replacing the data needs two taps (W-5); cancel at either step answers no or nothing.

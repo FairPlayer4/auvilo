@@ -276,11 +276,19 @@ private fun Report(report: BackupReport, actions: CloudActions) {
     val c = Avl.colors
     Column(Modifier.padding(top = 8.dp).testTag("cloudReport")) {
         val from = if (report.fromThisDevice) "" else " (von einem anderen Gerät)"
-        if (!report.comparison.same && !report.unchanged) {
+        // Found on the emulator: a backup of another device never held the data here, so
+        // "changed since" is wrong, and backing up here would offer to replace the other device's
+        // backup. That device's backup is taken over with "Wiederherstellen" instead.
+        if (!report.comparison.same && !report.fromThisDevice) {
+            Text(
+                "Sicherung vom ${shortTime(report.created)} von einem anderen Gerät:",
+                Modifier.testTag("cloudOtherDevice"), color = c.muted, fontSize = 13.sp,
+            )
+        } else if (!report.comparison.same && !report.unchanged) {
             Text("Seit der Sicherung geändert – Abweichungen sind zu erwarten.", Modifier.testTag("cloudChangedSince"), color = c.muted, fontSize = 13.sp)
         }
         ComparisonLines(report.comparison, "Sicherung vom ${shortTime(report.created)}$from entspricht den Daten auf diesem Gerät.")
-        if (!report.unchanged) {
+        if (!report.unchanged && report.fromThisDevice) {
             TextButton(onClick = actions::backUpAndCheck, Modifier.testTag("cloudBackUpAndCheck")) { Text("Jetzt sichern und erneut prüfen") }
         }
     }

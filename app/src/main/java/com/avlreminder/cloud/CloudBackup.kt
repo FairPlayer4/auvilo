@@ -795,6 +795,9 @@ class CloudBackup(
         if (result !is Eingerichtet.Vorhanden) store.setUnlocked(true)
         events.record(CloudEvent.SET_UP, mapOf("art" to SetupKind.of(result)))
         log("cloud: set up (${result::class.simpleName})")
+        // The prompts of the setup ("Bitte den Wiederherstellungsschlüssel eingeben", "passt nicht")
+        // are answered now; left standing they read as if the key were still missing.
+        state.update { it.copy(notes = emptyList()) }
     }
 
     /**

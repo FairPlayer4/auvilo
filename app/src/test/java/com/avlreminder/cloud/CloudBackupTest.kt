@@ -453,6 +453,8 @@ class CloudBackupTest {
         assertEquals(bund.person.oeffentlich.fingerabdruck(), ready.fingerprint)
         assertEquals(1, server.unlocks)
         assertTrue(ready.unlocked)
+        // Found on the emulator: the prompt for the key stayed after it was entered.
+        assertEquals(emptyList<String>(), cloud.status.value.notes)
     }
 
     @Test
