@@ -1,6 +1,6 @@
 # Stand und nächste Schritte
 
-Stand: 2026-11-08. Bei jedem größeren Schritt aktualisieren.
+Stand: 2026-11-09. Bei jedem größeren Schritt aktualisieren.
 
 ## In Arbeit
 - **V1.3a3** (`versionName` 1.3a3-prototyp, `versionCode` 9) in `develop`, gebaut,
@@ -144,6 +144,15 @@ Stand: 2026-11-08. Bei jedem größeren Schritt aktualisieren.
    per `run-as tar` bei laufender App nach `%USERPROFILE%/avlreminder-Backup20261109`
    (außerhalb der Repos), zweimal geholt und gleich, Arbeitskopie `integrity_check` ok,
    Schema 8; Alarme danach 170. Enthält auch Fotos und Audio, die in der Cloud-Sicherung fehlen.
+   **Schritt 5 bestätigt und gebaut** am 2026-11-09 (Backend-Pin `6d04e02`, `versionCode` 14,
+   **noch nicht installiert**): *Sicherung prüfen* (Vergleich je Tabelle ohne Inhalte),
+   *Wiederherstellen* über eine Prüfdatei mit Tausch beim nächsten Start, *Lokale Kopien*
+   (täglich, 7+4) mit *Rückgängig* für 7 Tage, Bremse beim automatischen Sichern (R-2),
+   *Sicherung löschen*, *Dieses Gerät abmelden* und *Cloud-Daten löschen* (mit Wort).
+   Details: wiederherstellen-entwurf.md, *Umsetzung*. Build grün mit Lint, 7 Mutationsproben
+   alle erkannt. Als Nächstes: Emulator mit Google Play einrichten und dort das echte
+   Wiederherstellen testen, dann nach Kevins Go auf dem S24 installieren und dort nur
+   *Prüfen* und einen Probelauf ohne Tausch (Gerätetest im Entwurf).
 3. **Play-Store-Release** ohne Eile, erst wenn die App „fertig“ ist (mindestens bis V2);
    dafür Transparenz, Notausschalter (in V1.3a), Backend nur nach Einschalten (7.28 PS5–PS9).
 

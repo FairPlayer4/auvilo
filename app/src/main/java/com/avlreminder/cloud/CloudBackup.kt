@@ -13,6 +13,16 @@ import com.avlreminder.protokoll.DiagnoseAblage
 import com.avlreminder.protokoll.DiagnoseNichtFreigeschaltet
 import com.avlreminder.protokoll.DiagnoseTageslimit
 import com.avlreminder.protokoll.DiagnoseZuGross
+import com.avlreminder.protokoll.Datensicherung
+import com.avlreminder.protokoll.EntschluesselnFehlgeschlagen
+import com.avlreminder.protokoll.Sicherung
+import com.avlreminder.protokoll.Wiederhergestellt
+import com.avlreminder.restore.Comparison
+import com.avlreminder.restore.DamagedDatabase
+import com.avlreminder.restore.NewerDatabase
+import com.avlreminder.restore.RestoreBusy
+import com.avlreminder.restore.RestoreKind
+import com.avlreminder.restore.RestoreTarget
 import com.avlreminder.protokoll.Eingerichtet
 import com.avlreminder.protokoll.Einrichtung
 import com.avlreminder.protokoll.EinrichtungAbgebrochen
@@ -88,10 +98,17 @@ sealed interface CloudPhase {
      */
     data class AskOverwrite(val created: Instant) : CloudPhase
 
+    /** The backup is fetched, checked and compared ([report]): swap it in? (W-5, step 2) */
+    data class AskRestore(val report: BackupReport) : CloudPhase
+
+    /** Many reminders are missing since the last backup ([before] then, [now] here): back up anyway? (R-2) */
+    data class AskBrake(val before: Int, val now: Int) : CloudPhase
+
     /**
      * Set up. [fingerprint] of the person key, to compare with another device; [lastBackup]: when
      * this device last backed up, null = not yet. [paused]: another device backs up and the
-     * automatic backup rests until the person backs up by hand (A-10).
+     * automatic backup rests until the person backs up by hand (A-10). [braked]: many reminders
+     * are missing and the automatic backup stopped (R-2).
      */
     data class Ready(
         val account: String,
@@ -100,14 +117,25 @@ sealed interface CloudPhase {
         val unlocked: Boolean,
         val lastBackup: Instant? = null,
         val paused: Boolean = false,
+        val braked: Boolean = false,
     ) : CloudPhase {
         /** The hourly backup runs: unlocked and backed up by hand once (A-9). */
         val automatic get() = unlocked && lastBackup != null
     }
 }
 
-/** [notes]: what the setup told the person; [error]: why the last step failed. */
-data class CloudStatus(val phase: CloudPhase, val notes: List<String> = emptyList(), val error: String? = null)
+/**
+ * [notes]: what the setup told the person; [error]: why the last step failed; [report]: the result
+ * of the last "Sicherung prüfen".
+ */
+data class CloudStatus(val phase: CloudPhase, val notes: List<String> = emptyList(), val error: String? = null, val report: BackupReport? = null)
+
+/**
+ * The result of "Sicherung prüfen" (W-1, W-2): the backup made at [created], from this device or
+ * another, compared table by table with the data here. [unchanged]: the data here are byte for
+ * byte those of the backup; otherwise differences are to be expected.
+ */
+data class BackupReport(val created: Instant, val fromThisDevice: Boolean, val unchanged: Boolean, val comparison: Comparison)
 
 /** The server as far as signing in and setting up need it; replaced in tests. */
 interface CloudServer {
@@ -151,6 +179,9 @@ interface CloudNotices {
     /** Another device backed up last ([created]); the automatic backup rests. */
     fun otherDevice(created: Instant)
 
+    /** Many reminders are missing ([before] at the last backup, [now] here); the automatic backup stops (R-2). */
+    fun brake(before: Int, now: Int)
+
     /** The backup has not held this device's data for over 3 days; [lastBackup] = last upload. */
     fun stale(lastBackup: Instant)
 
@@ -192,6 +223,8 @@ class ConnectCloudServer(private val verbindung: Verbindung, key: Geraeteschlues
  * @param events the backend logger, the only thing [sendDiagnosis] sends.
  * @param schedule the hourly backup; runs only while [CloudPhase.Ready.automatic].
  * @param notices the notifications of the automatic backup.
+ * @param restore checks a backup in its own file and swaps it in at the next start.
+ * @param reminders how many reminders there are now (brake, R-2).
  */
 class CloudBackup(
     private val store: CloudStore,
@@ -206,6 +239,8 @@ class CloudBackup(
     private val events: CloudLog,
     private val schedule: CloudSchedule,
     private val notices: CloudNotices,
+    private val restore: RestoreTarget,
+    private val reminders: suspend () -> Int,
     private val log: (String) -> Unit = {},
     private val clock: () -> Instant = Instant::now,
 ) {
@@ -216,6 +251,8 @@ class CloudBackup(
     @Volatile private var confirm: CompletableDeferred<Boolean>? = null
     @Volatile private var typed: CompletableDeferred<String?>? = null
     @Volatile private var overwrite: CompletableDeferred<Boolean>? = null
+    @Volatile private var restoreAnswer: CompletableDeferred<Boolean>? = null
+    @Volatile private var brakeAnswer: CompletableDeferred<Boolean>? = null
 
     /** The key on screen ([CloudPhase.ShowKey]) and its account, for [saveKey]. */
     @Volatile private var shown: Pair<String, String>? = null
@@ -281,7 +318,17 @@ class CloudBackup(
         overwrite?.complete(yes)
     }
 
-    fun dismissNotes() = state.update { it.copy(notes = emptyList(), error = null) }
+    /** The answer to [CloudPhase.AskRestore]: true = swap in at the restart. */
+    fun answerRestore(yes: Boolean) {
+        restoreAnswer?.complete(yes)
+    }
+
+    /** The answer to [CloudPhase.AskBrake]: true = back up anyway. */
+    fun answerBrake(yes: Boolean) {
+        brakeAnswer?.complete(yes)
+    }
+
+    fun dismissNotes() = state.update { it.copy(notes = emptyList(), error = null, report = null) }
 
     /**
      * Backs up now, by hand (backup-entwurf.md, step 3): the app's data, encrypted with the
@@ -289,29 +336,234 @@ class CloudBackup(
      *
      * KRITISCH: Switched off or not set up, nothing is read and the network is not touched. Did
      * another device back up last, it asks ([CloudPhase.AskOverwrite]) and replaces that backup
-     * only on yes; on no nothing changes on the server.
+     * only on yes; on no nothing changes on the server. Are many reminders missing since the last
+     * backup (R-2), it asks first ([CloudPhase.AskBrake]). While a restore waits for the restart,
+     * nothing is backed up: the data are about to be replaced.
      */
-    fun backUp(): Job = work(CloudStep.BACKUP) {
-        if (!store.enabled()) return@work
-        val known = store.lesen() ?: return@work
-        val local = keys(known.kontoId).laden() ?: return@work
-        if (local.offenesBackup != null) return@work
+    fun backUp(): Job = work(CloudStep.BACKUP) { backUpByHand() }
+
+    /** "Jetzt sichern und erneut prüfen" (W-2). */
+    fun backUpAndCheck(): Job = work(CloudStep.BACKUP) { if (backUpByHand()) checkNow() }
+
+    /** @return true = uploaded. */
+    private suspend fun backUpByHand(): Boolean {
+        if (!store.enabled()) return false
+        val known = store.lesen() ?: return false
+        val local = keys(known.kontoId).laden() ?: return false
+        if (local.offenesBackup != null) return false
+        if (restore.pending()) {
+            note("Ein Wiederherstellen wartet auf den Neustart der App. Nichts gesichert.")
+            return false
+        }
         busy("Sichern …")
         val started = clock()
+        val count = reminders()
+        val before = store.lastReminders(known.kontoId)
+        if (before != null && brakes(before, count) && !askBrake(before, count)) {
+            note("Nicht gesichert.")
+            return false
+        }
         val payload = source.payload()
-        when (val result = upload(known.kontoId, local.bund.tresor, payload, automatic = false, ask = ::askOverwrite)) {
+        return when (val result = upload(known.kontoId, local.bund.tresor, payload, automatic = false, ask = ::askOverwrite)) {
             is Gesichert.Ja -> {
                 notices.clear()
-                done(known.kontoId, payload, result, started, automatic = false)
+                done(known.kontoId, payload, result, started, automatic = false, count)
+                true
             }
             is Gesichert.AnderesGeraet -> {
                 events.record(CloudEvent.OTHER_DEVICE, mapOf("zaehler" to result.kopf.zaehler, "automatisch" to false))
                 log("cloud: not backed up, another device backed up last")
                 note("Nicht gesichert: Die Sicherung des anderen Geräts bleibt auf dem Server.")
+                false
             }
             // Only the automatic backup rests; by hand it asks again.
-            Gesichert.Ruht -> Unit
+            Gesichert.Ruht -> false
         }
+    }
+
+    /**
+     * "Sicherung prüfen" (W-1): fetches the backup, checks it in its own file and compares it with
+     * the data here, table by table; the file is deleted afterwards.
+     *
+     * KRITISCH: Nothing here is replaced, and the device's backup state stays as it is (no "seen",
+     * no "declined"): checking is not restoring.
+     */
+    fun check(): Job = work(CloudStep.CHECK) { checkNow() }
+
+    private suspend fun checkNow() {
+        if (!store.enabled()) return
+        val known = store.lesen() ?: return
+        val local = keys(known.kontoId).laden() ?: return
+        if (local.offenesBackup != null) return
+        busy("Sicherung holen …")
+        val server = server()
+        val session = server.session()
+        if (session.kontoId != known.kontoId) error("Die Sitzung gehört zu einem anderen Konto")
+        val fetched = server.dataBackups(session.token).holen()
+        if (fetched == null) {
+            note("Auf dem Server liegt keine Sicherung.")
+            return
+        }
+        val backup = Datensicherung.entschluesseln(fetched.chiffrat, local.bund.tresor, session.kontoId)
+        busy("Prüfen …")
+        val started = clock()
+        val report = report(backup, session.geraetId)
+        restore.discard()
+        state.update { it.copy(report = report) }
+        val c = report.comparison
+        events.record(
+            CloudEvent.CHECKED,
+            mapOf(
+                "gleich" to c.same, "unveraendert" to report.unchanged, "eigenes_geraet" to report.fromThisDevice,
+                "tabellen" to c.tables.size, "tabellen_abweichend" to c.tables.count { !it.same },
+                "einstellungen_gleich" to c.settingsSame, "schema" to c.schema,
+                "dauer_ms" to Duration.between(started, clock()).toMillis(),
+            ),
+        )
+        log("cloud: checked (${if (c.same) "same" else "${c.tables.count { !it.same }} table(s) differ"})")
+    }
+
+    /**
+     * Checks [backup] in its own file and compares it with the data here (W-1, W-4). On success the
+     * file stays for [restore]; the caller deletes it ([RestoreTarget.discard]) or swaps it in.
+     */
+    private suspend fun report(backup: Sicherung, device: String): BackupReport {
+        if (backup.kopf.schemaVersion > AvlDatabase.VERSION) throw NeueresSchema(backup.kopf.schemaVersion, AvlDatabase.VERSION)
+        val unchanged = sha256(source.payload()) == sha256(backup.nutzlast)
+        val comparison = restore.compare(BackupZip.unpack(backup.nutzlast))
+        return BackupReport(backup.kopf.erstellt, backup.kopf.geraetId == device, unchanged, comparison)
+    }
+
+    /**
+     * "Wiederherstellen" (W-5): fetch, check in its own file, compare, show, confirm; the data are
+     * swapped at the restart that follows.
+     *
+     * KRITISCH:
+     *  - The running database is not touched here. The swap happens at the next start, before
+     *    anything opens the database, and keeps a copy of the data before (undo, W-6).
+     *  - Nothing is staged unless the person confirms after seeing the comparison; a damaged or
+     *    newer backup ends before the question.
+     *  - Data from another device (W-7): this device backs up automatically only after the person
+     *    backed up by hand, and that asks before it replaces the other device's backup. A fresh
+     *    test device therefore never overwrites the backup it was restored from.
+     */
+    fun restore(): Job = work(CloudStep.RESTORE) {
+        if (!store.enabled()) return@work
+        val known = store.lesen() ?: return@work
+        val local = keys(known.kontoId).laden() ?: return@work
+        if (local.offenesBackup != null) return@work
+        if (restore.pending()) {
+            note("Ein Wiederherstellen wartet schon auf den Neustart der App.")
+            return@work
+        }
+        busy("Sicherung holen …")
+        val server = server()
+        val session = server.session()
+        if (session.kontoId != known.kontoId) error("Die Sitzung gehört zu einem anderen Konto")
+        var compared = false
+        var staged = false
+        try {
+            val result = Sicherungsablauf(
+                session.kontoId,
+                session.geraetId,
+                local.bund.tresor,
+                server.dataBackups(session.token),
+                backupState(session.kontoId),
+                uebernehmen = { false },
+                uhr = clock,
+            ).wiederherstellen(
+                AvlDatabase.VERSION,
+                bestaetigen = { backup ->
+                    busy("Prüfen …")
+                    val report = report(backup, session.geraetId)
+                    compared = true
+                    askRestore(report)
+                },
+                anwenden = {
+                    restore.stage(RestoreKind.CLOUD)
+                    staged = true
+                },
+            )
+            when (result) {
+                is Wiederhergestellt.Ja -> {
+                    val other = result.kopf.geraetId != session.geraetId
+                    if (other) {
+                        // W-7: the next upload compares with the server and asks (E-B2b-6).
+                        val stand = backupState(session.kontoId)
+                        stand.laden()?.let { stand.speichern(it.copy(version = 0)) }
+                        store.clearLastBackup()
+                        schedule.stop()
+                        notices.clear()
+                    }
+                    events.record(
+                        CloudEvent.RESTORE_STAGED,
+                        mapOf("art" to RestoreKind.CLOUD, "schema" to result.kopf.schemaVersion, "anderes_geraet" to other),
+                    )
+                    log("cloud: restore staged (#${result.kopf.zaehler}${if (other) ", other device" else ""})")
+                    busy("Neu starten …")
+                    restore.restart()
+                }
+                Wiederhergestellt.KeineSicherung -> note("Auf dem Server liegt keine Sicherung.")
+                Wiederhergestellt.Abgelehnt -> note("Nichts wiederhergestellt.")
+            }
+        } finally {
+            if (compared && !staged) restore.discard()
+        }
+    }
+
+    /**
+     * "Sicherung löschen" (W-8, DSGVO Art. 17): deletes the data backup on the server with all its
+     * older versions. The key backup stays, so backing up again needs no new setup. The automatic
+     * backup stops until the person backs up by hand.
+     */
+    fun deleteBackup(): Job = work(CloudStep.DELETE_BACKUP) {
+        if (!store.enabled()) return@work
+        val known = store.lesen() ?: return@work
+        busy("Sicherung löschen …")
+        val server = server()
+        val session = server.session()
+        if (session.kontoId != known.kontoId) error("Die Sitzung gehört zu einem anderen Konto")
+        Sicherungsablauf.loeschen(server.dataBackups(session.token), backupState(session.kontoId))
+        schedule.stop()
+        notices.clear()
+        store.clearLastBackup()
+        events.record(CloudEvent.DELETED)
+        log("cloud: backup deleted")
+        note("Die Sicherung auf dem Server ist gelöscht, mit allen älteren Fassungen. Der Schlüssel bleibt.")
+    }
+
+    /**
+     * "Dieses Gerät abmelden" (R-3): locks this device on the server and deletes its keys and
+     * session here. Reminders and settings stay. Afterwards it is off.
+     *
+     * KRITISCH: Nothing on the server is deleted; the backup and the key backup stay for the other
+     * devices and for restoring. Is the server not reachable, the phone is signed out anyway (a
+     * note says so): without its keys this device can do nothing there.
+     */
+    fun signOut(): Job = work(CloudStep.SIGN_OUT) {
+        if (!store.enabled()) return@work
+        val session = store.lesen()
+        var locked = session == null
+        if (session != null) {
+            busy("Abmelden …")
+            try {
+                val server = server()
+                server.lock(server.session().token, session.geraetId)
+                locked = true
+            } catch (e: CancellationException) {
+                throw e
+            } catch (e: Throwable) {
+                log("cloud: sign-out, device not locked (${logDetail(e)})")
+                note("Beim Server nicht abgemeldet (${describe(e) ?: "abgebrochen"}). Auf diesem Handy ist trotzdem alles abgemeldet.")
+            }
+        }
+        busy("Auf dem Handy löschen …")
+        schedule.stop()
+        notices.clear()
+        wipe()
+        store.clear()
+        events.record(CloudEvent.SIGNED_OUT, mapOf("gesperrt" to locked))
+        log("cloud: signed out")
     }
 
     /**
@@ -328,6 +580,10 @@ class CloudBackup(
      *    not ask the server again every hour.
      *  - Errors (no network, kill switch, limit) only show as status; the next try is an hour
      *    later (A-13).
+     *  - Are many reminders missing since the last backup (R-2), nothing is uploaded: the backup
+     *    stops with a notification until the person backs up by hand. Otherwise a fault in the app
+     *    would carry the loss to the server every hour.
+     *  - While a restore waits for the restart or after a failed swap, nothing is uploaded.
      */
     suspend fun backUpAutomatically() {
         work(CloudStep.AUTO_BACKUP, clearNotes = false) { automatic() }.join()
@@ -349,17 +605,29 @@ class CloudBackup(
         if (local.offenesBackup != null) return
         // Resting: not even the data are read.
         if (backupState(account).laden()?.abgelehnt == true) return
+        // A restore waits for the restart or failed (the data may not be what the person wants),
+        // or the brake stopped it: the person decides by hand.
+        if (restore.blocksBackup() || store.braked()) return
         val started = clock()
         val payload = source.payload()
         if (sha256(payload) == store.lastHash(account)) {
             store.setCurrent(account, clock().epochSecond)
             return
         }
+        val count = reminders()
+        val before = store.lastReminders(account)
+        if (before != null && brakes(before, count)) {
+            store.setBraked()
+            notices.brake(before, count)
+            events.record(CloudEvent.BRAKED, mapOf("vorher" to before, "jetzt" to count))
+            log("cloud: automatic backup braked ($before -> $count reminders)")
+            return
+        }
         busy("Sichern …")
         when (val result = upload(account, local.bund.tresor, payload, automatic = true, ask = { false })) {
             is Gesichert.Ja -> {
                 notices.clear()
-                done(account, payload, result, started, automatic = true)
+                done(account, payload, result, started, automatic = true, count)
             }
             is Gesichert.AnderesGeraet -> {
                 events.record(CloudEvent.OTHER_DEVICE, mapOf("zaehler" to result.kopf.zaehler, "automatisch" to true))
@@ -406,8 +674,8 @@ class CloudBackup(
         ).sichern(payload, AvlDatabase.VERSION, automatisch = automatic)
     }
 
-    private suspend fun done(account: String, payload: ByteArray, result: Gesichert.Ja, started: Instant, automatic: Boolean) {
-        store.setLastBackup(account, clock().epochSecond, sha256(payload))
+    private suspend fun done(account: String, payload: ByteArray, result: Gesichert.Ja, started: Instant, automatic: Boolean, count: Int) {
+        store.setLastBackup(account, clock().epochSecond, sha256(payload), count)
         val ms = Duration.between(started, clock()).toMillis()
         events.record(
             CloudEvent.BACKED_UP,
@@ -433,16 +701,18 @@ class CloudBackup(
     }
 
     /**
-     * Resets the cloud backup so it can be set up again: on the server the data backup and the
-     * key backup are deleted and this device is locked; on the phone the key file, the session
-     * and the Keystore keys go. Reminders and settings stay. Afterwards it is off.
+     * "Cloud-Daten löschen" (R-3): on the server the data backup with all its older versions and
+     * the key backup are deleted for good and this device is locked; on the phone the key file,
+     * the session and the Keystore keys go. Reminders and settings stay. Afterwards it is off and
+     * can be set up again. For a test device "Dieses Gerät abmelden" ([signOut]) is the way: this
+     * deletes the backup of every device of the account.
      *
      * KRITISCH: Is the server just not reachable (no network, kill switch, limit), nothing is
      * deleted on the phone: otherwise "reset" would leave the backup on the server unnoticed. Only
      * when this device may not delete there anymore (locked, not unlocked, session rejected) the
      * phone is reset anyway, with a note: waiting would not help.
      */
-    fun reset(): Job = work(CloudStep.RESET) {
+    fun deleteCloudData(): Job = work(CloudStep.RESET) {
         if (!store.enabled()) return@work
         val session = store.lesen()
         var cleared = session == null
@@ -549,6 +819,8 @@ class CloudBackup(
                 confirm = null
                 typed = null
                 overwrite = null
+                restoreAnswer = null
+                brakeAnswer = null
                 shown = null
                 running.unlock()
             }
@@ -577,6 +849,7 @@ class CloudBackup(
             store.unlocked(),
             store.lastBackup(session.kontoId)?.let(Instant::ofEpochSecond),
             paused = backupState(session.kontoId).laden()?.abgelehnt == true,
+            braked = store.braked(),
         )
     }
 
@@ -615,6 +888,18 @@ class CloudBackup(
         }
     }
 
+    private suspend fun askRestore(report: BackupReport): Boolean {
+        val answer = CompletableDeferred<Boolean>().also { restoreAnswer = it }
+        phase(CloudPhase.AskRestore(report))
+        return answer.await().also { busy("Wiederherstellen …") }
+    }
+
+    private suspend fun askBrake(before: Int, now: Int): Boolean {
+        val answer = CompletableDeferred<Boolean>().also { brakeAnswer = it }
+        phase(CloudPhase.AskBrake(before, now))
+        return answer.await().also { busy("Sichern …") }
+    }
+
     /** The question of [Sicherungsablauf] (E-B2b-6), answered with [answerOverwrite]. */
     private suspend fun askOverwrite(head: Sicherungskopf): Boolean {
         val answer = CompletableDeferred<Boolean>().also { overwrite = it }
@@ -631,6 +916,15 @@ class CloudBackup(
 
         /** After this long without a current backup the notice comes (A-13). */
         val STALE_AFTER: Duration = Duration.ofDays(3)
+
+        /** More reminders than this missing since the last backup stop the automatic backup (R-2). */
+        const val BRAKE_MAX_LOST = 10
+
+        /**
+         * The brake (R-2, Kevin 2026-11-09): fewer reminders than at the last backup, by more than
+         * half or by more than [BRAKE_MAX_LOST].
+         */
+        fun brakes(before: Int, now: Int): Boolean = now < before && (before - now > BRAKE_MAX_LOST || now * 2 < before)
 
         /** Same data, same hash: the ZIP has fixed entry times ([BackupZip]). */
         fun sha256(bytes: ByteArray): String =
@@ -677,7 +971,10 @@ class CloudBackup(
             is SicherungTageslimit, is DiagnoseTageslimit -> "Für heute ist das Limit erreicht. Morgen erneut versuchen."
             is AeltereSicherung -> "Der Server liefert eine ältere Sicherung, als dieses Gerät kennt. Nichts geändert."
             is VersionVeraltet -> "Die Sicherung wurde gerade von einem anderen Gerät geändert. Später erneut sichern."
-            is NeueresSchema -> "Die Sicherung stammt von einer neueren App-Version. Erst die App aktualisieren."
+            is NeueresSchema, is NewerDatabase -> "Die Sicherung stammt von einer neueren App-Version. Erst die App aktualisieren."
+            is DamagedBackup, is DamagedDatabase -> "Die Sicherung ist beschädigt oder passt nicht zur App. Nichts geändert."
+            is EntschluesselnFehlgeschlagen -> "Die Sicherung lässt sich mit diesem Schlüssel nicht öffnen. Nichts geändert."
+            is RestoreBusy -> "Es läuft schon eine Prüfung oder ein Wiederherstellen wartet auf den Neustart."
             is DiagnoseNichtFreigeschaltet -> "Dieses Konto darf keine Diagnose senden."
             is DiagnoseZuGross -> "Diagnose zu groß, nichts gesendet."
             // KRITISCH: An answer not from the service (kill switch, proxy) is an outage, not a verdict.
@@ -690,7 +987,7 @@ class CloudBackup(
 }
 
 /** The step a [CloudEvent.FAILED] happened in. */
-enum class CloudStep { LOAD, SWITCH, SIGN_IN, SETUP, BACKUP, AUTO_BACKUP, DIAGNOSIS, RESET }
+enum class CloudStep { LOAD, SWITCH, SIGN_IN, SETUP, BACKUP, AUTO_BACKUP, DIAGNOSIS, RESET, CHECK, RESTORE, DELETE_BACKUP, SIGN_OUT }
 
 /** How the setup ended, for [CloudEvent.SET_UP]. */
 enum class SetupKind {
@@ -708,7 +1005,7 @@ enum class SetupKind {
 /** The kind of error, for [CloudEvent.FAILED]; the same split as [CloudBackup.describe]. */
 enum class FailureKind {
     GOOGLE, REJECTED, LOCKED, SIGNED_OUT, NOT_UNLOCKED, SETUP_CANCELLED, OTHER_ACCOUNT, TOO_LARGE, DAILY_LIMIT,
-    OLDER_BACKUP, CHANGED_MEANWHILE, NEWER_SCHEMA, DIAGNOSIS_NOT_ALLOWED, SERVER, NETWORK, OTHER;
+    OLDER_BACKUP, CHANGED_MEANWHILE, NEWER_SCHEMA, DIAGNOSIS_NOT_ALLOWED, SERVER, NETWORK, DAMAGED, BUSY, OTHER;
 
     companion object {
         fun of(e: Throwable) = when (e) {
@@ -723,7 +1020,9 @@ enum class FailureKind {
             is SicherungTageslimit, is DiagnoseTageslimit -> DAILY_LIMIT
             is AeltereSicherung -> OLDER_BACKUP
             is VersionVeraltet -> CHANGED_MEANWHILE
-            is NeueresSchema -> NEWER_SCHEMA
+            is NeueresSchema, is NewerDatabase -> NEWER_SCHEMA
+            is DamagedBackup, is DamagedDatabase, is EntschluesselnFehlgeschlagen -> DAMAGED
+            is RestoreBusy -> BUSY
             is DiagnoseNichtFreigeschaltet -> DIAGNOSIS_NOT_ALLOWED
             is Serverfehler -> SERVER
             is IOException -> NETWORK

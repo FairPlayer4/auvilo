@@ -30,6 +30,14 @@ import com.avlreminder.cloud.KeystoreDeviceKey
 import com.avlreminder.cloud.KeystoreSealer
 import com.avlreminder.cloud.WorkManagerSchedule
 import com.avlreminder.cloud.deleteBackendKeystoreEntries
+import com.avlreminder.restore.DatabaseRestore
+import com.avlreminder.restore.DatabaseSwap
+import com.avlreminder.restore.LocalRestore
+import com.avlreminder.restore.RestoreFiles
+import com.avlreminder.restore.SnapshotWorker
+import com.avlreminder.restore.Snapshots
+import com.avlreminder.restore.SwapOutcome
+import java.time.LocalDate
 import com.avlreminder.verbindung.Verbindung
 import java.io.File
 import com.avlreminder.core.model.Occurrence
@@ -81,9 +89,15 @@ class AvlApp : Application() {
         if (graph.debuggable) runCatching { WifiProbe.start(this) }
         // Alarms may have been lost (reboot, force-stop, update): rebuild them from the database.
         started = graph.scope.launch {
+            // A restore swapped data in at this start: take its settings before anything plans alarms.
+            graph.finishRestore()
             graph.syncAndRing()
             graph.scheduleOverview()
             graph.cloud.load().join()
+            graph.local.load().join()
+            // R-1: the daily copy; the worker takes it on days the app does not start.
+            graph.takeSnapshot()
+            SnapshotWorker.schedule(this@AvlApp)
         }
     }
 }
@@ -107,6 +121,13 @@ class AndroidDeviceState(private val context: Context) : DeviceStatePort {
 
 /** Manually wired dependencies; no DI library needed for one user and a handful of classes. */
 class AppGraph(private val context: Context) : ClaudeApi.Access {
+    /**
+     * KRITISCH: A staged restore (W-5) is swapped in here, before anything opens the database;
+     * [db] is the only place that opens it.
+     */
+    private val restoreFiles = RestoreFiles(context.filesDir)
+    private val swap: SwapOutcome = runCatching { DatabaseSwap.applyPending(context.getDatabasePath(AvlDatabase.NAME), restoreFiles) }
+        .getOrElse { e -> Diag.log("restore: swap crashed (${e::class.simpleName})"); SwapOutcome.None }
     val db = AvlDatabase.create(context)
     val repository = RoomReminderRepository(db)
     val settings = Settings(context)
@@ -117,6 +138,9 @@ class AppGraph(private val context: Context) : ClaudeApi.Access {
 
     /** Cloud backup (backup-entwurf.md); nothing touches the network until it is switched on. */
     private val cloudStore = CloudStore(context)
+    private val cloudLog = CloudLog(File(context.filesDir, "cloud-diag"), header = ::diagnosisHeader)
+    private val restoreTarget = DatabaseRestore(context, db, settings, restoreFiles)
+    private val snapshots = Snapshots(File(context.filesDir, "backup"), Snapshots.vacuumInto(db))
     private val connection by lazy { Verbindung(CloudConfig.SERVER_URL) }
     val cloud = CloudBackup(
         cloudStore,
@@ -131,11 +155,38 @@ class AppGraph(private val context: Context) : ClaudeApi.Access {
         scope = scope,
         backupState = { account -> BackupStateFile(File(context.filesDir, "backend"), account) },
         source = AppBackupSource(db, settings, context.cacheDir),
-        events = CloudLog(File(context.filesDir, "cloud-diag"), header = ::diagnosisHeader),
+        events = cloudLog,
         schedule = WorkManagerSchedule(context, Diag::log),
         notices = AndroidCloudNotices(context),
+        restore = restoreTarget,
+        reminders = { db.dao().reminderCount() },
         log = Diag::log,
     )
+
+    /** Restoring from a daily copy and undoing a restore (R-1, W-6); no network. */
+    val local = LocalRestore(restoreTarget, restoreFiles, snapshots, settings::backup, scope, cloudLog, Diag::log)
+
+    /**
+     * Ends a restore swapped in at this start (W-5, step 5): takes its settings (without the pause
+     * and the interface, `Settings.restore`), then removes the order. Interrupted, the next start
+     * does it again.
+     */
+    suspend fun finishRestore() {
+        local.started(swap)
+        if (swap !is SwapOutcome.Swapped) return
+        try {
+            if (restoreFiles.settings.exists()) settings.restore(restoreFiles.settings.readText())
+            DatabaseSwap.finish(restoreFiles)
+        } catch (e: Exception) {
+            Diag.log("restore: settings not taken (${e::class.simpleName})")
+        }
+    }
+
+    /** The daily copy of the database (R-1); a failure is only logged. */
+    fun takeSnapshot() {
+        runCatching { if (snapshots.takeIfDue(LocalDate.now())) Diag.log("snapshot taken") }
+            .onFailure { Diag.log("snapshot failed (${it::class.simpleName})") }
+    }
 
     /** The first line of a diagnosis (formate.md): which app on which phone, nothing personal. */
     private fun diagnosisHeader(): Map<String, Any> = mapOf(

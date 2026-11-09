@@ -70,6 +70,13 @@ class AndroidCloudNotices(private val context: Context) : CloudNotices {
             "um von diesem Gerät weiterzusichern.",
     )
 
+    override fun brake(before: Int, now: Int) = show(
+        ID_BRAKE,
+        "Cloud-Backup pausiert: viele Daten fehlen",
+        "Bei der letzten Sicherung gab es $before Reminder, jetzt $now. Damit ein Fehler nicht die Sicherung " +
+            "überschreibt, sichert die App nicht mehr von selbst. In den Einstellungen „Jetzt sichern“, wenn das so stimmt.",
+    )
+
     override fun stale(lastBackup: Instant) = show(
         ID_STALE,
         "Cloud-Backup seit 3 Tagen nicht aktuell",
@@ -80,6 +87,7 @@ class AndroidCloudNotices(private val context: Context) : CloudNotices {
         val manager = context.getSystemService(NotificationManager::class.java)
         manager.cancel(TAG, ID_OTHER_DEVICE)
         manager.cancel(TAG, ID_STALE)
+        manager.cancel(TAG, ID_BRAKE)
     }
 
     private fun show(id: Int, title: String, text: String) {
@@ -110,6 +118,7 @@ class AndroidCloudNotices(private val context: Context) : CloudNotices {
         const val TAG = "cloud"
         const val ID_OTHER_DEVICE = 1
         const val ID_STALE = 2
+        const val ID_BRAKE = 3
         private val FORMAT = DateTimeFormatter.ofPattern("dd.MM.yyyy, HH:mm")
 
         fun createChannel(context: Context) {

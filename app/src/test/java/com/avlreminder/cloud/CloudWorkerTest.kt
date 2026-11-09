@@ -78,8 +78,9 @@ class CloudWorkerTest {
         val manager = shadowOf(context.getSystemService(NotificationManager::class.java))
         notices.otherDevice(Instant.parse("2026-11-08T12:30:00Z"))
         notices.stale(Instant.parse("2026-11-05T12:00:00Z"))
+        notices.brake(20, 5)
         val shown = manager.allNotifications
-        assertEquals(2, shown.size)
+        assertEquals(3, shown.size)
         assertTrue(shown.all { it.channelId == AndroidCloudNotices.CHANNEL })
         val intent = shadowOf(shown.first().contentIntent).savedIntent
         assertTrue(intent.getBooleanExtra("settings", false))

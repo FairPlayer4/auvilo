@@ -247,6 +247,9 @@ class AppViewModel(app: Application) : AndroidViewModel(app) {
     /** Cloud backup (A-14). */
     val cloud: StateFlow<com.avlreminder.cloud.CloudStatus> = graph.cloud.status
 
+    /** Daily copies and undo (R-1, W-6). */
+    val local: StateFlow<com.avlreminder.restore.LocalStatus> = graph.local.status
+
     fun setClaudeAccess(on: Boolean) {
         viewModelScope.launch { graph.setClaudeAccess(on) }
     }

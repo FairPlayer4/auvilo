@@ -32,6 +32,7 @@ import androidx.compose.ui.text.input.KeyboardCapitalization
 import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import com.avlreminder.cloud.BackupReport
 import com.avlreminder.cloud.CloudPhase
 import com.avlreminder.cloud.CloudStatus
 import com.avlreminder.ui.theme.Avl
@@ -48,24 +49,34 @@ interface CloudActions {
     fun submitKey(text: String?) {}
     fun saveKey() {}
     fun fetchKey() {}
-    fun reset() {}
     fun backUp() {}
     fun sendDiagnosis() {}
     fun answerOverwrite(yes: Boolean) {}
+    fun check() {}
+    fun backUpAndCheck() {}
+    fun restore() {}
+    fun answerRestore(yes: Boolean) {}
+    fun answerBrake(yes: Boolean) {}
+    fun deleteBackup() {}
+    fun signOut() {}
+    fun deleteCloudData() {}
 }
 
 /**
- * "Cloud-Backup (experimentell)" (A-14): setting up, backing up by hand and sending a diagnosis.
- * Automatic backups, restoring and deleting follow in the next steps.
+ * "Cloud-Backup (experimentell)" (A-14): setting up, backing up, checking and restoring
+ * (wiederherstellen-entwurf.md), deleting and sending a diagnosis.
  */
 @Composable
 fun CloudBackupSetting(status: CloudStatus, actions: CloudActions) {
     val c = Avl.colors
     val phase = status.phase
     var asking by remember { mutableStateOf(false) }
-    var resetting by remember { mutableStateOf(false) }
+    var deletingCloud by remember { mutableStateOf(false) }
+    var deletingBackup by remember { mutableStateOf(false) }
+    var signingOut by remember { mutableStateOf(false) }
     var diagnosing by remember { mutableStateOf(false) }
-    val busy = phase is CloudPhase.Busy || phase is CloudPhase.ShowKey || phase is CloudPhase.AskKey || phase is CloudPhase.AskOverwrite
+    val busy = phase is CloudPhase.Busy || phase is CloudPhase.ShowKey || phase is CloudPhase.AskKey || phase is CloudPhase.AskOverwrite ||
+        phase is CloudPhase.AskRestore || phase is CloudPhase.AskBrake
     Column(Modifier.padding(16.dp)) {
         Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
             Column(Modifier.weight(1f)) {
@@ -91,6 +102,13 @@ fun CloudBackupSetting(status: CloudStatus, actions: CloudActions) {
             is CloudPhase.ShowKey -> ShowKey(phase.key, phase.saved, actions)
             CloudPhase.AskKey -> AskKey(actions)
             is CloudPhase.AskOverwrite -> AskOverwrite(phase.created, actions)
+            is CloudPhase.AskRestore -> RestoreQuestion(
+                "Sicherung vom ${shortTime(phase.report.created)}, " +
+                    (if (phase.report.fromThisDevice) "von diesem Gerät." else "von einem anderen Gerät."),
+                phase.report.comparison,
+                actions::answerRestore,
+            )
+            is CloudPhase.AskBrake -> AskBrake(phase.before, phase.now, actions)
             is CloudPhase.Ready -> {
                 Text("Fingerabdruck ${phase.fingerprint}", Modifier.padding(top = 8.dp).testTag("cloudFingerprint"), color = c.text, fontSize = 14.sp, fontFamily = FontFamily.Monospace)
                 Text("Gerät ${phase.device.take(12)}", color = c.muted, fontSize = 13.sp, fontFamily = FontFamily.Monospace)
@@ -99,6 +117,11 @@ fun CloudBackupSetting(status: CloudStatus, actions: CloudActions) {
                     Modifier.padding(top = 4.dp).testTag("cloudLastBackup"), color = c.text, fontSize = 14.sp,
                 )
                 when {
+                    phase.braked -> Text(
+                        "Automatisches Sichern pausiert: Seit der letzten Sicherung fehlen viele Reminder. „Jetzt sichern“ " +
+                            "fragt nach, ob das so stimmt.",
+                        Modifier.testTag("cloudBraked"), color = c.strict, fontSize = 13.sp,
+                    )
                     phase.paused -> Text(
                         "Automatisches Sichern pausiert: Ein anderes Gerät hat zuletzt gesichert. „Jetzt sichern“ fragt, " +
                             "ob seine Sicherung ersetzt werden soll.",
@@ -112,16 +135,29 @@ fun CloudBackupSetting(status: CloudStatus, actions: CloudActions) {
                 if (phase.unlocked) {
                     Row(Modifier.padding(top = 4.dp), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                         Button(onClick = actions::backUp, Modifier.testTag("cloudBackUp")) { Text("Jetzt sichern") }
+                        OutlinedButton(onClick = actions::check, Modifier.testTag("cloudCheck")) { Text("Sicherung prüfen") }
+                    }
+                    Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                        OutlinedButton(onClick = actions::restore, Modifier.testTag("cloudRestore")) { Text("Wiederherstellen") }
                         OutlinedButton(onClick = { diagnosing = true }, Modifier.testTag("cloudDiagnosis")) { Text("Diagnose senden") }
                     }
+                    status.report?.let { Report(it, actions) }
                 } else {
                     Text("Nicht freigeschaltet: dieses Gerät kann nichts sichern.", color = c.strict, fontSize = 13.sp)
                 }
             }
         }
+        if (phase is CloudPhase.Ready && phase.unlocked) {
+            TextButton(onClick = { deletingBackup = true }, Modifier.padding(top = 4.dp).testTag("cloudDeleteBackup")) {
+                Text("Sicherung löschen", color = c.strict)
+            }
+        }
         if (phase is CloudPhase.Ready || phase == CloudPhase.NotSetUp || phase == CloudPhase.SignedOut) {
-            TextButton(onClick = { resetting = true }, Modifier.padding(top = 4.dp).testTag("cloudReset")) {
-                Text("Cloud-Konto zurücksetzen", color = c.strict)
+            if (phase != CloudPhase.SignedOut) {
+                TextButton(onClick = { signingOut = true }, Modifier.testTag("cloudSignOut")) { Text("Dieses Gerät abmelden") }
+            }
+            TextButton(onClick = { deletingCloud = true }, Modifier.testTag("cloudDeleteAll")) {
+                Text("Cloud-Daten löschen", color = c.strict)
             }
         }
         status.notes.forEach { Text(it, Modifier.padding(top = 6.dp), color = c.muted, fontSize = 13.sp) }
@@ -158,22 +194,110 @@ fun CloudBackupSetting(status: CloudStatus, actions: CloudActions) {
             dismissButton = { TextButton(onClick = { diagnosing = false }) { Text("Abbrechen") } },
         )
     }
-    if (resetting) {
+    if (signingOut) {
         AlertDialog(
-            onDismissRequest = { resetting = false },
-            title = { Text("Cloud-Konto zurücksetzen?") },
+            onDismissRequest = { signingOut = false },
+            title = { Text("Dieses Gerät abmelden?") },
             text = {
                 Text(
-                    "Löscht auf dem Server das Schlüssel-Backup und die Sicherung und sperrt dort dieses Handy. Auf dem " +
-                        "Handy werden die Schlüssel gelöscht. Reminder und Einstellungen bleiben. Danach lässt sich alles " +
-                        "neu einrichten, mit neuem Wiederherstellungsschlüssel; den alten Eintrag im Passwortmanager selbst löschen.",
+                    "Sperrt dieses Handy beim Server und löscht hier Schlüssel und Anmeldung. Die Sicherung und das " +
+                        "Schlüssel-Backup auf dem Server bleiben, für andere Geräte und zum Wiederherstellen. Reminder und " +
+                        "Einstellungen bleiben.",
                 )
             },
             confirmButton = {
-                TextButton(onClick = { resetting = false; actions.reset() }, Modifier.testTag("cloudResetOk")) { Text("Zurücksetzen", color = c.strict) }
+                TextButton(onClick = { signingOut = false; actions.signOut() }, Modifier.testTag("cloudSignOutOk")) { Text("Abmelden") }
             },
-            dismissButton = { TextButton(onClick = { resetting = false }) { Text("Abbrechen") } },
+            dismissButton = { TextButton(onClick = { signingOut = false }) { Text("Abbrechen") } },
         )
+    }
+    if (deletingBackup) {
+        val last = (phase as? CloudPhase.Ready)?.lastBackup
+        AlertDialog(
+            onDismissRequest = { deletingBackup = false },
+            title = { Text("Sicherung löschen?") },
+            text = {
+                Text(
+                    (last?.let { "Löscht die Sicherung vom ${shortTime(it)} auf dem Server. " } ?: "Löscht die Sicherung auf dem Server. ") +
+                        "Auch die älteren Fassungen der letzten 7 Tage werden gelöscht, das lässt sich nicht rückgängig machen. " +
+                        "Der Schlüssel bleibt; automatisch gesichert wird erst wieder nach „Jetzt sichern“.",
+                )
+            },
+            confirmButton = {
+                TextButton(onClick = { deletingBackup = false; actions.deleteBackup() }, Modifier.testTag("cloudDeleteBackupOk")) {
+                    Text("Löschen", color = c.strict)
+                }
+            },
+            dismissButton = { TextButton(onClick = { deletingBackup = false }) { Text("Abbrechen") } },
+        )
+    }
+    if (deletingCloud) DeleteCloudData(onDone = { deletingCloud = false }, actions)
+}
+
+/** The word to type before "Cloud-Daten löschen" (R-3). */
+const val DELETE_WORD = "löschen"
+
+/**
+ * "Cloud-Daten löschen" (R-3): deletes the backups of every device of the account for good, so it
+ * asks for the word [DELETE_WORD] and says that "Dieses Gerät abmelden" is the way for a test device.
+ */
+@Composable
+private fun DeleteCloudData(onDone: () -> Unit, actions: CloudActions) {
+    val c = Avl.colors
+    var typed by remember { mutableStateOf("") }
+    AlertDialog(
+        onDismissRequest = onDone,
+        title = { Text("Cloud-Daten endgültig löschen?") },
+        text = {
+            Column {
+                Text(
+                    "Löscht auf dem Server die Sicherung mit allen älteren Fassungen und das Schlüssel-Backup, für alle Geräte " +
+                        "dieses Kontos, und sperrt dort dieses Handy. Das lässt sich nicht rückgängig machen. Reminder und " +
+                        "Einstellungen auf diesem Handy bleiben. Nur dieses Handy abmelden geht mit „Dieses Gerät abmelden“.",
+                )
+                Text("Zum Bestätigen „$DELETE_WORD“ eingeben.", Modifier.padding(top = 8.dp), color = c.text, fontSize = 14.sp)
+                OutlinedTextField(typed, { typed = it }, Modifier.fillMaxWidth().testTag("cloudDeleteWord"), singleLine = true)
+            }
+        },
+        confirmButton = {
+            TextButton(
+                onClick = { onDone(); actions.deleteCloudData() },
+                Modifier.testTag("cloudDeleteAllOk"),
+                enabled = typed.trim().equals(DELETE_WORD, ignoreCase = true),
+            ) { Text("Endgültig löschen", color = c.strict) }
+        },
+        dismissButton = { TextButton(onClick = onDone) { Text("Abbrechen") } },
+    )
+}
+
+/** The result of "Sicherung prüfen" (W-2). */
+@Composable
+private fun Report(report: BackupReport, actions: CloudActions) {
+    val c = Avl.colors
+    Column(Modifier.padding(top = 8.dp).testTag("cloudReport")) {
+        val from = if (report.fromThisDevice) "" else " (von einem anderen Gerät)"
+        if (!report.comparison.same && !report.unchanged) {
+            Text("Seit der Sicherung geändert – Abweichungen sind zu erwarten.", Modifier.testTag("cloudChangedSince"), color = c.muted, fontSize = 13.sp)
+        }
+        ComparisonLines(report.comparison, "Sicherung vom ${shortTime(report.created)}$from entspricht den Daten auf diesem Gerät.")
+        if (!report.unchanged) {
+            TextButton(onClick = actions::backUpAndCheck, Modifier.testTag("cloudBackUpAndCheck")) { Text("Jetzt sichern und erneut prüfen") }
+        }
+    }
+}
+
+/** Many reminders are missing since the last backup (R-2). */
+@Composable
+private fun AskBrake(before: Int, now: Int, actions: CloudActions) {
+    val c = Avl.colors
+    Text(
+        "Bei der letzten Sicherung gab es $before Reminder, jetzt $now. Trotzdem sichern? Die Sicherung auf dem Server " +
+            "hat dann auch nur noch $now.",
+        Modifier.padding(top = 8.dp).testTag("cloudBrakeText"), color = c.text, fontSize = 14.sp,
+    )
+    Row(Modifier.padding(top = 8.dp), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+        Button(onClick = { actions.answerBrake(true) }, Modifier.testTag("cloudBrakeYes")) { Text("Trotzdem sichern") }
+        OutlinedButton(onClick = { actions.answerBrake(false) }, Modifier.testTag("cloudBrakeNo")) { Text("Nicht sichern") }
     }
 }
 
@@ -181,7 +305,8 @@ private fun headline(phase: CloudPhase): String = when (phase) {
     CloudPhase.Off -> "Aus"
     CloudPhase.SignedOut -> "Nicht angemeldet"
     is CloudPhase.Busy -> "Bitte warten"
-    is CloudPhase.AskOverwrite -> "Sichern"
+    is CloudPhase.AskOverwrite, is CloudPhase.AskBrake -> "Sichern"
+    is CloudPhase.AskRestore -> "Wiederherstellen"
     CloudPhase.NotSetUp, is CloudPhase.ShowKey, CloudPhase.AskKey -> "Einrichtung"
     is CloudPhase.Ready -> "Eingerichtet"
 }

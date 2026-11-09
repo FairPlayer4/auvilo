@@ -110,6 +110,7 @@ data class AppState(
     val claudeAccess: Boolean? = null,
     /** Cloud backup (A-14): null = not shown. */
     val cloud: CloudStatus? = null,
+    val local: com.avlreminder.restore.LocalStatus? = null,
 )
 
 interface AppActions {
@@ -151,6 +152,7 @@ interface AppActions {
     fun answerSnoozeHint(reminderId: Long, choice: SnoozeHintChoice) {}
     fun setClaudeAccess(on: Boolean) {}
     val cloud: CloudActions get() = object : CloudActions {}
+    val local: com.avlreminder.ui.screens.LocalActions get() = object : com.avlreminder.ui.screens.LocalActions {}
 }
 
 /** Simple navigation without a library: one route string, back goes to "today". */
@@ -269,6 +271,7 @@ fun AvlAppUi(
                     onPause = actions::setAlarmsPaused, now = now, zone = zone,
                     claudeAccess = state.claudeAccess, onClaudeAccess = actions::setClaudeAccess,
                     cloud = state.cloud, cloudActions = actions.cloud,
+                    local = state.local, localActions = actions.local,
                     permissions = state.permissions, onBack = { go(Routes.TODAY) },
                     home = state.home, onSetHome = actions::setHomeHere,
                     dwellMinutes = state.dwellMinutes, onDwell = actions::setDwellMinutes,

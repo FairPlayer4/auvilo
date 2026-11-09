@@ -105,6 +105,7 @@ class MainActivity : ComponentActivity() {
             val snoozeHints by vm.snoozeHints.collectAsStateWithLifecycle()
             val claudeAccess by vm.claudeAccess.collectAsStateWithLifecycle()
             val cloud by vm.cloud.collectAsStateWithLifecycle()
+            val local by vm.local.collectAsStateWithLifecycle()
             var now by androidx.compose.runtime.remember { mutableStateOf(Instant.now()) }
             var dnd by androidx.compose.runtime.remember { mutableStateOf(device.isDoNotDisturb()) }
             LaunchedEffect(Unit) {
@@ -125,7 +126,7 @@ class MainActivity : ComponentActivity() {
                             home = home, dwellMinutes = dwell, itemsDone = itemsDone,
                             reminderSort = reminderSort, suggestions = suggestions, overview = overview,
                             blockers = blockers, templates = templates, snoozeHints = snoozeHints,
-                            claudeAccess = claudeAccess, cloud = cloud,
+                            claudeAccess = claudeAccess, cloud = cloud, local = local,
                         ),
                         actions = actions,
                         now = now,
@@ -199,10 +200,23 @@ class MainActivity : ComponentActivity() {
             // The password service (7.33) shows its dialog over this activity, too.
             override fun saveKey() { graph.cloud.saveKey(this@MainActivity) }
             override fun fetchKey() { graph.cloud.fetchKey(this@MainActivity) }
-            override fun reset() { graph.cloud.reset() }
             override fun backUp() { graph.cloud.backUp() }
             override fun sendDiagnosis() { graph.cloud.sendDiagnosis() }
             override fun answerOverwrite(yes: Boolean) = graph.cloud.answerOverwrite(yes)
+            override fun check() { graph.cloud.check() }
+            override fun backUpAndCheck() { graph.cloud.backUpAndCheck() }
+            override fun restore() { graph.cloud.restore() }
+            override fun answerRestore(yes: Boolean) = graph.cloud.answerRestore(yes)
+            override fun answerBrake(yes: Boolean) = graph.cloud.answerBrake(yes)
+            override fun deleteBackup() { graph.cloud.deleteBackup() }
+            override fun signOut() { graph.cloud.signOut() }
+            override fun deleteCloudData() { graph.cloud.deleteCloudData() }
+        }
+        override val local = object : com.avlreminder.ui.screens.LocalActions {
+            override fun fromSnapshot(date: java.time.LocalDate) { graph.local.fromSnapshot(date) }
+            override fun undo() { graph.local.undo() }
+            override fun answer(yes: Boolean) = graph.local.answer(yes)
+            override fun dismiss() = graph.local.dismiss()
         }
         override fun answerSnoozeHint(reminderId: Long, choice: SnoozeHintChoice) = vm.answerSnoozeHint(reminderId, choice)
         override fun setArchived(reminderId: Long, archived: Boolean) = vm.setArchived(reminderId, archived)

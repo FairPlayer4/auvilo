@@ -92,6 +92,8 @@ fun SettingsScreen(
     onClaudeAccess: (Boolean) -> Unit = {},
     cloud: CloudStatus? = null,
     cloudActions: CloudActions = object : CloudActions {},
+    local: com.avlreminder.restore.LocalStatus? = null,
+    localActions: LocalActions = object : LocalActions {},
 ) {
     val c = Avl.colors
     var homeState by remember { mutableStateOf<String?>(null) }
@@ -218,6 +220,11 @@ fun SettingsScreen(
             if (cloud != null) {
                 SectionTitle("Cloud-Backup (experimentell)")
                 Card { CloudBackupSetting(cloud, cloudActions) }
+            }
+
+            if (local != null) {
+                SectionTitle("Lokale Kopien")
+                Card { LocalRestoreSetting(local, localActions, zone) }
             }
 
             if (claudeAccess != null) {

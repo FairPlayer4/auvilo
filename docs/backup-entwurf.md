@@ -130,7 +130,7 @@ Schlüssel-Backup löschen, Testgeräte sperren); dann richtet die App **neue** 
    - Gerätetest: nach einer Änderung (z. B. Reminder abhaken) höchstens eine Stunde warten,
      „Zuletzt gesichert“ ist weitergerückt; ohne Änderung bleibt es stehen (im Server-Log
      zu sehen). `adb shell dumpsys jobscheduler | grep -A3 com.avlreminder` zeigt den Job.
-5. **Prüfen, Wiederherstellen und Löschen.** Entwurf (2026-11-08, noch nicht bestätigt) in
+5. **Prüfen, Wiederherstellen und Löschen.** Entwurf (2026-11-08, bestätigt 2026-11-09, gebaut 2026-11-09) in
    [wiederherstellen-entwurf.md](wiederherstellen-entwurf.md): zuerst *Sicherung prüfen*
    ohne Ersetzen, Wiederherstellen über eine Prüfdatei mit Tausch beim Start und
    *Rückgängig*. Gerätetest auf dem Emulator, nicht durch Neuinstallation auf dem S24

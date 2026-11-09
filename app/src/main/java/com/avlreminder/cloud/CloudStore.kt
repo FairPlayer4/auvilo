@@ -5,6 +5,7 @@ import androidx.datastore.core.handlers.ReplaceFileCorruptionHandler
 import androidx.datastore.preferences.core.booleanPreferencesKey
 import androidx.datastore.preferences.core.edit
 import androidx.datastore.preferences.core.emptyPreferences
+import androidx.datastore.preferences.core.intPreferencesKey
 import androidx.datastore.preferences.core.longPreferencesKey
 import androidx.datastore.preferences.core.stringPreferencesKey
 import androidx.datastore.preferences.preferencesDataStore
@@ -36,6 +37,8 @@ class CloudStore(private val context: Context) : SitzungsAblage {
     private val hashKey = stringPreferencesKey("lastBackupHash")
     private val currentKey = longPreferencesKey("currentUnix")
     private val staleNoticeKey = booleanPreferencesKey("staleNoticeShown")
+    private val remindersKey = intPreferencesKey("lastBackupReminders")
+    private val brakedKey = booleanPreferencesKey("braked")
 
     private suspend fun prefs() = context.backendStore.data.first()
 
@@ -61,16 +64,42 @@ class CloudStore(private val context: Context) : SitzungsAblage {
 
     /**
      * [account] backed up at [unix]; [hash] is the SHA-256 of what went up, so the automatic
-     * backup can skip an unchanged payload (A-9). The backup is current from then on.
+     * backup can skip an unchanged payload (A-9); [reminders] how many reminders it held (brake,
+     * R-2). The backup is current from then on, and the brake is released.
      */
-    suspend fun setLastBackup(account: String, unix: Long, hash: String) {
+    suspend fun setLastBackup(account: String, unix: Long, hash: String, reminders: Int) {
         context.backendStore.edit {
             it[lastBackupAccountKey] = account
             it[lastBackupKey] = unix
             it[hashKey] = hash
             it[currentKey] = unix
+            it[remindersKey] = reminders
             it.remove(staleNoticeKey)
+            it.remove(brakedKey)
         }
+    }
+
+    /**
+     * Forgets this device's last backup (deleted, or the data were restored from another device,
+     * W-7): the automatic backup waits until the person backs up by hand again (A-9).
+     */
+    suspend fun clearLastBackup() {
+        context.backendStore.edit {
+            for (key in listOf(lastBackupAccountKey, lastBackupKey, hashKey, currentKey, remindersKey, staleNoticeKey, brakedKey)) it.remove(key)
+        }
+    }
+
+    /** How many reminders the last backup of [account] from here held; null = unknown. */
+    suspend fun lastReminders(account: String): Int? {
+        val p = prefs()
+        return if (p[lastBackupAccountKey] == account) p[remindersKey] else null
+    }
+
+    /** The automatic backup stopped because many reminders are missing (R-2). */
+    suspend fun braked(): Boolean = prefs()[brakedKey] == true
+
+    suspend fun setBraked() {
+        context.backendStore.edit { it[brakedKey] = true }
     }
 
     /** The SHA-256 of the last payload [account] uploaded from here. */

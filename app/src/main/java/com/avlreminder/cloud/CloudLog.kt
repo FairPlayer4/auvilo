@@ -18,10 +18,17 @@ enum class CloudEvent(val area: String, val id: String, val level: LogLevel) {
     SIGNED_IN("cloud", "angemeldet", LogLevel.INFO),
     SET_UP("cloud", "eingerichtet", LogLevel.INFO),
     RESET("cloud", "zurueckgesetzt", LogLevel.INFO),
+    SIGNED_OUT("cloud", "abgemeldet", LogLevel.INFO),
     FAILED("cloud", "fehlgeschlagen", LogLevel.WARN),
     BACKED_UP("sicherung", "gesichert", LogLevel.INFO),
     OTHER_DEVICE("sicherung", "anderes_geraet", LogLevel.WARN),
     STALE("sicherung", "veraltet", LogLevel.WARN),
+    BRAKED("sicherung", "gebremst", LogLevel.WARN),
+    CHECKED("sicherung", "geprueft", LogLevel.INFO),
+    DELETED("sicherung", "geloescht", LogLevel.INFO),
+    RESTORE_STAGED("wiederherstellen", "bereit", LogLevel.INFO),
+    RESTORED("wiederherstellen", "getauscht", LogLevel.INFO),
+    SWAP_FAILED("wiederherstellen", "fehlgeschlagen", LogLevel.ERROR),
     DIAGNOSIS_SENT("diagnose", "gesendet", LogLevel.INFO),
 }
 

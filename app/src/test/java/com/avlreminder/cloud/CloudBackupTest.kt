@@ -9,7 +9,15 @@ import androidx.credentials.exceptions.GetCredentialUnknownException
 import androidx.credentials.exceptions.NoCredentialException
 import androidx.test.core.app.ApplicationProvider
 import androidx.test.ext.junit.runners.AndroidJUnit4
+import com.avlreminder.data.AvlDatabase
 import com.avlreminder.protokoll.BackupAblage
+import com.avlreminder.restore.BackupTable
+import com.avlreminder.restore.Comparison
+import com.avlreminder.restore.RestoreKind
+import com.avlreminder.restore.RestoreTarget
+import com.avlreminder.restore.TableDiff
+import com.avlreminder.restore.oneReminderChanged
+import com.avlreminder.restore.sameEverywhere
 import com.avlreminder.protokoll.Datensicherung
 import com.avlreminder.protokoll.DiagnoseAblage
 import com.avlreminder.protokoll.DiagnoseNichtFreigeschaltet
@@ -180,9 +188,37 @@ class CloudBackupTest {
         val shown = mutableListOf<String>()
         override fun otherDevice(created: Instant) { shown += "otherDevice $created" }
         override fun stale(lastBackup: Instant) { shown += "stale $lastBackup" }
+        override fun brake(before: Int, now: Int) { shown += "brake $before $now" }
         override fun clear() { shown.clear() }
     }
     private var payloadReads = 0
+    private var reminderCount = 3
+
+    /** Restoring on the phone: what was compared, staged and restarted. The files are tested in `restore`. */
+    private class FakeRestore : RestoreTarget {
+        var comparison = sameEverywhere()
+        val compared = mutableListOf<BackupContents>()
+        val staged = mutableListOf<RestoreKind>()
+        var discards = 0
+        var restarts = 0
+        var pending = false
+        var blocks = false
+
+        fun reset() {
+            compared.clear(); staged.clear(); discards = 0; restarts = 0; pending = false; blocks = false
+        }
+
+        override suspend fun compare(contents: BackupContents): Comparison {
+            compared += contents
+            return comparison
+        }
+        override fun stage(kind: RestoreKind) { staged += kind; pending = true }
+        override fun discard() { discards++ }
+        override fun pending() = pending
+        override fun blocksBackup() = blocks || pending
+        override fun restart() { restarts++ }
+    }
+    private val restoreTarget = FakeRestore()
 
     @get:Rule val tmp = TemporaryFolder()
     private val events by lazy { CloudLog(tmp.newFolder("cloud-diag"), header = { mapOf("app" to "test") }) }
@@ -223,6 +259,8 @@ class CloudBackupTest {
         events = events,
         schedule = schedule,
         notices = notices,
+        restore = restoreTarget,
+        reminders = { reminderCount },
         log = { logged += it },
         clock = { now },
     )
@@ -645,7 +683,7 @@ class CloudBackupTest {
     fun aResetDeletesOnTheServerAndOnThePhoneAndAllowsANewSetup() {
         val cloud = cloud()
         val before = ready(cloud)
-        blocking { cloud.reset().join() }
+        blocking { cloud.deleteCloudData().join() }
         assertEquals(CloudPhase.Off, cloud.status.value.phase)
         assertNull(cloud.status.value.error)
         assertNull("key backup", server.backup)
@@ -665,7 +703,7 @@ class CloudBackupTest {
         val cloud = cloud()
         val before = ready(cloud)
         server.deleteError = Serverfehler(ConnectException(Code.UNAVAILABLE), vomDienst = false)
-        blocking { cloud.reset().join() }
+        blocking { cloud.deleteCloudData().join() }
         assertEquals(before, cloud.status.value.phase)
         assertTrue(cloud.status.value.error.orEmpty().contains("nicht erreichbar"))
         assertEquals(0, wiped)
@@ -679,7 +717,7 @@ class CloudBackupTest {
         val cloud = cloud()
         ready(cloud)
         server.deleteError = GeraetNichtFreigeschaltet()
-        blocking { cloud.reset().join() }
+        blocking { cloud.deleteCloudData().join() }
         assertEquals(CloudPhase.Off, cloud.status.value.phase)
         assertEquals(1, wiped)
         assertEquals(listOf("geraet-1"), server.locked)
@@ -690,7 +728,7 @@ class CloudBackupTest {
     fun signedOutAResetOnlyClearsThePhone() {
         val cloud = cloud()
         blocking { cloud.setEnabled(true).join() }
-        blocking { cloud.reset().join() }
+        blocking { cloud.deleteCloudData().join() }
         assertEquals(CloudPhase.Off, cloud.status.value.phase)
         assertEquals(1, wiped)
         assertEquals(0, serversCreated)
@@ -699,9 +737,305 @@ class CloudBackupTest {
     @Test
     fun switchedOffAResetDoesNothing() {
         val cloud = cloud()
-        blocking { cloud.reset().join() }
+        blocking { cloud.deleteCloudData().join() }
         assertEquals(0, wiped)
         assertEquals(0, serversCreated)
+    }
+
+    // --- Step 5: checking, restoring, brake, deleting (wiederherstellen-entwurf.md) ---------
+
+    /** A payload the app could restore (the fake does not open the database). */
+    private fun zip(db: String, settings: String = "{}") = BackupZip.pack(BackupContents(db.toByteArray(), settings))
+
+    /** Set up and backed up by hand once, with a restorable payload. */
+    private fun backedUp(cloud: CloudBackup) {
+        payload = zip("die Daten")
+        ready(cloud)
+        blocking { cloud.backUp().join() }
+    }
+
+    /** "Wiederherstellen" up to the question, then [yes]. */
+    private fun restore(cloud: CloudBackup, yes: Boolean): CloudPhase.AskRestore {
+        val job = cloud.restore()
+        val asked = cloud.awaitPhase(CloudPhase.AskRestore::class.java).phase as CloudPhase.AskRestore
+        cloud.answerRestore(yes)
+        blocking { job.join() }
+        return asked
+    }
+
+    // KRITISCH: checking replaces nothing and leaves the device's backup state as it is (W-1).
+    @Test
+    fun checkingComparesAndChangesNothing() {
+        val cloud = cloud()
+        backedUp(cloud)
+        val state = remembered.toMap()
+        val data = server.data
+        val last = blocking { store.lastBackup(account) }
+
+        blocking { cloud.check().join() }
+        val report = requireNotNull(cloud.status.value.report)
+        assertTrue(report.unchanged)
+        assertTrue(report.fromThisDevice)
+        assertTrue(report.comparison.same)
+        assertEquals("die Daten", String(restoreTarget.compared.single().database))
+        assertEquals(1, restoreTarget.discards)
+        assertTrue(restoreTarget.staged.isEmpty())
+        assertEquals(0, restoreTarget.restarts)
+        assertEquals(state, remembered)
+        assertEquals(data, server.data)
+        assertEquals(last, blocking { store.lastBackup(account) })
+        val checked = events().single { it.getString("ereignis") == "geprueft" }.getJSONObject("felder")
+        assertTrue(checked.getBoolean("gleich"))
+        assertNull(cloud.status.value.error)
+    }
+
+    @Test
+    fun checkingAfterAChangeSaysTheDataChangedSince() {
+        val cloud = cloud()
+        backedUp(cloud)
+        payload = zip("geändert")
+        restoreTarget.comparison = oneReminderChanged()
+        blocking { cloud.check().join() }
+        val report = requireNotNull(cloud.status.value.report)
+        assertFalse(report.unchanged)
+        assertFalse(report.comparison.same)
+    }
+
+    // KRITISCH: a damaged or newer backup ends before anything is compared or asked (W-4).
+    @Test
+    fun aDamagedOrNewerBackupIsNotCompared() {
+        val cases = listOf<Pair<String, () -> Unit>>(
+            "keine ZIP-Datei" to { replaceOnServer("kaputt".toByteArray(), 8) },
+            "neueres Schema" to { replaceOnServer(zip("neu"), AvlDatabase.VERSION + 1) },
+        )
+        for ((case, damage) in cases) {
+            val cloud = cloud()
+            backedUp(cloud)
+            damage()
+            restoreTarget.compared.clear()
+            blocking { cloud.check().join() }
+            assertTrue(case, restoreTarget.compared.isEmpty())
+            assertNotNull(case, cloud.status.value.error)
+            assertNull(case, cloud.status.value.report)
+            blocking { cloud.restore().join() }
+            assertTrue(case, restoreTarget.staged.isEmpty())
+            assertEquals(case, 0, restoreTarget.restarts)
+            blocking { store.clear() }
+            local.clear()
+            remembered.clear()
+            server.data = null
+            server.backup = null
+        }
+    }
+
+    /** Replaces the backup on the server by one of this device with [nutzlast]. */
+    private fun replaceOnServer(nutzlast: ByteArray, schema: Int) {
+        val before = requireNotNull(server.data)
+        val c = Datensicherung.verschluesseln(
+            Sicherung(Sicherungskopf(onServer().kopf.zaehler, now, "geraet-1", schema), nutzlast),
+            local.getValue(account).bund.tresor,
+            account,
+        )
+        server.data = GeholteSicherung(c, before.version)
+    }
+
+    // KRITISCH: only a yes after the comparison stages the swap and restarts (W-5); a no leaves
+    // nothing behind.
+    @Test
+    fun restoringStagesOnlyAfterYes() {
+        for (yes in listOf(false, true)) {
+            val cloud = cloud()
+            backedUp(cloud)
+            restoreTarget.reset()
+            val asked = restore(cloud, yes)
+            assertTrue(asked.report.fromThisDevice)
+            if (yes) {
+                assertEquals(listOf(RestoreKind.CLOUD), restoreTarget.staged)
+                assertEquals(1, restoreTarget.restarts)
+                assertEquals(0, restoreTarget.discards)
+                assertTrue(events().any { it.getString("ereignis") == "bereit" })
+            } else {
+                assertTrue(restoreTarget.staged.isEmpty())
+                assertEquals(0, restoreTarget.restarts)
+                assertEquals(1, restoreTarget.discards)
+                assertTrue(cloud.status.value.notes.toString(), cloud.status.value.notes.any { "Nichts wiederhergestellt" in it })
+            }
+            blocking { store.clear() }
+            local.clear()
+            remembered.clear()
+            server.data = null
+            server.backup = null
+        }
+    }
+
+    // KRITISCH: data from another device (W-7): afterwards nothing is backed up automatically, and
+    // by hand it asks before it replaces the other device's backup.
+    @Test
+    fun restoringFromAnotherDeviceNeverOverwritesItsBackupUnasked() {
+        val cloud = cloud()
+        backedUp(cloud)
+        anotherDeviceBacksUpOver(Instant.parse("2026-11-08T12:30:00Z"), zip("fremd"))
+        val theirs = server.data
+        val stops = schedule.stops
+
+        val asked = restore(cloud, yes = true)
+        assertFalse(asked.report.fromThisDevice)
+        assertEquals(listOf(RestoreKind.CLOUD), restoreTarget.staged)
+        assertNull(blocking { store.lastBackup(account) })
+        assertEquals(stops + 1, schedule.stops)
+        restoreTarget.pending = false // the restart swapped the data in
+
+        payload = zip("fremd, hier geändert")
+        auto(cloud)
+        assertEquals(theirs, server.data)
+
+        val job = cloud.backUp()
+        cloud.awaitPhase(CloudPhase.AskOverwrite::class.java)
+        cloud.answerOverwrite(false)
+        blocking { job.join() }
+        assertEquals(theirs, server.data)
+    }
+
+    // KRITISCH: while a restore waits for the restart nothing is backed up; after a failed swap
+    // only the automatic backup waits (W-5, step 5).
+    @Test
+    fun aPendingOrFailedRestoreHoldsTheBackup() {
+        val cloud = cloud()
+        backedUp(cloud)
+        val data = server.data
+        payload = zip("neu")
+
+        restoreTarget.pending = true
+        blocking { cloud.backUp().join() }
+        auto(cloud)
+        assertEquals(data, server.data)
+        assertTrue(cloud.status.value.notes.toString(), cloud.status.value.notes.any { "Neustart" in it })
+
+        restoreTarget.pending = false
+        restoreTarget.blocks = true
+        auto(cloud)
+        assertEquals(data, server.data)
+        blocking { cloud.backUp().join() }
+        assertTrue(onServer().nutzlast.contentEquals(payload))
+    }
+
+    // KRITISCH: the brake (R-2) holds when more than 10 or more than half the reminders are gone;
+    // fewer losses and growth do not.
+    @Test
+    fun theBrakeHoldsOnlyForLargeLosses() {
+        val cases = listOf(
+            Triple("20 -> 9: mehr als 10 weg", 20 to 9, true),
+            Triple("20 -> 10: genau 10 weg, genau die Hälfte", 20 to 10, false),
+            Triple("30 -> 19: 11 weg", 30 to 19, true),
+            Triple("5 -> 2: mehr als die Hälfte weg", 5 to 2, true),
+            Triple("5 -> 3: weniger als die Hälfte", 5 to 3, false),
+            Triple("1 -> 0: der letzte weg", 1 to 0, true),
+            Triple("0 -> 0", 0 to 0, false),
+            Triple("10 -> 12: mehr geworden", 10 to 12, false),
+        )
+        for ((case, counts, brakes) in cases) assertEquals(case, brakes, CloudBackup.brakes(counts.first, counts.second))
+    }
+
+    // KRITISCH: the automatic backup does not carry a large loss to the server (R-2); by hand it
+    // asks, and only yes uploads.
+    @Test
+    fun theBrakeStopsTheAutomaticBackupAndAsksByHand() {
+        val cloud = cloud()
+        reminderCount = 20
+        backedUp(cloud)
+        val data = server.data
+
+        reminderCount = 5
+        payload = zip("viel weniger")
+        auto(cloud)
+        assertEquals(data, server.data)
+        assertEquals(listOf("brake 20 5"), notices.shown)
+        assertTrue(blocking { store.braked() })
+        assertTrue((cloud.status.value.phase as CloudPhase.Ready).braked)
+
+        val reads = payloadReads
+        auto(cloud)
+        assertEquals("braked: not even the data are read", reads, payloadReads)
+
+        var job = cloud.backUp()
+        assertEquals(CloudPhase.AskBrake(20, 5), cloud.awaitPhase(CloudPhase.AskBrake::class.java).phase)
+        cloud.answerBrake(false)
+        blocking { job.join() }
+        assertEquals(data, server.data)
+
+        job = cloud.backUp()
+        cloud.awaitPhase(CloudPhase.AskBrake::class.java)
+        cloud.answerBrake(true)
+        blocking { job.join() }
+        assertTrue(onServer().nutzlast.contentEquals(payload))
+        assertFalse(blocking { store.braked() })
+        assertEquals(5, blocking { store.lastReminders(account) })
+    }
+
+    @Test
+    fun aSmallLossIsBackedUpAutomatically() {
+        val cloud = cloud()
+        reminderCount = 20
+        backedUp(cloud)
+        reminderCount = 15
+        payload = zip("etwas weniger")
+        auto(cloud)
+        assertTrue(onServer().nutzlast.contentEquals(payload))
+        assertFalse(blocking { store.braked() })
+    }
+
+    // KRITISCH: deleting the backup (W-8) removes it on the server, keeps the key backup and the
+    // keys, and the automatic backup does not upload it again.
+    @Test
+    fun deletingTheBackupKeepsTheKeyAndStopsTheAutomaticBackup() {
+        val cloud = cloud()
+        backedUp(cloud)
+        val keyBackup = server.backup
+        val stops = schedule.stops
+        blocking { cloud.deleteBackup().join() }
+        assertNull(server.data)
+        assertEquals(keyBackup, server.backup)
+        assertTrue(local.isNotEmpty())
+        assertEquals(stops + 1, schedule.stops)
+        assertNull(blocking { store.lastBackup(account) })
+        assertTrue(events().any { it.getString("ereignis") == "geloescht" })
+
+        payload = zip("neu")
+        auto(cloud)
+        assertNull(server.data)
+    }
+
+    // KRITISCH: signing out (R-3) deletes nothing on the server, also when the server is not
+    // reachable; deleting the cloud data does.
+    @Test
+    fun signingOutDeletesNothingOnTheServer() {
+        for (reachable in listOf(true, false)) {
+            val cloud = cloud()
+            backedUp(cloud)
+            val data = server.data
+            val keyBackup = server.backup
+            wiped = 0
+            server.locked.clear()
+            server.sessionError = if (reachable) null else Serverfehler(ConnectException(Code.UNAVAILABLE), vomDienst = false)
+            blocking { cloud.signOut().join() }
+            assertEquals(CloudPhase.Off, cloud.status.value.phase)
+            assertEquals(data, server.data)
+            assertEquals(keyBackup, server.backup)
+            assertTrue(server.dataBackup)
+            assertEquals(1, wiped)
+            assertNull(blocking { store.lesen() })
+            if (reachable) {
+                assertEquals(listOf("geraet-1"), server.locked)
+            } else {
+                assertTrue(server.locked.isEmpty())
+                assertTrue(cloud.status.value.notes.toString(), cloud.status.value.notes.any { "nicht abgemeldet" in it })
+            }
+            server.sessionError = null
+            server.data = null
+            server.backup = null
+            local.clear()
+            remembered.clear()
+        }
     }
 
     /** The data backup on the server, decrypted with this phone's vault key. */
@@ -854,7 +1188,7 @@ class CloudBackupTest {
 
     @Test
     fun theLastBackupOfAnotherAccountIsNotShown() = blocking {
-        store.setLastBackup("konto-2", 1_700_000_000, "hash")
+        store.setLastBackup("konto-2", 1_700_000_000, "hash", 0)
         assertNull(store.lastBackup(account))
         assertEquals(1_700_000_000L, store.lastBackup("konto-2"))
     }
@@ -864,10 +1198,10 @@ class CloudBackupTest {
     private fun auto(cloud: CloudBackup) = blocking { cloud.backUpAutomatically() }
 
     /** Another device backs up over this one's backup: higher counter, next server version. */
-    private fun anotherDeviceBacksUpOver(created: Instant) {
+    private fun anotherDeviceBacksUpOver(created: Instant, nutzlast: ByteArray = "fremd".toByteArray()) {
         val before = requireNotNull(server.data)
         val c = Datensicherung.verschluesseln(
-            Sicherung(Sicherungskopf(onServer().kopf.zaehler + 1, created, "geraet-2", 8), "fremd".toByteArray()),
+            Sicherung(Sicherungskopf(onServer().kopf.zaehler + 1, created, "geraet-2", 8), nutzlast),
             local.getValue(account).bund.tresor,
             account,
         )
@@ -1044,9 +1378,10 @@ class CloudBackupTest {
 
         blocking { cloud.setEnabled(true).join() }
         assertEquals(3, schedule.starts)
-        blocking { cloud.reset().join() }
+        blocking { cloud.deleteCloudData().join() }
         assertEquals(2, schedule.stops)
         assertEquals(CloudPhase.Off, cloud.status.value.phase)
         assertEquals(3, schedule.starts)
     }
 }
+

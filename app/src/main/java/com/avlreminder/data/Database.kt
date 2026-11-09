@@ -259,6 +259,10 @@ interface AvlDao {
     @Query("DELETE FROM reminder WHERE id = :id")
     suspend fun deleteReminder(id: Long)
 
+    /** All reminders, also paused and archived ones (brake of the cloud backup, R-2). */
+    @Query("SELECT COUNT(*) FROM reminder")
+    suspend fun reminderCount(): Int
+
     @Query("SELECT * FROM occurrence WHERE id = :id")
     suspend fun occurrence(id: Long): OccurrenceEntity?
 
@@ -585,7 +589,8 @@ abstract class AvlDatabase : RoomDatabase() {
         fun backupBeforeMigration(file: File, dir: File): File? {
             if (!file.exists()) return null
             return try {
-                SQLiteDatabase.openDatabase(file.path, null, SQLiteDatabase.OPEN_READWRITE).use { db ->
+                // WAL like Room, so that only looking at the version does not switch the journal mode.
+                SQLiteDatabase.openDatabase(file.path, null, SQLiteDatabase.OPEN_READWRITE or SQLiteDatabase.ENABLE_WRITE_AHEAD_LOGGING).use { db ->
                     if (db.version >= VERSION) return null
                     dir.mkdirs()
                     val stamp = DateTimeFormatter.ofPattern("yyyyMMdd-HHmmss").format(LocalDateTime.now())

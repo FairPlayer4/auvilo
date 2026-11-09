@@ -1,6 +1,7 @@
 # Entwurf: Cloud-Backup Schritt 5 – Prüfen, Wiederherstellen, Löschen
 
-> Stand: 2026-11-08, **Entwurf, noch nicht bestätigt**. Gehört zu
+> Stand: 2026-11-09, **bestätigt** (Kevin, 2026-11-09, Antworten unten), umgesetzt in
+> App-Schritt 5 (Abweichungen unter *Umsetzung*). Gehört zu
 > [backup-entwurf.md](backup-entwurf.md) (Schritt 5, A-11, A-14). Kevins Vorgaben vom
 > 2026-11-08: kein Risiko für die echten Daten, vorher eine manuelle Sicherung, auf dem
 > S24 nicht neu installieren, und auf dem Gerät prüfen können, dass die Sicherung den
@@ -151,11 +152,49 @@ Mutationsproben mit Gegenprobe.
    ein bis zwei Tage.
 5. Später R-4 im Backend.
 
-## Fragen an Kevin
-1. Ist *Prüfen zuerst, Umschalten nein* (statt mehrerer aktiver Datenbanken) für dich so in
-   Ordnung?
-2. R-3: *Zurücksetzen* in *Dieses Gerät abmelden* und *Cloud-Daten löschen* aufteilen?
-3. R-2: Sind „mehr als die Hälfte oder mehr als 10 Reminder weniger“ sinnvolle Grenzen?
-4. R-1: 7 tägliche und 4 wöchentliche lokale Schnappschüsse?
-5. Emulator: Darf Claude dafür das Android-Studio-Systemabbild mit Google Play laden
-   (einige GB) und den Emulator anlegen?
+## Antworten (Kevin, 2026-11-09)
+1. Prüfen zuerst, kein Umschalten zwischen Datenbanken: ja.
+2. R-3 aufteilen in *Dieses Gerät abmelden* und *Cloud-Daten löschen*: ja.
+3. R-2 mit „mehr als die Hälfte oder mehr als 10 Reminder weniger“: passt.
+4. R-1 mit 7 täglichen und 4 wöchentlichen Kopien: ja.
+5. Emulator-Abbild mit Google Play laden: ja.
+
+Die übrigen Empfehlungen gelten wie oben.
+
+## Umsetzung (2026-11-09)
+Pakete `restore` (Dateien, Tausch, Vergleich, lokale Kopien) und `cloud` (Prüfen,
+Wiederherstellen, Bremse, Löschen, Abmelden). Abweichungen und Ergänzungen zum Entwurf:
+- **W-1/W-4:** Die Prüfdatei wird gleich mit Room geöffnet (migriert und prüft das Schema),
+  dann `integrity_check` und `foreign_key_check`. Verglichen wird je Zeile ein SHA-256 über
+  alle Spalten (nach Namen sortiert, mit Typ, sodass `NULL`, `''` und `0` verschieden sind),
+  zugeordnet über den Primärschlüssel `id`. So zählt das Ergebnis *geändert*, *nur hier* und
+  *nur in der Sicherung* je Tabelle. Die Einstellungen werden über ihre Werte verglichen.
+- **W-5 (5):** Getauscht wird in `AppGraph`, bevor `AvlDatabase.create` die Datenbank öffnet
+  (`DatabaseSwap.applyPending`); die Einstellungen übernimmt der Start danach
+  (`finishRestore`). Neustart: Start-Activity mit neuem Task, dann `exit(0)`. Ein Beenden
+  des Prozesses löscht keine Alarme, nur *Beenden erzwingen*; der Start plant sie neu.
+- **Fehlgeschlagener Tausch:** `restore/fehlgeschlagen.json` mit dem Grund (feste Liste).
+  Die Daten bleiben wie sie sind, die Einstellungen zeigen es, und das automatische Sichern
+  wartet, bis es bestätigt ist. *Jetzt sichern* bleibt möglich.
+- **Rückfrage im Backend:** `Sicherungsablauf.wiederherstellen` gibt der Rückfrage die ganze
+  entschlüsselte Sicherung (Backend `6d04e02`), damit die App vor dem Bestätigen prüfen
+  und vergleichen kann.
+- **W-7:** Nach dem Wiederherstellen von einem anderen Gerät merkt sich die App die
+  Server-Fassung 0 und vergisst die letzte Sicherung; das automatische Sichern ruht, und
+  *Jetzt sichern* fragt vor dem Überschreiben.
+- **R-1:** `SnapshotWorker` täglich und beim App-Start, Abschnitt *Lokale Kopien* in den
+  Einstellungen. Eine tägliche Kopie enthält nur die Datenbank; beim Wiederherstellen daraus
+  bleiben die Einstellungen. *Rückgängig* nimmt die neueste Kopie vor einem Wiederherstellen
+  mit ihren Einstellungen.
+- **R-2:** gezählt werden nur Reminder (Löschen eines Reminders löscht seine Termine mit).
+  Die Bremse hält das automatische Sichern an, bis von Hand gesichert wird
+  (Benachrichtigung „Automatisches Sichern pausiert“); *Jetzt sichern* zeigt die Zahlen.
+- **R-3:** *Cloud-Daten löschen* braucht das eingetippte Wort „löschen“. *Dieses Gerät
+  abmelden* löscht nichts auf dem Server; ist er nicht erreichbar, wird das Handy trotzdem
+  abgemeldet (ohne Schlüssel kann es dort nichts mehr).
+- **Gefunden beim Testen:** `VACUUM INTO` auf der laufenden Datenbank öffnete sie ohne WAL
+  und schaltete so ihren Journalmodus um (die Datei änderte sich, die Daten nicht). Beide
+  Kopien (vor dem Tausch und vor einer Migration) öffnen sie jetzt im WAL-Modus wie Room.
+- **Logger:** `sicherung/geprueft`, `sicherung/gebremst`, `sicherung/geloescht`,
+  `cloud/abgemeldet`, `wiederherstellen/bereit`, `.../getauscht`, `.../fehlgeschlagen`; nur
+  Zahlen, Wahrheitswerte und feste Namen.
