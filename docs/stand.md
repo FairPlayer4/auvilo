@@ -185,9 +185,7 @@ Stand: 2026-11-09. Bei jedem größeren Schritt aktualisieren.
    freischalten*. Der wacklige Test `aPendingOrFailedRestoreHoldsTheBackup` ist behoben: Der
    Mutex in `CloudBackup.work` wird erst nach der Endphase freigegeben (Lauf-10-Fund).
    Die Serverregeln (Version vor „geschützt“, Freischalten beim ersten Backup, 10 neue
-   Geräte je Tag) sind im Backend fertig, **Deploy wartet auf Kevins Go**; bis dahin lehnt
-   der alte Server ein veraltetes erstes Backup eines nicht freigeschalteten Geräts mit
-   „nicht freigeschaltet“ statt „veraltet“ ab.
+   Geräte je Tag) sind deployt (2026-11-09, Revision `server-00016-r4r`).
 3. **Play-Store-Release** ohne Eile, erst wenn die App „fertig“ ist (mindestens bis V2);
    dafür Transparenz, Notausschalter (in V1.3a), Backend nur nach Einschalten (7.28 PS5–PS9).
 
