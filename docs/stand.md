@@ -171,8 +171,9 @@ Stand: 2026-11-09. Bei jedem größeren Schritt aktualisieren.
    bestanden (Kevin, Diagnose-Log): Tageskopie beim Start nach dem Update, *Prüfen*
    (2 Tabellen abweichend, Änderungen seit der letzten stündlichen Sicherung), Probelauf
    *Wiederherstellen* mit *Abbrechen* ohne Tausch (`restore/` danach leer), *Jetzt sichern*
-   (#17); das stündliche Sichern läuft weiter. Ein abgebrochenes Wiederherstellen schreibt
-   noch keine Zeile ins Diagnose-Log. adb im Emulator: Der Dialog „USB-Debugging zulassen“ lässt sich
+   (#17); das stündliche Sichern läuft weiter. Ein abgebrochenes Wiederherstellen schrieb
+   keine Zeile ins Diagnose-Log; jetzt `cloud: restore declined` (gebaut, noch nicht
+   installiert). adb im Emulator: Der Dialog „USB-Debugging zulassen“ lässt sich
    nur per Touch-Ereignis der Konsole bestätigen (Koordinaten auf 0–32767 skaliert);
    `-skip-adb-auth` wirkt bei Play-Abbildern nicht.
 3. **Play-Store-Release** ohne Eile, erst wenn die App „fertig“ ist (mindestens bis V2);

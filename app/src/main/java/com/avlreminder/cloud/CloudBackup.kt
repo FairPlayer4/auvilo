@@ -504,7 +504,11 @@ class CloudBackup(
                     restore.restart()
                 }
                 Wiederhergestellt.KeineSicherung -> note("Auf dem Server liegt keine Sicherung.")
-                Wiederhergestellt.Abgelehnt -> note("Nichts wiederhergestellt.")
+                Wiederhergestellt.Abgelehnt -> {
+                    // Without this line a cancelled restore leaves no trace in the diagnose log.
+                    log("cloud: restore declined")
+                    note("Nichts wiederhergestellt.")
+                }
             }
         } finally {
             if (compared && !staged) restore.discard()

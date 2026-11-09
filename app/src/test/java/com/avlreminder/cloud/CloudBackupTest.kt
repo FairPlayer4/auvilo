@@ -842,13 +842,14 @@ class CloudBackupTest {
     }
 
     // KRITISCH: only a yes after the comparison stages the swap and restarts (W-5); a no leaves
-    // nothing behind.
+    // nothing behind but a line in the diagnose log.
     @Test
     fun restoringStagesOnlyAfterYes() {
         for (yes in listOf(false, true)) {
             val cloud = cloud()
             backedUp(cloud)
             restoreTarget.reset()
+            logged.clear()
             val asked = restore(cloud, yes)
             assertTrue(asked.report.fromThisDevice)
             if (yes) {
@@ -856,11 +857,13 @@ class CloudBackupTest {
                 assertEquals(1, restoreTarget.restarts)
                 assertEquals(0, restoreTarget.discards)
                 assertTrue(events().any { it.getString("ereignis") == "bereit" })
+                assertFalse(logged.toString(), logged.any { "restore declined" in it })
             } else {
                 assertTrue(restoreTarget.staged.isEmpty())
                 assertEquals(0, restoreTarget.restarts)
                 assertEquals(1, restoreTarget.discards)
                 assertTrue(cloud.status.value.notes.toString(), cloud.status.value.notes.any { "Nichts wiederhergestellt" in it })
+                assertTrue(logged.toString(), logged.any { "restore declined" in it })
             }
             blocking { store.clear() }
             local.clear()
