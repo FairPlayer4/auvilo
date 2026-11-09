@@ -2,6 +2,7 @@ package com.avlreminder.restore
 
 import android.content.Context
 import android.database.Cursor
+import android.database.DatabaseErrorHandler
 import android.database.sqlite.SQLiteDatabase
 import android.util.Log
 import androidx.room.Room
@@ -150,13 +151,19 @@ object DatabaseSwap {
         tmp.delete()
         // In WAL mode like Room opens it: otherwise opening switches the journal mode and so
         // changes the file before anything is decided.
-        SQLiteDatabase.openDatabase(db.path, null, SQLiteDatabase.OPEN_READWRITE or SQLiteDatabase.ENABLE_WRITE_AHEAD_LOGGING).use {
+        // KRITISCH: a damaged page only makes the copy fail. Without a handler of its own,
+        // Android's default handler deletes the damaged database, the data to be kept.
+        val flags = SQLiteDatabase.OPEN_READWRITE or SQLiteDatabase.ENABLE_WRITE_AHEAD_LOGGING
+        SQLiteDatabase.openDatabase(db.path, null, flags, KEEP_DAMAGED).use {
             it.execSQL("VACUUM INTO '${tmp.path.replace("'", "''")}'")
         }
         Files.move(tmp.toPath(), target.toPath(), StandardCopyOption.ATOMIC_MOVE)
     }
 
     private val SIDECARS = listOf("-wal", "-shm", "-journal")
+
+    /** Leaves a damaged database alone (the default handler deletes it). */
+    private val KEEP_DAMAGED = DatabaseErrorHandler { }
 
     fun deleteWithSidecars(file: File) {
         file.delete()
