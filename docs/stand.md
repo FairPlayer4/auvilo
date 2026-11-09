@@ -125,8 +125,9 @@ Stand: 2026-11-08. Bei jedem größeren Schritt aktualisieren.
    der Installation: einmal sichern (Größe und Dauer stehen im Logger), dann Diagnose
    senden und mit `werkzeuge/diagnose-holen.sh` im Backend lesen.
    **Schritt 4 gebaut** am 2026-11-08, **installiert** am 2026-11-08 um 23:06 mit dem
-   Netzfehler-Fix (Alarme vorher und nachher 167, Job `CloudBackupWorker` geplant;
-   Bestätigung im Diagnose-Log steht aus):
+   Netzfehler-Fix (Alarme vorher und nachher 167, Job `CloudBackupWorker` geplant).
+   **Bestätigt** am 2026-11-09 über die Fassungen im Bucket: neue Sicherungen etwa
+   stündlich, wenn sich etwas geändert hat (bis 12:17 UTC zehn Fassungen seit der Installation):
    stündlich per WorkManager (`CloudWorker.kt`), nur mit Netz und nur, wenn sich der SHA-256
    der Nutzlast geändert hat; startet nach der ersten Sicherung von Hand, endet mit
    Ausschalten und Zurücksetzen. Hat ein anderes Gerät zuletzt gesichert, bleibt dessen
@@ -139,6 +140,10 @@ Stand: 2026-11-08. Bei jedem größeren Schritt aktualisieren.
    Ersetzen, Wiederherstellen über eine Prüfdatei, Bewertung der Idee mehrerer Datenbanken
    und Vorschlägen gegen Datenverlust (R-1 bis R-5). Als Nächstes: manuelle Sicherung der
    Datenbank vom S24 (R-5), dann Kevins Antworten auf die Fragen im Entwurf.
+   **R-5 erledigt** am 2026-11-09: App-Ordner ohne `cache/`, `code_cache/`, `files/backend/`
+   per `run-as tar` bei laufender App nach `%USERPROFILE%/avlreminder-Backup20261109`
+   (außerhalb der Repos), zweimal geholt und gleich, Arbeitskopie `integrity_check` ok,
+   Schema 8; Alarme danach 170. Enthält auch Fotos und Audio, die in der Cloud-Sicherung fehlen.
 3. **Play-Store-Release** ohne Eile, erst wenn die App „fertig“ ist (mindestens bis V2);
    dafür Transparenz, Notausschalter (in V1.3a), Backend nur nach Einschalten (7.28 PS5–PS9).
 
