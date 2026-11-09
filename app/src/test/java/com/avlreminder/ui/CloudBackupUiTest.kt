@@ -155,6 +155,21 @@ class CloudBackupUiTest {
         assertEquals(listOf("deleteCloudData"), actions.calls)
     }
 
+    // Without a session nothing can be deleted on the server: the button says so and asks first.
+    @Test
+    fun signedOutTheButtonOnlyResetsThePhoneAndAsksFirst() {
+        val actions = show(CloudStatus(CloudPhase.SignedOut))
+        compose.onNodeWithTag("cloudDeleteAll").assertDoesNotExist()
+        compose.onNodeWithTag("cloudResetPhone").performScrollTo().performClick()
+        compose.onNodeWithText("Die Sicherung auf dem Server bleibt", substring = true).assertExists()
+        compose.onNodeWithText("Abbrechen").performClick()
+        assertEquals(emptyList<String>(), actions.calls)
+
+        compose.onNodeWithTag("cloudResetPhone").performScrollTo().performClick()
+        compose.onNodeWithTag("cloudResetPhoneOk").performClick()
+        assertEquals(listOf("deleteCloudData"), actions.calls)
+    }
+
     // KRITISCH: signing out and deleting the backup ask first (R-3, W-8).
     @Test
     fun signingOutAndDeletingTheBackupAskFirst() {

@@ -134,6 +134,9 @@ class CloudStore(private val context: Context) : SitzungsAblage {
         context.backendStore.edit { it[staleNoticeKey] = true }
     }
 
+    /** The account of the last session, also after the server rejected it (A-13 counts on). */
+    suspend fun account(): String? = prefs()[accountKey]
+
     override suspend fun lesen(): Sitzung? {
         val p = prefs()
         return Sitzung(p[accountKey] ?: return null, p[deviceKey] ?: return null, p[tokenKey] ?: return null, p[expiresKey] ?: return null)

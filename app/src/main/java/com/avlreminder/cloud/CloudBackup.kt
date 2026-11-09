@@ -185,7 +185,13 @@ interface CloudNotices {
     /** The backup has not held this device's data for over 3 days; [lastBackup] = last upload. */
     fun stale(lastBackup: Instant)
 
-    /** Both are done with (backed up by hand). */
+    /** The server rejected the session; nothing is backed up until the person signs in again. */
+    fun signInAgain()
+
+    /** Signed in again: [signInAgain] is done with. */
+    fun signedIn()
+
+    /** The notices about the backup are done with (backed up by hand). */
     fun clear()
 }
 
@@ -275,6 +281,7 @@ class CloudBackup(
         val server = server()
         val signedIn = server.signIn { nonce -> google.idToken(activity, nonce) }
         store.setUnlocked(signedIn.freigeschaltet)
+        notices.signedIn()
         events.record(CloudEvent.SIGNED_IN, mapOf("neues_konto" to signedIn.neuesKonto, "freigeschaltet" to signedIn.freigeschaltet))
         log("cloud: signed in" + if (signedIn.neuesKonto) " (new account)" else "")
         setUp(server, signedIn.sitzung, activity)
@@ -516,6 +523,18 @@ class CloudBackup(
     }
 
     /**
+     * The data were restored on the phone (daily copy, undo) and are older than the last backup
+     * (W-7, 2026-11-09): this device forgets its last backup, so the automatic backup waits until
+     * the person backs up by hand. Runs at the start, before anything backs up.
+     */
+    suspend fun restoredOnThePhone() {
+        store.clearLastBackup()
+        schedule.stop()
+        notices.clear()
+        log("cloud: restored on the phone, automatic backup waits for a backup by hand")
+    }
+
+    /**
      * "Sicherung löschen" (W-8, DSGVO Art. 17): deletes the data backup on the server with all its
      * older versions. The key backup stays, so backing up again needs no new setup. The automatic
      * backup stops until the person backs up by hand.
@@ -642,15 +661,20 @@ class CloudBackup(
         }
     }
 
-    /** Shows the notice once when the backup has not held this device's data for 3 days (A-13). */
+    /**
+     * Shows the notice once when the backup has not held this device's data for 3 days (A-13).
+     *
+     * KRITISCH: It counts for the remembered account, not the session: after the server rejected
+     * the session nothing is backed up, and that is exactly when the notice is needed.
+     */
     private suspend fun checkStale() {
         if (!store.enabled()) return
-        val known = store.lesen() ?: return
-        val current = Instant.ofEpochSecond(store.current(known.kontoId) ?: return)
+        val account = store.account() ?: return
+        val current = Instant.ofEpochSecond(store.current(account) ?: return)
         if (store.staleNoticeShown()) return
         val age = Duration.between(current, clock())
         if (age <= STALE_AFTER) return
-        notices.stale(store.lastBackup(known.kontoId)?.let(Instant::ofEpochSecond) ?: current)
+        notices.stale(store.lastBackup(account)?.let(Instant::ofEpochSecond) ?: current)
         store.setStaleNoticeShown()
         events.record(CloudEvent.STALE, mapOf("tage" to age.toDays()))
         log("cloud: stale notice shown")
@@ -719,7 +743,8 @@ class CloudBackup(
     fun deleteCloudData(): Job = work(CloudStep.RESET) {
         if (!store.enabled()) return@work
         val session = store.lesen()
-        var cleared = session == null
+        // Without a session nothing is deleted on the server; the log must not say otherwise.
+        var cleared = false
         if (session != null) {
             busy("Auf dem Server löschen …")
             val server = server()
@@ -818,7 +843,12 @@ class CloudBackup(
             } catch (e: CancellationException) {
                 throw e
             } catch (e: Throwable) {
-                if (e is AnmeldungAbgelehnt) store.forgetSession()
+                if (e is AnmeldungAbgelehnt) {
+                    store.forgetSession()
+                    // KRITISCH: without a session the hourly backup stops for good; the person
+                    // must learn it at once, not only from the notice after 3 days (A-13).
+                    if (step != CloudStep.SIGN_IN) notices.signInAgain()
+                }
                 error = describe(e)
                 events.record(CloudEvent.FAILED, failure(step, e), e)
                 log("cloud: failed (${logDetail(e)})")

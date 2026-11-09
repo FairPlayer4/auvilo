@@ -34,6 +34,7 @@ import com.avlreminder.restore.DatabaseRestore
 import com.avlreminder.restore.DatabaseSwap
 import com.avlreminder.restore.LocalRestore
 import com.avlreminder.restore.RestoreFiles
+import com.avlreminder.restore.RestoreFinish
 import com.avlreminder.restore.SnapshotWorker
 import com.avlreminder.restore.Snapshots
 import com.avlreminder.restore.SwapOutcome
@@ -173,12 +174,7 @@ class AppGraph(private val context: Context) : ClaudeApi.Access {
     suspend fun finishRestore() {
         local.started(swap)
         if (swap !is SwapOutcome.Swapped) return
-        try {
-            if (restoreFiles.settings.exists()) settings.restore(restoreFiles.settings.readText())
-            DatabaseSwap.finish(restoreFiles)
-        } catch (e: Exception) {
-            Diag.log("restore: settings not taken (${e::class.simpleName})")
-        }
+        RestoreFinish.run(restoreFiles, swap.order, settings::restore, cloud::restoredOnThePhone, Diag::log)
     }
 
     /** The daily copy of the database (R-1); a failure is only logged. */

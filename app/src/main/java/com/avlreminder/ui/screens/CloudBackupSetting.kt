@@ -72,6 +72,7 @@ fun CloudBackupSetting(status: CloudStatus, actions: CloudActions) {
     val phase = status.phase
     var asking by remember { mutableStateOf(false) }
     var deletingCloud by remember { mutableStateOf(false) }
+    var resettingPhone by remember { mutableStateOf(false) }
     var deletingBackup by remember { mutableStateOf(false) }
     var signingOut by remember { mutableStateOf(false) }
     var diagnosing by remember { mutableStateOf(false) }
@@ -156,8 +157,15 @@ fun CloudBackupSetting(status: CloudStatus, actions: CloudActions) {
             if (phase != CloudPhase.SignedOut) {
                 TextButton(onClick = { signingOut = true }, Modifier.testTag("cloudSignOut")) { Text("Dieses Gerät abmelden") }
             }
-            TextButton(onClick = { deletingCloud = true }, Modifier.testTag("cloudDeleteAll")) {
-                Text("Cloud-Daten löschen", color = c.strict)
+            if (phase == CloudPhase.SignedOut) {
+                // Without a session nothing can be deleted on the server (Review-Lauf 10, 2026-11-09).
+                TextButton(onClick = { resettingPhone = true }, Modifier.testTag("cloudResetPhone")) {
+                    Text("Nur dieses Handy zurücksetzen", color = c.strict)
+                }
+            } else {
+                TextButton(onClick = { deletingCloud = true }, Modifier.testTag("cloudDeleteAll")) {
+                    Text("Cloud-Daten löschen", color = c.strict)
+                }
             }
         }
         status.notes.forEach { Text(it, Modifier.padding(top = 6.dp), color = c.muted, fontSize = 13.sp) }
@@ -232,6 +240,26 @@ fun CloudBackupSetting(status: CloudStatus, actions: CloudActions) {
         )
     }
     if (deletingCloud) DeleteCloudData(onDone = { deletingCloud = false }, actions)
+    if (resettingPhone) {
+        AlertDialog(
+            onDismissRequest = { resettingPhone = false },
+            title = { Text("Nur dieses Handy zurücksetzen?") },
+            text = {
+                Text(
+                    "Ohne Anmeldung kann die App auf dem Server nichts löschen. Gelöscht werden nur Schlüssel und Anmeldung " +
+                        "des Cloud-Backups auf diesem Handy. Die Sicherung auf dem Server bleibt und ist mit dem " +
+                        "Wiederherstellungsschlüssel erreichbar. Um sie zu löschen, erst neu anmelden. Reminder und " +
+                        "Einstellungen bleiben.",
+                )
+            },
+            confirmButton = {
+                TextButton(onClick = { resettingPhone = false; actions.deleteCloudData() }, Modifier.testTag("cloudResetPhoneOk")) {
+                    Text("Zurücksetzen", color = c.strict)
+                }
+            },
+            dismissButton = { TextButton(onClick = { resettingPhone = false }) { Text("Abbrechen") } },
+        )
+    }
 }
 
 /** The word to type before "Cloud-Daten löschen" (R-3). */

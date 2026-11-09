@@ -2,12 +2,13 @@ package com.avlreminder.restore
 
 import android.content.Context
 import android.database.Cursor
-import android.database.DatabaseErrorHandler
 import android.database.sqlite.SQLiteDatabase
 import android.util.Log
 import androidx.room.Room
 import androidx.room.RoomDatabase
 import com.avlreminder.data.AvlDatabase
+import com.avlreminder.data.KeepDamaged
+import kotlinx.coroutines.CancellationException
 import org.json.JSONObject
 import java.io.File
 import java.nio.file.Files
@@ -154,16 +155,13 @@ object DatabaseSwap {
         // KRITISCH: a damaged page only makes the copy fail. Without a handler of its own,
         // Android's default handler deletes the damaged database, the data to be kept.
         val flags = SQLiteDatabase.OPEN_READWRITE or SQLiteDatabase.ENABLE_WRITE_AHEAD_LOGGING
-        SQLiteDatabase.openDatabase(db.path, null, flags, KEEP_DAMAGED).use {
+        SQLiteDatabase.openDatabase(db.path, null, flags, KeepDamaged.handler).use {
             it.execSQL("VACUUM INTO '${tmp.path.replace("'", "''")}'")
         }
         Files.move(tmp.toPath(), target.toPath(), StandardCopyOption.ATOMIC_MOVE)
     }
 
     private val SIDECARS = listOf("-wal", "-shm", "-journal")
-
-    /** Leaves a damaged database alone (the default handler deletes it). */
-    private val KEEP_DAMAGED = DatabaseErrorHandler { }
 
     fun deleteWithSidecars(file: File) {
         file.delete()
@@ -193,6 +191,40 @@ object DatabaseSwap {
     /** Name for the copy before a restore at [at]. */
     fun beforeName(at: Instant): String =
         RestoreFiles.BEFORE + DateTimeFormatter.ofPattern("yyyyMMdd-HHmmss").withZone(ZoneId.systemDefault()).format(at)
+}
+
+/** The end of a swapped restore (W-5, step 5): settings, then the order goes. */
+object RestoreFinish {
+    /**
+     * Takes the settings that came with the swapped database via [take], then removes the order.
+     * After a restore on the phone ([RestoreKind.SNAPSHOT], [RestoreKind.UNDO]) [forgetLastBackup]
+     * runs first.
+     *
+     * KRITISCH:
+     *  - The order is removed even if [take] fails. The database is swapped already; the settings
+     *    then stay as they were on this device. Keeping the order would retry at every start
+     *    without ever succeeding and hold the automatic backup for good (R1 of Review-Lauf 10).
+     *  - W-7 for a restore on the phone (2026-11-09): the data are older than the last cloud
+     *    backup, so the automatic backup must not carry them up unasked. [forgetLastBackup] runs
+     *    before the order goes, so an interrupted start does it again.
+     */
+    suspend fun run(
+        files: RestoreFiles,
+        order: RestoreOrder,
+        take: suspend (String) -> Unit,
+        forgetLastBackup: suspend () -> Unit,
+        log: (String) -> Unit,
+    ) {
+        if (order.kind != RestoreKind.CLOUD) forgetLastBackup()
+        try {
+            if (files.settings.exists()) take(files.settings.readText())
+        } catch (e: CancellationException) {
+            throw e
+        } catch (e: Exception) {
+            log("restore: settings not taken (${e::class.simpleName})")
+        }
+        DatabaseSwap.finish(files)
+    }
 }
 
 /** The backup's database is not usable: not SQLite, damaged, or it does not fit the app. */

@@ -83,6 +83,17 @@ class AndroidCloudNotices(private val context: Context) : CloudNotices {
         "Zuletzt gesichert: ${time(lastBackup)}. Der Grund steht in den Einstellungen unter Cloud-Backup.",
     )
 
+    override fun signInAgain() = show(
+        ID_SIGN_IN,
+        "Cloud-Backup: Bitte neu anmelden",
+        "Der Server hat die Anmeldung dieses Handys abgelehnt (z. B. wegen einer falschen Uhrzeit). Bis zur neuen " +
+            "Anmeldung wird nicht gesichert. In den Einstellungen unter Cloud-Backup „Mit Google anmelden“.",
+    )
+
+    override fun signedIn() {
+        runCatching { context.getSystemService(NotificationManager::class.java).cancel(TAG, ID_SIGN_IN) }
+    }
+
     override fun clear() {
         val manager = context.getSystemService(NotificationManager::class.java)
         manager.cancel(TAG, ID_OTHER_DEVICE)
@@ -119,6 +130,7 @@ class AndroidCloudNotices(private val context: Context) : CloudNotices {
         const val ID_OTHER_DEVICE = 1
         const val ID_STALE = 2
         const val ID_BRAKE = 3
+        const val ID_SIGN_IN = 4
         private val FORMAT = DateTimeFormatter.ofPattern("dd.MM.yyyy, HH:mm")
 
         fun createChannel(context: Context) {

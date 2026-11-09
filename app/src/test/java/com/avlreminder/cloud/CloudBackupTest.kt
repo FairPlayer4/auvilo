@@ -189,6 +189,8 @@ class CloudBackupTest {
         override fun otherDevice(created: Instant) { shown += "otherDevice $created" }
         override fun stale(lastBackup: Instant) { shown += "stale $lastBackup" }
         override fun brake(before: Int, now: Int) { shown += "brake $before $now" }
+        override fun signInAgain() { shown += "signInAgain" }
+        override fun signedIn() { shown.remove("signInAgain") }
         override fun clear() { shown.clear() }
     }
     private var payloadReads = 0
@@ -734,6 +736,8 @@ class CloudBackupTest {
         assertEquals(CloudPhase.Off, cloud.status.value.phase)
         assertEquals(1, wiped)
         assertEquals(0, serversCreated)
+        // The log must not claim the server was cleared.
+        assertEquals(false, events().single { it.getString("ereignis") == "zurueckgesetzt" }.getJSONObject("felder").getBoolean("server_geleert"))
     }
 
     @Test
@@ -899,6 +903,29 @@ class CloudBackupTest {
         cloud.answerOverwrite(false)
         blocking { job.join() }
         assertEquals(theirs, server.data)
+    }
+
+    // KRITISCH: W-7 for a restore on the phone (daily copy, undo): the older data are not backed
+    // up automatically; a backup by hand uploads them and the automatic backup runs again.
+    @Test
+    fun afterARestoreOnThePhoneOnlyABackupByHandUploads() {
+        val cloud = cloud()
+        backedUp(cloud)
+        val newer = server.data
+        val stops = schedule.stops
+
+        blocking { cloud.restoredOnThePhone() }
+        assertNull(blocking { store.lastBackup(account) })
+        assertEquals(stops + 1, schedule.stops)
+        payload = zip("älterer Stand")
+        auto(cloud)
+        assertEquals(newer, server.data)
+
+        blocking { cloud.backUp().join() }
+        assertTrue(onServer().nutzlast.contentEquals(payload))
+        payload = zip("danach geändert")
+        auto(cloud)
+        assertTrue("automatic again", onServer().nutzlast.contentEquals(payload))
     }
 
     // KRITISCH: while a restore waits for the restart nothing is backed up; after a failed swap
@@ -1329,6 +1356,38 @@ class CloudBackupTest {
     }
 
     // A-13: after 3 days without a current backup a notice comes, once; unchanged data count as current.
+    // KRITISCH: a session the server rejects stops the automatic backup; the person learns it at
+    // once, and the notice after 3 days still comes, because it counts for the remembered account.
+    @Test
+    fun aRejectedSessionWarnsAtOnceAndTheNoticeAfterThreeDaysStillComes() {
+        val cloud = cloud()
+        ready(cloud)
+        blocking { cloud.backUp().join() }
+        val backedUp = now
+
+        payload = "neue Daten".toByteArray()
+        server.sessionError = AnmeldungAbgelehnt()
+        auto(cloud)
+        assertNull(blocking { store.lesen() })
+        assertEquals(listOf("signInAgain"), notices.shown)
+
+        now = now.plus(Duration.ofDays(3)).plusSeconds(3600)
+        auto(cloud)
+        assertEquals(listOf("signInAgain", "stale $backedUp"), notices.shown)
+    }
+
+    // Counter-check: signing in by hand and being rejected there needs no notification; the
+    // person sees the error on the screen.
+    @Test
+    fun aRejectionWhileSigningInByHandShowsNoNotification() {
+        val cloud = cloud()
+        blocking { cloud.setEnabled(true).join() }
+        server.signInError = AnmeldungAbgelehnt()
+        blocking { cloud.signIn(activity).join() }
+        assertTrue(notices.shown.isEmpty())
+        assertNotNull(cloud.status.value.error)
+    }
+
     @Test
     fun theNoticeComesAfterThreeDaysWithoutACurrentBackup() {
         val cloud = cloud()

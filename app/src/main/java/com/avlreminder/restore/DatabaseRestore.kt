@@ -5,6 +5,7 @@ import android.content.Intent
 import android.database.sqlite.SQLiteDatabase
 import com.avlreminder.cloud.BackupContents
 import com.avlreminder.data.AvlDatabase
+import com.avlreminder.data.BadSettings
 import com.avlreminder.data.Settings
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
@@ -74,6 +75,13 @@ class DatabaseRestore(
 
     private suspend fun compareNow(contents: BackupContents): Comparison = withContext(Dispatchers.IO) {
         files.failed.delete()
+        // KRITISCH: settings the app cannot take are rejected here, before anything is staged
+        // (R1 of Review-Lauf 10); after the swap they could only stop the restore half-way.
+        try {
+            Settings.checkBackup(contents.settings)
+        } catch (e: BadSettings) {
+            throw DamagedDatabase("Einstellungen (${e.key})", e)
+        }
         val schema = CheckFile.prepare(context, contents.database, files)
         DatabaseSwap.writeAtomically(files.settings, contents.settings)
         val now = settings.backup().also { current = it }

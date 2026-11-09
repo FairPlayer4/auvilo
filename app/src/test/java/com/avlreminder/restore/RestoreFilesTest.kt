@@ -357,4 +357,121 @@ class RestoreFilesTest {
         restore.discard()
         db.close()
     }
+
+    // --- Settings that come with a backup (R1 of Review-Lauf 10) -----------------------------
+
+    /** A backup of the settings with [values] instead of the real ones. */
+    private fun settingsJson(values: String, version: Int = Settings.BACKUP_VERSION) = """{"version":$version,"values":$values}"""
+
+    // KRITISCH: settings the app cannot take are rejected before anything is staged; after the
+    // swap they would stop the restore half-way or crash every start.
+    @Test
+    fun aBackupWithSettingsTheAppCannotTakeIsRejectedBeforeStaging() = runBlocking {
+        database(live, "hier")
+        val settings = Settings(context)
+        val db = Room.databaseBuilder(context, AvlDatabase::class.java, live.path).build()
+        val restore = DatabaseRestore(context, db, settings, files)
+        val backup = database(File(tmp.root, "sicherung.db"), "anders").readBytes()
+        val cases = listOf(
+            "kein JSON" to "kaputt",
+            "ohne Werte" to """{"version":1}""",
+            "neuere Fassung" to settingsJson("{}", version = Settings.BACKUP_VERSION + 1),
+            "Tagesende nach Mitternacht" to settingsJson("""{"dayEnd":1440}"""),
+            "laut ab negativ" to settingsJson("""{"loudFrom":-1}"""),
+            "Übersicht weder Zeit noch aus" to settingsJson("""{"overviewMorning":-2}"""),
+            "Wochenende weder an noch aus" to settingsJson("""{"weekendOverview":2}"""),
+            "Nachfragen nach 0" to settingsJson("""{"askBlockerAfter":0}"""),
+            "Zahl als Text" to settingsJson("""{"dayEnd":"600"}"""),
+            "unbekanntes Design" to settingsJson("""{"theme":"LILA"}"""),
+            "unbekannter Schlüssel" to settingsJson("""{"claudeAccess":1}"""),
+        )
+        for ((case, json) in cases) {
+            try {
+                restore.compare(BackupContents(backup, json))
+                fail("$case: accepted")
+            } catch (_: DamagedDatabase) {
+            }
+            assertFalse(case, files.check.exists())
+            assertFalse(case, files.settings.exists())
+            assertFalse(case, restore.pending())
+        }
+        // Counter-check: the edges themselves are fine, and so is everything the app writes.
+        val edges = settingsJson("""{"dayEnd":1439,"loudFrom":0,"overviewMorning":-1,"weekendOverview":1,"askBlockerAfter":5,"theme":"DARK"}""")
+        restore.compare(BackupContents(backup, edges))
+        restore.discard()
+        db.close()
+    }
+
+    // Everything the app writes into a backup passes the check (the list of allowed keys
+    // cannot fall behind the settings).
+    @Test
+    fun everySettingTheAppBacksUpPassesTheCheck() = runBlocking {
+        val settings = Settings(context)
+        settings.setAlert(
+            com.avlreminder.core.rules.AlertSettings(
+                java.time.LocalTime.of(0, 0), java.time.LocalTime.of(23, 59), 5,
+                com.avlreminder.core.rules.DayTimes(java.time.LocalTime.of(9, 0), java.time.LocalTime.of(23, 0)),
+            ),
+        )
+        settings.setOverview(com.avlreminder.data.OverviewTimes(null, java.time.LocalTime.of(23, 59), com.avlreminder.data.OverviewTimes(java.time.LocalTime.of(0, 0), null)))
+        settings.setTheme(com.avlreminder.data.ThemeMode.DARK)
+        settings.setReminderSort(com.avlreminder.core.usecases.ReminderSort.NAME)
+        settings.setDwellMinutes(10)
+        val json = settings.backup()
+        assertEquals("all backed-up keys are set", 13, JSONObject(json).getJSONObject("values").length())
+        Settings.checkBackup(json)
+    }
+
+    // KRITISCH: once the database is swapped, the order goes even if the settings cannot be
+    // taken; otherwise every start retries and the automatic backup waits for good.
+    @Test
+    fun theOrderGoesEvenIfTheSettingsCannotBeTaken() = runBlocking {
+        val cases = listOf(
+            Triple("Einstellungen übernommen", true, null),
+            Triple("Einstellungen unbrauchbar", false, "restore: settings not taken (BadSettings)"),
+            Triple("ohne Einstellungen", null, null),
+        )
+        for ((case, good, expectedLog) in cases) {
+            files.dir.mkdirs()
+            val order = RestoreOrder(RestoreKind.CLOUD, "x", "vorher", swapped = true)
+            DatabaseSwap.writeAtomically(files.order, order.json())
+            when (good) {
+                true -> DatabaseSwap.writeAtomically(files.settings, settingsJson("{}"))
+                false -> DatabaseSwap.writeAtomically(files.settings, settingsJson("""{"dayEnd":9999}"""))
+                null -> files.settings.delete()
+            }
+            val taken = mutableListOf<String>()
+            val logged = mutableListOf<String>()
+            RestoreFinish.run(files, order, { Settings.checkBackup(it); taken += it }, {}, { logged += it })
+
+            assertFalse(case, files.order.exists())
+            assertFalse(case, files.settings.exists())
+            assertEquals(case, if (good == true) 1 else 0, taken.size)
+            assertEquals(case, listOfNotNull(expectedLog), logged)
+        }
+    }
+
+    // KRITISCH: W-7 for a restore on the phone: after a daily copy or an undo the last backup is
+    // forgotten, so the automatic backup waits; after a cloud restore that is decided before the
+    // restart (CloudBackup.restore), not here.
+    @Test
+    fun aRestoreOnThePhoneForgetsTheLastBackupBeforeTheOrderGoes() = runBlocking {
+        val cases = listOf(
+            RestoreKind.SNAPSHOT to true,
+            RestoreKind.UNDO to true,
+            RestoreKind.CLOUD to false,
+        )
+        for ((kind, forgets) in cases) {
+            files.dir.mkdirs()
+            val order = RestoreOrder(kind, "x", "vorher", swapped = true)
+            DatabaseSwap.writeAtomically(files.order, order.json())
+            var forgotten = 0
+            var orderWhenForgotten: Boolean? = null
+            RestoreFinish.run(files, order, {}, { forgotten++; orderWhenForgotten = files.order.exists() }, {})
+
+            assertEquals("$kind", if (forgets) 1 else 0, forgotten)
+            if (forgets) assertEquals("$kind: forgotten while the order still exists", true, orderWhenForgotten)
+            assertFalse("$kind", files.order.exists())
+        }
+    }
 }

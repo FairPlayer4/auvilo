@@ -77,9 +77,9 @@ class Settings(private val context: Context) {
             AlertSettings(
                 loudFrom = prefs[loudFromKey]?.toTime() ?: default.loudFrom,
                 dayEnd = prefs[dayEndKey]?.toTime() ?: default.dayEnd,
-                askBlockerAfter = prefs[askBlockerKey] ?: default.askBlockerAfter,
+                askBlockerAfter = prefs[askBlockerKey]?.takeIf { it in 1..5 } ?: default.askBlockerAfter,
                 weekend = runCatching {
-                    DayTimes(requireNotNull(prefs[weekendLoudKey]).toTime(), requireNotNull(prefs[weekendEndKey]).toTime())
+                    DayTimes(requireNotNull(prefs[weekendLoudKey]?.toTime()), requireNotNull(prefs[weekendEndKey]?.toTime()))
                 }.getOrNull(),
                 alarmsPausedUntil = prefs[pausedUntilKey]?.let(Instant::ofEpochMilli),
                 alarmsPausedFrom = prefs[pausedFromKey]?.let(Instant::ofEpochMilli),
@@ -88,7 +88,7 @@ class Settings(private val context: Context) {
     }
 
     /** How long to stay at a place before it counts as arrived (driving past does not). */
-    val dwellMinutes: Flow<Int> = context.dataStore.data.map { it[dwellKey] ?: DEFAULT_DWELL }
+    val dwellMinutes: Flow<Int> = context.dataStore.data.map { prefs -> prefs[dwellKey]?.takeIf { it in DWELL_RANGE } ?: DEFAULT_DWELL }
 
     val reminderSort: Flow<ReminderSort> = context.dataStore.data.map { prefs ->
         prefs[sortKey]?.let { runCatching { ReminderSort.valueOf(it) }.getOrNull() } ?: ReminderSort.NEXT_DUE
@@ -100,7 +100,8 @@ class Settings(private val context: Context) {
             when (val v = prefs[key]) {
                 null -> fallback
                 -1 -> null
-                else -> v.toTime()
+                // A value out of range (only an old or foreign backup could bring one) is not a time.
+                else -> v.toTime() ?: fallback
             }
         val weekdays = OverviewTimes(read(morningKey, default.morning), read(eveningKey, default.evening))
         val weekend = if (prefs[weekendOnKey] == 1) {
@@ -189,6 +190,7 @@ class Settings(private val context: Context) {
      * and the interface stay as they are on this device.
      */
     suspend fun restore(json: String) {
+        checkBackup(json)
         val values = JSONObject(json).getJSONObject("values")
         context.dataStore.edit { prefs ->
             backupInts.forEach { key ->
@@ -204,8 +206,63 @@ class Settings(private val context: Context) {
         const val BACKUP_VERSION = 1
         const val DEFAULT_DWELL = 3
         val DWELL_CHOICES = listOf(1, 3, 5, 10)
+        private val DWELL_RANGE = 1..60
+        private val MINUTES = 0..1439
+
+        /** Minutes after midnight; -1 = off. */
+        private val OVERVIEW = -1..1439
+
+        /** What each value of a [backup] may hold; a key not listed here is not taken. */
+        private val ALLOWED_INTS: Map<String, IntRange> = mapOf(
+            "loudFrom" to MINUTES,
+            "dayEnd" to MINUTES,
+            "weekendLoudFrom" to MINUTES,
+            "weekendDayEnd" to MINUTES,
+            "askBlockerAfter" to 1..5,
+            "dwellMinutes" to DWELL_RANGE,
+            "overviewMorning" to OVERVIEW,
+            "overviewEvening" to OVERVIEW,
+            "weekendOverview" to 0..1,
+            "weekendOverviewMorning" to OVERVIEW,
+            "weekendOverviewEvening" to OVERVIEW,
+        )
+        private val ALLOWED_STRINGS: Map<String, Set<String>> = mapOf(
+            "theme" to ThemeMode.entries.map { it.name }.toSet(),
+            "reminderSort" to ReminderSort.entries.map { it.name }.toSet(),
+        )
+
+        /**
+         * Checks the settings of a [backup] before anything is swapped in (R1 of Review-Lauf 10).
+         *
+         * KRITISCH: A restore takes the settings only after the database is swapped. A value the
+         * app cannot read there would either stop the restore half-way or crash every start, so a
+         * backup with such settings is rejected while nothing has changed yet.
+         *
+         * @throws BadSettings with the first key that does not fit.
+         */
+        fun checkBackup(json: String) {
+            val root = runCatching { JSONObject(json) }.getOrElse { throw BadSettings("kein JSON") }
+            val version = root.opt("version")
+            if (version !is Int || version !in 1..BACKUP_VERSION) throw BadSettings("version")
+            val values = root.opt("values") as? JSONObject ?: throw BadSettings("values")
+            for (key in values.keys()) {
+                val v = values.get(key)
+                val ints = ALLOWED_INTS[key]
+                val strings = ALLOWED_STRINGS[key]
+                val ok = when {
+                    ints != null -> v is Int && v in ints
+                    strings != null -> v is String && v in strings
+                    else -> false
+                }
+                if (!ok) throw BadSettings(key)
+            }
+        }
     }
 
-    private fun Int.toTime(): LocalTime = LocalTime.of(this / 60, this % 60)
+    /** null if the value is no time of day. */
+    private fun Int.toTime(): LocalTime? = if (this in MINUTES) LocalTime.of(this / 60, this % 60) else null
     private fun LocalTime.toMinutes(): Int = hour * 60 + minute
 }
+
+/** The settings of a backup do not fit this app ([Settings.checkBackup]); [key] names the first. */
+class BadSettings(val key: String) : Exception("Einstellungen der Sicherung unbrauchbar: $key")

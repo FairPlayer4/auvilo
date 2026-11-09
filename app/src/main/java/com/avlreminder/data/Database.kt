@@ -576,9 +576,12 @@ abstract class AvlDatabase : RoomDatabase() {
         const val VERSION = 8
 
         fun create(context: Context): AvlDatabase {
-            backupBeforeMigration(context.getDatabasePath(NAME), File(context.filesDir, "backup"))
+            val backups = File(context.filesDir, "backup")
+            backupBeforeMigration(context.getDatabasePath(NAME), backups)
             return Room.databaseBuilder(context, AvlDatabase::class.java, NAME)
                 .addMigrations(*MIGRATIONS)
+                // KRITISCH: a damaged page must not delete the database (R2 of Review-Lauf 10).
+                .openHelperFactory(KeepDamaged.Factory({ KeepDamaged.copyAside(it, backups) }))
                 .build()
         }
 
@@ -590,7 +593,8 @@ abstract class AvlDatabase : RoomDatabase() {
             if (!file.exists()) return null
             return try {
                 // WAL like Room, so that only looking at the version does not switch the journal mode.
-                SQLiteDatabase.openDatabase(file.path, null, SQLiteDatabase.OPEN_READWRITE or SQLiteDatabase.ENABLE_WRITE_AHEAD_LOGGING).use { db ->
+                // Its own error handler: the default one deletes a damaged database.
+                SQLiteDatabase.openDatabase(file.path, null, SQLiteDatabase.OPEN_READWRITE or SQLiteDatabase.ENABLE_WRITE_AHEAD_LOGGING, KeepDamaged.handler).use { db ->
                     if (db.version >= VERSION) return null
                     dir.mkdirs()
                     val stamp = DateTimeFormatter.ofPattern("yyyyMMdd-HHmmss").format(LocalDateTime.now())
