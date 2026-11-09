@@ -145,6 +145,14 @@ fun CloudBackupSetting(status: CloudStatus, actions: CloudActions) {
                     status.report?.let { Report(it, actions) }
                 } else {
                     Text("Nicht freigeschaltet: dieses Gerät kann nichts sichern.", color = c.strict, fontSize = 13.sp)
+                    Text(
+                        "Ein freigeschaltetes Gerät des Kontos kann es freischalten, oder hier mit dem Wiederherstellungsschlüssel.",
+                        color = c.muted, fontSize = 13.sp,
+                    )
+                    // R3 of Review-Lauf 9: without this the only way out was signing out and in again.
+                    OutlinedButton(onClick = actions::continueSetup, Modifier.padding(top = 4.dp).testTag("cloudUnlock")) {
+                        Text("Mit Wiederherstellungsschlüssel freischalten")
+                    }
                 }
             }
         }

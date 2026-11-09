@@ -8,6 +8,7 @@ import androidx.credentials.exceptions.NoCredentialException
 import com.avlreminder.data.AvlDatabase
 import com.avlreminder.protokoll.AeltereSicherung
 import com.avlreminder.protokoll.BackupAblage
+import com.avlreminder.protokoll.CloudLoeschen
 import com.avlreminder.protokoll.Diagnose
 import com.avlreminder.protokoll.DiagnoseAblage
 import com.avlreminder.protokoll.DiagnoseNichtFreigeschaltet
@@ -28,6 +29,7 @@ import com.avlreminder.protokoll.Einrichtung
 import com.avlreminder.protokoll.EinrichtungAbgebrochen
 import com.avlreminder.protokoll.GeraeteFreischaltung
 import com.avlreminder.protokoll.GeraetNichtFreigeschaltet
+import com.avlreminder.protokoll.KontoAufDemServer
 import com.avlreminder.protokoll.Gesichert
 import com.avlreminder.protokoll.LokaleAblage
 import com.avlreminder.protokoll.NeueresSchema
@@ -48,6 +50,7 @@ import com.avlreminder.verbindung.NichtAngemeldet
 import com.avlreminder.verbindung.ServerBackupAblage
 import com.avlreminder.verbindung.ServerDiagnoseAblage
 import com.avlreminder.verbindung.ServerGeraete
+import com.avlreminder.verbindung.ServerKonto
 import com.avlreminder.verbindung.ServerSicherungsAblage
 import com.avlreminder.verbindung.Serverfehler
 import com.avlreminder.verbindung.Sitzung
@@ -156,11 +159,8 @@ interface CloudServer {
     fun dataBackups(token: String): SicherungsAblage
     fun diagnosis(token: String): DiagnoseAblage
 
-    /** Deletes the account's data backup with all older versions (none is no error). */
-    suspend fun deleteDataBackup(token: String)
-
-    /** Deletes the account's key backup (none is no error). */
-    suspend fun deleteKeyBackup(token: String)
+    /** The account for "Cloud-Daten löschen" ([CloudLoeschen]): devices and both backups. */
+    fun account(token: String): KontoAufDemServer
 
     /** Locks [device] for good; the own device may always lock itself. */
     suspend fun lock(token: String, device: String)
@@ -208,8 +208,7 @@ class ConnectCloudServer(private val verbindung: Verbindung, key: Geraeteschlues
     override fun unlocking(token: String): GeraeteFreischaltung = ServerGeraete(verbindung, token)
     override fun dataBackups(token: String): SicherungsAblage = ServerSicherungsAblage(verbindung, token)
     override fun diagnosis(token: String): DiagnoseAblage = ServerDiagnoseAblage(verbindung, token)
-    override suspend fun deleteDataBackup(token: String) = ServerSicherungsAblage(verbindung, token).loeschen()
-    override suspend fun deleteKeyBackup(token: String) = ServerBackupAblage(verbindung, token).loeschen()
+    override fun account(token: String): KontoAufDemServer = ServerKonto(verbindung, token)
     override suspend fun lock(token: String, device: String) = ServerGeraete(verbindung, token).sperren(device)
 }
 
@@ -745,15 +744,15 @@ class CloudBackup(
         val session = store.lesen()
         // Without a session nothing is deleted on the server; the log must not say otherwise.
         var cleared = false
+        var othersLocked = 0
         if (session != null) {
             busy("Auf dem Server löschen …")
             val server = server()
             var token: String? = null
             try {
                 token = server.session().token
-                server.deleteDataBackup(token)
-                server.deleteKeyBackup(token)
-                server.lock(token, session.geraetId)
+                // KRITISCH: locks every device of the account, the others first (Kap. 11, 2026-11-09).
+                othersLocked = CloudLoeschen.alles(server.account(token))
                 cleared = true
             } catch (e: CancellationException) {
                 throw e
@@ -775,8 +774,8 @@ class CloudBackup(
         notices.clear()
         wipe()
         store.clear()
-        events.record(CloudEvent.RESET, mapOf("server_geleert" to cleared))
-        log("cloud: reset")
+        events.record(CloudEvent.RESET, mapOf("server_geleert" to cleared, "andere_gesperrt" to othersLocked))
+        log("cloud: reset, $othersLocked other devices locked")
     }
 
     private suspend fun setUp(server: CloudServer, session: Sitzung, activity: Activity?) {
@@ -820,8 +819,10 @@ class CloudBackup(
             },
             meldung = { text -> state.update { it.copy(notes = it.notes + text) } },
         ).ausfuehren()
-        // A new account and one restored with the recovery key are unlocked (E-B2b-13).
-        if (result !is Eingerichtet.Vorhanden) store.setUnlocked(true)
+        // A new account and one restored with the recovery key are unlocked (E-B2b-13), and so is
+        // a set-up device that just unlocked itself with the key ("Mit Wiederherstellungsschlüssel
+        // freischalten").
+        if (result !is Eingerichtet.Vorhanden || result.freigeschaltet) store.setUnlocked(true)
         events.record(CloudEvent.SET_UP, mapOf("art" to SetupKind.of(result)))
         log("cloud: set up (${result::class.simpleName})")
         // The prompts of the setup ("Bitte den Wiederherstellungsschlüssel eingeben", "passt nicht")
@@ -837,39 +838,46 @@ class CloudBackup(
         if (!running.tryLock()) return Job().apply { complete() }
         if (clearNotes) dismissNotes()
         return scope.launch {
-            var error: String? = null
+            // KRITISCH: The lock is released only after the final phase is set (Review-Lauf 10).
+            // Released before, the next step could show its question (AskKey, AskRestore) and
+            // this one would then overwrite it with its own final phase: the question would be
+            // gone, and the next step would wait for an answer for ever.
             try {
-                block()
-            } catch (e: CancellationException) {
-                throw e
-            } catch (e: Throwable) {
-                if (e is AnmeldungAbgelehnt) {
-                    store.forgetSession()
-                    // KRITISCH: without a session the hourly backup stops for good; the person
-                    // must learn it at once, not only from the notice after 3 days (A-13).
-                    if (step != CloudStep.SIGN_IN) notices.signInAgain()
+                var error: String? = null
+                try {
+                    block()
+                } catch (e: CancellationException) {
+                    throw e
+                } catch (e: Throwable) {
+                    if (e is AnmeldungAbgelehnt) {
+                        store.forgetSession()
+                        // KRITISCH: without a session the hourly backup stops for good; the person
+                        // must learn it at once, not only from the notice after 3 days (A-13).
+                        if (step != CloudStep.SIGN_IN) notices.signInAgain()
+                    }
+                    error = describe(e)
+                    events.record(CloudEvent.FAILED, failure(step, e), e)
+                    log("cloud: failed (${logDetail(e)})")
+                } finally {
+                    confirm = null
+                    typed = null
+                    overwrite = null
+                    restoreAnswer = null
+                    brakeAnswer = null
+                    shown = null
                 }
-                error = describe(e)
-                events.record(CloudEvent.FAILED, failure(step, e), e)
-                log("cloud: failed (${logDetail(e)})")
+                val phase = runCatching { current() }.getOrElse { e ->
+                    if (error == null) error = describe(e)
+                    // Even the switch may be unreadable here; the app must not crash over the backup.
+                    if (runCatching { store.enabled() }.getOrDefault(false)) CloudPhase.NotSetUp else CloudPhase.Off
+                }
+                state.update { it.copy(phase = phase, error = error) }
+                // KRITISCH: The hourly backup runs only while it may (switched on, set up, unlocked,
+                // backed up by hand once); switching off and resetting stop it.
+                if (phase is CloudPhase.Ready && phase.automatic) schedule.start()
             } finally {
-                confirm = null
-                typed = null
-                overwrite = null
-                restoreAnswer = null
-                brakeAnswer = null
-                shown = null
                 running.unlock()
             }
-            val phase = runCatching { current() }.getOrElse { e ->
-                if (error == null) error = describe(e)
-                // Even the switch may be unreadable here; the app must not crash over the backup.
-                if (runCatching { store.enabled() }.getOrDefault(false)) CloudPhase.NotSetUp else CloudPhase.Off
-            }
-            state.update { it.copy(phase = phase, error = error) }
-            // KRITISCH: The hourly backup runs only while it may (switched on, set up, unlocked,
-            // backed up by hand once); switching off and resetting stop it.
-            if (phase is CloudPhase.Ready && phase.automatic) schedule.start()
         }
     }
 

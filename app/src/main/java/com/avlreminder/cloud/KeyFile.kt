@@ -57,6 +57,12 @@ class KeyFile(private val dir: File, private val sealer: Sealer, private val acc
         Files.move(tmp.toPath(), file.toPath(), StandardCopyOption.REPLACE_EXISTING, StandardCopyOption.ATOMIC_MOVE)
     }
 
+    /** Removes the keys, e.g. a first backup the server rejected (Einrichtung). */
+    override fun loeschen() {
+        File(dir, "$NAME.tmp").delete()
+        file.delete()
+    }
+
     companion object {
         const val NAME = "keys.json"
         private const val VERSION = 1

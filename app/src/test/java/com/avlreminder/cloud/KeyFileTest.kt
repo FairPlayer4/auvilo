@@ -49,6 +49,15 @@ class KeyFileTest {
     }
 
     @Test
+    fun deletedThereAreNoKeysAndDeletingAgainIsNoError() {
+        val f = file()
+        f.speichern(LokalerStand(Schluesselbund.erzeugen(), null))
+        f.loeschen()
+        assertNull(f.laden())
+        f.loeschen()
+    }
+
+    @Test
     fun withoutAFileThereAreNoKeys() {
         assertNull(file().laden())
     }

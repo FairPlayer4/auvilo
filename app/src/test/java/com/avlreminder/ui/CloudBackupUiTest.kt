@@ -319,6 +319,21 @@ class CloudBackupUiTest {
         compose.onNodeWithTag("cloudDiagnosis").assertDoesNotExist()
     }
 
+    // R3 of Review-Lauf 9: not unlocked, the device can unlock itself with the key; unlocked, the
+    // button is gone.
+    @Test
+    fun notUnlockedOffersToUnlockWithTheKey() {
+        val actions = show(CloudStatus(CloudPhase.Ready("konto-1", "geraet-1", "AB12", unlocked = false)))
+        compose.onNodeWithTag("cloudUnlock").performClick()
+        assertEquals(listOf("continue"), actions.calls)
+    }
+
+    @Test
+    fun unlockedOffersNoUnlocking() {
+        show(CloudStatus(CloudPhase.Ready("konto-1", "geraet-1", "AB12", unlocked = true)))
+        compose.onNodeWithTag("cloudUnlock").assertDoesNotExist()
+    }
+
     @Test
     fun aDiagnosisIsSentOnlyAfterAskingAndSaysWhatGoesOut() {
         val actions = show(CloudStatus(CloudPhase.Ready("konto-1", "geraet-1", "AB12", unlocked = true)))

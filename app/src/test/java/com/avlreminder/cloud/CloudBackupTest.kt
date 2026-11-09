@@ -26,6 +26,8 @@ import com.avlreminder.protokoll.GeholteSicherung
 import com.avlreminder.protokoll.GeholtesBackup
 import com.avlreminder.protokoll.GeraeteFreischaltung
 import com.avlreminder.protokoll.GeraetNichtFreigeschaltet
+import com.avlreminder.protokoll.KontoAufDemServer
+import com.avlreminder.protokoll.KontoGeraet
 import com.avlreminder.protokoll.LokaleAblage
 import com.avlreminder.protokoll.LokalerStand
 import com.avlreminder.protokoll.Schluesselbund
@@ -84,6 +86,9 @@ class CloudBackupTest {
     private inner class FakeServer : CloudServer {
         var backup: GeholtesBackup? = null
         var unlockedAtSignIn = false
+
+        /** Another device of the account is unlocked: the server takes no first backup from a locked one. */
+        var otherUnlockedDevice = false
         var signInError: Throwable? = null
         var sessionError: Throwable? = null
         var uploadError: Throwable? = null
@@ -111,7 +116,9 @@ class CloudBackupTest {
             override suspend fun speichern(chiffrat: ByteArray, freischaltschluessel: ByteArray, erwartet: Long): Long {
                 uploadError?.let { throw it }
                 uploads++
+                // The server's order (schluessel.go): the version first, then the protection.
                 if ((backup?.version ?: 0) != erwartet) throw VersionVeraltet()
+                if (otherUnlockedDevice && !unlockedAtSignIn) throw GeraetNichtFreigeschaltet()
                 backup = GeholtesBackup(chiffrat, erwartet + 1)
                 return erwartet + 1
             }
@@ -148,17 +155,32 @@ class CloudBackupTest {
             }
         }
 
+        /** Thrown where this device needs to be unlocked: deleting, locking another device. */
         var deleteError: Throwable? = null
         var dataBackup = true
         val locked = mutableListOf<String>()
 
-        override suspend fun deleteDataBackup(token: String) {
-            deleteError?.let { throw it }
-            dataBackup = false
-        }
+        /** The other devices of the account. */
+        val others = mutableListOf<String>()
 
-        override suspend fun deleteKeyBackup(token: String) {
-            backup = null
+        override fun account(token: String) = object : KontoAufDemServer {
+            override suspend fun geraete() =
+                (listOf("geraet-1") + others).map { KontoGeraet(it, gesperrt = it in locked, diesesGeraet = it == "geraet-1") }
+
+            override suspend fun sperren(geraetId: String) {
+                if (geraetId != "geraet-1") deleteError?.let { throw it }
+                locked += geraetId
+            }
+
+            override suspend fun datensicherungLoeschen() {
+                deleteError?.let { throw it }
+                dataBackup = false
+                data = null
+            }
+
+            override suspend fun schluesselBackupLoeschen() {
+                backup = null
+            }
         }
 
         override suspend fun lock(token: String, device: String) {
@@ -203,8 +225,11 @@ class CloudBackupTest {
         val staged = mutableListOf<RestoreKind>()
         var discards = 0
         var restarts = 0
-        var pending = false
-        var blocks = false
+
+        // Set by the test thread, read by the steps on Dispatchers.Default.
+        @Volatile var pending = false
+
+        @Volatile var blocks = false
 
         fun reset() {
             compared.clear(); staged.clear(); discards = 0; restarts = 0; pending = false; blocks = false
@@ -238,6 +263,7 @@ class CloudBackupTest {
                     return local[acc]
                 }
                 override fun speichern(stand: LokalerStand) { local[acc] = stand }
+                override fun loeschen() { local.remove(acc) }
             }
         },
         google = { _, nonce ->
@@ -457,6 +483,47 @@ class CloudBackupTest {
         assertTrue(ready.unlocked)
         // Found on the emulator: the prompt for the key stayed after it was entered.
         assertEquals(emptyList<String>(), cloud.status.value.notes)
+    }
+
+    // KRITISCH: the server rejects the first backup when another device of the account is unlocked
+    // (Review-Lauf 9). Then nothing of it stays, and the person learns the shown key is not valid.
+    @Test
+    fun aRejectedFirstBackupLeavesNoKeysAndSaysTheKeyIsNotValid() {
+        server.otherUnlockedDevice = true
+        val cloud = cloud()
+        blocking { cloud.setEnabled(true).join() }
+        val job = cloud.signIn(activity)
+        cloud.awaitPhase(CloudPhase.ShowKey::class.java)
+        cloud.confirmKey(true)
+        blocking { job.join() }
+        assertEquals(CloudPhase.NotSetUp, cloud.status.value.phase)
+        assertTrue(cloud.status.value.error.orEmpty(), "gilt nicht" in cloud.status.value.error.orEmpty())
+        assertNull(server.backup)
+        assertTrue(local.isEmpty())
+        assertFalse(blocking { store.unlocked() })
+    }
+
+    // R3 of Review-Lauf 9: a set-up device that is not unlocked unlocks itself with the key later.
+    @Test
+    fun aSetUpDeviceThatIsNotUnlockedUnlocksWithTheKeyLater() {
+        val bund = existingAccount()
+        local[account] = LokalerStand(bund, null)
+        val cloud = cloud()
+        blocking { cloud.setEnabled(true).join() }
+        val job = cloud.signIn(activity)
+        cloud.awaitPhase(CloudPhase.AskKey::class.java)
+        cloud.submitKey(null) // later
+        blocking { job.join() }
+        assertEquals(false, (cloud.status.value.phase as CloudPhase.Ready).unlocked)
+        assertEquals(0, server.unlocks)
+
+        val again = cloud.continueSetup()
+        cloud.awaitPhase(CloudPhase.AskKey::class.java)
+        cloud.submitKey(requireNotNull(existingKey).alsText())
+        blocking { again.join() }
+        assertEquals(true, (cloud.status.value.phase as CloudPhase.Ready).unlocked)
+        assertEquals(1, server.unlocks)
+        assertTrue(blocking { store.unlocked() })
     }
 
     @Test
@@ -716,15 +783,30 @@ class CloudBackupTest {
         assertTrue(server.locked.isEmpty())
     }
 
+    // KRITISCH: "Cloud-Daten löschen" locks every device of the account, this one last; otherwise
+    // another device sets the data backup up again without a key backup (Kap. 11, 2026-11-09).
+    @Test
+    fun aResetLocksEveryOtherDeviceFirstAndThisOneLast() {
+        val cloud = cloud()
+        ready(cloud)
+        server.others += listOf("geraet-2", "geraet-3")
+        blocking { cloud.deleteCloudData().join() }
+        assertEquals(CloudPhase.Off, cloud.status.value.phase)
+        assertEquals(listOf("geraet-2", "geraet-3", "geraet-1"), server.locked)
+        assertNull("key backup", server.backup)
+        assertFalse("data backup", server.dataBackup)
+    }
+
     @Test
     fun aDeviceThatMayNotDeleteResetsThePhoneLocksItselfAndSaysSo() {
         val cloud = cloud()
         ready(cloud)
+        server.others += "geraet-2"
         server.deleteError = GeraetNichtFreigeschaltet()
         blocking { cloud.deleteCloudData().join() }
         assertEquals(CloudPhase.Off, cloud.status.value.phase)
         assertEquals(1, wiped)
-        assertEquals(listOf("geraet-1"), server.locked)
+        assertEquals("only itself", listOf("geraet-1"), server.locked)
         assertTrue(cloud.status.value.notes.toString(), cloud.status.value.notes.any { "nichts löschen" in it })
     }
 

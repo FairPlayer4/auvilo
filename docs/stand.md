@@ -176,6 +176,18 @@ Stand: 2026-11-09. Bei jedem größeren Schritt aktualisieren.
    S24 installiert). adb im Emulator: Der Dialog „USB-Debugging zulassen“ lässt sich
    nur per Touch-Ereignis der Konsole bestätigen (Koordinaten auf 0–32767 skaliert);
    `-skip-adb-auth` wirkt bei Play-Abbildern nicht.
+   **Phase A (Datensicherheit) am 2026-11-09**, auf `feature/backup`, Backend-Pin `89b2f4a`,
+   noch nicht installiert: R1 (Einstellungen vor dem Tausch prüfen), R2 (Room löscht eine
+   beschädigte DB nicht mehr), W-7 auch lokal, abgelehnte Sitzung meldet sich sofort;
+   *Cloud-Daten löschen* sperrt erst alle anderen Geräte, dann die Daten, zuletzt dieses
+   Gerät (`CloudLoeschen` im Backend); ein vom Server abgelehntes erstes Backup hinterlässt
+   keine Schlüssel; nicht freigeschaltete Geräte haben *Mit Wiederherstellungsschlüssel
+   freischalten*. Der wacklige Test `aPendingOrFailedRestoreHoldsTheBackup` ist behoben: Der
+   Mutex in `CloudBackup.work` wird erst nach der Endphase freigegeben (Lauf-10-Fund).
+   Die Serverregeln (Version vor „geschützt“, Freischalten beim ersten Backup, 10 neue
+   Geräte je Tag) sind im Backend fertig, **Deploy wartet auf Kevins Go**; bis dahin lehnt
+   der alte Server ein veraltetes erstes Backup eines nicht freigeschalteten Geräts mit
+   „nicht freigeschaltet“ statt „veraltet“ ab.
 3. **Play-Store-Release** ohne Eile, erst wenn die App „fertig“ ist (mindestens bis V2);
    dafür Transparenz, Notausschalter (in V1.3a), Backend nur nach Einschalten (7.28 PS5–PS9).
 
