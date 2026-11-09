@@ -145,7 +145,7 @@ Stand: 2026-11-09. Bei jedem größeren Schritt aktualisieren.
    (außerhalb der Repos), zweimal geholt und gleich, Arbeitskopie `integrity_check` ok,
    Schema 8; Alarme danach 170. Enthält auch Fotos und Audio, die in der Cloud-Sicherung fehlen.
    **Schritt 5 bestätigt und gebaut** am 2026-11-09 (Backend-Pin `6d04e02`, `versionCode` 14,
-   **noch nicht installiert**): *Sicherung prüfen* (Vergleich je Tabelle ohne Inhalte),
+   **installiert** am 2026-11-09 mit dem Zeitzonen-Fix, `5b8ee18`): *Sicherung prüfen* (Vergleich je Tabelle ohne Inhalte),
    *Wiederherstellen* über eine Prüfdatei mit Tausch beim nächsten Start, *Lokale Kopien*
    (täglich, 7+4) mit *Rückgängig* für 7 Tage, Bremse beim automatischen Sichern (R-2),
    *Sicherung löschen*, *Dieses Gerät abmelden* und *Cloud-Daten löschen* (mit Wort).
@@ -167,8 +167,12 @@ Stand: 2026-11-09. Bei jedem größeren Schritt aktualisieren.
    Termin an. Jetzt legt nur das Verschieben im Formular einen neuen Termin an
    (`Changes.save`, Entscheidung 2026-11-09); Fristen waren nicht betroffen. Tests:
    `OneOffZoneChangeTest` (16 Fälle), 5 Mutationsproben alle erkannt. Branch
-   `fix/zeitzone-einmalig`, noch nicht in `feature/backup`. Nächster Schritt: nach Kevins Go auf dem S24 installieren und dort nur
-   *Prüfen* und einen Probelauf ohne Tausch (Gerätetest im Entwurf). adb im Emulator: Der Dialog „USB-Debugging zulassen“ lässt sich
+   `fix/zeitzone-einmalig`, in `feature/backup` gemergt. **Gerätetest S24** am 2026-11-09
+   bestanden (Kevin, Diagnose-Log): Tageskopie beim Start nach dem Update, *Prüfen*
+   (2 Tabellen abweichend, Änderungen seit der letzten stündlichen Sicherung), Probelauf
+   *Wiederherstellen* mit *Abbrechen* ohne Tausch (`restore/` danach leer), *Jetzt sichern*
+   (#17); das stündliche Sichern läuft weiter. Ein abgebrochenes Wiederherstellen schreibt
+   noch keine Zeile ins Diagnose-Log. adb im Emulator: Der Dialog „USB-Debugging zulassen“ lässt sich
    nur per Touch-Ereignis der Konsole bestätigen (Koordinaten auf 0–32767 skaliert);
    `-skip-adb-auth` wirkt bei Play-Abbildern nicht.
 3. **Play-Store-Release** ohne Eile, erst wenn die App „fertig“ ist (mindestens bis V2);
