@@ -160,11 +160,14 @@ Stand: 2026-11-09. Bei jedem größeren Schritt aktualisieren.
    7 Termine und 21 Ereignisse, die der Start neu angelegt hat (siehe offener Punkt
    Zeitzone). Danach *Dieses Gerät abmelden* und Emulator zurückgesetzt. Dabei gefunden und
    behoben: Bericht bei fremder Sicherung, stehengebliebene Schlüssel-Aufforderung.
-   **Offener Punkt Zeitzone (alt, nicht Schritt 5):** Ein einmaliger Reminder gilt als neu
-   fällig, wenn sein Zeitpunkt in der aktuellen Zeitzone vom letzten Termin abweicht
+   **Zeitzone (alt, nicht Schritt 5), behoben 2026-11-09:** Ein einmaliger Reminder galt als neu
+   fällig, wenn sein Zeitpunkt in der aktuellen Zeitzone vom letzten Termin abwich
    (`ScheduleRules`, `Schedule.Once`). In einer anderen Zeitzone (Emulator GMT, S24 MEZ;
-   ebenso auf Reisen) legt der Start für erledigte einmalige Reminder je einen „verpasst“-
-   Termin an. Nächster Schritt: nach Kevins Go auf dem S24 installieren und dort nur
+   ebenso auf Reisen) legte der Start für erledigte einmalige Reminder je einen „verpasst“-
+   Termin an. Jetzt legt nur das Verschieben im Formular einen neuen Termin an
+   (`Changes.save`, Entscheidung 2026-11-09); Fristen waren nicht betroffen. Tests:
+   `OneOffZoneChangeTest` (16 Fälle), 5 Mutationsproben alle erkannt. Branch
+   `fix/zeitzone-einmalig`, noch nicht in `feature/backup`. Nächster Schritt: nach Kevins Go auf dem S24 installieren und dort nur
    *Prüfen* und einen Probelauf ohne Tausch (Gerätetest im Entwurf). adb im Emulator: Der Dialog „USB-Debugging zulassen“ lässt sich
    nur per Touch-Ereignis der Konsole bestätigen (Koordinaten auf 0–32767 skaliert);
    `-skip-adb-auth` wirkt bei Play-Abbildern nicht.
