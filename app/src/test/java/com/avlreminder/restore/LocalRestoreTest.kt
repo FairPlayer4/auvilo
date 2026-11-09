@@ -109,6 +109,28 @@ class LocalRestoreTest {
         assertTrue(files.backupDir.list()!!.none { it.endsWith(".tmp") })
     }
 
+    // Found on the emulator: the copy at the start came after the status was loaded, so the
+    // settings said "no copy" until the next start.
+    @Test
+    fun aNewDailyCopyShowsAtOnceAndOnlyOnceADay() {
+        val local = local()
+        blocking { local.load().join() }
+        assertTrue(local.status.value.snapshots.isEmpty())
+
+        assertTrue(local.takeSnapshot())
+        assertEquals(listOf(LocalDate.parse("2026-11-09")), local.status.value.snapshots)
+        assertFalse(local.takeSnapshot())
+        assertEquals(1, copies)
+
+        now = Instant.parse("2026-11-09T23:30:00Z")
+        val berlin = LocalRestore(
+            target, files, snapshots, currentSettings = { "jetzt" }, scope = scope, events = events,
+            clock = { now }, zone = { java.time.ZoneId.of("Europe/Berlin") },
+        )
+        assertTrue("the day follows the phone's time zone", berlin.takeSnapshot())
+        assertEquals(LocalDate.parse("2026-11-10"), berlin.status.value.snapshots.first())
+    }
+
     // --- Restoring on the phone ----------------------------------------------------------------
 
     // KRITISCH: a daily copy is swapped in only after yes; it takes the database only, the

@@ -192,6 +192,9 @@ Wiederherstellen, Bremse, Löschen, Abmelden). Abweichungen und Ergänzungen zum
 - **R-3:** *Cloud-Daten löschen* braucht das eingetippte Wort „löschen“. *Dieses Gerät
   abmelden* löscht nichts auf dem Server; ist er nicht erreichbar, wird das Handy trotzdem
   abgemeldet (ohne Schlüssel kann es dort nichts mehr).
+- **Gefunden im Emulator (2026-11-09):** Die Tageskopie beim Start entstand erst, nachdem der
+  Status geladen war; die Einstellungen zeigten bis zum nächsten Start „Noch keine Kopie“.
+  `LocalRestore.takeSnapshot` legt sie jetzt an und zeigt sie sofort (auch aus dem Worker).
 - **Gefunden beim Testen:** `VACUUM INTO` auf der laufenden Datenbank öffnete sie ohne WAL
   und schaltete so ihren Journalmodus um (die Datei änderte sich, die Daten nicht). Beide
   Kopien (vor dem Tausch und vor einer Migration) öffnen sie jetzt im WAL-Modus wie Room.

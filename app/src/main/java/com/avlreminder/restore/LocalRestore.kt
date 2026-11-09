@@ -86,6 +86,16 @@ class LocalRestore(
 
     fun load(): Job = work { }
 
+    /**
+     * Takes the daily copy (R-1) if today has none yet and shows it at once. Not inside [work]:
+     * an open question must not hold the copy back.
+     */
+    fun takeSnapshot(): Boolean {
+        val taken = snapshots.takeIfDue(LocalDate.ofInstant(clock(), zone()))
+        if (taken) state.update { it.copy(snapshots = runCatching { snapshots.dates() }.getOrDefault(it.snapshots)) }
+        return taken
+    }
+
     fun fromSnapshot(date: LocalDate): Job = work {
         val file = snapshots.file(date)
         if (!file.exists()) return@work

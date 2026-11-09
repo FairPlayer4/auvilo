@@ -150,9 +150,15 @@ Stand: 2026-11-09. Bei jedem größeren Schritt aktualisieren.
    (täglich, 7+4) mit *Rückgängig* für 7 Tage, Bremse beim automatischen Sichern (R-2),
    *Sicherung löschen*, *Dieses Gerät abmelden* und *Cloud-Daten löschen* (mit Wort).
    Details: wiederherstellen-entwurf.md, *Umsetzung*. Build grün mit Lint, 7 Mutationsproben
-   alle erkannt. Als Nächstes: Emulator mit Google Play einrichten und dort das echte
-   Wiederherstellen testen, dann nach Kevins Go auf dem S24 installieren und dort nur
-   *Prüfen* und einen Probelauf ohne Tausch (Gerätetest im Entwurf).
+   alle erkannt. **Emulator** (`Pixel_API37`, Android 37 mit Google Play, nur Testdaten):
+   Tageskopie beim Start, Vergleich (1 Reminder nur in der Kopie), Wiederherstellen mit
+   Neustart und *Rückgängig* mit Neustart bestanden; dabei gefunden und behoben: die
+   Tageskopie erschien erst nach dem nächsten Start. Offen: das Wiederherstellen aus der
+   Cloud im Emulator (braucht Kevins Google-Anmeldung und Schlüssel), dann nach Kevins Go
+   auf dem S24 installieren und dort nur *Prüfen* und einen Probelauf ohne Tausch
+   (Gerätetest im Entwurf). adb im Emulator: Der Dialog „USB-Debugging zulassen“ lässt sich
+   nur per Touch-Ereignis der Konsole bestätigen (Koordinaten auf 0–32767 skaliert);
+   `-skip-adb-auth` wirkt bei Play-Abbildern nicht.
 3. **Play-Store-Release** ohne Eile, erst wenn die App „fertig“ ist (mindestens bis V2);
    dafür Transparenz, Notausschalter (in V1.3a), Backend nur nach Einschalten (7.28 PS5–PS9).
 

@@ -77,9 +77,10 @@ fun RestoreQuestion(title: String, comparison: Comparison, onAnswer: (Boolean) -
     Column(Modifier.padding(top = 8.dp)) {
         Text(title, color = c.text, fontSize = 14.sp)
         val reminders = comparison.count(BackupTable.REMINDER)
+        val occurrences = comparison.count(BackupTable.OCCURRENCE)
+        // "Termine: 1" instead of "1 Termine": reads right for every number.
         Text(
-            "${reminders.backup} Reminder (hier: ${reminders.here}), ${comparison.count(BackupTable.OCCURRENCE).backup} Termine " +
-                "(hier: ${comparison.count(BackupTable.OCCURRENCE).here})",
+            "Reminder: ${reminders.backup} (hier: ${reminders.here}), Termine: ${occurrences.backup} (hier: ${occurrences.here})",
             Modifier.padding(top = 4.dp).testTag("restoreCounts"), color = c.text, fontSize = 14.sp,
         )
         ComparisonLines(comparison, "Entspricht den Daten auf diesem Gerät.")

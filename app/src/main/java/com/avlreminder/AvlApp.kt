@@ -37,7 +37,6 @@ import com.avlreminder.restore.RestoreFiles
 import com.avlreminder.restore.SnapshotWorker
 import com.avlreminder.restore.Snapshots
 import com.avlreminder.restore.SwapOutcome
-import java.time.LocalDate
 import com.avlreminder.verbindung.Verbindung
 import java.io.File
 import com.avlreminder.core.model.Occurrence
@@ -184,7 +183,7 @@ class AppGraph(private val context: Context) : ClaudeApi.Access {
 
     /** The daily copy of the database (R-1); a failure is only logged. */
     fun takeSnapshot() {
-        runCatching { if (snapshots.takeIfDue(LocalDate.now())) Diag.log("snapshot taken") }
+        runCatching { if (local.takeSnapshot()) Diag.log("snapshot taken") }
             .onFailure { Diag.log("snapshot failed (${it::class.simpleName})") }
     }
 

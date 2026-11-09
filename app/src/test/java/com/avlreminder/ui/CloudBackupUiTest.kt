@@ -7,6 +7,7 @@ import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.test.assertIsNotEnabled
+import androidx.compose.ui.test.assertTextEquals
 import androidx.compose.ui.test.junit4.v2.createComposeRule
 import androidx.compose.ui.test.onAllNodesWithTag
 import androidx.compose.ui.test.onNodeWithTag
@@ -236,7 +237,7 @@ class CloudBackupUiTest {
         val report = BackupReport(Instant.parse("2026-11-08T10:00:00Z"), fromThisDevice = false, unchanged = true, comparison = oneReminderChanged())
         val actions = show(CloudStatus(CloudPhase.AskRestore(report)))
         compose.onNodeWithText("von einem anderen Gerät", substring = true).assertExists()
-        compose.onNodeWithTag("restoreCounts").assertExists()
+        compose.onNodeWithTag("restoreCounts").assertTextEquals("Reminder: 1 (hier: 1), Termine: 1 (hier: 1)")
         compose.onNodeWithTag("cloudSwitch").assertIsNotEnabled()
         compose.onNodeWithTag("restoreYes").performClick()
         compose.onNodeWithTag("restoreSureNo").performClick()
