@@ -94,6 +94,11 @@ von vor einigen Tagen prüfen (W-1) und wiederherstellen kann. Kostet fast nicht
 Backend-Arbeit (Proto, Server, Client). Bis dahin kann Kevin eine ältere Fassung über die
 GCP-Konsole holen; sie ist verschlüsselt und nur mit dem Wiederherstellungsschlüssel
 lesbar. Empfehlung: nach Schritt 5, vor der Sicherheitsphase.
+- **Backend umgesetzt 2026-11-10:** `FassungsArchiv` in `protokoll` (`fassungen()`,
+  `holen(version)`), im Client `ServerSicherungsAblage`. Für die App bleibt: Auswahl der
+  Fassung und Prüfen/Wiederherstellen über den Sicherungsablauf. Achtung E-B2b-3: Eine
+  bewusst gewählte ältere Fassung hat einen kleineren Zähler; die Warnung „älter als
+  bekannt“ muss dort als gewollt gelten, ohne den gemerkten Zähler zu senken.
 
 ### R-5 Manuelle Sicherung vor dem Test (morgen, einmalig)
 Die Debug-App erlaubt `run-as`; damit holt Claude die Datenbank auf den PC, ohne die App
