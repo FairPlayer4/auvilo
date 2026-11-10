@@ -1,5 +1,8 @@
 # Entwurf: Cloud-Backup in der App (Backend B2b, Schritt 7)
 
+> Umgesetzt (Schritte 1–5, bis 2026-11-09). Den aktuellen Aufbau beschreibt
+> [design.md](design.md) Kapitel 16; hier bleiben die Entscheidungen und ihre Gründe.
+
 > Stand: 2026-11-07, von Kevin **bestätigt** am 2026-11-07 (anforderungen.md Kap. 9). Grundlage: Backend `../avlreminder-backend`,
 > `docs/b2b-entwurf.md` (E-B2b-1 bis E-B2b-13), `docs/formate.md`,
 > `docs/diagnose-entwurf.md`; hier Anf. 7.28 (PS8, PS8a, PS9) und 8.4.

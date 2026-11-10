@@ -544,6 +544,58 @@ umgesetzt / verworfen. Liste in den Einstellungen, *Teilen* als Markdown.
 
 ---
 
+## 16. Cloud-Backup (Backend B2b, seit 1.3b0.4)
+Stand der Umsetzung; die Begründungen stehen in den Entscheidungstabellen von
+[backup-entwurf.md](backup-entwurf.md) (A-1…A-15) und
+[wiederherstellen-entwurf.md](wiederherstellen-entwurf.md) (W-1…W-8, R-1…R-6).
+
+**Aufteilung.** Abläufe, die auch der Test-Client braucht (Einrichten, Sichern,
+Wiederherstellen, W-7, Löschen, Diagnose), liegen im Backend-Modul `protokoll`; die
+Anbindung an den Server in `verbindung`. Die App bindet beide als Composite Build ein,
+Commit fest in `gradle/backend-commit.txt` (A-2). In der App (`app/…/cloud/`):
+
+| Datei | Aufgabe |
+|---|---|
+| `CloudBackup.kt` | Zustand für die Oberfläche, je Aktion ein Schritt unter einem Mutex (`work`) |
+| `CloudServer.kt` | Schnittstelle zum Server; `ConnectCloudServer` über `Anmeldung`, `withSession` erneuert eine abgelehnte Sitzung einmal; Zeitplan (WorkManager) und Hinweise |
+| `CloudUpload.kt` | ein Hochladen über `Sicherungsablauf`, Hash und Bremse (R-2) |
+| `AutomaticBackup.kt` | stündliches Sichern (A-9, A-10), 3-Tage-Hinweis (A-13) |
+| `CloudErrors.kt` | Fehler → Text und Diagnose-Art (gesperrt, neu anmelden, Limit, Netz) |
+| `Question.kt` | eine offene Rückfrage an die Person (Schlüssel, Ersetzen, Bremse) |
+| `CloudPhase.kt` | Zustände und Berichte der Oberfläche |
+| `PasswordSafe.kt` | Wiederherstellungsschlüssel im Passwortdienst (A-15) |
+| übrige | `CloudStore` (Merker), `CloudLog` (Logger), `CloudWorker` (WorkManager), `GoogleSignIn` (A-4), `Keystore`/`KeyFile` (A-5, A-6), `BackupPayload` (A-8), `BackupStateFile`, `CloudConfig` |
+
+**Schlüssel.** Geräteschlüssel ECDSA P-256 im Android Keystore (A-5); Keysets mit einem
+Keystore-AES-Schlüssel verschlüsselt (A-6); Sitzung und Sicherungsstand in einem eigenen
+DataStore (A-7). Die Adapter holen das Token vor jedem Aufruf (Backend R2), damit lange
+Eingaben die Sitzung nicht überdauern.
+
+**Sichern.** Nutzlast ZIP aus DB-Kopie (`VACUUM INTO`) und Einstellungen (A-8).
+Automatisch stündlich nur, wenn sich der Hash geändert hat, das Gerät freigeschaltet ist
+und zuletzt selbst gesichert hat; sonst ruht es mit Hinweis bis *Jetzt sichern* (A-10).
+Die Bremse hält an, wenn seit der letzten Sicherung mehr als die Hälfte oder mehr als
+10 Reminder fehlen (R-2). Während ein Wiederherstellen wartet, wird nichts hochgeladen.
+
+**Prüfen und Wiederherstellen.** *Sicherung prüfen* vergleicht je Tabelle, ohne Inhalte
+zu zeigen (W-1…W-3). Wiederherstellen holt die Fassung, prüft sie mit Room, fragt und
+tauscht beim nächsten Start (W-5); vorher bleibt eine Tageskopie (R-1). Nach der
+Fassung eines anderen Geräts fragt die nächste Sicherung vor dem Ersetzen (W-7, im
+`Sicherungsablauf`). Ältere Fassungen liefert der Server über `FassungenAuflisten` und
+`SicherungHolen` mit Version (R-4).
+
+**Abmelden und Löschen.** *Dieses Gerät abmelden* sperrt das Gerät beim Server.
+*Cloud-Daten löschen* sperrt erst alle anderen Geräte, löscht dann Sicherung und
+Schlüssel-Backup und sperrt zuletzt dieses Gerät (`CloudLoeschen`, R-3). Ein nicht
+freigeschaltetes Gerät kann sich mit dem Wiederherstellungsschlüssel freischalten.
+
+**Diagnose.** Eigener Logger mit festen Ereignissen und typisierten Feldern, ohne Texte
+aus der App (A-12); *Diagnose senden* nur für Konten mit Diagnose-Erlaubnis.
+
+**Tests.** `CloudBackupTest` (gegen `FakeServer` mit den Serverregeln fürs erste
+Schlüssel-Backup), `RestoreFilesTest`, `LocalRestoreTest`, `CorruptCopyTest`; auf dem
+Gerät [geraetetest.md](geraetetest.md) Abschnitt D.
+
 ## Entwurf V1.3 (2026-11-02, bestätigt; V1.3a und V1.3b0 umgesetzt)
 
 > Grundlage: anforderungen.md 7.11 (Timer), 7.12 (Abläufe), 7.14 G2/G3 (Uhr über

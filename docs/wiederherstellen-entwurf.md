@@ -1,5 +1,8 @@
 # Entwurf: Cloud-Backup Schritt 5 – Prüfen, Wiederherstellen, Löschen
 
+> Umgesetzt (2026-11-09/10). Den aktuellen Aufbau beschreibt [design.md](design.md)
+> Kapitel 16; hier bleiben die Entscheidungen und ihre Gründe.
+
 > Stand: 2026-11-09, **bestätigt** (Kevin, 2026-11-09, Antworten unten), umgesetzt in
 > App-Schritt 5 (Abweichungen unter *Umsetzung*). Gehört zu
 > [backup-entwurf.md](backup-entwurf.md) (Schritt 5, A-11, A-14). Kevins Vorgaben vom
