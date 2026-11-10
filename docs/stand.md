@@ -186,6 +186,12 @@ Stand: 2026-11-09. Bei jedem größeren Schritt aktualisieren.
    Mutex in `CloudBackup.work` wird erst nach der Endphase freigegeben (Lauf-10-Fund).
    Die Serverregeln (Version vor „geschützt“, Freischalten beim ersten Backup, 10 neue
    Geräte je Tag) sind deployt (2026-11-09, Revision `server-00016-r4r`).
+   **Phase C (Aufräumen) am 2026-11-10**, Backend-Pin `83009b7`, noch nicht installiert:
+   `CloudBackup.kt` geteilt (Fehlerabbildung `CloudErrors.kt`, `AutomaticBackup.kt`,
+   `CloudUpload.kt`, Rückfragen `Question.kt`, Typen in `CloudPhase.kt` und
+   `CloudServer.kt`); W-7 liegt im Backend-`Sicherungsablauf`; lehnt der Server die
+   Sitzung ab, erneuert die App sie einmal (`CloudServer.withSession`), erst danach heißt
+   es „gesperrt“ oder „neu anmelden“.
 3. **Play-Store-Release** ohne Eile, erst wenn die App „fertig“ ist (mindestens bis V2);
    dafür Transparenz, Notausschalter (in V1.3a), Backend nur nach Einschalten (7.28 PS5–PS9).
 

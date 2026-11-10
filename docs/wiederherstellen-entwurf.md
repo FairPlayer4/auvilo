@@ -187,9 +187,10 @@ Wiederherstellen, Bremse, Löschen, Abmelden). Abweichungen und Ergänzungen zum
 - **Rückfrage im Backend:** `Sicherungsablauf.wiederherstellen` gibt der Rückfrage die ganze
   entschlüsselte Sicherung (Backend `6d04e02`), damit die App vor dem Bestätigen prüfen
   und vergleichen kann.
-- **W-7:** Nach dem Wiederherstellen von einem anderen Gerät merkt sich die App die
-  Server-Fassung 0 und vergisst die letzte Sicherung; das automatische Sichern ruht, und
-  *Jetzt sichern* fragt vor dem Überschreiben.
+- **W-7:** Nach dem Wiederherstellen von einem anderen Gerät merkt sich der
+  `Sicherungsablauf` (Backend `83009b7`) die Server-Fassung 0, und die App vergisst die
+  letzte Sicherung; das automatische Sichern ruht, und *Jetzt sichern* fragt vor dem
+  Überschreiben.
 - **R-1:** `SnapshotWorker` täglich und beim App-Start, Abschnitt *Lokale Kopien* in den
   Einstellungen. Eine tägliche Kopie enthält nur die Datenbank; beim Wiederherstellen daraus
   bleiben die Einstellungen. *Rückgängig* nimmt die neueste Kopie vor einem Wiederherstellen

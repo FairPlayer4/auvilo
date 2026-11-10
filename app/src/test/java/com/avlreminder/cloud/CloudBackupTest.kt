@@ -611,8 +611,8 @@ class CloudBackupTest {
 
     @Test
     fun onlyAnAnswerOfTheServiceItselfCountsAsItsVerdict() {
-        val fromService = CloudBackup.describe(Serverfehler(ConnectException(Code.RESOURCE_EXHAUSTED), vomDienst = true))
-        val fromBefore = CloudBackup.describe(Serverfehler(ConnectException(Code.RESOURCE_EXHAUSTED), vomDienst = false))
+        val fromService = CloudErrors.describe(Serverfehler(ConnectException(Code.RESOURCE_EXHAUSTED), vomDienst = true))
+        val fromBefore = CloudErrors.describe(Serverfehler(ConnectException(Code.RESOURCE_EXHAUSTED), vomDienst = false))
         assertTrue(fromService.orEmpty().contains("resource_exhausted"))
         assertTrue(fromBefore.orEmpty().contains("nicht erreichbar"))
     }
@@ -936,8 +936,12 @@ class CloudBackupTest {
             backedUp(cloud)
             restoreTarget.reset()
             logged.clear()
+            val stops = schedule.stops
             val asked = restore(cloud, yes)
             assertTrue(asked.report.fromThisDevice)
+            // W-7 only for data of another device: the own backup keeps the automatic backup.
+            assertNotNull(blocking { store.lastBackup(account) })
+            assertEquals(stops, schedule.stops)
             if (yes) {
                 assertEquals(listOf(RestoreKind.CLOUD), restoreTarget.staged)
                 assertEquals(1, restoreTarget.restarts)
@@ -1047,7 +1051,7 @@ class CloudBackupTest {
             Triple("0 -> 0", 0 to 0, false),
             Triple("10 -> 12: mehr geworden", 10 to 12, false),
         )
-        for ((case, counts, brakes) in cases) assertEquals(case, brakes, CloudBackup.brakes(counts.first, counts.second))
+        for ((case, counts, brakes) in cases) assertEquals(case, brakes, CloudUpload.brakes(counts.first, counts.second))
     }
 
     // KRITISCH: the automatic backup does not carry a large loss to the server (R-2); by hand it
