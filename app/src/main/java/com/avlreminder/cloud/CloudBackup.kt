@@ -514,8 +514,8 @@ class CloudBackup(
             session.kontoId,
             session.geraetId,
             store.unlocked(),
-            server.keyBackups(session.token),
-            server.unlocking(session.token),
+            server.keyBackups(),
+            server.unlocking(),
             keys(session.kontoId),
             frageSchluessel = {
                 val fromSafe = if (trySafe && activity != null) {

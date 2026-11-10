@@ -110,7 +110,7 @@ class CloudBackupTest {
             return store.lesen() ?: throw NichtAngemeldet()
         }
 
-        override fun keyBackups(token: String) = object : BackupAblage {
+        override fun keyBackups() = object : BackupAblage {
             override suspend fun holen() = backup
 
             override suspend fun speichern(chiffrat: ByteArray, freischaltschluessel: ByteArray, erwartet: Long): Long {
@@ -124,7 +124,7 @@ class CloudBackupTest {
             }
         }
 
-        override fun unlocking(token: String) = GeraeteFreischaltung { unlocks++ }
+        override fun unlocking() = GeraeteFreischaltung { unlocks++ }
 
         /** The data backup on the server. */
         var data: GeholteSicherung? = null

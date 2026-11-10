@@ -40,8 +40,12 @@ interface CloudServer {
      */
     suspend fun <T> withSession(block: suspend (Sitzung) -> T): T = block(session())
 
-    fun keyBackups(token: String): BackupAblage
-    fun unlocking(token: String): GeraeteFreischaltung
+    /**
+     * For the setup: these fetch a current token before every call (backend R2). Between two
+     * calls the person may type the recovery key for longer than the session lasts.
+     */
+    fun keyBackups(): BackupAblage
+    fun unlocking(): GeraeteFreischaltung
     fun dataBackups(token: String): SicherungsAblage
     fun diagnosis(token: String): DiagnoseAblage
 
@@ -91,8 +95,8 @@ class ConnectCloudServer(private val verbindung: Verbindung, key: Geraeteschlues
     }
     override suspend fun session(): Sitzung = anmeldung.sitzung()
     override suspend fun <T> withSession(block: suspend (Sitzung) -> T): T = anmeldung.mitSitzung(block)
-    override fun keyBackups(token: String): BackupAblage = ServerBackupAblage(verbindung, token)
-    override fun unlocking(token: String): GeraeteFreischaltung = ServerGeraete(verbindung, token)
+    override fun keyBackups(): BackupAblage = ServerBackupAblage(verbindung) { anmeldung.sitzung().token }
+    override fun unlocking(): GeraeteFreischaltung = ServerGeraete(verbindung) { anmeldung.sitzung().token }
     override fun dataBackups(token: String): SicherungsAblage = ServerSicherungsAblage(verbindung, token)
     override fun diagnosis(token: String): DiagnoseAblage = ServerDiagnoseAblage(verbindung, token)
     override fun account(token: String): KontoAufDemServer = ServerKonto(verbindung, token)
