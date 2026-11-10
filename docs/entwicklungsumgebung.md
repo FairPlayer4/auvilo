@@ -40,3 +40,8 @@ Kevins privater Rechner (Windows 11 Pro), eingerichtet am 2026-10-31.
 | Google AICore | vorhanden (2026-09-17) → Gemini Nano voraussichtlich nutzbar |
 | Samsung AICore | vorhanden (2.1.09.57) |
 | Google Play-Dienste | 26.40.32 (Geofencing, Fused Location verfügbar) |
+
+## Emulator
+- adb im Emulator: Der Dialog „USB-Debugging zulassen“ lässt sich nur per
+  Touch-Ereignis der Konsole bestätigen (Koordinaten auf 0–32767 skaliert);
+  `-skip-adb-auth` wirkt bei Play-Abbildern nicht.
