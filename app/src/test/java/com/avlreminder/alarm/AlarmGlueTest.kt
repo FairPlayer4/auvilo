@@ -6,6 +6,7 @@ import android.content.Context
 import android.content.Intent
 import androidx.test.core.app.ApplicationProvider
 import androidx.test.ext.junit.runners.AndroidJUnit4
+import com.avlreminder.AvlApp
 import com.avlreminder.core.model.Occurrence
 import com.avlreminder.core.model.OccurrenceState
 import com.avlreminder.core.model.ProofSpec
@@ -39,7 +40,9 @@ class AlarmGlueTest {
 
     @Before
     fun setUp() {
-        // The app syncs on start; let that finish so it does not race with the test.
+        // The app syncs on start (on Dispatchers.Default); let that finish so it does not race
+        // with the test. Idling the main looper alone did not wait for it.
+        runBlocking { (context as AvlApp).started.join() }
         ShadowLooper.idleMainLooper()
     }
 
@@ -54,17 +57,19 @@ class AlarmGlueTest {
     @Test
     fun strictAndNormalUseAlarmClockRelaxedUsesExactAlarm() {
         val port = AndroidAlarmPort(context)
+        // Without the WLAN probe's tick (debug build, elapsed-time alarm); the overview from the
+        // app start is already planned, so count what the port adds.
+        fun reminderAlarms() = shadowOf(alarmManager).scheduledAlarms.filter { it.getType() != AlarmManager.ELAPSED_REALTIME_WAKEUP }
+        val before = reminderAlarms().size
         port.set(1, at, AlarmKind.ALARM_CLOCK)
         assertEquals(at.toEpochMilli(), alarmManager.nextAlarmClock?.triggerTime)
 
         port.set(2, at.plusSeconds(60), AlarmKind.EXACT)
-        // Without the WLAN probe's tick (debug build, elapsed-time alarm).
-        fun reminderAlarms() = shadowOf(alarmManager).scheduledAlarms.filter { it.type != AlarmManager.ELAPSED_REALTIME_WAKEUP }
-        assertEquals(2, reminderAlarms().size)
+        assertEquals(before + 2, reminderAlarms().size)
 
         port.cancel(1)
         port.cancel(2)
-        assertEquals(0, reminderAlarms().size)
+        assertEquals(before, reminderAlarms().size)
     }
 
     @Test

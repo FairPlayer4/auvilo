@@ -1069,6 +1069,25 @@ vorher schieben oder auslassen können, wie man Checklisten-Punkte vorab abhakt.
   auch vorab. Vorab ausgelassen oder erledigt lässt sich zurücknehmen (7.31); der Termin
   kommt dann zur geplanten Zeit, nicht schon in 10 min.
 
+### 7.33 Wiederherstellungsschlüssel im Passwortdienst (2026-11-08)
+Beim ersten Gerätetest war das Aufschreiben des Wiederherstellungsschlüssels umständlich
+(langen Code abtippen). Die App soll das Sichern deshalb selbst anbieten.
+- WS1 **Automatisch angeboten:** Zeigt die App einen neuen Wiederherstellungsschlüssel,
+  öffnet sie sofort den Speicher-Dialog des Passwortdienstes (Credential Manager,
+  `CreatePasswordRequest`; Standard ist der Google Passwortmanager, andere Dienste wie
+  Bitwarden gehen genauso). Name: „avlreminder Wiederherstellung“, als Nutzername das
+  Konto-Pseudonym. Gespeichert → fertig, eine Bestätigung genügt. Abgelehnt oder kein
+  Dienst → wie bisher anzeigen und „aufgeschrieben“ bestätigen.
+- WS2 **Automatisch geholt:** Fragt die App nach dem Schlüssel (neues Gerät, App-Daten
+  gelöscht), bietet sie zuerst den gespeicherten aus dem Passwortdienst an
+  (`GetPasswordOption`); Eintippen bleibt möglich.
+- WS3 **Nie anders:** Der Schlüssel geht nur an den Passwortdienst, nie ins Log, in die
+  Zwischenablage oder ans Backend.
+- WS4 **Hinweis:** Der Google Passwortmanager verschlüsselt nur mit eingeschalteter
+  **Geräteverschlüsselung** Ende-zu-Ende; ohne sie könnte Google Schlüssel und (in GCP
+  liegende) Sicherung zusammenbringen. Die App sagt das in einem Satz; Papier bleibt als
+  zusätzliche Kopie empfohlen.
+
 ## 8. Zielplattform und Technik
 
 ### 8.1 Zielgerät
@@ -1150,6 +1169,15 @@ Neueste zuerst. Kap. 7 enthält immer den gültigen Stand; diese Tabelle ist die
 
 | Datum | Entscheidung |
 |---|---|
+| 2026-11-09 | Nach Review-Lauf 10 (Backend-Repo `.review/runs/2026-11-09.md`, Fragen 1–3): (1) *Cloud-Daten löschen* sperrt **alle Geräte** des Kontos, nicht nur dieses (Ablauf in `protokoll`, R-3 in [wiederherstellen-entwurf.md](wiederherstellen-entwurf.md)). (2) Lehnt der Server die Sitzung ab (`AnmeldungAbgelehnt`), benachrichtigt die App sofort „Bitte neu anmelden“; der 3-Tage-Hinweis (A-13) hängt am gemerkten Konto statt an der Sitzung; ohne Sitzung heißt der Löschknopf „Nur dieses Handy zurücksetzen“, mit dem Hinweis, dass auf dem Server nichts gelöscht wird. (3) Nach einem lokalen Wiederherstellen (Tageskopie, *Rückgängig*) gilt W-7: automatisch wird erst nach einem Sichern von Hand wieder gesichert |
+| 2026-11-09 | Nach Review-Lauf 9 (Backend Kap. 11): Der Server prüft beim ersten Schlüssel-Backup zuerst die Version und schaltet ein angenommenes Gerät frei; die Einrichtung verwirft ein abgelehntes offenes Backup; die Testattrappe der App bildet die Regel nach. Dazu der Knopf „Mit Wiederherstellungsschlüssel freischalten“. Der Worker wertet eine unbeantwortete Rückfrage „übernehmen?“ wie „nein“ (A-10) |
+| 2026-11-09 | Versionsname je auf dem Handy installiertem Stand: `1.3b0.<n>-backup<Schritt>`, `versionCode` +1 bei jeder Installation (ab `1.3b0.5-backup5`, Code 15). So zeigen Einstellungen und Diagnose-Log, welcher Stand läuft |
+| 2026-11-09 | Gerätetests: Nach jeder Änderung ein kleines festes Set manueller Tests auf dem S24, größere Testschleifen mit dem Emulator. `geraetetest.md` wird dafür gesondert überarbeitet ([stand.md](stand.md)) |
+| 2026-11-09 | Einmalige Reminder und Fristen gelten nach einem Wechsel der Zeitzone (Reise, Sicherung in einer anderen Zone wiederhergestellt) nicht als verschoben: Sie bleiben bei ihrem Termin und kommen nur wieder, wenn ihr Zeitpunkt im Formular geändert wird. Das Verschieben legt den neuen Termin ausdrücklich beim Speichern an (`Changes.save`); `ScheduleRules` plant für *einmalig* nur den ersten Termin. Ein Termin, der schon geklingelt hat, endet beim Verschieben als „Zeitplan geändert“ (wie bei Fristen). Keine Migration: der alte Vergleich steckte nur in der Rechnung, nicht in den Daten |
+| 2026-11-09 | Cloud-Backup Schritt 5 ([wiederherstellen-entwurf.md](wiederherstellen-entwurf.md)) bestätigt: erst *Sicherung prüfen* in einer eigenen Prüfdatei, kein Umschalten zwischen Datenbanken; Wiederherstellen tauscht beim nächsten Start und behält die alten Daten 7 Tage zum Rückgängigmachen; nach dem Wiederherstellen von einem anderen Gerät sichert die App erst wieder nach *Jetzt sichern* mit Rückfrage. *Zurücksetzen* aufgeteilt in *Dieses Gerät abmelden* (löscht nichts auf dem Server) und *Cloud-Daten löschen* (nur mit eingetipptem „löschen“). Bremse: fehlen mehr als 10 oder mehr als die Hälfte der Reminder, sichert die App nicht automatisch. Lokale Kopien: 7 tägliche und 4 wöchentliche. Gerätetest des Wiederherstellens auf einem Emulator mit Google Play |
+| 2026-11-08 | Cloud-Backup Schritt 4: Trifft das automatische Sichern auf die Sicherung eines anderen Geräts, ruht es sofort (wie nach „Nein“) und meldet das per Benachrichtigung; die Rückfrage „Überschreiben?“ kommt erst mit *Jetzt sichern* in den Einstellungen (backup-entwurf.md, Ergänzung zu A-10). Der Hinweis nach 3 Tagen zählt ab der letzten Stunde, in der die Sicherung aktuell war |
+| 2026-11-08 | Android Lint in Build und CI (`:app:lintDebug`): Altfunde in `app/lint-baseline.xml`, jeder neue Fund (auch Warnung) macht den Build rot; Versions-Hinweise sind abgeschaltet. Go bleibt bei gofmt, go vet und golangci-lint im Backend; detekt erst, wenn Lint ruhig läuft, kein Qodana |
+| 2026-11-08 | Wiederherstellungsschlüssel: Die App bietet automatisch an, ihn im Passwortdienst zu sichern, und holt ihn von dort beim Wiederherstellen (7.33, Wunsch aus dem ersten Gerätetest von Backup Schritt 2). Papier bleibt der Weg ohne Passwortdienst |
 | 2026-11-07 | Cloud-Backup in der App: Entwurf [backup-entwurf.md](backup-entwurf.md) A-1 bis A-14 bestätigt. Keine eigene App-Variante, solange nur Kevin die App nutzt (Schalter aus PS8 im normalen Build); Composite Build mit festem Backend-Commit und Deploy-Key in der CI; neue Berechtigung `INTERNET` (8.4 präzisiert); Credential Manager, Geräteschlüssel und Keysets im Android Keystore; ZIP aus Datenbank und Einstellungen; stündlich per WorkManager nur bei Änderung; Wiederherstellen ersetzt die Datenbank nach lokaler Kopie; Diagnose ans Backend nur mit eigenem Logger ohne Inhalte. App und `core` bauen für Java 21 statt 17 |
 | 2026-11-07 | Vorab verschieben und auslassen (7.32): Alarm-Bildschirm vorab mit *Verschieben* und *Auslassen*, „heute später“ +30 min/+1/+2 Std ab der geplanten Zeit, zählt aufs Verschieben-Konto, bei *streng* mit Rückfrage; Ort behält die neue Zeit, wartet sonst auf die Ankunft; Vorab-Reminder wandert mit; NT2 zählt Verschieben mit. Umgesetzt in V1.3b0.4 |
 | 2026-11-07 | Erledigung zurücknehmen (7.31): Rückgängig-Benachrichtigung 1 min, danach *Zurücknehmen* auf *Heute*; wieder offen, klingelt in 10 min ohne als *Später* zu zählen; nur der letzte Termin, bis der nächste klingelt bzw. bis zur Tagesgrenze; *Auslassen* auch, *verpasst*/*entfällt* nicht; Nachweis zählt wieder; neues Ereignis statt Löschen. Umgesetzt in V1.3b0.4 |

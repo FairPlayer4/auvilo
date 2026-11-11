@@ -12,20 +12,49 @@ concurrency:
 
 jobs:
   build:
-    runs-on: ubuntu-latest
+    # Fest auf 24.04: ubuntu-latest wechselt ab Oktober 2026 auf 26.04 (Hinweis im Lauf).
+    runs-on: ubuntu-24.04
     timeout-minutes: 30
+    # Beide Repos nebeneinander wie auf Kevins Rechner: Die App bindet
+    # ../avlreminder-backend/client per Composite Build ein (docs/backup-entwurf.md A-2).
+    defaults:
+      run:
+        working-directory: avlreminder
     steps:
       - uses: actions/checkout@v5
+        with:
+          path: avlreminder
+
+      - name: Festgehaltener Backend-Commit
+        id: backend
+        run: echo "commit=$(tr -d '[:space:]' < gradle/backend-commit.txt)" >> "$GITHUB_OUTPUT"
+
+      # Das Backend-Repo ist privat. Der Deploy-Key darf nur dieses Repo lesen
+      # (Secret BACKEND_DEPLOY_KEY, Anleitung in docs/backup-entwurf.md).
+      - uses: actions/checkout@v5
+        with:
+          repository: FairPlayer4/avlreminder-backend
+          ref: ${{ steps.backend.outputs.commit }}
+          ssh-key: ${{ secrets.BACKEND_DEPLOY_KEY }}
+          path: avlreminder-backend
+          persist-credentials: false
 
       - uses: actions/setup-java@v5
         with:
           distribution: microsoft
           java-version: 21
 
+      # Standardmäßig speichert setup-gradle den Cache nur auf dem Standard-Branch (main).
+      # Gebaut wird aber fast nur auf feature/backup, so begann jeder Lauf leer (alle
+      # Abhängigkeiten laden, alles kompilieren). Jeder Branch liest Caches von main und
+      # vom eigenen Branch; alte Einträge räumt setup-gradle nach erfolgreichen Läufen auf.
       - uses: gradle/actions/setup-gradle@v5
+        with:
+          cache-read-only: false
 
       - name: Build und Tests
-        run: ./gradlew :core:check :core:koverLog :app:testDebugUnitTest :app:assembleDebug
+        # backendStreng: bricht ab, falls der Backend-Stand nicht zum festgehaltenen passt.
+        run: ./gradlew -PbackendStreng=true :core:check :core:koverLog :app:testDebugUnitTest :app:lintDebug :app:assembleDebug
 
       - name: Testberichte
         if: failure()
@@ -33,13 +62,13 @@ jobs:
         with:
           name: testberichte
           path: |
-            core/build/reports/
-            app/build/reports/
+            avlreminder/core/build/reports/
+            avlreminder/app/build/reports/
           retention-days: 7
 
       - name: Debug-APK
         uses: actions/upload-artifact@v6
         with:
           name: app-debug
-          path: app/build/outputs/apk/debug/app-debug.apk
+          path: avlreminder/app/build/outputs/apk/debug/app-debug.apk
           retention-days: 14

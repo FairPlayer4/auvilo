@@ -264,9 +264,14 @@ internal class Scheduler(private val c: EngineContext, private val views: AlarmV
             minOf(settings.alarmsPausedUntil!!, missedAt)
         } else {
             val paused = occurrence.pausedUntil
+            // KRITISCH: The next round counts from the last ring or checked item, not from now. plan() also runs
+            // on every sync (app start, time change, reboot); counting from now would push the
+            // round further with each sync, and a phone used often would never ring again.
+            val rang = lastRound(occurrence) ?: now
             // A deadline rings again after its interval.
-            val round = (reminder.schedule as? Schedule.Deadline)?.let { now.plus(Duration.ofMinutes(it.intervalMinutes.toLong())) }
-            val next = if (paused != null && paused > now) paused else round ?: Escalation.nextRound(now)
+            val round = (reminder.schedule as? Schedule.Deadline)?.let { rang.plus(Duration.ofMinutes(it.intervalMinutes.toLong())) }
+            // A round missed (phone off) rings right away.
+            val next = if (paused != null && paused > now) paused else maxOf(round ?: Escalation.nextRound(rang), now)
             minOf(next, missedAt)
         }
         val kind = if (reminder.strictness == Strictness.RELAXED) AlarmKind.EXACT else AlarmKind.ALARM_CLOCK
@@ -275,6 +280,10 @@ internal class Scheduler(private val c: EngineContext, private val views: AlarmV
         if (notice != null && notice > now && notice < occurrence.currentAt) c.preNotices.set(occurrence.id, notice)
         else c.preNotices.cancel(occurrence.id)
     }
+
+    /** When the occurrence last rang or progressed; null: never. */
+    private suspend fun lastRound(occurrence: Occurrence): Instant? =
+        repo.events(occurrence.id).filter { it.type in ROUND_EVENTS }.maxOfOrNull { it.at }
 
     /** No alarm and no notice before for the occurrence. */
     fun cancel(occurrence: Occurrence) {
@@ -328,3 +337,6 @@ internal class Scheduler(private val c: EngineContext, private val views: AlarmV
         cancel(occurrence)
     }
 }
+
+/** Events the next round counts from (see [Scheduler.plan]): a ring, a checked item, "Zurücknehmen". */
+private val ROUND_EVENTS = setOf(EventType.DUE, EventType.ESCALATED, EventType.ITEM_DONE, EventType.REOPENED)

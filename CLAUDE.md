@@ -25,11 +25,19 @@ Strenge und invasive Mechanismen sind gewollt. Kommunikation auf **Deutsch, mit 
 
 ## Bauen und testen (Git Bash)
 ```bash
-./gradlew -q :core:check :core:koverLog :app:testDebugUnitTest :app:assembleDebug
+./gradlew -q :core:check :core:koverLog :app:testDebugUnitTest :app:lintDebug :app:assembleDebug
 ```
 - `JAVA_HOME` und `ANDROID_HOME` sind auf dem Rechner gesetzt, nichts exportieren
   (Pfade in entwicklungsumgebung.md).
 - Gradle, adb und `git push` brauchen in Claude Code Netz/Geräte außerhalb der Sandbox.
+- Der Build braucht das Backend-Repo daneben (`../avlreminder-backend`, Composite Build,
+  [backup-entwurf.md](docs/backup-entwurf.md) A-2). Steht dort ein anderer Commit als in
+  `gradle/backend-commit.txt` oder gibt es uncommittete Änderungen in `client/`/`proto/`,
+  warnt der Build: **eine solche APK nicht installieren**. Nach Änderungen im Backend den
+  Commit dort pushen und in `gradle/backend-commit.txt` eintragen.
+- Android Lint (`:app:lintDebug`) bricht bei jedem neuen Fund ab, auch bei Warnungen. Funde
+  beheben statt in die Baseline (`app/lint-baseline.xml`) zu schieben; nur wenn ein Fund
+  bewusst so bleibt, mit Begründung `@SuppressLint` setzen.
 - Vor jeder Installation: alle Tests grün. UI-Tests laufen mit Robolectric/Compose
   (`app/src/test`), Migrationen haben einen eigenen `MigrationTest`.
 
@@ -40,6 +48,7 @@ Strenge und invasive Mechanismen sind gewollt. Kommunikation auf **Deutsch, mit 
 - Ohne Rückfrage erlaubt: lesende Geräteinfos, App installieren/deinstallieren, Logs
   lesen, App-Berechtigungen setzen. Alles andere vorher fragen, auch `logcat -c`.
 - Immer `adb install -r`, **nie vorher deinstallieren** (sonst sind Kevins Daten weg).
+- Starten mit `adb shell am start -n com.avlreminder/.ui.MainActivity`, **nie mit `adb shell monkey`** (schaltet die Auto-Rotation ein, 2026-11-08).
 - Bei Gerätetests genau sagen, wann Kevin sperren, entsperren oder etwas tun soll.
   Simulationen danach zurücksetzen.
 - Diagnose: `adb exec-out run-as com.avlreminder cat files/diag/diag.log` und

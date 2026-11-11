@@ -1,5 +1,8 @@
 package com.avlreminder.ui
 
+import com.avlreminder.cloud.CloudStatus
+import com.avlreminder.ui.screens.CloudActions
+
 import androidx.activity.compose.BackHandler
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
@@ -105,6 +108,9 @@ data class AppState(
     val snoozeHints: List<SnoozeHint> = emptyList(),
     /** Interface for Claude (Anf. 7.26 AG11): null = not in this build. */
     val claudeAccess: Boolean? = null,
+    /** Cloud backup (A-14): null = not shown. */
+    val cloud: CloudStatus? = null,
+    val local: com.avlreminder.restore.LocalStatus? = null,
 )
 
 interface AppActions {
@@ -145,6 +151,8 @@ interface AppActions {
     fun setAlarmsPaused(until: Instant?) {}
     fun answerSnoozeHint(reminderId: Long, choice: SnoozeHintChoice) {}
     fun setClaudeAccess(on: Boolean) {}
+    val cloud: CloudActions get() = object : CloudActions {}
+    val local: com.avlreminder.ui.screens.LocalActions get() = object : com.avlreminder.ui.screens.LocalActions {}
 }
 
 /** Simple navigation without a library: one route string, back goes to "today". */
@@ -262,6 +270,8 @@ fun AvlAppUi(
                     theme = state.theme, onTheme = actions::setTheme, alert = state.alert, onAlert = actions::setAlert,
                     onPause = actions::setAlarmsPaused, now = now, zone = zone,
                     claudeAccess = state.claudeAccess, onClaudeAccess = actions::setClaudeAccess,
+                    cloud = state.cloud, cloudActions = actions.cloud,
+                    local = state.local, localActions = actions.local,
                     permissions = state.permissions, onBack = { go(Routes.TODAY) },
                     home = state.home, onSetHome = actions::setHomeHere,
                     dwellMinutes = state.dwellMinutes, onDwell = actions::setDwellMinutes,

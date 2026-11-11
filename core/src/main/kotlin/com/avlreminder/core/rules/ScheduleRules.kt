@@ -17,7 +17,8 @@ object ScheduleRules {
      * @param lastDoneAt when the reminder was last actually done (for [Schedule.AfterDone]).
      * @param previousWasDone whether the last occurrence was done (not skipped or missed).
      * @param previousMissed whether the last occurrence was missed (a deadline then stays to be done).
-     * @return null if there is no further occurrence (a one-off reminder that already happened).
+     * @return null if there is no further occurrence (a one-off reminder that already happened;
+     *   moving it plans the next one in Changes.save).
      */
     fun nextDue(
         schedule: Schedule,
@@ -39,11 +40,10 @@ object ScheduleRules {
             else -> now
         }
         return when (schedule) {
-            // Due again only when its time was changed after the last occurrence.
-            is Schedule.Once -> {
-                val at = schedule.at.atZone(zone).toInstant()
-                if (previousDueAt == null || at != previousDueAt) at else null
-            }
+            // KRITISCH: only the first occurrence. Comparing the time with the last occurrence
+            // would take a time zone change (travel, a backup restored elsewhere) for a move and
+            // ring every finished one-off again. Moving it is marked in Changes.save instead.
+            is Schedule.Once -> if (previousDueAt == null) schedule.at.atZone(zone).toInstant() else null
 
             // Waits for the arrival; the due time only orders it.
             Schedule.OnArrival -> if (previousDueAt == null) now else null

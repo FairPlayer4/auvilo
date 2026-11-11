@@ -115,6 +115,35 @@ class ReminderEngineTest {
         assertEquals(AlarmLevel.FULLSCREEN, ring.level)
     }
 
+    // KRITISCH: sync() läuft bei jedem App-Start; er darf die nächste Runde nicht verschieben.
+    @Test
+    fun `a sync between rounds keeps the next round`() = runTest {
+        val id = create()
+        val o = open(id)
+        clock.now = at(26, 18)
+        engine.onAlarm(o.id)
+        clock.now = at(26, 18, 5)
+        engine.sync()
+        assertEquals(at(26, 18, 10), alarms.set[o.id]!!.first)
+        clock.now = at(26, 18, 10)
+        engine.onAlarm(o.id)
+        clock.now = at(26, 18, 17)
+        engine.sync()
+        assertEquals(at(26, 18, 20), alarms.set[o.id]!!.first)
+    }
+
+    @Test
+    fun `a round missed while the phone was off rings right away`() = runTest {
+        val id = create()
+        val o = open(id)
+        clock.now = at(26, 18)
+        engine.onAlarm(o.id)
+        alarms.set.clear() // reboot
+        clock.now = at(26, 18, 25)
+        engine.sync()
+        assertEquals(at(26, 18, 25), alarms.set[o.id]!!.first)
+    }
+
     @Test
     fun `the last round before the deadline waits for the deadline`() = runTest {
         val id = create(reminder(Schedule.Daily(LocalTime.of(22, 55))))
