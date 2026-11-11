@@ -43,8 +43,7 @@ ersten weiteren Nutzer kommt die Sicherheitsphase (Backend `CLAUDE.md`, b2b-entw
    offen VS3 (7.25).
 5. **V1.3:** Entwurf bestätigt (design.md *Entwurf V1.3*); als Nächstes Entwurf 7.29 Z.7
    (WLAN) bestätigen, dann V1.3b (Sitzung mit Timer, Uhr) und V1.3c (Abläufe).
-6. **Später, stört aktuell nicht:** Eskalationsrunde wird bei jedem `sync` neu ab „jetzt“
-   geplant; Checklisten mit mehreren Uhrzeiten (Kevin vermutet einen Fehler); Training-Alarm
+6. **Später, stört aktuell nicht:** Checklisten mit mehreren Uhrzeiten (Kevin vermutet einen Fehler); Training-Alarm
    am Morgen und „Checkliste nicht richtig gespeichert“ (Kevin beschreibt das Szenario);
    WLAN-Sonde auslesen; aus Review-Lauf 2 optional Paket `alarm` aufteilen, Wochenstand
    einmal definieren, *Heute* an einer Stelle laden.
