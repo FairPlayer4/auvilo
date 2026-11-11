@@ -11,7 +11,9 @@ import com.avlreminder.core.model.WeeklyGoal
 import com.avlreminder.core.reminder
 import com.avlreminder.core.rules.Action
 import com.avlreminder.core.rules.AlarmLevel
+import com.avlreminder.core.rules.WeeklyGoals
 import java.time.DayOfWeek
+import java.time.LocalDate
 import java.time.LocalTime
 import kotlinx.coroutines.test.runTest
 import com.avlreminder.core.rules.SkipReasons
@@ -105,6 +107,21 @@ class WeeklyGoalEngineTest {
         val id = create()
         doTraining(id, minimum = true)
         assertEquals(at(2, 19, month = 11), open(id).dueAt)
+    }
+
+    // KRITISCH: Alarm (zählt in der Datenbank) und Bildschirme (zählen geladene Termine)
+    // zeigen denselben Wochenstand, auch an der Wochengrenze: Montag 00:30 ist in UTC noch Sonntag.
+    @Test
+    fun `alarm and screens count the same week`() = runTest {
+        val id = create(training(WeeklyGoal(target = 3, max = 7)).copy(schedule = Schedule.Daily(LocalTime.of(0, 30))))
+        doTraining(id)
+        doTraining(id, minimum = true)
+        repeat(5) { doTraining(id) } // Tuesday to Monday 00:30
+        val r = repo.reminders.getValue(id)
+        val resolved = repo.occurrences.values.filter { it.resolvedAt != null }
+        for (day in (26..31).map { LocalDate.of(2026, 10, it) } + LocalDate.of(2026, 11, 1) + LocalDate.of(2026, 11, 2)) {
+            assertEquals(engine.weekStatus(r, day), WeeklyGoals.status(r, resolved, day, clock.zone), "$day")
+        }
     }
 
     @Test

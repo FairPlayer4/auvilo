@@ -44,6 +44,15 @@ object WeeklyGoals {
         else -> false
     }
 
+    /**
+     * The week of [day] from the counts of goals and minimums resolved in it; offers counted
+     * from [day] on. The one definition for the alarm and the screens (Review-Lauf 2).
+     *
+     * KRITISCH: A minimum counts towards the target as well (Anf. Z1c).
+     */
+    fun status(goal: WeeklyGoal, schedule: Schedule, goals: Int, minimums: Int, day: LocalDate): WeekStatus =
+        WeekStatus(goal, goals + minimums, minimums, offersLeft(schedule, day))
+
     /** The week of [day] from already loaded occurrences of [reminder] (for the screens). */
     fun status(reminder: Reminder, resolved: List<Occurrence>, day: LocalDate, zone: ZoneId): WeekStatus? {
         val goal = reminder.weeklyGoal ?: return null
@@ -51,8 +60,12 @@ object WeeklyGoals {
         val own = resolved.filter { o ->
             o.reminderId == reminder.id && o.resolvedAt?.let { Weeks.start(it.atZone(zone).toLocalDate()) } == week
         }
-        val minimums = own.count { it.resolution == Resolution.MINIMUM }
-        return WeekStatus(goal, own.count { it.resolution == Resolution.GOAL } + minimums, minimums, offersLeft(reminder.schedule, day))
+        return status(
+            goal, reminder.schedule,
+            goals = own.count { it.resolution == Resolution.GOAL },
+            minimums = own.count { it.resolution == Resolution.MINIMUM },
+            day = day,
+        )
     }
 
     /** Offer days from [from] to the Sunday of its week, [from] included. */
