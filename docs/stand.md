@@ -9,13 +9,13 @@ in den Entwürfen und den Review-Berichten (`.review/runs/`), nicht hier.
   abgelehnte Sitzung, *Cloud-Daten löschen*, *Mit Wiederherstellungsschlüssel
   freischalten*), Phase C und D, Phase F (Eskalationsrunde ab letztem Klingeln, Wochenstand
   einmal definiert, Checklisten-Knopf im Vollbild-Alarm und auf der Uhr). Nach dem Start:
-  Berechtigungen ok, Alarme neu geplant, keine Fehler im Diagnose-Log. Offen: Gerätetest
-  (Kerntests und C1–C4) durch Kevin.
+  Berechtigungen ok, Alarme neu geplant, keine Fehler im Diagnose-Log; Gerätetest C1–C4
+  am selben Tag bestanden. Seit 2026-11-11 in `develop`.
 
 ## Cloud-Backup
 Entwürfe: [backup-entwurf.md](backup-entwurf.md) (Schritte 1–5),
 [wiederherstellen-entwurf.md](wiederherstellen-entwurf.md) (W-1…W-8, R-1…R-6);
-Überblick [backend.md](backend.md). Branch `feature/backup`.
+Überblick [backend.md](backend.md). Seit 2026-11-11 in `develop`.
 
 | Schritt | Inhalt | Stand |
 |---|---|---|
