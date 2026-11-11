@@ -46,6 +46,8 @@ import com.avlreminder.data.toModel
 import com.avlreminder.core.ports.DeviceStatePort
 import com.avlreminder.core.rules.AlertSettings
 import com.avlreminder.core.usecases.ReminderEngine
+import com.avlreminder.core.usecases.Today
+import com.avlreminder.core.usecases.Overview
 import com.avlreminder.data.AvlDatabase
 import com.avlreminder.data.RoomReminderRepository
 import com.avlreminder.data.Settings
@@ -239,6 +241,13 @@ class AppGraph(private val context: Context) : ClaudeApi.Access {
     override suspend fun resolvedOccurrences(): List<Occurrence> = db.dao().observeResolved().first().map { it.toModel() }
     override fun now(): Instant = Instant.now()
     override val zone: ZoneId get() = ZoneId.systemDefault()
+
+    /**
+     * *Heute* from the database, for everything outside the screens (overview notification,
+     * widget, interface for Claude); the screens build it from the same queries as flows.
+     */
+    suspend fun today(now: Instant = now()): Today =
+        Overview.today(reminders(), openOccurrences() + resolvedOccurrences(), now, zone)
 
     /** The interface for Claude exists only in the debug build (sideload). */
     val debuggable: Boolean get() = context.applicationInfo.flags and android.content.pm.ApplicationInfo.FLAG_DEBUGGABLE != 0

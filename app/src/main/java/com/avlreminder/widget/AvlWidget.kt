@@ -51,10 +51,10 @@ class AvlWidgetReceiver : GlanceAppWidgetReceiver() {
 /** Home-screen widget: next reminder, "+ Reminder" and one-tap meeting reminders. Follows the system mode. */
 class AvlWidget : GlanceAppWidget() {
     override suspend fun provideGlance(context: Context, id: GlanceId) {
-        val repo = context.graph.repository
-        val zone = ZoneId.systemDefault()
+        val graph = context.graph
+        val zone = graph.zone
         val now = Instant.now()
-        val next = Overview.next(Overview.today(repo.reminders(), repo.openOccurrences(), now, zone))
+        val next = Overview.next(graph.today(now))
         val label = next?.let { Format.moment(it.occurrence.currentAt, zone, now.atZone(zone).toLocalDate()) }
         provideContent { Content(next, label) }
     }
