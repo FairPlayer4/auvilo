@@ -36,7 +36,7 @@ Das Cloud-Backup (`app/…/cloud`, `restore`) prüft der review-loop des Backend
 - 2026-11-03 (Lauf 2): Nachbearbeitung (`ring`, `checkPlacesAndRing`) wiederholt jeder Aufrufer; `ClaudeApi.save` prüft den Ort nicht. Empfehlung E4.
 - 2026-11-03 (Lauf 2): Mehrfache Projektionen: Wochenstand zweimal (`weekStatus`, `WeeklyGoals.status`), *Heute* an vier Stellen geladen, Takt in fünf Darstellungen, Vorlagen-Mapping in der UI.
 - 2026-11-03 (Lauf 2): Mutant M1 (`resume` ohne Wochenziel-Filter) unentdeckt.
-- 2026-11-03: Die Android-Schicht ist dünn getestet. `AlarmService`, `AlarmActivity`, Freigabe der Claude-Schnittstelle und Provider haben keine Tests; Mutant M3 (`enabled()` ohne `debuggable`) blieb unentdeckt.
+- 2026-11-03: Die Android-Schicht ist dünn getestet. `AlarmService`, `AlarmActivity`, Freigabe der Claude-Schnittstelle und Provider haben keine Tests; Mutant M3 (`enabled()` ohne `debuggable`) blieb unentdeckt; seit 2026-11-11 fängt ihn `ClaudeAccessTest`.
 - 2026-11-03: Engine-Aktionen sind nicht transaktional, und `AlarmActivity` ruft sie im `lifecycleScope` auf. **Trend (Lauf 2):** wichtiger mit B2b-Backup. Empfehlung E3.
 - 2026-11-03: Die Fälligkeit speichert den Zeitpunkt der nächsten Runde nicht; `plan()` rechnet ab „jetzt“.
 
