@@ -59,6 +59,8 @@ class Settings(private val context: Context) {
     private val pausedUntilKey = longPreferencesKey("alarmsPausedUntil")
     /** Epoch milliseconds when the running pause was switched on. */
     private val pausedFromKey = longPreferencesKey("alarmsPausedFrom")
+    /** The one-time hint about the arrival window (Anf. 7.29 OZ9) was dismissed; device only. */
+    private val arrivalHintKey = intPreferencesKey("arrivalHintSeen")
 
     /** What goes into the backup (B2b); the pause and the interface stay on the device. */
     private val backupInts = listOf(
@@ -150,6 +152,12 @@ class Settings(private val context: Context) {
 
     suspend fun setReminderSort(sort: ReminderSort) {
         context.dataStore.edit { it[sortKey] = sort.name }
+    }
+
+    val arrivalHintSeen: Flow<Boolean> = context.dataStore.data.map { prefs -> prefs[arrivalHintKey] == 1 }
+
+    suspend fun setArrivalHintSeen() {
+        context.dataStore.edit { it[arrivalHintKey] = 1 }
     }
 
     suspend fun setDwellMinutes(minutes: Int) {

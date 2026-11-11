@@ -1,5 +1,6 @@
 package com.avlreminder.ui
 
+import com.avlreminder.PlaceSetResult
 import android.app.Application
 import androidx.lifecycle.AndroidViewModel
 import androidx.lifecycle.viewModelScope
@@ -70,8 +71,16 @@ class AppViewModel(app: Application) : AndroidViewModel(app) {
         },
     )
 
-    /** V1.1b knows one place, "Zuhause". */
-    val home: StateFlow<Place?> = state(null, dao.observePlaces().map { l -> l.firstOrNull()?.toModel() })
+    /** The places with their WLANs; the first is "Zuhause" (Anf. 7.29 OZ6). */
+    val places: StateFlow<List<Place>> = state(
+        emptyList(),
+        combine(dao.observePlaces(), dao.observePlaceWifis()) { places, wifis ->
+            val byPlace = wifis.groupBy { it.placeId }
+            places.map { it.toModel(byPlace[it.id].orEmpty()) }
+        },
+    )
+
+    val arrivalHintSeen: StateFlow<Boolean> = state(true, graph.settings.arrivalHintSeen)
 
 
     val dwellMinutes: StateFlow<Int> = state(com.avlreminder.data.Settings.DEFAULT_DWELL, graph.settings.dwellMinutes)
@@ -203,8 +212,12 @@ class AppViewModel(app: Application) : AndroidViewModel(app) {
         }
     }
 
-    fun setHomeHere(onResult: (Boolean) -> Unit) {
-        viewModelScope.launch { onResult(graph.setHomeHere()) }
+    fun setPlaceHere(placeId: Long?, name: String, onResult: (PlaceSetResult) -> Unit) {
+        viewModelScope.launch { onResult(graph.setPlaceHere(placeId, name)) }
+    }
+
+    fun dismissArrivalHint() {
+        viewModelScope.launch { graph.settings.setArrivalHintSeen() }
     }
 
     /** The geofences are registered again with the new time. */

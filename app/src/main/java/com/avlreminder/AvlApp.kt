@@ -55,7 +55,9 @@ import com.avlreminder.data.SuggestionEntity
 import com.avlreminder.location.AndroidGeofences
 import com.avlreminder.system.Diag
 import com.avlreminder.location.AndroidLocation
-import com.avlreminder.location.WifiProbe
+import com.avlreminder.location.AndroidPlaceAlarms
+import com.avlreminder.location.AndroidWifi
+import com.avlreminder.core.rules.WifiLocation
 import com.avlreminder.widget.AvlWidget
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Job
@@ -87,8 +89,8 @@ class AvlApp : Application() {
         PreNotices.createChannel(this)
         AlarmPause.createChannel(this)
         AndroidCloudNotices.createChannel(this)
-        // WLAN device test before 7.29, debug build only (design.md *Entwurf 7.29*).
-        if (graph.debuggable) runCatching { WifiProbe.start(this) }
+        // Android reports WLAN connections from now on, also without a running process (7.29 OZ3).
+        AndroidWifi.watch(this)
         // Alarms may have been lost (reboot, force-stop, update): rebuild them from the database.
         started = graph.scope.launch {
             // A restore swapped data in at this start: take its settings before anything plans alarms.
@@ -137,6 +139,7 @@ class AppGraph(private val context: Context) : ClaudeApi.Access {
     @Volatile private var alert = AlertSettings()
     @Volatile private var dwell = Settings.DEFAULT_DWELL
     val location = AndroidLocation(context)
+    val wifi = AndroidWifi(context)
 
     /** Cloud backup (backup-entwurf.md); nothing touches the network until it is switched on. */
     private val cloudStore = CloudStore(context)
@@ -197,9 +200,12 @@ class AppGraph(private val context: Context) : ClaudeApi.Access {
         repository, AndroidAlarmPort(context), SystemZoneClock, AndroidDeviceState(context),
         settings = { alert },
         geofences = AndroidGeofences(context) { dwell },
-        location = location,
+        // The WLAN first; only at the latest time a coarse position when it is unclear (7.29 OZ2).
+        location = WifiLocation(wifi, SystemZoneClock) { location.isAt(it) },
         preNotices = PreNotices.Port(context),
         ringer = { Ringer.ring(context, it) },
+        placeAlarms = AndroidPlaceAlarms(context),
+        diag = Diag::log,
     )
     private val mutex = Mutex()
 
@@ -290,14 +296,36 @@ class AppGraph(private val context: Context) : ClaudeApi.Access {
         withEngine { it.checkPlaces() }
     }
 
-    /** Sets "Zuhause" to the current position; false if there is no position. */
-    suspend fun setHomeHere(): Boolean {
-        val here = location.current() ?: return false
-        withEngine { e ->
-            val home = e.places().firstOrNull()
-            e.savePlace(Place(id = home?.id ?: 0, name = "Zuhause", lat = here.latitude, lon = here.longitude))
+    /**
+     * "Hier festlegen" for a place (Anf. 7.29 OZ3, OZ6): the current position and the connected
+     * WLAN with all its access points. What is not available now stays as it was; a new place
+     * needs a position.
+     */
+    suspend fun setPlaceHere(placeId: Long?, name: String): PlaceSetResult {
+        val here = location.current()
+        val network = wifi.currentNetwork()
+        val saved = withEngine { e ->
+            val old = e.places().firstOrNull { it.id == placeId }
+            val lat = here?.latitude ?: old?.lat
+            val lon = here?.longitude ?: old?.lon
+            if (lat == null || lon == null || (here == null && network == null)) return@withEngine false
+            e.savePlace(
+                Place(
+                    id = old?.id ?: 0, name = name.trim().ifEmpty { old?.name ?: "Ort" }, lat = lat, lon = lon,
+                    radiusMeters = old?.radiusMeters ?: 150, wifis = network ?: old?.wifis.orEmpty(),
+                ),
+            )
+            true
         }
+        if (!saved) return PlaceSetResult.NoPosition
         checkPlacesAndRing()
-        return true
+        return PlaceSetResult.Saved(position = here != null, ssid = network?.firstNotNullOfOrNull { it.ssid }, wifi = network != null)
     }
+}
+
+/** What "Hier festlegen" could take over; the SSID is only shown on the device, never logged. */
+sealed interface PlaceSetResult {
+    /** No position (and nothing else to update). */
+    data object NoPosition : PlaceSetResult
+    data class Saved(val position: Boolean, val wifi: Boolean, val ssid: String?) : PlaceSetResult
 }

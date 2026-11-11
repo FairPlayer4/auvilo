@@ -40,6 +40,10 @@
 | K20 | Blocker | *Als Aufgabe planen*, Nachfrage (94, 96) | Aufgabe am Vorabend; Nachfrage ab der Schwelle |
 | K21 | Zurücknehmen (7.31) | *Erledigt*, dann innerhalb 1 min *Zurücknehmen* auf *Heute* | wieder offen, klingelt in 10 min; Nachweis zählt wieder |
 | K22 | Vorab verschieben (7.32) | im Vorab-Reminder „heute später“ | +30 min/+1/+2 Std ab der geplanten Zeit; zählt aufs Verschieben-Konto |
+| K23 | Orte (7.29) | *Einstellungen → Orte*, zuhause im WLAN *Hier festlegen* | „Standort übernommen · WLAN „…“ übernommen“, Zugangspunkte gezählt; `diag.log` ohne WLAN-Namen und BSSIDs |
+| K24 | Ankunft im Zeitraum (7.29) | Reminder 19:30 *Bei Ankunft*, ab 90 min; vor 18:00 heimkommen, dann um 18:30 ins WLAN | vor 18:00 kein Alarm (Diag „too early“); *Heute* „ab 18:00 bei Ankunft zuhause, sonst 19:30“; 5 min nach dem Verbinden Alarm |
+| K25 | Schon da (F2) | zuhause bleiben, Zeitraum beginnt | kein Alarm zu Beginn; Prüfungen alle 20 min im Log („place check … AT“); Alarm um 19:30 |
+| K26 | Nicht da (F1) | zur spätesten Uhrzeit weg, WLAN aus Reichweite | *entfällt* bzw. bei *trotzdem klingeln* Alarm; bei „unklar“ klingelt es |
 
 ## D. Cloud-Backup (seit 1.3b0.4)
 Auf dem **S24** nur dieses kleine Set (echte Daten, Eigenbetrieb). Alles, was Geräte sperrt,

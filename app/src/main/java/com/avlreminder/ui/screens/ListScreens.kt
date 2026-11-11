@@ -1,5 +1,6 @@
 package com.avlreminder.ui.screens
 
+import com.avlreminder.core.model.Place
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.Arrangement
@@ -60,12 +61,13 @@ fun RemindersScreen(
     sort: ReminderSort = ReminderSort.NEXT_DUE,
     onSort: (ReminderSort) -> Unit = {},
     onRestore: (Reminder) -> Unit = {},
+    places: List<Place> = emptyList(),
 ) {
     val c = Avl.colors
     var showClosed by rememberSaveable { mutableStateOf(false) }
     val groups = ReminderList.group(reminders, openByReminder, sort)
     val card: @Composable (Reminder) -> Unit = { r ->
-        ReminderCard(r, openByReminder[r.id], today, zone, onEdit, onSetActive, onRestore)
+        ReminderCard(r, openByReminder[r.id], today, zone, onEdit, onSetActive, onRestore, places)
     }
     LazyColumn(modifier.padding(horizontal = 16.dp)) {
         item { ScreenTitle("Reminder") }
@@ -106,12 +108,13 @@ private fun ReminderCard(
     onEdit: (Reminder) -> Unit,
     onSetActive: (Reminder, Boolean) -> Unit,
     onRestore: (Reminder) -> Unit,
+    places: List<Place>,
 ) {
     val c = Avl.colors
     val next = open?.currentAt
     val finished = ReminderList.finished(r, open)
     val detail = buildString {
-        append(Format.plan(r))
+        append(Format.plan(r, places))
         when {
             r.archivedAt != null -> append(" · archiviert")
             // A one-off that already happened rings again only with a new time.

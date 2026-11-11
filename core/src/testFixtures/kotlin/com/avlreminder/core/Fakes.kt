@@ -18,6 +18,12 @@ import com.avlreminder.core.ports.AlarmPort
 import com.avlreminder.core.ports.DeviceStatePort
 import com.avlreminder.core.ports.GeofencePort
 import com.avlreminder.core.ports.LocationPort
+import com.avlreminder.core.ports.PlaceAlarmPort
+import com.avlreminder.core.ports.PlaceCheck
+import com.avlreminder.core.ports.PlaceResult
+import com.avlreminder.core.ports.PlaceSource
+import com.avlreminder.core.ports.WifiPort
+import com.avlreminder.core.ports.WifiScan
 import com.avlreminder.core.ports.PreNoticePort
 import com.avlreminder.core.ports.ReminderRepository
 import java.time.Clock
@@ -75,12 +81,32 @@ class FakePreNotices : PreNoticePort {
     }
 }
 
-/** [here]: null = position unknown. */
+/** [here]: null = position unknown; the same answer with or without fallback. */
 class FakeLocation(var here: Boolean? = null) : LocationPort {
     var checks = 0
-    override suspend fun isAt(place: Place): Boolean? {
+    override suspend fun check(place: Place, fallback: Boolean): PlaceCheck {
         checks++
-        return here
+        return when (here) {
+            true -> PlaceCheck(PlaceResult.AT, PlaceSource.FALLBACK)
+            false -> PlaceCheck(PlaceResult.AWAY, PlaceSource.FALLBACK)
+            null -> PlaceCheck(PlaceResult.UNKNOWN, null)
+        }
+    }
+}
+
+/** The WLAN as Android reports it: the connected access point and the last scan. */
+class FakeWifi(var connected: String? = null, var scan: WifiScan? = null) : WifiPort {
+    override suspend fun connected() = connected
+    override suspend fun lastScan() = scan
+}
+
+class FakePlaceAlarms : PlaceAlarmPort {
+    val set = mutableMapOf<Long, Instant>()
+    override fun set(placeId: Long, at: Instant) {
+        set[placeId] = at
+    }
+    override fun cancel(placeId: Long) {
+        set.remove(placeId)
     }
 }
 

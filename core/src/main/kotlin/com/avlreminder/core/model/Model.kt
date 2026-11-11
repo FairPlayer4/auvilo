@@ -62,6 +62,8 @@ enum class EventType {
     AWAITING_ARRIVAL,
     /** "Zurücknehmen" after a misclick (Anf. 7.31): open again; detail = the resolution taken back. */
     REOPENED,
+    /** Arrived in the window or while waiting for it (7.29); detail = when it rings. */
+    ARRIVED,
 }
 
 /** When a reminder is due. */
@@ -151,14 +153,25 @@ data class Blocker(
     val isOpen: Boolean get() = solvedAt == null
 }
 
-/** A place for arrival triggers; V1.1b knows only "Zuhause". */
+/** A place for arrival triggers: "Zuhause" and one more (Anf. 7.29 OZ6). */
 data class Place(
     val id: Long = 0,
     val name: String,
     val lat: Double,
     val lon: Double,
     val radiusMeters: Int = 150,
-)
+    /** Its WLAN access points (OZ3); empty: only the geofence knows it. */
+    val wifis: List<PlaceWifi> = emptyList(),
+) {
+    /** Connected to one of these access points means being there. */
+    fun hasWifi(bssid: String): Boolean = wifis.any { it.bssid.equals(bssid, ignoreCase = true) }
+}
+
+/**
+ * One access point of a place. The [bssid] identifies it; names like "FRITZ!Box" exist many times.
+ * [ssid] is only shown. Both are private: never in the diagnostic log.
+ */
+data class PlaceWifi(val bssid: String, val ssid: String? = null)
 
 /** What happens at the scheduled time if the arrival has not come. */
 enum class WhenAway {
@@ -169,10 +182,39 @@ enum class WhenAway {
 }
 
 /**
- * The schedule picks the day, the arrival the moment: arriving at [placeId] makes the day's
- * occurrence due right away; at the scheduled time [whenAway] applies.
+ * The schedule picks the day, the arrival the moment (Anf. 7.29): the scheduled time is the latest
+ * time, the window starts [leadMinutes] before it. Arriving in the window rings [bufferMinutes]
+ * later; before it the arrival does not count. In the window the place is checked every
+ * [checkMinutes]. At the latest time [whenAway] applies. [leadMinutes] 0: no window, an arrival
+ * on the day rings right away as before 7.29.
  */
-data class Arrival(val placeId: Long, val whenAway: WhenAway = WhenAway.DROP)
+data class Arrival(
+    val placeId: Long,
+    val whenAway: WhenAway = WhenAway.DROP,
+    val leadMinutes: Int = DEFAULT_LEAD,
+    val bufferMinutes: Int = DEFAULT_BUFFER,
+    val checkMinutes: Int = DEFAULT_CHECK,
+) {
+    init {
+        require(leadMinutes in 0..MAX_LEAD) { "lead must be 0–$MAX_LEAD minutes" }
+        require(bufferMinutes in 0..MAX_BUFFER) { "buffer must be 0–$MAX_BUFFER minutes" }
+        require(checkMinutes in MIN_CHECK..MAX_CHECK) { "check interval must be $MIN_CHECK–$MAX_CHECK minutes" }
+    }
+
+    /** With a window (7.29); without it an arrival rings right away as before. */
+    val hasWindow: Boolean get() = leadMinutes > 0
+
+    companion object {
+        /** F3 (2026-11-04): 90 min before, 5 min buffer, checked every 20 min. */
+        const val DEFAULT_LEAD = 90
+        const val DEFAULT_BUFFER = 5
+        const val DEFAULT_CHECK = 20
+        const val MAX_LEAD = 12 * 60
+        const val MAX_BUFFER = 30
+        const val MIN_CHECK = 15
+        const val MAX_CHECK = 30
+    }
+}
 
 /**
  * "3–4× pro Woche, mindestens 1×" (Anf. Z1c) on a daily or weekday reminder; weeks run Monday
@@ -247,6 +289,12 @@ data class Occurrence(
     val firedAt: Instant? = null,
     /** Planned again after it rang, not at the place at the new time: rings on arrival, missed at the end of the day (7.29 OZ5). */
     val awaitsArrival: Boolean = false,
+    /**
+     * The arrival that counts for the next ring (7.29 OZ1, OZ4): in the window or while waiting for
+     * it. Set, the occurrence rings at [currentAt] wherever one is then; a new time (snoozed,
+     * postponed) clears it, as the decision is made anew.
+     */
+    val arrivedAt: Instant? = null,
 ) {
     val isOpen: Boolean get() = state != OccurrenceState.DONE && state != OccurrenceState.CLOSED
 

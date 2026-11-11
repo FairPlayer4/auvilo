@@ -1,5 +1,6 @@
 package com.avlreminder.ui.screens
 
+import com.avlreminder.core.model.Place
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.ExperimentalLayoutApi
@@ -63,6 +64,10 @@ fun TodayScreen(
     /** "bis 19:30" while all alarms are paused (PS7), null otherwise. */
     pausedUntil: String? = null,
     onResume: () -> Unit = {},
+    places: List<Place> = emptyList(),
+    /** Show the one-time hint about the arrival window (Anf. 7.29 OZ9). */
+    arrivalHint: Boolean = false,
+    onDismissArrivalHint: () -> Unit = {},
     /** Reminders snoozed again and again (NT2). */
     hints: List<SnoozeHint> = emptyList(),
     onHint: (SnoozeHint, SnoozeHintChoice) -> Unit = { _, _ -> },
@@ -90,6 +95,16 @@ fun TodayScreen(
             }
         }
         if (pausedUntil != null) item { PausedBanner(pausedUntil, onResume) }
+        if (arrivalHint) {
+            item {
+                EntryCard(
+                    title = "Neu: Ankunft im Zeitraum",
+                    detail = "Eine Ankunft zählt erst kurz vor der Uhrzeit (Standard ab 90 min vorher), dann klingelt es " +
+                        "5 min später. Bist du schon da, um die Uhrzeit. Einstellbar im Reminder unter „Bei Ankunft“.",
+                    highlight = c.accent,
+                ) { TextButton(onClick = onDismissArrivalHint, Modifier.testTag("arrivalHintOk")) { Text("OK", color = c.accent) } }
+            }
+        }
         items(hints, key = { "hint${it.reminder.id}" }) { SnoozeHintCard(it, onHint) }
         if (waiting > 0) {
             item {
@@ -124,7 +139,7 @@ fun TodayScreen(
             items(today.overdue, key = { "over" + it.occurrence.id }) { e ->
                 EntryCard(
                     title = e.reminder.title,
-                    detail = Format.plan(e.reminder) + progress(e),
+                    detail = Format.plan(e.reminder, places) + progress(e),
                     highlight = c.strict,
                     onClick = { onEdit(e.reminder) },
                 ) {
@@ -140,7 +155,8 @@ fun TodayScreen(
             items(today.laterToday, key = { "later" + it.occurrence.id }) { e ->
                 EntryCard(
                     title = e.reminder.title,
-                    detail = moved(e) + (goalLine(e.reminder) ?: Format.plan(e.reminder)) + progress(e),
+                    detail = moved(e) + (Format.arrival(e.reminder, e.occurrence, zone, places) ?: goalLine(e.reminder) ?: Format.plan(e.reminder, places)) +
+                        progress(e),
                     time = Format.time(e.occurrence.currentAt, zone),
                     onClick = { onEdit(e.reminder) },
                 ) {
@@ -150,12 +166,12 @@ fun TodayScreen(
             }
         }
         if (today.waiting.isNotEmpty()) {
-            item { SectionTitle("Wenn du zuhause bist") }
+            item { SectionTitle("Bei Ankunft") }
             items(today.waiting, key = { "wait" + it.occurrence.id }) { e ->
                 EntryCard(
                     title = e.reminder.title,
                     detail = if (e.occurrence.awaitsArrival) "verschoben – klingelt bei Ankunft, sonst heute verpasst" + progress(e)
-                    else (goalLine(e.reminder) ?: "klingelt bei Ankunft") + progress(e),
+                    else (goalLine(e.reminder) ?: "klingelt bei Ankunft ${Format.at(e.reminder.arrival?.placeId ?: 0, places)}") + progress(e),
                     onClick = { onEdit(e.reminder) },
                 ) {
                     StrictnessTag(e.reminder.strictness)

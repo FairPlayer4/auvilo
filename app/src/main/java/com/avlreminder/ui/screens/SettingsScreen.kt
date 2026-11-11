@@ -1,5 +1,7 @@
 package com.avlreminder.ui.screens
 
+import androidx.compose.material3.OutlinedTextField
+import com.avlreminder.PlaceSetResult
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
@@ -74,8 +76,8 @@ fun SettingsScreen(
     permissions: List<PermissionItem>,
     onBack: () -> Unit,
     modifier: Modifier = Modifier,
-    home: Place? = null,
-    onSetHome: (onResult: (Boolean) -> Unit) -> Unit = {},
+    places: List<Place> = emptyList(),
+    onSetPlace: (placeId: Long?, name: String, onResult: (PlaceSetResult) -> Unit) -> Unit = { _, _, _ -> },
     dwellMinutes: Int = Settings.DEFAULT_DWELL,
     onDwell: (Int) -> Unit = {},
     openSuggestions: Int = 0,
@@ -96,7 +98,6 @@ fun SettingsScreen(
     localActions: LocalActions = object : LocalActions {},
 ) {
     val c = Avl.colors
-    var homeState by remember { mutableStateOf<String?>(null) }
     Column(modifier) {
         Row(Modifier.padding(4.dp), verticalAlignment = Alignment.CenterVertically) {
             IconButton(onClick = onBack) { Icon(AvlIcons.Back, "Zurück", tint = c.text) }
@@ -232,16 +233,13 @@ fun SettingsScreen(
                 Card { ClaudeSetting(claudeAccess, onClaudeAccess) }
             }
 
-            SectionTitle("Zuhause")
+            SectionTitle("Orte")
             Card {
                 Column(Modifier.padding(16.dp)) {
-                    Text(if (home == null) "Noch nicht festgelegt" else "Festgelegt · Umkreis ${home.radiusMeters} m", color = c.text, fontSize = 15.sp)
-                    TextButton(onClick = {
-                        homeState = "Standort wird bestimmt …"
-                        onSetHome { ok -> homeState = if (ok) "Zuhause gespeichert" else "Kein Standort – Berechtigung und GPS prüfen" }
-                    }) { Text(if (home == null) "Aktuellen Standort als Zuhause" else "Neu setzen auf aktuellen Standort", color = c.accent) }
-                    homeState?.let { Text(it, color = c.muted, fontSize = 13.sp) }
-                    Text("Ankunft zählt nach", Modifier.padding(top = 12.dp), color = c.text, fontSize = 15.sp)
+                    PlaceSetting(places.getOrNull(0), fixedName = "Zuhause", onSetPlace = onSetPlace)
+                    // Zuhause first: the second place gets the next id (OZ6).
+                    if (places.isNotEmpty()) PlaceSetting(places.getOrNull(1), fixedName = null, onSetPlace = onSetPlace, Modifier.padding(top = 16.dp))
+                    Text("Ankunft ohne WLAN zählt nach", Modifier.padding(top = 12.dp), color = c.text, fontSize = 15.sp)
                     FlowRow(Modifier.padding(top = 6.dp), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                         (Settings.DWELL_CHOICES + dwellMinutes).distinct().sorted().forEach { m ->
                             FilterChip(m == dwellMinutes, { onDwell(m) }, label = { Text("$m min") })
@@ -250,8 +248,8 @@ fun SettingsScreen(
                 }
             }
             Text(
-                "Der Standort bleibt auf dem Handy. Vorbeifahren zählt nicht, erst das Bleiben. Für die Ankunft braucht die App " +
-                    "den Standort „Immer erlauben“.",
+                "Standort und WLAN bleiben auf dem Handy. Mit dem WLAN eines Orts verbunden heißt: da. Ohne WLAN zählt der " +
+                    "Standort, und Vorbeifahren zählt nicht, erst das Bleiben. Für die Ankunft braucht die App den Standort „Immer erlauben“.",
                 Modifier.padding(4.dp), color = c.muted, fontSize = 13.sp,
             )
 
@@ -387,4 +385,55 @@ private fun TimeSetting(
         OutlinedButton(onClick = { pick = true }, Modifier.testTag(tag)) { Text(time?.let { Format.time(it) } ?: "aus") }
     }
     if (pick) TimeDialog(time ?: fallback, onDismiss = { pick = false }, error = error, onPick = onPick)
+}
+
+/**
+ * One place in *Orte* (Anf. 7.29 OZ3, OZ6): "Hier festlegen" takes the current position and the
+ * connected WLAN with all its access points. [fixedName] null: the name can be typed.
+ */
+@Composable
+private fun PlaceSetting(
+    place: Place?,
+    fixedName: String?,
+    onSetPlace: (Long?, String, (PlaceSetResult) -> Unit) -> Unit,
+    modifier: Modifier = Modifier,
+) {
+    val c = Avl.colors
+    var name by remember(place?.id) { mutableStateOf(place?.name.orEmpty()) }
+    var status by remember { mutableStateOf<String?>(null) }
+    Column(modifier) {
+        if (fixedName != null) {
+            Text(fixedName, color = c.text, fontSize = 15.sp, fontWeight = FontWeight.SemiBold)
+        } else {
+            OutlinedTextField(
+                name, { name = it }, Modifier.fillMaxWidth().testTag("placeName"),
+                label = { Text("Weiterer Ort, z. B. Arbeit") }, singleLine = true,
+            )
+        }
+        Text(describe(place), color = c.muted, fontSize = 13.sp)
+        TextButton(
+            onClick = {
+                status = "Standort und WLAN werden bestimmt …"
+                onSetPlace(place?.id, fixedName ?: name) { status = message(it) }
+            },
+            Modifier.testTag("setPlace${place?.id ?: "New"}"),
+            enabled = fixedName != null || name.isNotBlank(),
+        ) { Text(if (place == null) "Hier festlegen" else "Neu festlegen: hier", color = c.accent) }
+        status?.let { Text(it, color = c.muted, fontSize = 13.sp) }
+    }
+}
+
+private fun describe(place: Place?): String = when {
+    place == null -> "Noch nicht festgelegt"
+    place.wifis.isEmpty() -> "Umkreis ${place.radiusMeters} m · ohne WLAN"
+    else -> "Umkreis ${place.radiusMeters} m · WLAN „${place.wifis.firstNotNullOfOrNull { it.ssid } ?: "ohne Namen"}“" +
+        " (${place.wifis.size} ${if (place.wifis.size == 1) "Zugangspunkt" else "Zugangspunkte"})"
+}
+
+private fun message(result: PlaceSetResult): String = when (result) {
+    PlaceSetResult.NoPosition -> "Kein Standort – Berechtigung und GPS prüfen"
+    is PlaceSetResult.Saved -> listOfNotNull(
+        if (result.position) "Standort übernommen" else "Standort unverändert",
+        if (result.wifi) "WLAN „${result.ssid ?: "ohne Namen"}“ übernommen" else "nicht mit WLAN verbunden, WLAN unverändert",
+    ).joinToString(" · ")
 }

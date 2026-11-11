@@ -13,6 +13,7 @@ import com.avlreminder.core.model.ChecklistItem
 import com.avlreminder.core.model.Occurrence
 import com.avlreminder.core.model.OccurrenceState
 import com.avlreminder.core.model.Place
+import com.avlreminder.core.model.PlaceWifi
 import com.avlreminder.core.model.Reminder
 import com.avlreminder.core.model.Schedule
 import com.avlreminder.core.model.WhenAway
@@ -20,6 +21,7 @@ import com.avlreminder.core.usecases.SaveResult
 import com.avlreminder.AvlApp
 import com.avlreminder.graph
 import com.avlreminder.location.GeofenceReceiver
+import com.avlreminder.location.PlaceCheckReceiver
 import com.avlreminder.system.SystemReceiver
 import kotlinx.coroutines.runBlocking
 import org.junit.Assert.assertEquals
@@ -215,6 +217,33 @@ class ReceiverGlueTest {
         GeofenceReceiver.arrived(graph, listOf(home + 1))
 
         assertEquals(OccurrenceState.PLANNED, repo.openOccurrence(id)?.state)
+    }
+
+    /**
+     * In the arrival window the engine sets the check alarm of the place (7.29 Z.3); when it
+     * fires, the check runs and the log has its result without WLAN names or BSSIDs.
+     */
+    @Test
+    fun theCheckAlarmOfAPlaceRunsTheCheckAndLogsItWithoutNames() = runBlocking {
+        val bssid = "aa:bb:cc:00:00:01"
+        val home = graph.withEngine {
+            it.savePlace(Place(name = "Zuhause", lat = 48.1, lon = 11.5, wifis = listOf(PlaceWifi(bssid, "Heimnetz"))))
+        }
+        // Due in an hour: the window (90 min before) is running, the next check comes within 20 min.
+        val latest = LocalTime.now().plusHours(1).withSecond(0).withNano(0)
+        val saved = graph.withEngine {
+            it.save(reminder("Training").copy(schedule = Schedule.Daily(latest), arrival = Arrival(home, WhenAway.DROP)))
+        }
+        assertTrue(saved.toString(), saved is SaveResult.Saved)
+        val check = shadowOf(alarmManager).scheduledAlarms.single { it.operation?.let { op -> shadowOf(op).savedIntent }?.component?.className == PlaceCheckReceiver::class.java.name }
+        assertTrue(Instant.ofEpochMilli(check.triggerAtTime) <= Instant.now().plus(Duration.ofMinutes(20)))
+
+        broadcast(shadowOf(check.operation).savedIntent)
+
+        val log = File(context.filesDir, "diag/diag.log")
+        waitFor("check logged") { log.readText().contains("place check place=$home UNKNOWN") }
+        val text = log.readText()
+        assertTrue(text, !text.contains(bssid) && !text.contains("Heimnetz"))
     }
 
     // --- Boot and time change -------------------------------------------------------------------

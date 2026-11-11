@@ -54,7 +54,14 @@ internal class ClaudeJson(private val zone: ZoneId) {
         .put("ignoreDnd", r.ignoreDnd)
         .put("snoozeMinutes", JSONArray(r.snoozeMinutes))
         .put("motivationAudio", r.motivationAudio != null)
-        .put("arrival", r.arrival?.let { JSONObject().put("placeId", it.placeId).put("whenAway", it.whenAway.name) } ?: JSONObject.NULL)
+        .put(
+            "arrival",
+            r.arrival?.let {
+                // The window (Anf. 7.29); the places' WLANs stay on the device.
+                JSONObject().put("placeId", it.placeId).put("whenAway", it.whenAway.name)
+                    .put("leadMinutes", it.leadMinutes).put("bufferMinutes", it.bufferMinutes).put("checkMinutes", it.checkMinutes)
+            } ?: JSONObject.NULL,
+        )
         .put("checklist", JSONArray(r.checklist.map { JSONObject().put("id", it.id).put("title", it.title) }))
         .put("weeklyGoal", r.weeklyGoal?.let { JSONObject().put("target", it.target).put("max", it.max).put("minimum", it.minimum) } ?: JSONObject.NULL)
         .put("preNotice", preNotice(r.preNotice))
@@ -144,7 +151,14 @@ internal class ClaudeJson(private val zone: ZoneId) {
         if (o.has("arrival")) {
             r = r.copy(
                 arrival = o.optJSONObject("arrival")?.let {
-                    Arrival(it.getLong("placeId"), WhenAway.valueOf(it.optString("whenAway", WhenAway.DROP.name)))
+                    // Missing window values stay as they were, for a new arrival the defaults.
+                    val old = r.arrival
+                    Arrival(
+                        it.getLong("placeId"), WhenAway.valueOf(it.optString("whenAway", WhenAway.DROP.name)),
+                        leadMinutes = it.optInt("leadMinutes", old?.leadMinutes ?: Arrival.DEFAULT_LEAD),
+                        bufferMinutes = it.optInt("bufferMinutes", old?.bufferMinutes ?: Arrival.DEFAULT_BUFFER),
+                        checkMinutes = it.optInt("checkMinutes", old?.checkMinutes ?: Arrival.DEFAULT_CHECK),
+                    )
                 },
             )
         }

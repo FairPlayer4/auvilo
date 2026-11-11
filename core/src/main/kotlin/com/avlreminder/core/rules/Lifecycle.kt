@@ -23,6 +23,11 @@ sealed interface Action {
     data object Drop : Action
     /** Snoozed or postponed and not at the place at the new time: waits for the arrival (7.29 OZ5). */
     data object AwaitArrival : Action
+    /**
+     * Arrived in the window or while waiting for it (7.29 OZ1, OZ4): stays planned and rings at
+     * [at], after the buffer or at the latest time when already there at the start (F2).
+     */
+    data class Arrived(val at: Instant) : Action
     /** Another ringing round without reaction. */
     data object Escalate : Action
     data class Snooze(val duration: Duration) : Action
@@ -127,7 +132,7 @@ object Lifecycle {
             return ok(
                 occurrence.copy(
                     state = PLANNED, currentAt = action.at, resolution = null, resolvedAt = null, note = null,
-                    pausedUntil = null, awaitsArrival = false, firstProgressAt = progress,
+                    pausedUntil = null, awaitsArrival = false, arrivedAt = null, firstProgressAt = progress,
                 ),
                 EventType.REOPENED, occurrence.resolution?.name,
             )
@@ -137,12 +142,12 @@ object Lifecycle {
         return when (action) {
             Action.Fire ->
                 if (occurrence.state != PLANNED) TransitionResult.Rejected("only a planned occurrence can fire")
-                else ok(occurrence.copy(state = DUE, firedAt = occurrence.firedAt ?: now, awaitsArrival = false), EventType.DUE)
+                else ok(occurrence.copy(state = DUE, firedAt = occurrence.firedAt ?: now, awaitsArrival = false, arrivedAt = null), EventType.DUE)
 
             Action.Arrive ->
                 if (occurrence.state != PLANNED) TransitionResult.Rejected("only a planned occurrence can fire")
                 else ok(
-                    occurrence.copy(state = DUE, currentAt = now, firedAt = occurrence.firedAt ?: now, awaitsArrival = false),
+                    occurrence.copy(state = DUE, currentAt = now, firedAt = occurrence.firedAt ?: now, awaitsArrival = false, arrivedAt = null),
                     EventType.DUE, "Ankunft",
                 )
 
@@ -153,6 +158,15 @@ object Lifecycle {
                     occurrence.copy(state = CLOSED, resolution = Resolution.DROPPED, resolvedAt = now),
                     EventType.DROPPED,
                 )
+
+            is Action.Arrived -> when {
+                occurrence.state != PLANNED -> TransitionResult.Rejected("only a planned occurrence can arrive")
+                occurrence.arrivedAt != null -> TransitionResult.Rejected("the first arrival counts")
+                else -> ok(
+                    occurrence.copy(currentAt = action.at, arrivedAt = now, awaitsArrival = false),
+                    EventType.ARRIVED, action.at.toString(),
+                )
+            }
 
             Action.AwaitArrival ->
                 if (occurrence.state != PLANNED || !occurrence.rangOrMoved) TransitionResult.Rejected("only a snoozed or postponed occurrence awaits the arrival")
@@ -165,7 +179,7 @@ object Lifecycle {
             is Action.Snooze ->
                 if (occurrence.state == PLANNED) TransitionResult.Rejected("nothing to snooze yet")
                 else ok(
-                    occurrence.copy(state = PLANNED, currentAt = now.plus(action.duration), pausedUntil = null, awaitsArrival = false),
+                    occurrence.copy(state = PLANNED, currentAt = now.plus(action.duration), pausedUntil = null, awaitsArrival = false, arrivedAt = null),
                     EventType.SNOOZED, "${action.duration.toMinutes()} min",
                 )
 
@@ -176,7 +190,7 @@ object Lifecycle {
                 limits.nextTime != null && action.to >= limits.nextTime -> TransitionResult.Rejected("postpone target after the next time")
                 else -> ok(
                     occurrence.copy(
-                        state = PLANNED, currentAt = action.to, postponeCount = occurrence.postponeCount + 1, pausedUntil = null, awaitsArrival = false,
+                        state = PLANNED, currentAt = action.to, postponeCount = occurrence.postponeCount + 1, pausedUntil = null, awaitsArrival = false, arrivedAt = null,
                     ),
                     EventType.POSTPONED, action.to.toString(),
                 )
@@ -246,7 +260,7 @@ object Lifecycle {
                     counts && !canPostpone(reminder, occurrence) -> TransitionResult.Rejected("postpone limit reached")
                     else -> ok(
                         occurrence.copy(
-                            state = PLANNED, currentAt = action.to, pausedUntil = null, awaitsArrival = false,
+                            state = PLANNED, currentAt = action.to, pausedUntil = null, awaitsArrival = false, arrivedAt = null,
                             postponeCount = occurrence.postponeCount + if (counts) 1 else 0,
                         ),
                         EventType.DEFERRED, action.to.toString(),
@@ -256,7 +270,7 @@ object Lifecycle {
 
             is Action.CloseWindow ->
                 if (action.to <= now) TransitionResult.Rejected("next window must lie in the future")
-                else ok(occurrence.copy(state = PLANNED, currentAt = action.to, pausedUntil = null, awaitsArrival = false), EventType.WINDOW_CLOSED, action.to.toString())
+                else ok(occurrence.copy(state = PLANNED, currentAt = action.to, pausedUntil = null, awaitsArrival = false, arrivedAt = null), EventType.WINDOW_CLOSED, action.to.toString())
 
             is Action.Skip -> ok(
                 occurrence.copy(state = CLOSED, resolution = Resolution.SKIPPED, resolvedAt = now, note = action.reason),

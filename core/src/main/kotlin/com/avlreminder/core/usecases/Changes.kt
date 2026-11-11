@@ -74,7 +74,7 @@ internal class Changes(private val c: EngineContext, private val views: AlarmVie
             problems += "Startklar-Fragen beantworten"
         }
         reminder.arrival?.let { a ->
-            if (repo.places().none { it.id == a.placeId }) problems += "Zuhause zuerst in den Einstellungen festlegen"
+            if (repo.places().none { it.id == a.placeId }) problems += "Ort zuerst in den Einstellungen festlegen"
         }
         if (problems.isNotEmpty()) return SaveResult.Invalid(problems)
         val id = repo.saveReminder(reminder)
@@ -150,7 +150,7 @@ internal class Changes(private val c: EngineContext, private val views: AlarmVie
             val due = scheduler.nextDue(reminder, repo.lastResolved(reminderId))
             if (due == null || due <= now()) scheduler.close(reminder, open, Action.Skip(SkipReasons.PAUSED))
             else repo.saveOccurrence(
-                open.copy(state = OccurrenceState.PLANNED, dueAt = due, currentAt = due, pausedUntil = null, firedAt = null, awaitsArrival = false),
+                open.copy(state = OccurrenceState.PLANNED, dueAt = due, currentAt = due, pausedUntil = null, firedAt = null, awaitsArrival = false, arrivedAt = null),
             )
         }
         scheduler.syncReminder(reminder.copy(active = true))

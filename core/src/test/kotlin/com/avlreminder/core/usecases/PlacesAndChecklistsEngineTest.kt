@@ -53,7 +53,7 @@ class PlacesAndChecklistsEngineTest {
     @Test
     fun `an arrival reminder needs the place to exist`() = runTest {
         val result = engine.save(training(placeId = 42))
-        assertEquals(SaveResult.Invalid(listOf("Zuhause zuerst in den Einstellungen festlegen")), result)
+        assertEquals(SaveResult.Invalid(listOf("Ort zuerst in den Einstellungen festlegen")), result)
     }
 
     @Test
@@ -72,8 +72,10 @@ class PlacesAndChecklistsEngineTest {
     }
 
     @Test
-    fun `arriving rings today's occurrence before its time`() = runTest {
-        val id = create(training(homeId()))
+    fun `without a window, arriving rings today's occurrence before its time`() = runTest {
+        // Lead 0: as before 7.29 (design.md Z.7 4.).
+        val r = training(homeId())
+        val id = create(r.copy(arrival = r.arrival!!.copy(leadMinutes = 0)))
         clock.now = at(26, 17, 30)
         val rings = engine.onArrival(repo.places.keys.single())
         val o = rings.single().occurrence

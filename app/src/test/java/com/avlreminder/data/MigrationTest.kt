@@ -5,13 +5,16 @@ import android.database.sqlite.SQLiteDatabase
 import androidx.room.Room
 import androidx.test.core.app.ApplicationProvider
 import androidx.test.ext.junit.runners.AndroidJUnit4
+import com.avlreminder.core.model.Arrival
 import com.avlreminder.core.model.BlockerOrigin
 import com.avlreminder.core.model.ChecklistItem
 import com.avlreminder.core.model.ItemDone
+import com.avlreminder.core.model.PlaceWifi
 import com.avlreminder.core.model.ProofSpec
 import com.avlreminder.core.model.ProofType
 import com.avlreminder.core.model.Schedule
 import com.avlreminder.core.model.WeeklyGoal
+import com.avlreminder.core.model.WhenAway
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.test.runTest
 import org.json.JSONObject
@@ -133,6 +136,50 @@ class MigrationTest {
                 "(1, 5, 500, 'CREATED', NULL), (2, 5, 1000, 'DUE', NULL), (3, 5, 1100, 'SNOOZED', '10 min'), (4, 5, 2000, 'DUE', NULL), " +
                 "(5, 6, 600, 'CREATED', NULL)",
         )
+    }
+
+    private fun createV8() = create(8) { db ->
+        db.execSQL("INSERT INTO place (id, name, lat, lon, radiusMeters) VALUES (1, 'Zuhause', 48.1, 11.5, 150)")
+        db.execSQL(
+            "INSERT INTO reminder (id, title, character, strictness, scheduleType, timeMinutes, weekdays, proof, active, createdAt, " +
+                "proofPhoto, ignoreDnd, snoozeMinutes, solvedBlockerIsMinimum, arrivalPlaceId, arrivalWhenAway) " +
+                "VALUES (1, 'Training', 'DOCUMENT', 'NORMAL', 'DAILY', 1170, 0, 'CONFIRM', 1, 0, 0, 0, '10', 0, 1, 'DROP')",
+        )
+        db.execSQL(
+            "INSERT INTO occurrence (id, reminderId, dueAt, currentAt, state, postponeCount, resolvedAt, resolution, note, awaitsArrival) " +
+                "VALUES (5, 1, 1000, 1000, 'PLANNED', 0, NULL, NULL, NULL, 0)",
+        )
+    }
+
+    // KRITISCH: Bestehende Ankunfts-Reminder bekommen die Standardwerte aus F3 (Anf. 7.29 OZ9).
+    @Test
+    fun version8KeepsDataAndGetsTheArrivalWindowWithDefaults() = runTest {
+        createV8()
+        val db = open()
+        try {
+            val repo = RoomReminderRepository(db)
+            assertEquals(Arrival(1, WhenAway.DROP, leadMinutes = 90, bufferMinutes = 5, checkMinutes = 20), repo.reminder(1)!!.arrival)
+            assertNull(repo.occurrence(5)!!.arrivedAt)
+            assertEquals(emptyList<PlaceWifi>(), repo.places().single().wifis)
+            // The new columns and the table work both ways.
+            repo.saveOccurrence(repo.occurrence(5)!!.copy(arrivedAt = Instant.ofEpochMilli(900)))
+            assertEquals(Instant.ofEpochMilli(900), repo.occurrence(5)!!.arrivedAt)
+            val wifis = listOf(PlaceWifi("aa:bb:cc:00:00:01", "Heim"), PlaceWifi("aa:bb:cc:00:00:02", "Heim"))
+            repo.savePlace(repo.places().single().copy(wifis = wifis))
+            assertEquals(wifis, repo.places().single().wifis)
+            // Saving the place again replaces its WLANs instead of adding them twice.
+            repo.savePlace(repo.places().single().copy(wifis = wifis.take(1)))
+            assertEquals(wifis.take(1), repo.places().single().wifis)
+        } finally {
+            db.close()
+        }
+    }
+
+    @Test
+    fun backupIsTakenBeforeTheUpgradeFromVersion8() {
+        createV8()
+        val dir = File(context.filesDir, "backup-test-8").apply { deleteRecursively() }
+        assertTrue(AvlDatabase.backupBeforeMigration(file, dir)!!.name.startsWith("avlreminder-v8-"))
     }
 
     @Test

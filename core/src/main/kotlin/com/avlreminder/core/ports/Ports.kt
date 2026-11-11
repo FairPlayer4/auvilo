@@ -9,6 +9,7 @@ import com.avlreminder.core.model.PrepAnswer
 import com.avlreminder.core.model.Proof
 import com.avlreminder.core.model.Reminder
 import com.avlreminder.core.model.Resolution
+import java.time.Duration
 import java.time.Instant
 
 /** Storage; the database behind it is the single source of truth. */
@@ -86,10 +87,60 @@ fun interface GeofencePort {
     fun watch(places: List<Place>)
 }
 
-/** Active check of the current position. */
+/**
+ * Is the phone at [Place] right now (Anf. 7.29 OZ2, OZ3)? First the WLAN; with [fallback] (only
+ * at the latest time) an unclear WLAN falls back to a coarse position.
+ */
 fun interface LocationPort {
-    /** null = position unknown (no permission, no fix in time). */
-    suspend fun isAt(place: Place): Boolean?
+    suspend fun check(place: Place, fallback: Boolean): PlaceCheck
+}
+
+enum class PlaceResult { AT, AWAY, UNKNOWN }
+
+enum class PlaceSource {
+    /** Connected to a WLAN of the place. */
+    WIFI_CONNECTED,
+    /** Android's last WLAN scan. */
+    WIFI_SCAN,
+    GEOFENCE,
+    /** A coarse position, only at the latest time. */
+    FALLBACK,
+}
+
+/**
+ * One check of a place as a fact for the diagnostic log (OZ8): where the answer came from and how
+ * old the scan was. [source] null: nothing could tell (no WLAN, no position).
+ */
+data class PlaceCheck(val result: PlaceResult, val source: PlaceSource?, val scanAge: Duration? = null)
+
+/** The checks of a place in its arrival window (7.29 Z.3): one alarm per place, not per occurrence. */
+interface PlaceAlarmPort {
+    fun set(placeId: Long, at: Instant)
+    fun cancel(placeId: Long)
+
+    companion object {
+        val NONE = object : PlaceAlarmPort {
+            override fun set(placeId: Long, at: Instant) = Unit
+            override fun cancel(placeId: Long) = Unit
+        }
+    }
+}
+
+/**
+ * What Android knows about the WLAN without searching itself (OZ7). [connected]: the BSSID of the
+ * connected access point, null if none or Android does not tell.
+ */
+interface WifiPort {
+    suspend fun connected(): String?
+    suspend fun lastScan(): WifiScan?
+}
+
+/** Android's last WLAN scan: the access points seen and when. */
+data class WifiScan(val bssids: Set<String>, val at: Instant)
+
+/** Why the engine decided what it did (OZ8), for the diagnostic log; no names, no positions. */
+fun interface DiagPort {
+    fun log(message: String)
 }
 
 /** The silent notice before a reminder (T6); like alarms derived from the database. */

@@ -897,6 +897,8 @@ Vordergrund, nicht Reichweite.
   Cloud-Backups: [backup-entwurf.md](backup-entwurf.md) (bestätigt 2026-11-07).
 
 ### 7.29 Ankunft im Zeitraum mit WLAN (2026-11-04, ohne GPS seit 2026-11-05)
+> Umgesetzt in V1.3b0.6 (2026-11-11); wie genau: design.md *Entwurf 7.29* Z.8.
+
 **Anlass:** Am 2026-11-04 klingelte *Training* (19:30, Ankunft zuhause, sonst entfällt)
 um 07:12, weil der Geofence morgens eine Ankunft meldete. Eine früheste Uhrzeit gibt es
 bisher nicht (T2b). Abends klingelte der auf 20:30 verschobene Termin auf dem Heimweg:
@@ -1169,6 +1171,7 @@ Neueste zuerst. Kap. 7 enthält immer den gültigen Stand; diese Tabelle ist die
 
 | Datum | Entscheidung |
 |---|---|
+| 2026-11-11 | Entwurf 7.29 Z.7 bestätigt und in V1.3b0.6 umgesetzt (design.md *Entwurf 7.29*, Z.8). Bei der Umsetzung festgelegt: F2 gilt, wenn die erste Prüfung im Zeitraum (bis 5 min nach Beginn) einen schon da findet; Prüfungen im Raster Beginn + k·Prüfabstand, die späteste Uhrzeit prüft der Alarm des Termins selbst; der Puffer gilt auch für verschobene Termine (`awaitsArrival`), nicht für *Wenn ich ankomme*; Vorlauf 0 = genau das alte Verhalten (kein Puffer, keine Prüfungen); WLAN-Namen und BSSIDs bleiben auf dem Handy (nicht im Diagnose-Log, nicht in der Claude-Schnittstelle, im Testdaten-Export ersetzt); die WLAN-Sonde ist entfernt. Einstellungen *Orte*: Zuhause und ein weiterer Ort, *Hier festlegen* übernimmt Standort und verbundenes WLAN |
 | 2026-11-09 | Nach Review-Lauf 10 (Backend-Repo `.review/runs/2026-11-09.md`, Fragen 1–3): (1) *Cloud-Daten löschen* sperrt **alle Geräte** des Kontos, nicht nur dieses (Ablauf in `protokoll`, R-3 in [wiederherstellen-entwurf.md](wiederherstellen-entwurf.md)). (2) Lehnt der Server die Sitzung ab (`AnmeldungAbgelehnt`), benachrichtigt die App sofort „Bitte neu anmelden“; der 3-Tage-Hinweis (A-13) hängt am gemerkten Konto statt an der Sitzung; ohne Sitzung heißt der Löschknopf „Nur dieses Handy zurücksetzen“, mit dem Hinweis, dass auf dem Server nichts gelöscht wird. (3) Nach einem lokalen Wiederherstellen (Tageskopie, *Rückgängig*) gilt W-7: automatisch wird erst nach einem Sichern von Hand wieder gesichert |
 | 2026-11-09 | Nach Review-Lauf 9 (Backend Kap. 11): Der Server prüft beim ersten Schlüssel-Backup zuerst die Version und schaltet ein angenommenes Gerät frei; die Einrichtung verwirft ein abgelehntes offenes Backup; die Testattrappe der App bildet die Regel nach. Dazu der Knopf „Mit Wiederherstellungsschlüssel freischalten“. Der Worker wertet eine unbeantwortete Rückfrage „übernehmen?“ wie „nein“ (A-10) |
 | 2026-11-09 | Versionsname je auf dem Handy installiertem Stand: `1.3b0.<n>-backup<Schritt>`, `versionCode` +1 bei jeder Installation (ab `1.3b0.5-backup5`, Code 15). So zeigen Einstellungen und Diagnose-Log, welcher Stand läuft |
@@ -1288,6 +1291,8 @@ Neueste zuerst. Kap. 7 enthält immer den gültigen Stand; diese Tabelle ist die
 | V1.3b0.2 | 2026-11-05 | Termin merkt sich, ob er geklungen hat; Speichern beim Schlummern verschiebt nicht mehr auf morgen; verschobenes Training wartet auf die Ankunft (7.29 OZ5); Ortsprüfung vor der Transaktion (Kap. 9, 2026-11-05) |
 | V1.3b0.3 | 2026-11-05 | WLAN-Sonde im Debug-Build als Gerätetest für 7.29 |
 | V1.3b0.4 | 2026-11-07 | Erledigung zurücknehmen (7.31), vorab verschieben und auslassen (7.32) |
+| V1.3b0.5 | 2026-11-11 | Cloud-Backup Schritte 1–5 in `develop`, Fixes aus Review-Lauf 10 |
+| V1.3b0.6 | 2026-11-11 | Ankunft im Zeitraum mit WLAN (7.29), weiterer Ort, Geofences nach `GEOFENCE_NOT_AVAILABLE` neu registriert |
 
 Details zum Verhalten: [design.md](design.md), Gerätetests: [geraetetest.md](geraetetest.md).
 
@@ -1313,9 +1318,8 @@ Details zum Verhalten: [design.md](design.md), Gerätetests: [geraetetest.md](ge
    - **Jetzt (seit 2026-11-02): Nutzung beobachten und trimmen** (7.27): welche
      Funktionen Kevin wirklich nutzt, Rückfragen bei Schlupflöchern, Hinweis bei
      wiederholtem *Später*. Fehler aus dem Alltag als Fix auf `develop`.
-   - **Als Nächstes (2026-11-04): Ankunft im Zeitraum** mit WLAN (7.29); F1–F3 und
-     OZ9 entschieden, Entwurf in design.md (Abschnitt *Entwurf 7.29*). Kevin hat die
-     Anforderungen am 2026-11-05 gelesen; vor V1.3b. GPS (7.30) später.
+   - ✅ **Ankunft im Zeitraum** mit WLAN (7.29), umgesetzt in V1.3b0.6 (2026-11-11);
+     GPS (7.30) später.
    - **V1.3:** **Durchführung mit Timer** und Nachfrage-Muster (7.11), ein Vollbild
      zur Zeit (7.3), Knöpfe je Art (7.4), **Abläufe**
      für Training (7.12), **Galaxy Watch** über Benachrichtigungen (7.14),

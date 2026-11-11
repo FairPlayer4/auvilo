@@ -1,5 +1,8 @@
 package com.avlreminder.ui
 
+import java.time.Duration
+import com.avlreminder.core.model.Occurrence
+import com.avlreminder.core.model.Place
 import com.avlreminder.core.model.Reminder
 import com.avlreminder.core.model.Resolution
 import com.avlreminder.core.model.Schedule
@@ -81,13 +84,31 @@ object Format {
         }
     }
 
-    /** Schedule plus the arrival trigger, e.g. "täglich 19:00 · bei Ankunft zuhause". */
-    fun plan(r: Reminder): String {
-        val arrival = r.arrival
-        return when {
-            arrival == null || r.schedule == Schedule.OnArrival -> schedule(r.schedule)
-            arrival.whenAway == WhenAway.RING -> "${schedule(r.schedule)} · bei Ankunft zuhause, sonst klingeln"
-            else -> "${schedule(r.schedule)} · bei Ankunft zuhause, sonst entfällt"
-        }
+    /** "zuhause" for the first place or an unknown one, otherwise "am Ort „Arbeit“". */
+    fun at(placeId: Long, places: List<Place>): String {
+        val place = places.firstOrNull { it.id == placeId }
+        return if (place == null || place.id == places.first().id) "zuhause" else "am Ort „${place.name}“"
+    }
+
+    /** Schedule plus the arrival trigger, e.g. "täglich 19:00 · ab 90 min vorher bei Ankunft zuhause, sonst klingeln". */
+    fun plan(r: Reminder, places: List<Place> = emptyList()): String {
+        val arrival = r.arrival ?: return schedule(r.schedule)
+        val at = at(arrival.placeId, places)
+        if (r.schedule == Schedule.OnArrival) return "wenn ich $at bin"
+        val window = if (arrival.hasWindow) "ab ${arrival.leadMinutes} min vorher " else ""
+        val away = if (arrival.whenAway == WhenAway.RING) "sonst klingeln" else "sonst entfällt"
+        return "${schedule(r.schedule)} · ${window}bei Ankunft $at, $away"
+    }
+
+    /**
+     * For *Heute* (Anf. 7.29 Z.5): "ab 18:00 bei Ankunft zuhause, sonst 19:30", or "angekommen –
+     * klingelt 18:35"; null without an arrival window.
+     */
+    fun arrival(r: Reminder, o: Occurrence, zone: ZoneId, places: List<Place>): String? {
+        val arrival = r.arrival?.takeIf { it.hasWindow && r.schedule != Schedule.OnArrival } ?: return null
+        if (o.arrivedAt != null) return "angekommen – klingelt ${time(o.currentAt, zone)}"
+        if (o.awaitsArrival) return null
+        val from = o.currentAt.minus(Duration.ofMinutes(arrival.leadMinutes.toLong()))
+        return "ab ${time(from, zone)} bei Ankunft ${at(arrival.placeId, places)}, sonst ${time(o.currentAt, zone)}"
     }
 }

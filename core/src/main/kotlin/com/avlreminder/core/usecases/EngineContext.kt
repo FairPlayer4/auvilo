@@ -4,7 +4,10 @@ import com.avlreminder.core.model.Place
 import com.avlreminder.core.ports.AlarmKind
 import com.avlreminder.core.ports.AlarmPort
 import com.avlreminder.core.ports.DeviceStatePort
+import com.avlreminder.core.ports.DiagPort
 import com.avlreminder.core.ports.GeofencePort
+import com.avlreminder.core.ports.PlaceAlarmPort
+import com.avlreminder.core.ports.PlaceCheck
 import com.avlreminder.core.ports.PreNoticePort
 import com.avlreminder.core.ports.ReminderRepository
 import com.avlreminder.core.rules.AlertSettings
@@ -21,6 +24,8 @@ internal class EngineContext(
     val settings: () -> AlertSettings,
     val geofences: GeofencePort,
     preNotices: PreNoticePort,
+    placeAlarms: PlaceAlarmPort,
+    private val diag: DiagPort,
 ) {
     val zone: ZoneId get() = clock.zone
     fun now(): Instant = clock.instant()
@@ -46,15 +51,24 @@ internal class EngineContext(
         override fun cancel(occurrenceId: Long) = effect { preNotices.cancel(occurrenceId) }
     }
 
+    val placeAlarms: PlaceAlarmPort = object : PlaceAlarmPort {
+        override fun set(placeId: Long, at: Instant) = effect { placeAlarms.set(placeId, at) }
+        override fun cancel(placeId: Long) = effect { placeAlarms.cancel(placeId) }
+    }
+
+    /** Written once the command is stored, so a command run again does not log twice. */
+    fun log(message: String) = effect { diag.log(message) }
+
     /**
      * Positions found before the running command (E6): a command never waits for a position
      * inside its transaction. One it does not have yet ends the try with [PositionNeeded]; the
      * engine finds it outside and runs the command again. One check per place and command.
      */
-    val positions = mutableMapOf<Long, Boolean?>()
+    val positions = mutableMapOf<Pair<Long, Boolean>, PlaceCheck>()
 
-    fun isAt(place: Place): Boolean? =
-        if (place.id in positions) positions[place.id] else throw PositionNeeded(place)
+    /** [fallback]: may fall back to a coarse position when the WLAN is unclear (only at the latest time). */
+    fun check(place: Place, fallback: Boolean): PlaceCheck =
+        positions[place.id to fallback] ?: throw PositionNeeded(place, fallback)
 
     fun begin() {
         buffering = true
@@ -78,6 +92,6 @@ internal class EngineContext(
 }
 
 /** A command needs the position at [place]; thrown inside the transaction, so it rolls back. */
-internal class PositionNeeded(val place: Place) : RuntimeException("position needed for place ${place.id}") {
+internal class PositionNeeded(val place: Place, val fallback: Boolean) : RuntimeException("position needed for place ${place.id}") {
     override fun fillInStackTrace(): Throwable = this
 }

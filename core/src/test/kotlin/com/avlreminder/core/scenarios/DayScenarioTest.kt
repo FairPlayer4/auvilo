@@ -44,10 +44,11 @@ class DayScenarioTest {
         val (home, id) = training()
         sim.leave(at(26, 7, 45))
         sim.arrive(home, at(26, 18, 30))
-        sim.act(id, at(26, 18, 45)) { Action.Complete(minimumOnly = false) }
+        sim.act(id, at(26, 18, 50)) { Action.Complete(minimumOnly = false) }
         sim.runUntil(at(27, 6))
 
-        assertEquals(listOf("Mo 18:30 Training FULLSCREEN", "Mo 18:40 Training FULLSCREEN"), ringsOf("Training"))
+        // In the window (17:30–19:00): rings after the buffer of 5 min, then every 10 min.
+        assertEquals(listOf("Mo 18:35 Training FULLSCREEN", "Mo 18:45 Training FULLSCREEN"), ringsOf("Training"))
         assertEquals(at(27, 19), sim.open(id).dueAt)
     }
 
@@ -80,27 +81,31 @@ class DayScenarioTest {
     }
 
     /**
-     * Today's rule (Anf. 5.1, T2b): an arrival before the time makes it due at once, there is no
-     * earliest time. A geofence that reports home in the morning thus rings the evening training
-     * in the morning. Kevin's case of 2026-11-03 may be this; open until his scenario is known.
+     * Until 7.29 an arrival before the time made it due at once: the geofence reported home in
+     * the morning of 2026-11-04 and the evening training rang at 07:12. Now it does not count
+     * before the window, only the diagnostic log notes it (OZ1).
      */
     @Test
-    fun `an arrival in the morning rings the evening training at once (open point)`() = runTest {
+    fun `an arrival in the morning does not count, the training waits for its window`() = runTest {
         val (home, _) = training()
         sim.arrive(home, at(26, 7, 10))
-        assertEquals(listOf("Mo 07:10 Training FULLSCREEN"), sim.rings)
+        assertEquals(emptyList<String>(), sim.rings)
+        assertTrue(sim.diag.any { "too early" in it }, sim.diag.toString())
+        // At home at its time it rings then, as always.
+        sim.runUntil(at(26, 19, 5))
+        assertEquals(listOf("Mo 19:00 Training FULLSCREEN"), sim.rings)
     }
 
     @Test
     fun `a second arrival the same day does not ring again once done`() = runTest {
         val (home, id) = training()
         sim.leave(at(26, 7, 45))
-        sim.arrive(home, at(26, 17))
-        sim.act(id, at(26, 17, 5)) { Action.Complete(minimumOnly = false) }
-        sim.leave(at(26, 17, 30))
+        sim.arrive(home, at(26, 17, 40))
+        sim.act(id, at(26, 17, 50)) { Action.Complete(minimumOnly = false) }
+        sim.leave(at(26, 18))
         sim.arrive(home, at(26, 18, 30))
         sim.runUntil(at(26, 23, 30))
-        assertEquals(listOf("Mo 17:00 Training FULLSCREEN"), ringsOf("Training"))
+        assertEquals(listOf("Mo 17:45 Training FULLSCREEN"), ringsOf("Training"))
     }
 
     // --- Postponed with an arrival: the decision is made (7.29 OZ5, Review B2) ---------------
@@ -121,7 +126,9 @@ class DayScenarioTest {
         sim.runUntil(at(26, 20, 35))
         assertTrue(sim.open(id).awaitsArrival)
         sim.arrive(home, at(26, 21, 10))
-        assertEquals(listOf("Mo 19:00 Training FULLSCREEN", "Mo 21:10 Training FULLSCREEN"), ringsOf("Training"))
+        sim.runUntil(at(26, 21, 20))
+        // After the buffer (7.29 OZ4).
+        assertEquals(listOf("Mo 19:00 Training FULLSCREEN", "Mo 21:15 Training FULLSCREEN"), ringsOf("Training"))
     }
 
     @Test
@@ -159,7 +166,9 @@ class DayScenarioTest {
         sim.phoneOff(until = at(26, 21))
         assertTrue(sim.open(id).awaitsArrival)
         sim.arrive(home, at(26, 21, 10))
-        assertEquals(listOf("Mo 19:00 Training FULLSCREEN", "Mo 21:10 Training FULLSCREEN"), ringsOf("Training"))
+        sim.runUntil(at(26, 21, 20))
+        // After the buffer (7.29 OZ4).
+        assertEquals(listOf("Mo 19:00 Training FULLSCREEN", "Mo 21:15 Training FULLSCREEN"), ringsOf("Training"))
     }
 
     // --- An ordinary daily reminder -----------------------------------------------------------

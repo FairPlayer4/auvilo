@@ -1,5 +1,7 @@
 package com.avlreminder.ui.screens
 
+import com.avlreminder.core.model.Arrival
+import com.avlreminder.core.model.Place
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.ExperimentalLayoutApi
@@ -95,6 +97,8 @@ fun EditScreen(
     /** Archive (true) or restore (false); null for a new reminder. */
     onArchive: ((Boolean) -> Unit)? = null,
     archived: Boolean = false,
+    /** The places to choose from for the arrival; the first is "Zuhause". */
+    places: List<Place> = emptyList(),
     /** Opens the statistics; null for a new reminder. */
     onStats: (() -> Unit)? = null,
     /** "Als Vorlage speichern" with the name. */
@@ -141,13 +145,13 @@ fun EditScreen(
             Choice(
                 listOf(
                     ScheduleKind.ONCE to "Einmalig", ScheduleKind.DAILY to "Täglich", ScheduleKind.WEEKDAYS to "Wochentage",
-                    ScheduleKind.AFTER_DONE to "Nach Erledigung", ScheduleKind.ON_ARRIVAL to "Wenn ich zuhause bin",
+                    ScheduleKind.AFTER_DONE to "Nach Erledigung", ScheduleKind.ON_ARRIVAL to "Wenn ich ankomme",
                     ScheduleKind.DEADLINE to "Frist",
                 ),
                 form.kind,
             ) { form = form.copy(kind = it) }
             ScheduleDetail(form) { form = it }
-            PlaceSection(form) { form = it }
+            PlaceSection(form, places) { form = it }
 
             SectionTitle("Wie streng?")
             Choice(
@@ -206,6 +210,7 @@ fun EditScreen(
                 }
                 Text("Später-Knöpfe im Alarm", Modifier.padding(top = 12.dp), color = c.text, fontSize = 14.sp)
                 SnoozeChoice(form.snoozeMinutes) { form = form.copy(snoozeMinutes = it) }
+                ArrivalFine(form) { form = it }
             }
 
             if (onSaveTemplate != null && form.prepFor == null) {
@@ -372,23 +377,52 @@ private fun <T> Choice(options: List<Pair<T, String>>, selected: T, color: @Comp
     }
 }
 
-/** Arrival at home as an earlier trigger; the time stays the fallback. */
+/**
+ * Arrival at a place in a window before the time (Anf. 7.29): the time is the latest one, the
+ * lead says from when an arrival counts. Buffer and check interval are under *Feineinstellungen*.
+ */
 @Composable
-private fun PlaceSection(form: ReminderForm, onChange: (ReminderForm) -> Unit) {
+private fun PlaceSection(form: ReminderForm, places: List<Place>, onChange: (ReminderForm) -> Unit) {
     val c = Avl.colors
     if (!form.placePossible) return
+    val arriving = form.atHome || form.kind == ScheduleKind.ON_ARRIVAL
     if (form.kind != ScheduleKind.ON_ARRIVAL) {
-        Choice(listOf(false to "Nur Uhrzeit", true to "Bei Ankunft zuhause"), form.atHome) {
+        Choice(listOf(false to "Nur Uhrzeit", true to "Bei Ankunft"), form.atHome) {
             onChange(form.copy(atHome = it))
         }
-        if (form.atHome) {
-            Text("Bist du vor der Uhrzeit zuhause, klingelt es dann. Um ${Format.time(form.time)} noch nicht zuhause:", Modifier.padding(top = 6.dp), color = c.muted, fontSize = 13.sp)
-            Choice(listOf(WhenAway.DROP to "entfällt", WhenAway.RING to "trotzdem klingeln"), form.whenAway) { onChange(form.copy(whenAway = it)) }
+    }
+    if (arriving && places.size > 1) {
+        Choice(places.map { it.id to it.name }, form.placeId) { onChange(form.copy(placeId = it)) }
+    }
+    if (form.atHome && form.kind != ScheduleKind.ON_ARRIVAL) {
+        val latest = Format.time(form.time)
+        Text("Spätestens um $latest. Ankunft zählt ab", Modifier.padding(top = 6.dp), color = c.text, fontSize = 14.sp)
+        NumberChoice(listOf(30, 60, 90, 120), form.lead, 0..Arrival.MAX_LEAD, "Ankunft zählt ab … vorher", "min vorher") {
+            onChange(form.copy(lead = it))
         }
+        val how = if (form.lead == 0) {
+            "Ohne Zeitraum: Kommst du vor $latest an, klingelt es sofort."
+        } else {
+            "Ab ${Format.time(form.time.minusMinutes(form.lead.toLong()))}: Kommst du an, klingelt es ${form.buffer} min später. " +
+                "Bist du da schon da, um $latest."
+        }
+        Text("$how Um $latest nicht da:", Modifier.padding(top = 6.dp), color = c.muted, fontSize = 13.sp)
+        Choice(listOf(WhenAway.DROP to "entfällt", WhenAway.RING to "trotzdem klingeln"), form.whenAway) { onChange(form.copy(whenAway = it)) }
     }
-    if ((form.atHome || form.kind == ScheduleKind.ON_ARRIVAL) && form.homeId == null) {
-        Text("Zuhause ist noch nicht festgelegt – in den Einstellungen.", Modifier.padding(top = 6.dp), color = c.strict, fontSize = 13.sp)
+    if (arriving && form.placeId == null) {
+        Text("Ort ist noch nicht festgelegt – in den Einstellungen unter „Orte“.", Modifier.padding(top = 6.dp), color = c.strict, fontSize = 13.sp)
     }
+}
+
+/** Buffer and check interval of the arrival window, under *Feineinstellungen*. */
+@Composable
+private fun ArrivalFine(form: ReminderForm, onChange: (ReminderForm) -> Unit) {
+    val c = Avl.colors
+    if (!form.hasWindow) return
+    Text("Puffer nach der Ankunft", Modifier.padding(top = 12.dp), color = c.text, fontSize = 14.sp)
+    NumberChoice(listOf(0, 5, 10, 15), form.buffer, 0..Arrival.MAX_BUFFER, "Puffer nach der Ankunft", "min") { onChange(form.copy(buffer = it)) }
+    Text("Prüfen im Zeitraum alle", Modifier.padding(top = 12.dp), color = c.text, fontSize = 14.sp)
+    NumberChoice(listOf(15, 20, 30), form.check, Arrival.MIN_CHECK..Arrival.MAX_CHECK, "Prüfen im Zeitraum alle", "min") { onChange(form.copy(check = it)) }
 }
 
 /** The further times of a day (VS1): change, remove, add up to [Validation.MAX_TIMES] in all. */
@@ -559,6 +593,7 @@ private fun fineSummary(form: ReminderForm) = listOfNotNull(
     "Verschieben " + (form.postponeLimit?.let { "$it×" } ?: "unbegrenzt"),
     "Später " + form.snoozeMinutes.joinToString(" / ") { "+$it" },
     "auch bei Nicht stören".takeIf { form.ignoreDnd },
+    "Ankunft +${form.buffer} min, prüfen alle ${form.check} min".takeIf { form.hasWindow },
 ).joinToString(" · ")
 
 @OptIn(ExperimentalMaterial3Api::class, ExperimentalLayoutApi::class)

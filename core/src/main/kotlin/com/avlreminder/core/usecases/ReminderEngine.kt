@@ -9,8 +9,12 @@ import com.avlreminder.core.model.PrepAnswer
 import com.avlreminder.core.model.Reminder
 import com.avlreminder.core.ports.AlarmPort
 import com.avlreminder.core.ports.DeviceStatePort
+import com.avlreminder.core.ports.DiagPort
 import com.avlreminder.core.ports.GeofencePort
 import com.avlreminder.core.ports.LocationPort
+import com.avlreminder.core.ports.PlaceAlarmPort
+import com.avlreminder.core.ports.PlaceCheck
+import com.avlreminder.core.ports.PlaceResult
 import com.avlreminder.core.ports.PreNoticePort
 import com.avlreminder.core.ports.ReminderRepository
 import com.avlreminder.core.rules.Action
@@ -46,11 +50,13 @@ class ReminderEngine(
     device: DeviceStatePort = DeviceStatePort { false },
     settings: () -> AlertSettings = { AlertSettings() },
     geofences: GeofencePort = GeofencePort {},
-    private val location: LocationPort = LocationPort { null },
+    private val location: LocationPort = LocationPort { _, _ -> PlaceCheck(PlaceResult.UNKNOWN, null) },
     preNotices: PreNoticePort = PreNoticePort.NONE,
     private val ringer: RingPort = RingPort {},
+    placeAlarms: PlaceAlarmPort = PlaceAlarmPort.NONE,
+    diag: DiagPort = DiagPort {},
 ) {
-    private val c = EngineContext(repo, alarms, clock, device, settings, geofences, preNotices)
+    private val c = EngineContext(repo, alarms, clock, device, settings, geofences, preNotices, placeAlarms, diag)
     private val views = AlarmViews(c)
     private val scheduler = Scheduler(c, views)
     private val changes = Changes(c, views, scheduler)
@@ -69,11 +75,12 @@ class ReminderEngine(
             depth++
             c.begin()
             val result = try {
-                repo.transaction { block() }
+                // The checks of the places follow from what the command left (7.29 Z.3).
+                repo.transaction { block().also { scheduler.planChecks() } }
             } catch (e: PositionNeeded) {
                 c.rollback()
                 depth--
-                c.positions[e.place.id] = location.isAt(e.place)
+                c.positions[e.place.id to e.fallback] = location.check(e.place, e.fallback)
                 continue
             } catch (e: Throwable) {
                 c.rollback()
@@ -112,10 +119,19 @@ class ReminderEngine(
     suspend fun savePlace(place: Place): Long = command { changes.savePlace(place) }
 
     /**
-     * Arrived at [placeId] (geofence after the dwell time): today's occurrences of its reminders
-     * ring now. Snoozed or postponed ones keep their time.
+     * Arrived at [placeId] (geofence after the dwell time): an occurrence in its window rings after
+     * the buffer, one waiting for the arrival too (7.29); before the window it does not count.
+     * Without a window today's occurrences ring now. Snoozed or postponed ones keep their time.
      */
     suspend fun onArrival(placeId: Long): List<Ring> = command { scheduler.onArrival(placeId) }
+
+    /** Connected to the WLAN [bssid] (Android reports it): an arrival at each place it belongs to (OZ3). */
+    suspend fun onWifi(bssid: String): List<Ring> = command {
+        repo.places().filter { it.hasWifi(bssid) }.flatMap { scheduler.onArrival(it.id) }
+    }
+
+    /** The check alarm of [placeId] fired: one check for all occurrences that wait there (OZ2). */
+    suspend fun onPlaceCheck(placeId: Long): List<Ring> = command { scheduler.onPlaceCheck(placeId) }
 
     /**
      * Checks the position for reminders that only wait for an arrival: after a reboot or a new

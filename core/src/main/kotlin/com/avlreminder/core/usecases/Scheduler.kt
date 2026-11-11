@@ -11,7 +11,10 @@ import com.avlreminder.core.model.Strictness
 import com.avlreminder.core.model.WhenAway
 import com.avlreminder.core.model.severalADay
 import com.avlreminder.core.ports.AlarmKind
+import com.avlreminder.core.ports.PlaceResult
 import com.avlreminder.core.rules.Action
+import com.avlreminder.core.rules.ArrivalDecision
+import com.avlreminder.core.rules.ArrivalWindow
 import com.avlreminder.core.rules.Deadlines
 import com.avlreminder.core.rules.Escalation
 import com.avlreminder.core.rules.Lifecycle
@@ -80,19 +83,23 @@ internal class Scheduler(private val c: EngineContext, private val views: AlarmV
         return rings
     }
 
-    suspend fun onArrival(placeId: Long): List<Ring> {
+    /** Arrived at [placeId], reported by the geofence or the WLAN connection. */
+    suspend fun onArrival(placeId: Long): List<Ring> =
+        waitingAt(placeId).mapNotNull { (r, o) -> arrived(r, o, byCheck = false) }
+
+    /**
+     * The check alarm of [placeId] (7.29 OZ2): one check for all occurrences in their window or
+     * waiting for the arrival there, from the WLAN alone. Only "there" changes anything.
+     */
+    suspend fun onPlaceCheck(placeId: Long): List<Ring> {
+        val place = repo.places().firstOrNull { it.id == placeId } ?: return emptyList()
         val now = now()
-        val today = now.atZone(zone).toLocalDate()
-        return repo.reminders().filter { it.active && it.arrival?.placeId == placeId }.mapNotNull { r ->
-            val o = repo.openOccurrence(r.id) ?: return@mapNotNull null
-            // Waits for it: only on arrival, today's not yet rung, or snoozed/postponed and away at its time.
-            // Snoozed or postponed ones before their new time keep it.
-            val waiting = o.state == OccurrenceState.PLANNED && (
-                r.schedule == Schedule.OnArrival || o.awaitsArrival ||
-                    (!o.rangOrMoved && o.currentAt > now && o.currentAt.atZone(zone).toLocalDate() == today)
-                )
-            if (waiting) arrive(r, o) else null
-        }
+        val waiting = waitingAt(placeId).filter { (r, o) -> ArrivalWindow.waits(r, o, now, views.missedAt(r, o)) }
+        if (waiting.isEmpty()) return emptyList()
+        val check = c.check(place, fallback = false)
+        c.log("place check place=$placeId ${ArrivalWindow.describe(check)} for ${waiting.joinToString { "r${it.first.id}" }}")
+        if (check.result != PlaceResult.AT) return emptyList()
+        return waiting.mapNotNull { (r, o) -> arrived(r, o, byCheck = true) }
     }
 
     suspend fun checkPlaces(): List<Ring> {
@@ -102,7 +109,57 @@ internal class Scheduler(private val c: EngineContext, private val views: AlarmV
             val o = repo.openOccurrence(r.id)
                 ?.takeIf { it.state == OccurrenceState.PLANNED && (r.schedule == Schedule.OnArrival || it.awaitsArrival) }
                 ?: return@mapNotNull null
-            if (c.isAt(place) == true) arrive(r, o) else null
+            if (c.check(place, fallback = true).result == PlaceResult.AT) arrived(r, o, byCheck = true) else null
+        }
+    }
+
+    /** Active reminders with an arrival at [placeId] and their open occurrence. */
+    private suspend fun waitingAt(placeId: Long): List<Pair<Reminder, Occurrence>> =
+        repo.reminders().filter { it.active && it.arrival?.placeId == placeId }
+            .mapNotNull { r -> repo.openOccurrence(r.id)?.let { r to it } }
+
+    /** What the arrival means (see [ArrivalWindow.decide]); rings what is due right away. */
+    private suspend fun arrived(reminder: Reminder, occurrence: Occurrence, byCheck: Boolean): Ring? {
+        val now = now()
+        return when (val d = ArrivalWindow.decide(reminder, occurrence, now, zone, byCheck)) {
+            ArrivalDecision.Ignore -> null
+            is ArrivalDecision.TooEarly -> {
+                c.log("arrival r${reminder.id}: too early, window from ${local(d.windowStart)}")
+                null
+            }
+            ArrivalDecision.Now -> arrive(reminder, occurrence)
+            is ArrivalDecision.At -> {
+                val arrived = apply(reminder, occurrence, Action.Arrived(d.at))
+                c.log("arrival r${reminder.id}: rings at ${local(d.at)}" + if (byCheck) " (check)" else "")
+                if (d.at <= now) {
+                    fire(reminder, arrived)
+                } else {
+                    plan(reminder, arrived)
+                    null
+                }
+            }
+        }
+    }
+
+    private fun local(at: Instant) = at.atZone(zone).toLocalTime().withNano(0)
+
+    /**
+     * The next check of each place (7.29 Z.3): the earliest of all occurrences waiting there, so
+     * the shortest check interval wins. Runs at the end of every command.
+     */
+    suspend fun planChecks() {
+        val now = now()
+        val next = mutableMapOf<Long, Instant>()
+        for (r in repo.reminders()) {
+            val placeId = r.arrival?.placeId ?: continue
+            if (!r.active) continue
+            val o = repo.openOccurrence(r.id) ?: continue
+            val at = ArrivalWindow.nextCheck(r, o, now, views.missedAt(r, o)) ?: continue
+            next.merge(placeId, at, ::minOf)
+        }
+        for (place in repo.places()) {
+            val at = next[place.id]
+            if (at != null) c.placeAlarms.set(place.id, at) else c.placeAlarms.cancel(place.id)
         }
     }
 
@@ -111,7 +168,7 @@ internal class Scheduler(private val c: EngineContext, private val views: AlarmV
         if (!reminder.active || reminder.schedule != Schedule.OnArrival) return null
         val place = repo.places().firstOrNull { it.id == reminder.arrival?.placeId } ?: return null
         val o = repo.openOccurrence(reminder.id)?.takeIf { it.state == OccurrenceState.PLANNED } ?: return null
-        return if (c.isAt(place) == true) arrive(reminder, o) else null
+        return if (c.check(place, fallback = true).result == PlaceResult.AT) arrive(reminder, o) else null
     }
 
     suspend fun syncReminder(reminder: Reminder): Ring? {
@@ -158,20 +215,22 @@ internal class Scheduler(private val c: EngineContext, private val views: AlarmV
      * The planned time is reached. With "sonst entfällt" the position decides: not at the place
      * drops the occurrence; an unknown position rings, so nothing is lost. Snoozed or postponed it
      * rang already and the decision is made (7.29 OZ5): only "there" rings, away or unknown waits
-     * for the arrival until the end of the day.
+     * for the arrival until the end of the day. After an arrival it rings wherever one is now (OZ4).
      */
     private suspend fun fire(reminder: Reminder, occurrence: Occurrence): Ring? {
         val arrival = reminder.arrival
         // A rescue reminder rings wherever one is.
-        if (arrival?.whenAway == WhenAway.DROP && !views.isRescue(reminder, occurrence)) {
+        if (arrival?.whenAway == WhenAway.DROP && occurrence.arrivedAt == null && !views.isRescue(reminder, occurrence)) {
             val place = repo.places().firstOrNull { it.id == arrival.placeId }
             if (place != null) {
-                val here = c.isAt(place)
-                if (occurrence.rangOrMoved && here != true) {
+                val check = c.check(place, fallback = true)
+                c.log("place check place=${place.id} ${ArrivalWindow.describe(check)} at the time of r${reminder.id}")
+                val here = check.result
+                if (occurrence.rangOrMoved && here != PlaceResult.AT) {
                     awaitArrival(reminder, apply(reminder, occurrence, Action.AwaitArrival))
                     return null
                 }
-                if (!occurrence.rangOrMoved && here == false) {
+                if (!occurrence.rangOrMoved && here == PlaceResult.AWAY) {
                     close(reminder, occurrence, Action.Drop)
                     createNext(reminder)?.let { plan(reminder, it) }
                     return null

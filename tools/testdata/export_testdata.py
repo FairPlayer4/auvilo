@@ -10,10 +10,12 @@ What it does:
 - writes all tables as JSON rows with the schema version, so a test can load them into the
   schema of that version and migrate them (app: RealDataTest);
 - replaces every free text (titles, why, goal, minimum, checklist items, notes, proof texts,
-  "Startklar" answers, blockers, template names, place names) with filler of the same length.
+  "Startklar" answers, blockers, template names, place names, WLAN names) with filler of the
+  same length.
   Fixed words with a meaning in the app ("Ja, sofort", skip reasons, resolutions) stay;
 - drops media (photo and audio paths, motivation audio), the suggestions (Anf. 7.24) and the
-  coordinates of places (moved to a made-up spot);
+  coordinates of places (moved to a made-up spot) and the BSSIDs of their WLANs (made-up
+  ones, Anf. 7.29: WLAN names and BSSIDs are private);
 - at the end checks that no original free text of 4 or more characters is left in the output.
 
 Times, schedules, states and counts stay as they are: they are what makes the data realistic.
@@ -48,6 +50,7 @@ FREE = {
     "blocker": {"text": "Blocker"},
     "template": {"name": "Vorlage", "minimum": "Minimum"},
     "place": {"name": "Ort"},
+    "place_wifi": {"ssid": "WLAN"},
 }
 MEDIA = {"reminder": ["motivationAudio"], "proof": ["filePath"]}
 DROP_TABLES = {"suggestion", "room_master_table", "android_metadata", "sqlite_sequence"}
@@ -120,6 +123,10 @@ def export(db_path):
             if table == "place":
                 r["lat"] = round(52.52 + 0.01 * r["id"], 4)
                 r["lon"] = 13.405
+            if table == "place_wifi":
+                originals.add(r["bssid"])
+                # Locally administered, so never a real access point; unique per row.
+                r["bssid"] = f"02:00:00:00:{r['id'] // 256 % 256:02x}:{r['id'] % 256:02x}"
             rows.append(r)
         out[table] = rows
     con.close()

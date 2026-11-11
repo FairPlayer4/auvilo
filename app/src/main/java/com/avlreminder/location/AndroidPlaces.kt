@@ -11,11 +11,11 @@ import android.location.Location
 import android.util.Log
 import com.avlreminder.core.model.Place
 import com.avlreminder.core.ports.GeofencePort
-import com.avlreminder.core.ports.LocationPort
 import com.avlreminder.AppGraph
 import com.avlreminder.graph
 import com.avlreminder.system.Diag
 import com.google.android.gms.location.Geofence
+import com.google.android.gms.location.GeofenceStatusCodes
 import com.google.android.gms.location.GeofencingEvent
 import com.google.android.gms.location.GeofencingRequest
 import com.google.android.gms.location.LocationServices
@@ -39,12 +39,10 @@ fun Context.hasBackgroundLocation() =
  * No initial trigger; being home already is covered by [AndroidLocation] where it matters.
  */
 class AndroidGeofences(private val context: Context, private val dwellMinutes: () -> Int) : GeofencePort {
-    /** What is registered in this process; geofences are gone after a reboot, and so is this. */
-    @Volatile private var registered: Pair<List<Place>, Int>? = null
-
     @SuppressLint("MissingPermission") // checked right before
     override fun watch(places: List<Place>) {
-        val wanted = places.sortedBy { it.id } to dwellMinutes()
+        // Only the circles count; a new WLAN of a place needs no new geofence.
+        val wanted = places.map { it.copy(wifis = emptyList()) }.sortedBy { it.id } to dwellMinutes()
         if (wanted == registered) return
         val client = LocationServices.getGeofencingClient(context)
         client.removeGeofences(pending(context))
@@ -77,6 +75,22 @@ class AndroidGeofences(private val context: Context, private val dwellMinutes: (
             }
     }
 
+    companion object {
+        /**
+         * What is registered in this process; geofences are gone after a reboot, and so is this.
+         * Process-wide, so the receiver can [forget] it.
+         */
+        @Volatile private var registered: Pair<List<Place>, Int>? = null
+
+        /**
+         * Android dropped the geofences (GEOFENCE_NOT_AVAILABLE, e.g. location switched off):
+         * the next sync registers them again (design.md 6., Anf. 7.29 Z.4).
+         */
+        fun forget() {
+            registered = null
+        }
+    }
+
     private fun pending(context: Context): PendingIntent = PendingIntent.getBroadcast(
         context, 0, Intent(context, GeofenceReceiver::class.java),
         // Play services fills in the event, so the intent must be mutable.
@@ -85,11 +99,12 @@ class AndroidGeofences(private val context: Context, private val dwellMinutes: (
 }
 
 /**
- * "Am I there right now?" from one fresh position. Clearly inside → true, clearly outside → false;
- * no permission, no fix in time or a fix too inaccurate to tell → null (unknown).
+ * "Am I there right now?" from one fresh coarse position, the fallback at the latest time when the
+ * WLAN is unclear (7.29 OZ2). Clearly inside → true, clearly outside → false; no permission, no
+ * fix in time or a fix too inaccurate to tell → null (unknown).
  */
-class AndroidLocation(private val context: Context) : LocationPort {
-    override suspend fun isAt(place: Place): Boolean? {
+class AndroidLocation(private val context: Context) {
+    suspend fun isAt(place: Place): Boolean? {
         val here = current(Priority.PRIORITY_BALANCED_POWER_ACCURACY) ?: return null
         val distance = here.distanceTo(place.location())
         return when {
@@ -129,6 +144,19 @@ class GeofenceReceiver : BroadcastReceiver() {
         if (event.hasError()) {
             Log.w(TAG, "Geofence-Fehler ${event.errorCode}")
             Diag.log("geofence error ${event.errorCode}")
+            if (event.errorCode == GeofenceStatusCodes.GEOFENCE_NOT_AVAILABLE) {
+                AndroidGeofences.forget()
+                // Registers again right away; fails as long as the location stays off, then the next sync tries.
+                val result = goAsync()
+                val graph = context.graph
+                graph.scope.launch {
+                    try {
+                        graph.syncAndRing()
+                    } finally {
+                        result.finish()
+                    }
+                }
+            }
             return
         }
         Diag.log("geofence transition=${event.geofenceTransition}")

@@ -55,11 +55,15 @@ data class ReminderForm(
     val motivationAudio: String? = null,
     /** Question 1..4 → answer; only answered ones are saved. */
     val prep: Map<Int, PrepDraft> = emptyMap(),
-    /** Ring on arrival at home instead of only at the time. */
+    /** Ring on arrival at [placeId] in the window before the time instead of only at the time (Anf. 7.29). */
     val atHome: Boolean = false,
     val whenAway: WhenAway = WhenAway.DROP,
-    /** Id of the "Zuhause" place, if it is set. */
-    val homeId: Long? = null,
+    /** The place of the arrival; for a new reminder "Zuhause" if it is set. */
+    val placeId: Long? = null,
+    /** Window before the latest time; 0 = any arrival before the time, as before 7.29. */
+    val lead: Int = Arrival.DEFAULT_LEAD,
+    val buffer: Int = Arrival.DEFAULT_BUFFER,
+    val check: Int = Arrival.DEFAULT_CHECK,
     /** Items keep their id while editing; empty ones are dropped on save. */
     val checklist: List<ChecklistItem> = emptyList(),
     /** Weekly goal (only daily or on weekdays); the numbers are kept when it is switched off. */
@@ -106,14 +110,17 @@ data class ReminderForm(
                 if (days.isEmpty()) null else Schedule.Deadline(LocalDateTime.of(date, time), days, windowFrom, windowUntil, remindEvery)
         }
 
+    /** The arrival has a window with buffer and checks (not for "wenn ich ankomme"). */
+    val hasWindow: Boolean get() = atHome && placePossible && kind != ScheduleKind.ON_ARRIVAL && lead > 0
+
     /** A deadline rings in its windows only, so it has no arrival; nor do several times a day. */
     val placePossible: Boolean get() = kind != ScheduleKind.DEADLINE && !severalADay
 
     /** Waiting for the arrival needs no time; the arrival option of the other kinds is then implied. */
     val arrival: Arrival?
         get() = when {
-            kind == ScheduleKind.ON_ARRIVAL -> Arrival(homeId ?: 0, WhenAway.RING)
-            atHome && placePossible -> Arrival(homeId ?: 0, whenAway)
+            kind == ScheduleKind.ON_ARRIVAL -> Arrival(placeId ?: 0, WhenAway.RING, lead, buffer, check)
+            atHome && placePossible -> Arrival(placeId ?: 0, whenAway, lead, buffer, check)
             else -> null
         }
 
@@ -140,7 +147,7 @@ data class ReminderForm(
             snoozeMinutes = snoozeMinutes,
             motivationAudio = motivationAudio,
             // Without a place the validation says what is missing.
-            arrival = arrival?.takeIf { homeId != null },
+            arrival = arrival?.takeIf { placeId != null },
             checklist = checklist.map { it.copy(title = it.title.trim()) }.filter { it.title.isNotEmpty() },
             weeklyGoal = if (weekly && weeklyPossible) WeeklyGoal(weekTarget, weekMax, weekMinimum) else null,
             preNotice = when (preNotice) {
@@ -162,12 +169,12 @@ data class ReminderForm(
         val WORKDAYS = setOf(DayOfWeek.MONDAY, DayOfWeek.TUESDAY, DayOfWeek.WEDNESDAY, DayOfWeek.THURSDAY, DayOfWeek.FRIDAY)
 
         /** A new reminder: next full hour today. */
-        fun new(now: Instant, zone: ZoneId, homeId: Long? = null): ReminderForm {
+        fun new(now: Instant, zone: ZoneId, placeId: Long? = null): ReminderForm {
             val next = now.atZone(zone).toLocalDateTime().truncatedTo(ChronoUnit.HOURS).plusHours(1)
-            return ReminderForm(date = next.toLocalDate(), time = next.toLocalTime(), homeId = homeId)
+            return ReminderForm(date = next.toLocalDate(), time = next.toLocalTime(), placeId = placeId)
         }
 
-        fun of(r: Reminder, today: LocalDate, prep: Map<Int, PrepAnswer> = emptyMap(), homeId: Long? = null): ReminderForm {
+        fun of(r: Reminder, today: LocalDate, prep: Map<Int, PrepAnswer> = emptyMap(), placeId: Long? = null): ReminderForm {
             val base = ReminderForm(
                 id = r.id, createdAt = r.createdAt, active = r.active, title = r.title, why = r.why.orEmpty(),
                 character = r.character, strictness = r.strictness, date = today, time = LocalTime.of(18, 0),
@@ -177,7 +184,10 @@ data class ReminderForm(
                 prep = prep.mapValues { (_, a) -> PrepDraft(a.text.orEmpty(), a.unknown) },
                 atHome = r.arrival != null && r.schedule != Schedule.OnArrival,
                 whenAway = r.arrival?.whenAway ?: WhenAway.DROP,
-                homeId = r.arrival?.placeId ?: homeId,
+                placeId = r.arrival?.placeId ?: placeId,
+                lead = r.arrival?.leadMinutes ?: Arrival.DEFAULT_LEAD,
+                buffer = r.arrival?.bufferMinutes ?: Arrival.DEFAULT_BUFFER,
+                check = r.arrival?.checkMinutes ?: Arrival.DEFAULT_CHECK,
                 checklist = r.checklist,
                 weekly = r.weeklyGoal != null,
                 weekTarget = r.weeklyGoal?.target ?: 3,

@@ -115,7 +115,7 @@ nach dem Abschluss legt die Engine die nächste an.
 | `checklist_item`, `item_done` | Punkte eines Reminders; erledigte Punkte pro Fälligkeit mit `withProof` |
 | `prep_answer` | Startklar-Antworten, nur anhängen; aktuell ist die neueste pro Frage |
 | `blocker` | Text, angelegt, gelöst am, Herkunft (`STARTKLAR` / `ASKED`), Vorbereitungsaufgabe |
-| `place` | Orte (bisher nur *Zuhause*), Radius Standard 150 m; WLANs ab 7.29 (Entwurf unten) |
+| `place` | Orte (*Zuhause* und ein weiterer), Radius Standard 150 m; ihre WLANs in `place_wifi` (7.29, Entwurf unten) |
 | `template` | Vorlagen (11.3) |
 | `suggestion` | Verbesserungsvorschläge (11.5), ohne Fremdschlüssel |
 
@@ -262,11 +262,10 @@ PLANNED ──(Zeit/Ankunft)──► DUE ──(keine Reaktion)──► ESCALA
   `AWAITING_ARRIVAL`). Die Ankunft lässt ihn klingeln; der Alarm liegt an der
   Tagesgrenze, dort wird er *verpasst*. *Heute* zeigt ihn unter *Wenn du zuhause bist*
   („verschoben – klingelt bei Ankunft, sonst heute verpasst“). `checkPlaces` prüft
-  wartende Termine mit. Periodische Prüfungen im Prüfabstand kommen mit 7.29.
-- Offen: `AndroidGeofences` merkt sich im Prozess, was registriert ist. Verwerfen die
-  Play-Services die Geofences (Standort aus und wieder an), registriert die App sie erst
-  nach einem Neustart des Prozesses neu. Nicht reproduziert; mit 7.29 auf
-  `GEOFENCE_NOT_AVAILABLE` und den Wechsel des Standort-Schalters reagieren.
+  wartende Termine mit, seit V1.3b0.6 auch die Prüf-Alarme des Orts (Entwurf 7.29 Z.8).
+- `AndroidGeofences` merkt sich im Prozess, was registriert ist. Meldet ein Geofence
+  `GEOFENCE_NOT_AVAILABLE` (Standort aus), vergisst die App das und registriert neu; klappt
+  das nicht, versucht es der nächste Sync (seit V1.3b0.6).
 
 ## 7. Fristen
 
@@ -609,7 +608,7 @@ Gerät [geraetetest.md](geraetetest.md) Abschnitt D.
 |---|---|---|
 | **V1.3a – Alltag** | Mehrmals täglich (VS1), Wochenend-Zeiten (VS2), Hinweis bei ständigem *Später* (NT2), Notausschalter (PS7) | Klein, sofort im Alltag spürbar, passt zur Beobachtungsphase. Keine neuen Bildschirme, nur Regeln und Einstellungen. |
 | **V1.3b0 – Umbau** | Engine als Fassade, Befehle in einer Transaktion, Alarm-Ansicht in `core` (Review-Lauf 2); V1.3b0.2: `firedAt`/`awaitsArrival`, Ortsprüfung vor der Transaktion (Review-Lauf 3) | Umgesetzt. Macht die Sitzung (neuer Zustand) und 7.29 (Ort im Befehl) sicher. |
-| **7.29 – Ankunft im Zeitraum** | Zeitraum und WLAN, ohne GPS (Entwurf unten); GPS später mit Anf. 7.30 | Vor V1.3b; Anforderungen von Kevin am 2026-11-05 gelesen. |
+| **7.29 – Ankunft im Zeitraum** | Zeitraum und WLAN, ohne GPS (Entwurf unten); GPS später mit Anf. 7.30 | Umgesetzt in V1.3b0.6 (2026-11-11). |
 | **V1.3b – Sitzung mit Timer** | *Ich starte jetzt*, Timer, Nachfragen, Ziel/Minimum als Dauer, maximale Dauer, Dauer-Vergleich (7.11 D1–D6), vorgezogen starten (7.20 V2), Aktionen und Timer auf der Uhr per Benachrichtigung (G2, G3) | Der große neue Mechanismus. Braucht einen neuen Zustand *läuft* im Lebenszyklus und einen Dienst für den Timer. |
 | **V1.3c – Abläufe** | Schritte, Pausen, Wiederholungen, Signale, Fortschritt, Abläufe als Vorlagen (7.12 A1–A7) | Baut vollständig auf der Sitzung aus V1.3b auf; erst sinnvoll, wenn der Timer im Alltag trägt. |
 
@@ -714,12 +713,12 @@ die anderen Regeln* in E.3 kam am 2026-11-05 dazu (Review-Lauf 3).
 
 ---
 
-## Entwurf 7.29 – Ankunft im Zeitraum (2026-11-05, zum Bestätigen)
+## Entwurf 7.29 – Ankunft im Zeitraum (2026-11-05, bestätigt und umgesetzt 2026-11-11)
 
 > Grundlage: anforderungen.md 7.29 OZ1–OZ9 und F1–F3, Review-Lauf 3 E7. Seit 2026-11-05 nur
 > WLAN, GPS ist nach 7.30 ausgelagert. **[E]** = Empfehlung,
-> **[P]** = vorher auf dem Gerät prüfen. Umsetzung erst nach Kevins Gesamtdurchsicht der
-> Anforderungen; dieser Entwurf soll nur verhindern, dass der Umbau später teurer wird.
+> **[P]** = vorher auf dem Gerät prüfen. Kevin hat Z.7 am 2026-11-11 bestätigt; umgesetzt in
+> V1.3b0.6, die Abweichungen und Präzisierungen stehen in Z.8.
 
 ### Z.1 Datenmodell (Migration 8→9)
 - `Arrival` bekommt `leadMinutes` (Vorlauf, Standard 90; 0 = kein Zeitraum wie bisher),
@@ -808,3 +807,39 @@ späteste Uhrzeit.
    sonst *unklar* und Rückfall zur spätesten Uhrzeit (Z.3). Die **[P]**-Punkte zum WLAN
    prüfe ich zuerst mit einem kleinen Gerätetest.
 4. Vorlauf 0 bedeutet „wie bisher“, auch als Ausweg, falls 7.29 im Alltag stört.
+
+### Z.8 Umsetzung (V1.3b0.6, 2026-11-11)
+- **Zeitraum** = [`currentAt` − Vorlauf, `currentAt`], solange `arrivedAt` leer ist. Eine
+  erkannte Ankunft (`Action.Arrived`, Ereignis `ARRIVED`) setzt `arrivedAt` und legt
+  `currentAt` auf Ankunft + Puffer; liegt das schon hinter jetzt, klingelt es sofort.
+  *Später*, *Verschieben*, *Rest auf morgen*, Fenster schließen, Wiederöffnen, Klingeln
+  und Bearbeiten leeren `arrivedAt`.
+- **F2:** Findet die erste Prüfung im Zeitraum (bis `START_TOLERANCE` = 5 min nach Beginn)
+  einen schon da, klingelt es zur spätesten Uhrzeit. Eine Verbindung oder ein Geofence ist
+  dagegen eine echte Ankunft (Puffer). Ankunft vor dem Zeitraum: ignoriert, Diag „too early“.
+- **Prüfungen** im Raster Beginn + k·Prüfabstand, jeweils vor der spätesten Uhrzeit; die
+  späteste Uhrzeit prüft der Alarm des Termins selbst (mit Rückfall auf die grobe
+  Ortsabfrage, `check(fallback = true)`). Wartende verschobene Termine (`awaitsArrival`)
+  prüfen ab `currentAt` bis zur Tagesgrenze. Mehrere Reminder am Ort: die früheste fällige
+  Prüfung gilt. `planChecks()` läuft am Ende jedes Befehls in der Transaktion und setzt je
+  Ort einen Prüf-Alarm (`PlaceAlarmPort`, `setWindow` 2 min) oder löscht ihn.
+- **Ortsergebnis:** `WifiLocation` (core) aus `WifiPort`: verbunden mit einer BSSID des
+  Orts → `AT`; Ort ohne WLAN oder keine Suche → `UNKNOWN`; sonst WLAN des Orts nicht in
+  einer Suche ≤ 10 min → `AWAY`, älter → `UNKNOWN`. Nur mit `fallback` fällt `UNKNOWN` auf
+  `AndroidLocation.isAt` zurück.
+- **Vorlauf 0** = genau das alte Verhalten: kein Puffer, keine Prüfungen. *Wenn ich
+  ankomme* (`OnArrival`) klingelt bei Ankunft sofort, ohne Puffer.
+- **Android:** `AndroidWifi.watch` registriert bei jedem Prozessstart einen
+  `NetworkCallback` mit PendingIntent auf `WifiReceiver` (ruft `onWifi`);
+  `PlaceCheckReceiver` ruft `onPlaceCheck`. Die WLAN-Sonde aus V1.3b0.3 ist entfernt.
+- **Oberfläche:** Formular *Bei Ankunft* mit Ortswahl (ab zwei Orten), *Ankunft zählt ab*
+  30/60/90/120 min/*andere…* und *entfällt*/*trotzdem klingeln*; Puffer und Prüfabstand
+  unter *Feineinstellungen*. Einstellungen *Orte*: Zuhause und ein weiterer Ort mit Namen,
+  *Hier festlegen* übernimmt Standort und das verbundene WLAN mit allen Zugangspunkten
+  derselben SSID aus der letzten Suche. *Heute*: „ab 18:00 bei Ankunft zuhause, sonst
+  19:30“ bzw. „angekommen – klingelt 18:35“ und einmal der Hinweis auf die Umstellung (OZ9).
+- **Privat:** Diagnose nur mit Ort-Id, Ergebnis, Quelle und Alter der Suche; die
+  Claude-Schnittstelle kennt Vorlauf, Puffer und Prüfabstand, aber keine WLANs; der
+  Testdaten-Export ersetzt SSIDs und BSSIDs.
+- **Tests:** `ArrivalWindowScenarioTest` (u. a. 2026-11-04 nachgestellt, F1, F2, zwei
+  Reminder am Ort), `ArrivalWindowTest`, `MigrationTest` 8→9, `FormatArrivalTest`.

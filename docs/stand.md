@@ -4,6 +4,9 @@ Stand: 2026-11-11. Bei jedem größeren Schritt aktualisieren. Erledigtes steht 
 in den Entwürfen und den Review-Berichten (`.review/runs/`), nicht hier.
 
 ## Auf dem Gerät (S24)
+- **1.3b0.6-backup5** (`versionCode` 16) ist gebaut, noch nicht installiert: Ankunft im
+  Zeitraum mit WLAN (7.29), weiterer Ort, Geofence-Neuregistrierung. Danach Gerätetest
+  K15 und K23–K26 ([geraetetest.md](geraetetest.md)).
 - **1.3b0.5-backup5** (`versionCode` 15), installiert am 2026-11-11 über 1.3b0.4
   (Backend-Pin `5845beb`). Gegenüber 1.3b0.4: Fixes aus Review-Lauf 10 (R1, R2, W-7,
   abgelehnte Sitzung, *Cloud-Daten löschen*, *Mit Wiederherstellungsschlüssel
@@ -29,7 +32,8 @@ Entwürfe: [backup-entwurf.md](backup-entwurf.md) (Schritte 1–5),
 ersten weiteren Nutzer kommt die Sicherheitsphase (Backend `CLAUDE.md`, b2b-entwurf.md).
 
 ## Offen
-1. **1.3b0.5 installieren** und die Cloud-Fälle aus [geraetetest.md](geraetetest.md) prüfen.
+1. **1.3b0.6 installieren**, *Zuhause* in *Orte* neu festlegen (mit WLAN verbunden) und
+   K23–K26 aus [geraetetest.md](geraetetest.md) im Alltag prüfen.
 2. **Testsession vor V2** ([testsession.md](testsession.md)): Kevin führt sie durch, danach
    wertet Claude `diag.log`, `logcat` und `adb shell dumpsys alarm` aus.
 3. **Nutzung beobachten und trimmen** (7.27): Reminder werden manchmal zu streng angelegt
@@ -37,8 +41,8 @@ ersten weiteren Nutzer kommt die Sicherheitsphase (Backend `CLAUDE.md`, b2b-entw
    der Testsession (NT4).
 4. **Vorschläge in der App:** 1, 4, 5, 6, 7 und 9 sind umgesetzt (Kevin markiert sie);
    offen VS3 (7.25).
-5. **V1.3:** Entwurf bestätigt (design.md *Entwurf V1.3*); als Nächstes Entwurf 7.29 Z.7
-   (WLAN) bestätigen (Sonde ausgewertet: geraetetest-archiv.md, V1.3b0.3), dann V1.3b (Sitzung mit Timer, Uhr) und V1.3c (Abläufe).
+5. **V1.3:** Entwurf bestätigt (design.md *Entwurf V1.3*); 7.29 umgesetzt (V1.3b0.6),
+   als Nächstes V1.3b (Sitzung mit Timer, Uhr) und V1.3c (Abläufe).
 6. **Später, stört aktuell nicht:** Kevin beschreibt die Szenarien zu Checklisten mit
    mehreren Uhrzeiten (vermuteter Fehler; Code und Tests am 2026-11-11 ohne Befund
    geprüft), Training-Alarm am Morgen und „Checkliste nicht richtig gespeichert“

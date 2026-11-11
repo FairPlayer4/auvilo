@@ -86,7 +86,11 @@
             android:exported="false" />
 
         <receiver
-            android:name=".location.WifiProbeReceiver"
+            android:name=".location.WifiReceiver"
+            android:exported="false" />
+
+        <receiver
+            android:name=".location.PlaceCheckReceiver"
             android:exported="false" />
 
         <receiver
