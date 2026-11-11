@@ -4,9 +4,10 @@ Stand: 2026-11-11. Bei jedem größeren Schritt aktualisieren. Erledigtes steht 
 in den Entwürfen und den Review-Berichten (`.review/runs/`), nicht hier.
 
 ## Auf dem Gerät (S24)
-- **1.3b0.6-backup5** (`versionCode` 16) ist gebaut, noch nicht installiert: Ankunft im
-  Zeitraum mit WLAN (7.29), weiterer Ort, Geofence-Neuregistrierung. Danach Gerätetest
-  K15 und K23–K26 ([geraetetest.md](geraetetest.md)).
+- **1.3b0.6-backup5** (`versionCode` 16), installiert am 2026-11-11 über 1.3b0.5: Ankunft
+  im Zeitraum mit WLAN (7.29), weiterer Ort, Geofence-Neuregistrierung. Nach dem Start:
+  Berechtigungen ok, Alarme neu geplant, WLAN-Meldung kommt an (Log ohne BSSID), keine
+  Fehler. Offen: Gerätetest K15 und K23–K26 ([geraetetest.md](geraetetest.md)).
 - **1.3b0.5-backup5** (`versionCode` 15), installiert am 2026-11-11 über 1.3b0.4
   (Backend-Pin `5845beb`). Gegenüber 1.3b0.4: Fixes aus Review-Lauf 10 (R1, R2, W-7,
   abgelehnte Sitzung, *Cloud-Daten löschen*, *Mit Wiederherstellungsschlüssel
