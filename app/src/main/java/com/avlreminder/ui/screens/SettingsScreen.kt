@@ -35,6 +35,7 @@ import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
+import com.avlreminder.cloud.CloudStatus
 import com.avlreminder.core.model.Place
 import com.avlreminder.alarm.AlarmPause
 import com.avlreminder.core.rules.AlertSettings
@@ -89,6 +90,10 @@ fun SettingsScreen(
     zone: ZoneId = ZoneId.systemDefault(),
     claudeAccess: Boolean? = null,
     onClaudeAccess: (Boolean) -> Unit = {},
+    cloud: CloudStatus? = null,
+    cloudActions: CloudActions = object : CloudActions {},
+    local: com.avlreminder.restore.LocalStatus? = null,
+    localActions: LocalActions = object : LocalActions {},
 ) {
     val c = Avl.colors
     var homeState by remember { mutableStateOf<String?>(null) }
@@ -211,6 +216,16 @@ fun SettingsScreen(
                 }
             }
             Text("Eine stille Benachrichtigung ohne Ton; ein Tipp öffnet die App.", Modifier.padding(4.dp), color = c.muted, fontSize = 13.sp)
+
+            if (cloud != null) {
+                SectionTitle("Cloud-Backup (experimentell)")
+                Card { CloudBackupSetting(cloud, cloudActions) }
+            }
+
+            if (local != null) {
+                SectionTitle("Lokale Kopien")
+                Card { LocalRestoreSetting(local, localActions, zone) }
+            }
 
             if (claudeAccess != null) {
                 SectionTitle("Schnittstelle für Claude")

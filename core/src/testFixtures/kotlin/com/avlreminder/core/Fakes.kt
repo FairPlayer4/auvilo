@@ -97,22 +97,18 @@ class FakeRepository : ReminderRepository {
 
     /** Like the database: a failed transaction leaves nothing behind. */
     override suspend fun <T> transaction(block: suspend () -> T): T {
-        val saved = listOf(LinkedHashMap(reminders), LinkedHashMap(occurrences), LinkedHashMap(places), LinkedHashMap(blockers))
-        val lists = listOf(events.toList(), proofs.toList(), prep.toList(), done.toList())
+        // Each snapshot returns how to put its collection back; typed, so no casts are needed.
+        fun <K, V> MutableMap<K, V>.snapshot(): () -> Unit = LinkedHashMap(this).let { copy -> { clear(); putAll(copy) } }
+        fun <E> MutableList<E>.snapshot(): () -> Unit = toList().let { copy -> { clear(); addAll(copy) } }
+        val restore = listOf(
+            reminders.snapshot(), occurrences.snapshot(), places.snapshot(), blockers.snapshot(),
+            events.snapshot(), proofs.snapshot(), prep.snapshot(), done.snapshot(),
+        )
         val id = nextId
         try {
             return block()
         } catch (e: Throwable) {
-            @Suppress("UNCHECKED_CAST")
-            fun <K, V> restore(map: MutableMap<K, V>, from: Any) {
-                map.clear()
-                map.putAll(from as Map<K, V>)
-            }
-            restore(reminders, saved[0]); restore(occurrences, saved[1]); restore(places, saved[2]); restore(blockers, saved[3])
-            events.clear(); events.addAll(lists[0] as List<Event>)
-            proofs.clear(); proofs.addAll(lists[1] as List<Proof>)
-            prep.clear(); prep.addAll(lists[2] as List<PrepAnswer>)
-            done.clear(); done.addAll(lists[3] as List<ItemDone>)
+            restore.forEach { it() }
             nextId = id
             throw e
         }

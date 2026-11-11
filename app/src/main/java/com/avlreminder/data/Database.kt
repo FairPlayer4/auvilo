@@ -259,6 +259,10 @@ interface AvlDao {
     @Query("DELETE FROM reminder WHERE id = :id")
     suspend fun deleteReminder(id: Long)
 
+    /** All reminders, also paused and archived ones (brake of the cloud backup, R-2). */
+    @Query("SELECT COUNT(*) FROM reminder")
+    suspend fun reminderCount(): Int
+
     @Query("SELECT * FROM occurrence WHERE id = :id")
     suspend fun occurrence(id: Long): OccurrenceEntity?
 
@@ -572,9 +576,12 @@ abstract class AvlDatabase : RoomDatabase() {
         const val VERSION = 8
 
         fun create(context: Context): AvlDatabase {
-            backupBeforeMigration(context.getDatabasePath(NAME), File(context.filesDir, "backup"))
+            val backups = File(context.filesDir, "backup")
+            backupBeforeMigration(context.getDatabasePath(NAME), backups)
             return Room.databaseBuilder(context, AvlDatabase::class.java, NAME)
                 .addMigrations(*MIGRATIONS)
+                // KRITISCH: a damaged page must not delete the database (R2 of Review-Lauf 10).
+                .openHelperFactory(KeepDamaged.Factory({ KeepDamaged.copyAside(it, backups) }))
                 .build()
         }
 
@@ -585,7 +592,9 @@ abstract class AvlDatabase : RoomDatabase() {
         fun backupBeforeMigration(file: File, dir: File): File? {
             if (!file.exists()) return null
             return try {
-                SQLiteDatabase.openDatabase(file.path, null, SQLiteDatabase.OPEN_READWRITE).use { db ->
+                // WAL like Room, so that only looking at the version does not switch the journal mode.
+                // Its own error handler: the default one deletes a damaged database.
+                SQLiteDatabase.openDatabase(file.path, null, SQLiteDatabase.OPEN_READWRITE or SQLiteDatabase.ENABLE_WRITE_AHEAD_LOGGING, KeepDamaged.handler).use { db ->
                     if (db.version >= VERSION) return null
                     dir.mkdirs()
                     val stamp = DateTimeFormatter.ofPattern("yyyyMMdd-HHmmss").format(LocalDateTime.now())

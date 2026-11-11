@@ -15,6 +15,7 @@ import android.os.VibrationEffect
 import android.os.VibratorManager
 import android.util.Log
 import com.avlreminder.system.Diag
+import com.avlreminder.core.model.ChecklistItem
 import com.avlreminder.core.rules.Escalation
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
@@ -35,6 +36,8 @@ class AlarmService : Service() {
         private const val EXTRA_QUICK_DONE = "quickDone"
         private const val EXTRA_SNOOZE = "snooze"
         private const val EXTRA_LOUD = "loud"
+        private const val EXTRA_ITEM_ID = "itemId"
+        private const val EXTRA_ITEM_TITLE = "itemTitle"
 
         /** Long, unusual pattern (ms): off/on pairs, easy to tell apart from normal notifications. */
         private val VIBRATION_PATTERN = longArrayOf(0, 800, 200, 800, 200, 100, 100, 100, 100, 100, 1200)
@@ -52,6 +55,9 @@ class AlarmService : Service() {
                 .putExtra(EXTRA_QUICK_DONE, info.quickDone)
                 .putExtra(EXTRA_SNOOZE, info.snooze.toIntArray())
                 .putExtra(EXTRA_LOUD, loud)
+            // KRITISCH: Alles aus AlarmInfo muss mit, sonst fehlt es in den Benachrichtigungen
+            // des Dienstes; ohne nextItem schlösse "Erledigt" eine Checkliste ganz ab.
+            info.nextItem?.let { intent.putExtra(EXTRA_ITEM_ID, it.id).putExtra(EXTRA_ITEM_TITLE, it.title) }
             try {
                 context.startForegroundService(intent)
             } catch (e: Exception) {
@@ -91,6 +97,7 @@ class AlarmService : Service() {
                     text = intent.getStringExtra(EXTRA_TEXT),
                     quickDone = intent.getBooleanExtra(EXTRA_QUICK_DONE, false),
                     snooze = intent.getIntArrayExtra(EXTRA_SNOOZE)?.toList().orEmpty(),
+                    nextItem = intent.getStringExtra(EXTRA_ITEM_TITLE)?.let { ChecklistItem(intent.getLongExtra(EXTRA_ITEM_ID, -1), it) },
                 ),
                 intent.getBooleanExtra(EXTRA_LOUD, false),
             )

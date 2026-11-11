@@ -13,6 +13,7 @@ import android.net.NetworkRequest
 import android.net.wifi.WifiInfo
 import android.net.wifi.WifiManager
 import android.os.SystemClock
+import androidx.core.content.edit
 import com.avlreminder.graph
 import com.avlreminder.system.Diag
 import kotlinx.coroutines.CompletableDeferred
@@ -79,13 +80,14 @@ object WifiProbe {
             connectedBssid = info?.bssid,
             source = source,
             wifiOn = wifi.isWifiEnabled,
-            scanAlways = runCatching { wifi.isScanAlwaysAvailable }.getOrDefault(false),
+            // Deprecated without a replacement for apps; the probe only logs it for diagnosis.
+            scanAlways = runCatching { @Suppress("DEPRECATION") wifi.isScanAlwaysAvailable }.getOrDefault(false),
             locationOn = context.getSystemService(LocationManager::class.java).isLocationEnabled,
             scan = scan,
         )
         val prefs = context.getSharedPreferences(PREFS, Context.MODE_PRIVATE)
         val (networks, line) = WifiProbeLogic.evaluate(decode(prefs.getString(KEY, null)), sample)
-        prefs.edit().putString(KEY, encode(networks)).apply()
+        prefs.edit { putString(KEY, encode(networks)) }
         Diag.log(line)
     }
 

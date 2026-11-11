@@ -85,9 +85,12 @@ internal class AlarmViews(private val c: EngineContext) {
     suspend fun weekStatus(reminder: Reminder, day: LocalDate = now().atZone(zone).toLocalDate()): WeekStatus? {
         val goal = reminder.weeklyGoal ?: return null
         val (from, until) = Weeks.range(day, zone)
-        val goals = repo.countResolved(reminder.id, Resolution.GOAL, from, until)
-        val minimums = repo.countResolved(reminder.id, Resolution.MINIMUM, from, until)
-        return WeekStatus(goal, goals + minimums, minimums, WeeklyGoals.offersLeft(reminder.schedule, day))
+        return WeeklyGoals.status(
+            goal, reminder.schedule,
+            goals = repo.countResolved(reminder.id, Resolution.GOAL, from, until),
+            minimums = repo.countResolved(reminder.id, Resolution.MINIMUM, from, until),
+            day = day,
+        )
     }
 
     fun isRescue(reminder: Reminder, occurrence: Occurrence): Boolean =

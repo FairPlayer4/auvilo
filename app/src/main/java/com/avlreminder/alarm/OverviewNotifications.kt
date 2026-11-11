@@ -12,9 +12,7 @@ import androidx.core.net.toUri
 import com.avlreminder.R
 import com.avlreminder.core.usecases.Digest
 import com.avlreminder.core.usecases.Digests
-import com.avlreminder.core.usecases.Overview
 import com.avlreminder.data.OverviewTimes
-import com.avlreminder.data.toModel
 import com.avlreminder.graph
 import com.avlreminder.system.Diag
 import com.avlreminder.ui.MainActivity
@@ -107,10 +105,8 @@ class OverviewReceiver : BroadcastReceiver() {
         graph.scope.launch {
             try {
                 val now = Instant.now()
-                val zone = ZoneId.systemDefault()
-                val dao = graph.db.dao()
-                val occurrences = dao.openOccurrences().map { it.toModel() } + dao.observeResolved().first().map { it.toModel() }
-                val today = Overview.today(graph.repository.reminders(), occurrences, now, zone)
+                val zone = graph.zone
+                val today = graph.today(now)
                 val digest = if (morning) Digests.morning(today, zone)
                 else Digests.evening(today, graph.withEngine { it.weekGoals() }, now, zone)
                 OverviewNotifications.show(context, digest)

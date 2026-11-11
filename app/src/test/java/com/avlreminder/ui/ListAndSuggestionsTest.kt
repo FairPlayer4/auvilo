@@ -1,12 +1,15 @@
 package com.avlreminder.ui
 
-import androidx.compose.ui.test.junit4.createComposeRule
+import android.content.ClipboardManager
+import android.content.Context
+import androidx.compose.ui.test.junit4.v2.createComposeRule
 import androidx.compose.ui.test.onNodeWithContentDescription
 import androidx.compose.ui.test.onNodeWithTag
 import androidx.compose.ui.test.onNodeWithText
 import androidx.compose.ui.test.performClick
 import androidx.compose.ui.test.performScrollTo
 import androidx.compose.ui.test.performTextInput
+import androidx.test.core.app.ApplicationProvider
 import androidx.test.ext.junit.runners.AndroidJUnit4
 import com.avlreminder.core.model.Occurrence
 import com.avlreminder.core.model.PrepAnswer
@@ -155,6 +158,21 @@ class ListAndSuggestionsTest {
         compose.onNodeWithText("Wichtig: Knopf größer").performClick()
         compose.onNodeWithText("Umgesetzt").performClick()
         assertEquals(SuggestionStatus.DONE, actions.updated.single().status)
+    }
+
+    @Test
+    fun copyPutsTheOpenOnesOnTheClipboard() {
+        val list = listOf(suggestion(1, "Knopf größer", important = true), suggestion(2, "Alt", status = SuggestionStatus.DONE))
+        compose.setContent { AvlTheme(dark = false) { AvlAppUi(state(list), FakeActions(), now, zone, startRoute = Routes.SETTINGS) } }
+        compose.onNodeWithText("Vorschläge ansehen").performClick()
+        compose.onNodeWithText("Kopiert").assertDoesNotExist()
+
+        compose.onNodeWithText("Alle offenen kopieren").performClick()
+        compose.waitForIdle()
+
+        val clipboard = ApplicationProvider.getApplicationContext<Context>().getSystemService(ClipboardManager::class.java)
+        assertEquals(SuggestionExport.markdown(list, zone), clipboard.primaryClip!!.getItemAt(0).text.toString())
+        compose.onNodeWithText("Kopiert").assertExists()
     }
 
     @Test

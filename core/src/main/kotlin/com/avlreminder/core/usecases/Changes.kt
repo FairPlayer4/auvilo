@@ -88,10 +88,14 @@ internal class Changes(private val c: EngineContext, private val views: AlarmVie
             val created = repo.saveOccurrence(Occurrence(reminderId = id, dueAt = due))
             repo.addEvent(Event(occurrenceId = created, at = now(), type = EventType.CREATED))
         }
+        // KRITISCH: a moved one-off is due again here, explicitly. ScheduleRules only plans its
+        // first occurrence, so a time zone change does not count as a move (stand.md, Zeitzone).
+        if (moved && schedule is Schedule.Once) moveOnce(saved, schedule)
         val open = repo.openOccurrence(id)
         // A changed schedule moves an occurrence that never rang. One that rang and was snoozed or
         // postponed keeps its day: editing must not make today's occurrence vanish (Review B1).
-        if (open != null && open.state == OccurrenceState.PLANNED && !open.hasFired && open.postponeCount == 0 && schedule != Schedule.OnArrival && schedule !is Schedule.Deadline) {
+        // One-offs and deadlines are handled above: unchanged, their occurrence stays as it is.
+        if (open != null && open.state == OccurrenceState.PLANNED && !open.hasFired && open.postponeCount == 0 && schedule != Schedule.OnArrival && schedule !is Schedule.Deadline && schedule !is Schedule.Once) {
             val due = scheduler.nextDue(saved, repo.lastResolved(id))
             if (due == null) {
                 scheduler.close(saved, open, Action.Skip(SkipReasons.SCHEDULE_CHANGED))
@@ -102,6 +106,23 @@ internal class Changes(private val c: EngineContext, private val views: AlarmVie
         val ring = scheduler.syncReminder(saved) ?: scheduler.arriveIfThere(saved)
         scheduler.watchPlaces()
         return SaveResult.Saved(id, ring)
+    }
+
+    /**
+     * The one-off [reminder] was moved to [schedule]: its occurrence is at the new time. One that
+     * never rang just moves; one that rang ends as skipped (schedule changed), and a new one comes,
+     * also after it was done, skipped or missed.
+     */
+    private suspend fun moveOnce(reminder: Reminder, schedule: Schedule.Once) {
+        val due = schedule.at.atZone(zone).toInstant()
+        val open = repo.openOccurrence(reminder.id)
+        if (open != null && open.state == OccurrenceState.PLANNED && !open.hasFired && open.postponeCount == 0) {
+            repo.saveOccurrence(open.copy(dueAt = due, currentAt = due))
+            return
+        }
+        open?.let { scheduler.close(reminder, it, Action.Skip(SkipReasons.SCHEDULE_CHANGED)) }
+        val created = repo.saveOccurrence(Occurrence(reminderId = reminder.id, dueAt = due))
+        repo.addEvent(Event(occurrenceId = created, at = now(), type = EventType.CREATED))
     }
 
     suspend fun delete(reminderId: Long) {
