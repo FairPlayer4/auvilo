@@ -4,8 +4,8 @@ Stand: 2026-11-11. Bei jedem größeren Schritt aktualisieren. Erledigtes steht 
 in den Entwürfen und den Review-Berichten (`.review/runs/`), nicht hier.
 
 ## Auf dem Gerät (S24)
-- **V1.3b1** (Sitzung mit Timer und Uhr, 7.11) in `develop`, noch nicht installiert.
-  Offen: installieren, Gerätetest K27–K30, danach eine Woche Training mit Timer vor V1.3c.
+- **V1.3b1** (Sitzung mit Timer und Uhr, 7.11) installiert am 2026-11-11 (Code 17).
+  Offen: Gerätetest K27–K30, danach eine Woche Training mit Timer vor V1.3c.
 - **1.3b0.6-backup5** (`versionCode` 16), installiert am 2026-11-11 über 1.3b0.5: Ankunft
   im Zeitraum mit WLAN (7.29), weiterer Ort, Geofence-Neuregistrierung. Nach dem Start:
   Berechtigungen ok, Alarme neu geplant, WLAN-Meldung kommt an (Log ohne BSSID), keine
