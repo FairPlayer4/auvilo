@@ -685,6 +685,29 @@ Schritte eines Ablaufs.
 - Bildschirm: Sitzungsansicht mit großem Timer und den vier Antworten; erreichbar aus
   *Heute* (*läuft seit …*) und über die Benachrichtigung.
 
+**Bei der Umsetzung festgelegt (V1.3b1, 2026-11-11)**
+- Zusätzliches Feld `finalCallAt` (wann der letzte Reminder hörbar kam) und eigenes
+  Ereignis `ABORTED`. Ohne Antwort endet die Sitzung (`EndSession`) mit *Minimum*, wenn
+  Checklistenpunkte erledigt sind, unter Notaus mit `ABORTED`, sonst `MISSED`.
+- Eine unbeantwortete Nachfrage fragt nach min(Intervall, 10 min) erneut, wie die Runden
+  eines Alarms. Nachfragen liegen nie nach der maximalen Dauer; eine nach dem Maximum
+  gefundene (Handy aus) ist der letzte Reminder.
+- Vorschlag (D4): Ziel-Dauer erreicht → *Fertig*; ohne Ziel und Minimum-Dauer erreicht →
+  *Teilschritt*; sonst *Noch dran*. *Teilschritt* gibt es nur mit Minimum (Text oder Dauer).
+- Schnitt (D6): die letzten 10 mit Ziel oder Minimum abgeschlossenen Sitzungen;
+  abgebrochene und verpasste sagen nichts über das Tempo.
+- Während der Sitzung lässt `save` nur Titel, Warum, Ziel und Minimum ändern;
+  `setActive` und `setArchived` melden `false`, die App sagt „Läuft gerade“.
+- Im Verlauf zählt eine Sitzung für ihren Starttag; *Heute* zeigt bei erledigten die Dauer.
+- Benachrichtigung: am Handy höchstens drei Knöpfe (*Noch dran*, die vorgeschlagene
+  Antwort zum Beenden, *Abbruch*), auf der Uhr alle vier (`WearableExtender`). *Fertig*
+  nur ohne Foto-, Text- oder Audio-Nachweis; sonst über den Bildschirm. *Abbruch* im
+  Bildschirm erst nach Rückfrage.
+- Der Sitzungsdienst misst nichts selbst; die App aktualisiert ihn nach jedem Anwendungsfall
+  aus den laufenden Fälligkeiten. Fällt der Vordergrunddienst aus, bleibt eine normale
+  laufende Benachrichtigung.
+- Vorlagen speichern die Sitzung noch nicht.
+
 ### E.4 V1.3c – Abläufe (Skizze)
 - Tabelle `routine` (Name, Schritte als JSON): Schritt = Art (*Zeit*, *offen*,
   *Pause*), Titel, Dauer, Signal; Gruppen mit Wiederholungen (A3). Der Reminder

@@ -1,5 +1,7 @@
 package com.avlreminder.data
 
+import com.avlreminder.core.model.Strictness
+import com.avlreminder.core.model.SessionSpec
 import androidx.room.withTransaction
 import com.avlreminder.core.model.Arrival
 import com.avlreminder.core.model.AtTimes
@@ -193,6 +195,16 @@ fun ReminderEntity.toModel(items: List<ChecklistItemEntity> = emptyList()): Remi
     prepFor = prepFor,
     solvedBlockerIsMinimum = solvedBlockerIsMinimum,
     hintQuietUntil = hintQuietUntil,
+    session = sessionCheck?.let {
+        SessionSpec(
+            checkMinutes = it,
+            checkStrictness = sessionCheckStrictness ?: Strictness.RELAXED,
+            goalMinutes = sessionGoal,
+            minimumMinutes = sessionMinimum,
+            maxMinutes = sessionMax ?: SessionSpec.DEFAULT_MAX,
+            finalMinutes = sessionFinal ?: SessionSpec.DEFAULT_FINAL,
+        )
+    },
 )
 
 /** The first time plus the further ones of several a day (VS1). */
@@ -269,6 +281,12 @@ fun Reminder.toEntity(): ReminderEntity {
         solvedBlockerIsMinimum = solvedBlockerIsMinimum,
         moreTimes = s.moreTimes(),
         hintQuietUntil = hintQuietUntil,
+        sessionCheck = session?.checkMinutes,
+        sessionCheckStrictness = session?.checkStrictness,
+        sessionGoal = session?.goalMinutes,
+        sessionMinimum = session?.minimumMinutes,
+        sessionMax = session?.maxMinutes,
+        sessionFinal = session?.finalMinutes,
     )
 }
 
@@ -284,14 +302,14 @@ fun OccurrenceEntity.toModel() = Occurrence(
     id = id, reminderId = reminderId, dueAt = dueAt, currentAt = currentAt, state = state,
     postponeCount = postponeCount, resolvedAt = resolvedAt, resolution = resolution, note = note,
     pausedUntil = pausedUntil, firstProgressAt = firstProgressAt, firedAt = firedAt, awaitsArrival = awaitsArrival,
-    arrivedAt = arrivedAt,
+    arrivedAt = arrivedAt, startedAt = startedAt, nextCheckAt = nextCheckAt, finalCallAt = finalCallAt,
 )
 
 fun Occurrence.toEntity() = OccurrenceEntity(
     id = id, reminderId = reminderId, dueAt = dueAt, currentAt = currentAt, state = state,
     postponeCount = postponeCount, resolvedAt = resolvedAt, resolution = resolution, note = note,
     pausedUntil = pausedUntil, firstProgressAt = firstProgressAt, firedAt = firedAt, awaitsArrival = awaitsArrival,
-    arrivedAt = arrivedAt,
+    arrivedAt = arrivedAt, startedAt = startedAt, nextCheckAt = nextCheckAt, finalCallAt = finalCallAt,
 )
 
 fun PrepAnswerEntity.toModel() = PrepAnswer(id = id, reminderId = reminderId, question = question, text = text, unknown = unknown, at = at)

@@ -44,6 +44,10 @@
 | K24 | Ankunft im Zeitraum (7.29) | Reminder 19:30 *Bei Ankunft*, ab 90 min; vor 18:00 heimkommen, dann um 18:30 ins WLAN | vor 18:00 kein Alarm (Diag „too early“); *Heute* „ab 18:00 bei Ankunft zuhause, sonst 19:30“; 5 min nach dem Verbinden Alarm |
 | K25 | Schon da (F2) | zuhause bleiben, Zeitraum beginnt | kein Alarm zu Beginn; Prüfungen alle 20 min im Log („place check … AT“); Alarm um 19:30 |
 | K26 | Nicht da (F1) | zur spätesten Uhrzeit weg, WLAN aus Reichweite | *entfällt* bzw. bei *trotzdem klingeln* Alarm; bei „unklar“ klingelt es |
+| K27 | Sitzung starten (7.11) | Reminder mit *Sitzung mit Timer* (Nachfrage 2 min, max. 6 min); im Alarm *Ich starte jetzt* | Alarm endet; Sitzungsbildschirm mit Timer; laufende Benachrichtigung mit Timer, *Fertig*/*Abbruch*; *Heute* „läuft seit …“ |
+| K28 | Nachfrage und Uhr | 2 min warten | Nachfrage als Banner, auf der Uhr mit *Noch dran / Fertig / Teilschritt / Abbruch*; *Noch dran* auf der Uhr → nächste in 2 min |
+| K29 | Maximale Dauer | ohne Antwort bis 6 min | letzter Reminder im Vollbild ohne *Noch dran*; 5 min später *verpasst* im Verlauf, Benachrichtigung weg |
+| K30 | Vorab starten (7.20 V2) | vor der Uhrzeit *Vorab* → *Ich starte jetzt*, nach 1 min *Fertig* | Verlauf „Sitzung …–… · 1 min“; zur Uhrzeit kein Alarm |
 
 ## D. Cloud-Backup (seit 1.3b0.4)
 Auf dem **S24** nur dieses kleine Set (echte Daten, Eigenbetrieb). Alles, was Geräte sperrt,

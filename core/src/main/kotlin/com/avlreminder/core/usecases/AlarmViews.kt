@@ -1,5 +1,6 @@
 package com.avlreminder.core.usecases
 
+import java.time.Duration
 import com.avlreminder.core.model.Character
 import com.avlreminder.core.model.EventType
 import com.avlreminder.core.model.ItemDone
@@ -19,6 +20,7 @@ import com.avlreminder.core.rules.Lifecycle
 import com.avlreminder.core.rules.Limits
 import com.avlreminder.core.rules.Prep
 import com.avlreminder.core.rules.ScheduleRules
+import com.avlreminder.core.rules.Sessions
 import com.avlreminder.core.rules.WeekStatus
 import com.avlreminder.core.rules.WeeklyGoals
 import com.avlreminder.core.rules.Weeks
@@ -174,18 +176,48 @@ internal class AlarmViews(private val c: EngineContext) {
             blockers = repo.blockers(reminder.id).filter { it.isOpen },
             proofCarried = limits.proofCarried,
             missedAt = missedAt(reminder, occurrence),
+            canStart = Sessions.canStart(reminder, occurrence),
+            session = sessionView(reminder, occurrence),
         )
     }
 
+    /** The running session; null if it does not run. */
+    suspend fun sessionView(reminder: Reminder, occurrence: Occurrence): SessionView? {
+        val spec = reminder.session ?: return null
+        val started = occurrence.startedAt?.takeIf { occurrence.isRunning } ?: return null
+        val now = now()
+        val maxAt = Sessions.maxAt(spec, started)
+        return SessionView(
+            startedAt = started,
+            maxAt = maxAt,
+            // The last alarm may come a little early; its view is the last reminder all the same.
+            final = occurrence.finalCallAt != null || now >= maxAt.minus(ReminderEngine.EARLY_TOLERANCE),
+            suggestion = Sessions.suggestion(spec, started, now),
+            average = average(reminder.id),
+            checkMinutes = spec.checkMinutes,
+        )
+    }
+
+    /** The average duration of the last sessions done (D6). */
+    suspend fun average(reminderId: Long): Duration? =
+        Sessions.average(repo.recentResolved(reminderId, SESSION_HISTORY))
+
     /** The occurrence rings now: how loud, with what it shows; it rings once the command is stored. */
     suspend fun ring(reminder: Reminder, occurrence: Occurrence): Ring {
-        val strictness = strictness(reminder, occurrence)
+        val view = alarmView(reminder, occurrence)
+        val session = view.session
+        // A check rings with its own strictness, the last reminder as strict as possible (7.11 D3, D5).
+        val strictness = when {
+            session == null -> strictness(reminder, occurrence)
+            session.final -> Strictness.STRICT
+            else -> reminder.session?.checkStrictness ?: reminder.strictness
+        }
         val now = now()
         val level = if (strictness == null || c.settings().alarmsPaused(now)) AlarmLevel.SILENT else Escalation.level(
             strictness, now.atZone(zone).toLocalTime(), c.settings().on(now.atZone(zone).toLocalDate()),
             c.device.isDoNotDisturb(), reminder.ignoreDnd,
         )
-        return Ring(alarmView(reminder, occurrence), level).also { c.pending += it }
+        return Ring(view, level).also { c.pending += it }
     }
 
     companion object {
@@ -193,5 +225,7 @@ internal class AlarmViews(private val c: EngineContext) {
         private const val ASK_HISTORY = 10
         /** Enough resolved occurrences for a week of six times a day. */
         private const val MINIMUM_HISTORY = 60
+        /** Resolved occurrences looked at for the average session (D6); not every one was a session. */
+        private const val SESSION_HISTORY = 30
     }
 }

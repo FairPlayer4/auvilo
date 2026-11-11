@@ -4,6 +4,8 @@ Stand: 2026-11-11. Bei jedem größeren Schritt aktualisieren. Erledigtes steht 
 in den Entwürfen und den Review-Berichten (`.review/runs/`), nicht hier.
 
 ## Auf dem Gerät (S24)
+- **V1.3b1** (Sitzung mit Timer und Uhr, 7.11) in `develop`, noch nicht installiert.
+  Offen: installieren, Gerätetest K27–K30, danach eine Woche Training mit Timer vor V1.3c.
 - **1.3b0.6-backup5** (`versionCode` 16), installiert am 2026-11-11 über 1.3b0.5: Ankunft
   im Zeitraum mit WLAN (7.29), weiterer Ort, Geofence-Neuregistrierung. Nach dem Start:
   Berechtigungen ok, Alarme neu geplant, WLAN-Meldung kommt an (Log ohne BSSID), keine
@@ -43,14 +45,17 @@ ersten weiteren Nutzer kommt die Sicherheitsphase (Backend `CLAUDE.md`, b2b-entw
 4. **Vorschläge in der App:** 1, 4, 5, 6, 7 und 9 sind umgesetzt (Kevin markiert sie);
    offen VS3 (7.25).
 5. **V1.3:** Entwurf bestätigt (design.md *Entwurf V1.3*); 7.29 umgesetzt (V1.3b0.6),
-   als Nächstes V1.3b (Sitzung mit Timer, Uhr) und V1.3c (Abläufe).
+   Sitzung mit Timer umgesetzt (V1.3b1); als Nächstes V1.3c (Abläufe) nach einer Woche
+   Training mit dem Timer. Offen aus V1.3b: Vorlagen mit Sitzung, Chronometer auf der
+   Uhr prüfen (design.md E.3 **[P]**).
 6. **Später, stört aktuell nicht:** Kevin beschreibt die Szenarien zu Checklisten mit
    mehreren Uhrzeiten (vermuteter Fehler; Code und Tests am 2026-11-11 ohne Befund
    geprüft), Training-Alarm am Morgen und „Checkliste nicht richtig gespeichert“
    (möglicher Grund am 2026-11-11 behoben: Vollbild-Alarm und Uhr zeigten bei Checklisten
    „Erledigt“ statt „✓ Punkt“ und schlossen so die ganze Liste ohne Punkte ab);
    aus Review-Lauf 2 optional Paket `alarm` aufteilen.
-7. **Versionsname** je installiertem Stand `1.3b0.<n>-backup<Schritt>`, `versionCode` +1.
+7. **Versionsname** je installiertem Stand `1.3b<n>-backup<Schritt>` (ab 1.3b1; vorher
+   `1.3b0.<n>`), `versionCode` +1.
 8. **Play-Store-Release** ohne Eile, frühestens mit V2 (7.28 PS5–PS9). Branch-Regel für
    `main` setzt Kevin.
 

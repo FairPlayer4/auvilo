@@ -19,6 +19,8 @@ data class Counts(
     val missed: Int = 0,
     val dropped: Int = 0,
     val early: Int = 0,
+    /** Sessions aborted (7.11 D3). */
+    val aborted: Int = 0,
 ) {
     val done: Int get() = goal + minimum
 }
@@ -61,6 +63,7 @@ object Stats {
         missed = occurrences.count { it.resolution == Resolution.MISSED },
         dropped = occurrences.count { it.resolution == Resolution.DROPPED },
         early = occurrences.count { it.state == OccurrenceState.DONE && it.resolvedAt!! < it.dueAt },
+        aborted = occurrences.count { it.resolution == Resolution.ABORTED },
     )
 
     /**
@@ -101,7 +104,8 @@ object Stats {
 
     private fun outcome(resolution: Resolution?) = when (resolution) {
         Resolution.GOAL, Resolution.MINIMUM -> Outcome.COUNT
-        Resolution.MISSED -> Outcome.MISS
+        // An aborted session breaks the series like a miss (design.md E.5).
+        Resolution.MISSED, Resolution.ABORTED -> Outcome.MISS
         else -> Outcome.KEEP
     }
 
@@ -117,7 +121,7 @@ object Stats {
                 done >= goal.minimum -> Step(Outcome.COUNT, week.withDayOfMonth(1))
                 // The running week can still make it.
                 week == thisWeek -> null
-                list.any { it.resolution == Resolution.MISSED } -> Step(Outcome.MISS, week.withDayOfMonth(1))
+                list.any { it.resolution == Resolution.MISSED || it.resolution == Resolution.ABORTED } -> Step(Outcome.MISS, week.withDayOfMonth(1))
                 else -> Step(Outcome.KEEP, week.withDayOfMonth(1))
             }
         }

@@ -105,11 +105,14 @@ class ReminderEngine(
     /** Also deletes its preparation tasks; deleting a task leaves its blocker open. */
     suspend fun delete(reminderId: Long) = command { changes.delete(reminderId) }
 
-    /** Switching a reminder on also takes it out of the archive. */
-    suspend fun setActive(reminderId: Long, active: Boolean) = command { changes.setActive(reminderId, active) }
+    /**
+     * Switching a reminder on also takes it out of the archive. False if nothing changed: unknown,
+     * or a session is running (Anf. 7.11 D7).
+     */
+    suspend fun setActive(reminderId: Long, active: Boolean): Boolean = command { changes.setActive(reminderId, active) }
 
-    /** Archiving pauses the reminder; restoring keeps it paused until it is switched on. */
-    suspend fun setArchived(reminderId: Long, archived: Boolean) = command { changes.setArchived(reminderId, archived) }
+    /** Archiving pauses the reminder; restoring keeps it paused until it is switched on. False as [setActive]. */
+    suspend fun setArchived(reminderId: Long, archived: Boolean): Boolean = command { changes.setArchived(reminderId, archived) }
 
     // --- Places ----------------------------------------------------------------------------
 
@@ -162,6 +165,16 @@ class ReminderEngine(
 
     /** Current "Startklar" answers, the newest per question. */
     suspend fun prep(reminderId: Long): Map<Int, PrepAnswer> = views.prep(reminderId)
+
+    /**
+     * "Ich starte jetzt" (Anf. 7.11 D1): the session runs, the alarm ends; also before it is due
+     * (7.20 V2). The checks come through the alarm port; "Noch dran", "Fertig", "Teilschritt" and
+     * "Abbruch" are [Action.StillOn], [Action.Complete] and [Action.Abort] through [act].
+     */
+    suspend fun start(occurrenceId: Long): TransitionResult = act(occurrenceId, Action.Start)
+
+    /** The average duration of the last sessions done (D6); null without any. */
+    suspend fun sessionAverage(reminderId: Long): Duration? = views.average(reminderId)
 
     /** Called when an alarm fires. Returns what rings, or null if nothing (stale alarm). */
     suspend fun onAlarm(occurrenceId: Long): Ring? = command { scheduler.onAlarm(occurrenceId) }

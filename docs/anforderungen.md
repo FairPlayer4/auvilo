@@ -1171,6 +1171,7 @@ Neueste zuerst. Kap. 7 enthält immer den gültigen Stand; diese Tabelle ist die
 
 | Datum | Entscheidung |
 |---|---|
+| 2026-11-11 | Sitzung mit Timer (7.11, 7.20 V2) in V1.3b1 umgesetzt, nach design.md E.3. Bei der Umsetzung festgelegt (Einzelheiten in E.3): ohne Antwort am Ende *Minimum* mit erledigten Punkten, unter Notaus *abgebrochen*, sonst *verpasst*; unbeantwortete Nachfrage fragt nach höchstens 10 min erneut; *Teilschritt* nur mit Minimum; Schnitt aus den letzten 10 abgeschlossenen Sitzungen; während der Sitzung nur Texte änderbar; Vorlagen ohne Sitzung. Versionsname ab jetzt `1.3b<n>-backup<Schritt>` (erster: `1.3b1-backup5`, Code 17) |
 | 2026-11-11 | Entwurf 7.29 Z.7 bestätigt und in V1.3b0.6 umgesetzt (design.md *Entwurf 7.29*, Z.8). Bei der Umsetzung festgelegt: F2 gilt, wenn die erste Prüfung im Zeitraum (bis 5 min nach Beginn) einen schon da findet; Prüfungen im Raster Beginn + k·Prüfabstand, die späteste Uhrzeit prüft der Alarm des Termins selbst; der Puffer gilt auch für verschobene Termine (`awaitsArrival`), nicht für *Wenn ich ankomme*; Vorlauf 0 = genau das alte Verhalten (kein Puffer, keine Prüfungen); WLAN-Namen und BSSIDs bleiben auf dem Handy (nicht im Diagnose-Log, nicht in der Claude-Schnittstelle, im Testdaten-Export ersetzt); die WLAN-Sonde ist entfernt. Einstellungen *Orte*: Zuhause und ein weiterer Ort, *Hier festlegen* übernimmt Standort und verbundenes WLAN |
 | 2026-11-09 | Nach Review-Lauf 10 (Backend-Repo `.review/runs/2026-11-09.md`, Fragen 1–3): (1) *Cloud-Daten löschen* sperrt **alle Geräte** des Kontos, nicht nur dieses (Ablauf in `protokoll`, R-3 in [wiederherstellen-entwurf.md](wiederherstellen-entwurf.md)). (2) Lehnt der Server die Sitzung ab (`AnmeldungAbgelehnt`), benachrichtigt die App sofort „Bitte neu anmelden“; der 3-Tage-Hinweis (A-13) hängt am gemerkten Konto statt an der Sitzung; ohne Sitzung heißt der Löschknopf „Nur dieses Handy zurücksetzen“, mit dem Hinweis, dass auf dem Server nichts gelöscht wird. (3) Nach einem lokalen Wiederherstellen (Tageskopie, *Rückgängig*) gilt W-7: automatisch wird erst nach einem Sichern von Hand wieder gesichert |
 | 2026-11-09 | Nach Review-Lauf 9 (Backend Kap. 11): Der Server prüft beim ersten Schlüssel-Backup zuerst die Version und schaltet ein angenommenes Gerät frei; die Einrichtung verwirft ein abgelehntes offenes Backup; die Testattrappe der App bildet die Regel nach. Dazu der Knopf „Mit Wiederherstellungsschlüssel freischalten“. Der Worker wertet eine unbeantwortete Rückfrage „übernehmen?“ wie „nein“ (A-10) |
@@ -1293,6 +1294,7 @@ Neueste zuerst. Kap. 7 enthält immer den gültigen Stand; diese Tabelle ist die
 | V1.3b0.4 | 2026-11-07 | Erledigung zurücknehmen (7.31), vorab verschieben und auslassen (7.32) |
 | V1.3b0.5 | 2026-11-11 | Cloud-Backup Schritte 1–5 in `develop`, Fixes aus Review-Lauf 10 |
 | V1.3b0.6 | 2026-11-11 | Ankunft im Zeitraum mit WLAN (7.29), weiterer Ort, Geofences nach `GEOFENCE_NOT_AVAILABLE` neu registriert |
+| V1.3b1 | – | Sitzung mit Timer und Uhr (7.11, 7.20 V2) |
 
 Details zum Verhalten: [design.md](design.md), Gerätetests: [geraetetest.md](geraetetest.md).
 

@@ -114,11 +114,26 @@ fun TodayScreen(
                 )
             }
         }
-        if (today.dueNow.isEmpty() && today.laterToday.isEmpty() && today.resolved.isEmpty() && today.waiting.isEmpty() && today.overdue.isEmpty()) {
+        if (today.dueNow.isEmpty() && today.laterToday.isEmpty() && today.resolved.isEmpty() && today.waiting.isEmpty() && today.overdue.isEmpty() &&
+            today.running.isEmpty()
+        ) {
             item {
                 Text(
                     "Heute steht nichts mehr an. Mit + legst du einen Reminder an.",
                     Modifier.padding(top = 32.dp), color = c.muted, fontSize = 15.sp,
+                )
+            }
+        }
+        // A running session first: back into it with one tap (Anf. 7.11).
+        if (today.running.isNotEmpty()) {
+            item { SectionTitle("Läuft") }
+            items(today.running, key = { "run" + it.occurrence.id }) { e ->
+                EntryCard(
+                    title = e.reminder.title,
+                    detail = e.occurrence.startedAt?.let { "läuft seit ${Format.time(it, zone)}" },
+                    highlight = c.accent,
+                    onClick = { onOpenDue(e) },
+                    modifier = Modifier.testTag("running${e.occurrence.id}"),
                 )
             }
         }
@@ -190,7 +205,7 @@ fun TodayScreen(
             items(today.resolved, key = { "done" + it.occurrence.id }) { e ->
                 EntryCard(
                     title = e.reminder.title,
-                    detail = e.occurrence.resolvedAt?.let { Format.time(it, zone) },
+                    detail = e.occurrence.resolvedAt?.let { Format.time(it, zone) + (e.occurrence.sessionDuration?.let { d -> " · ${Format.duration(d)}" } ?: "") },
                     dimmed = true,
                 ) {
                     Column(horizontalAlignment = Alignment.End) {

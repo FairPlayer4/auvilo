@@ -1,5 +1,8 @@
 package com.avlreminder.data
 
+import com.avlreminder.core.model.OccurrenceState
+import com.avlreminder.core.model.Strictness
+import com.avlreminder.core.model.SessionSpec
 import android.content.Context
 import android.database.sqlite.SQLiteDatabase
 import androidx.room.Room
@@ -149,6 +152,50 @@ class MigrationTest {
             "INSERT INTO occurrence (id, reminderId, dueAt, currentAt, state, postponeCount, resolvedAt, resolution, note, awaitsArrival) " +
                 "VALUES (5, 1, 1000, 1000, 'PLANNED', 0, NULL, NULL, NULL, 0)",
         )
+    }
+
+    private fun createV9() = create(9) { db ->
+        db.execSQL(
+            "INSERT INTO reminder (id, title, character, strictness, scheduleType, timeMinutes, weekdays, proof, active, createdAt, " +
+                "proofPhoto, ignoreDnd, snoozeMinutes, solvedBlockerIsMinimum, arrivalLead, arrivalBuffer, arrivalCheck) " +
+                "VALUES (1, 'Training', 'OVERCOME', 'NORMAL', 'DAILY', 1080, 0, 'CONFIRM', 1, 0, 0, 0, '10', 0, 90, 5, 20)",
+        )
+        db.execSQL(
+            "INSERT INTO occurrence (id, reminderId, dueAt, currentAt, state, postponeCount, resolvedAt, resolution, note, awaitsArrival) " +
+                "VALUES (5, 1, 1000, 1000, 'DUE', 0, NULL, NULL, NULL, 0)",
+        )
+    }
+
+    // KRITISCH: Bestehende Reminder bleiben ohne Sitzung (Anf. 7.11); eine laufende Sitzung zählt als offen.
+    @Test
+    fun version9KeepsDataWithoutSessionAndARunningSessionIsOpen() = runTest {
+        createV9()
+        val db = open()
+        try {
+            val repo = RoomReminderRepository(db)
+            val training = repo.reminder(1)!!
+            assertNull(training.session)
+            val spec = SessionSpec(checkMinutes = 15, checkStrictness = Strictness.NORMAL, goalMinutes = 45, minimumMinutes = 10, maxMinutes = 60, finalMinutes = 3)
+            repo.saveReminder(training.copy(session = spec))
+            assertEquals(spec, repo.reminder(1)!!.session)
+            val running = repo.occurrence(5)!!.copy(
+                state = OccurrenceState.RUNNING, startedAt = Instant.ofEpochMilli(2000),
+                nextCheckAt = Instant.ofEpochMilli(3000), finalCallAt = Instant.ofEpochMilli(4000),
+            )
+            repo.saveOccurrence(running)
+            assertEquals(running, repo.occurrence(5))
+            assertEquals(running, repo.openOccurrence(1))
+            assertEquals(listOf(running), repo.openOccurrences())
+        } finally {
+            db.close()
+        }
+    }
+
+    @Test
+    fun backupIsTakenBeforeTheUpgradeFromVersion9() {
+        createV9()
+        val dir = File(context.filesDir, "backup-test-9").apply { deleteRecursively() }
+        assertTrue(AvlDatabase.backupBeforeMigration(file, dir)!!.name.startsWith("avlreminder-v9-"))
     }
 
     // KRITISCH: Bestehende Ankunfts-Reminder bekommen die Standardwerte aus F3 (Anf. 7.29 OZ9).

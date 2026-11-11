@@ -21,6 +21,8 @@ import com.avlreminder.core.rules.Lifecycle
 import com.avlreminder.core.rules.Limits
 import com.avlreminder.core.rules.PreNotices
 import com.avlreminder.core.rules.ScheduleRules
+import com.avlreminder.core.rules.SessionStep
+import com.avlreminder.core.rules.Sessions
 import com.avlreminder.core.rules.SkipReasons
 import com.avlreminder.core.rules.TransitionResult
 import com.avlreminder.core.rules.WeeklyGoals
@@ -52,6 +54,7 @@ internal class Scheduler(private val c: EngineContext, private val views: AlarmV
             }
             return fire(reminder, occurrence)
         }
+        if (occurrence.state == OccurrenceState.RUNNING) return session(reminder, occurrence)
         val paused = occurrence.pausedUntil
         if (paused != null && paused > now.plus(ReminderEngine.EARLY_TOLERANCE)) {
             plan(reminder, occurrence)
@@ -64,6 +67,43 @@ internal class Scheduler(private val c: EngineContext, private val views: AlarmV
         val escalated = apply(reminder, occurrence, Action.Escalate)
         plan(reminder, escalated)
         return views.ring(reminder, escalated)
+    }
+
+    /**
+     * The alarm of a running session (Anf. 7.11): a check, the last reminder or the end. Not yet
+     * due (alarm early, a sync, the proof screen open) it is only planned again. Also after a
+     * reboot: a check missed meanwhile rings now, a maximum passed brings the last reminder (D7).
+     */
+    private suspend fun session(reminder: Reminder, occurrence: Occurrence): Ring? {
+        val now = now()
+        val at = Sessions.nextAlarm(reminder, occurrence)
+        val proof = occurrence.pausedUntil
+        if (at != null && (at > now.plus(ReminderEngine.EARLY_TOLERANCE) || (proof != null && proof > now.plus(ReminderEngine.EARLY_TOLERANCE)))) {
+            plan(reminder, occurrence)
+            return null
+        }
+        val paused = c.settings().alarmsPaused(now)
+        // Without its settings (switched off while running, e.g. a restored backup) it ends at once.
+        val step = if (at == null) SessionStep.TimeOut else Sessions.step(
+            reminder, occurrence, now, quiet = c.device.isDoNotDisturb() && !reminder.ignoreDnd, paused = paused,
+        )
+        return when (step) {
+            is SessionStep.Check -> {
+                val asked = apply(reminder, occurrence, Action.AskCheck(step.again))
+                plan(reminder, asked)
+                views.ring(reminder, asked)
+            }
+            is SessionStep.FinalCall -> {
+                val called = apply(reminder, occurrence, Action.FinalCall(step.audible, step.again))
+                plan(reminder, called)
+                views.ring(reminder, called)
+            }
+            SessionStep.TimeOut -> {
+                close(reminder, occurrence, Action.EndSession(paused))
+                createNext(reminder)?.let { plan(reminder, it) }
+                null
+            }
+        }
     }
 
     suspend fun sync(): List<Ring> {
@@ -191,6 +231,8 @@ internal class Scheduler(private val c: EngineContext, private val views: AlarmV
                 awaitArrival(reminder, open)
                 null
             }
+            // A session is not missed at the end of the day; it ends through an answer or its maximum (7.11 D7).
+            open.state == OccurrenceState.RUNNING -> session(reminder, open)
             open.state == OccurrenceState.PLANNED && open.currentAt < now.minus(ReminderEngine.GRACE) -> {
                 repo.addEvent(Event(occurrenceId = open.id, at = now, type = EventType.MISSED_DETECTED, detail = open.currentAt.toString()))
                 if (now >= views.missedAt(reminder, open)) {
@@ -308,6 +350,10 @@ internal class Scheduler(private val c: EngineContext, private val views: AlarmV
      * or the next round, at most the miss deadline.
      */
     suspend fun plan(reminder: Reminder, occurrence: Occurrence) {
+        if (occurrence.state == OccurrenceState.RUNNING) {
+            planSession(reminder, occurrence)
+            return
+        }
         val now = now()
         val missedAt = views.missedAt(reminder, occurrence)
         val settings = c.settings()
@@ -340,6 +386,23 @@ internal class Scheduler(private val c: EngineContext, private val views: AlarmV
         else c.preNotices.cancel(occurrence.id)
     }
 
+    /**
+     * The next alarm of a running session: check, last reminder or the end of the time to react,
+     * after the proof screen if it is open. Checks of a relaxed session are exact alarms; the last
+     * reminder is an alarm clock, as strict as possible (D5).
+     */
+    private fun planSession(reminder: Reminder, occurrence: Occurrence) {
+        val next = Sessions.nextAlarm(reminder, occurrence) ?: now()
+        val proof = occurrence.pausedUntil
+        val at = if (proof != null && proof > next) proof else next
+        val spec = reminder.session
+        val started = occurrence.startedAt
+        val final = spec == null || started == null || occurrence.finalCallAt != null || next >= Sessions.maxAt(spec, started)
+        val kind = if (!final && spec?.checkStrictness == Strictness.RELAXED) AlarmKind.EXACT else AlarmKind.ALARM_CLOCK
+        c.alarms.set(occurrence.id, at, kind)
+        c.preNotices.cancel(occurrence.id)
+    }
+
     /** When the occurrence last rang or progressed; null: never. */
     private suspend fun lastRound(occurrence: Occurrence): Instant? =
         repo.events(occurrence.id).filter { it.type in ROUND_EVENTS }.maxOfOrNull { it.at }
@@ -367,7 +430,8 @@ internal class Scheduler(private val c: EngineContext, private val views: AlarmV
             zone = zone,
             previousDueAt = previous?.dueAt,
             lastDoneAt = lastDoneAt,
-            previousWasDone = previous?.state == OccurrenceState.DONE,
+            // After a session the next time not yet begun follows; times passed during it do not count extra (7.11 D7).
+            previousWasDone = previous?.state == OccurrenceState.DONE || previous?.startedAt != null,
             previousMissed = previous?.resolution == Resolution.MISSED,
         )
         val now = now()

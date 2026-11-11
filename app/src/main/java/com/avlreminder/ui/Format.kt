@@ -47,6 +47,36 @@ object Format {
         }
     }
 
+    /** The session timer (Anf. 7.11 D2): "12:34", from an hour on "1:02:03". */
+    fun elapsed(d: Duration): String {
+        val s = d.seconds.coerceAtLeast(0)
+        val (h, m, sec) = Triple(s / 3600, s % 3600 / 60, s % 60)
+        return if (h > 0) "%d:%02d:%02d".format(h, m, sec) else "%02d:%02d".format(m, sec)
+    }
+
+    /** "45 min", "1 h", "1 h 30 min". */
+    fun minutes(m: Int): String = when {
+        m < 60 -> "$m min"
+        m % 60 == 0 -> "${m / 60} h"
+        else -> "${m / 60} h ${m % 60} min"
+    }
+
+    /** A duration in whole minutes, rounded: "42 min". */
+    fun duration(d: Duration): String = minutes(((d.seconds + 30) / 60).toInt())
+
+    /**
+     * How [duration] compares with the [average] (D6): "6 min schneller als im Schnitt", "3 min
+     * länger als im Schnitt", within a minute "wie im Schnitt".
+     */
+    fun pace(duration: Duration, average: Duration): String {
+        val diff = ((duration.seconds - average.seconds) / 60.0).let { kotlin.math.round(it).toInt() }
+        return when {
+            diff == 0 -> "wie im Schnitt"
+            diff < 0 -> "${minutes(-diff)} schneller als im Schnitt"
+            else -> "${minutes(diff)} länger als im Schnitt"
+        }
+    }
+
     fun strictness(s: Strictness) = when (s) {
         Strictness.RELAXED -> "locker"
         Strictness.NORMAL -> "normal"
@@ -60,6 +90,7 @@ object Format {
         Resolution.SKIPPED -> "ausgelassen"
         Resolution.MISSED -> "verpasst"
         Resolution.DROPPED -> "entfallen"
+        Resolution.ABORTED -> "abgebrochen"
     }
 
     fun schedule(s: Schedule): String = when (s) {

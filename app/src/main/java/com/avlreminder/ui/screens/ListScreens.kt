@@ -177,12 +177,14 @@ fun HistoryScreen(
                 val time = Format.time(o.resolvedAt!!, zone)
                 val own = proofs[o.id].orEmpty()
                 val audio = own.firstOrNull { it.type == ProofType.AUDIO }?.filePath
+                // A session (Anf. 7.11): its span and duration, e.g. "Sitzung 18:42–19:27 · 45 min".
+                val session = o.startedAt?.let { start -> "Sitzung ${Format.time(start, zone)}–$time · ${Format.duration(o.sessionDuration!!)}" }
                 val detail = when (o.resolution) {
-                    Resolution.MISSED -> "keine Reaktion bis $time"
+                    Resolution.MISSED -> "keine Reaktion bis $time" + (session?.let { " · $it" } ?: "")
                     Resolution.SKIPPED -> "$time · Grund: ${o.note ?: "–"}"
                     else -> listOfNotNull(
-                        time,
-                        "vor dem Reminder erledigt".takeIf { o.resolvedAt!! < o.dueAt },
+                        session ?: time,
+                        "vor dem Reminder erledigt".takeIf { o.resolvedAt!! < o.dueAt && session == null },
                         proofLine(own),
                         own.firstOrNull { it.type == ProofType.TEXT }?.text?.let { "„$it“" },
                         o.note,

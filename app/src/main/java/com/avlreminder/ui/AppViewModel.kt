@@ -1,5 +1,6 @@
 package com.avlreminder.ui
 
+import android.widget.Toast
 import com.avlreminder.PlaceSetResult
 import android.app.Application
 import androidx.lifecycle.AndroidViewModel
@@ -233,11 +234,16 @@ class AppViewModel(app: Application) : AndroidViewModel(app) {
     }
 
     fun setActive(reminderId: Long, active: Boolean) {
-        viewModelScope.launch { graph.withEngine { it.setActive(reminderId, active) } }
+        viewModelScope.launch { if (!graph.withEngine { it.setActive(reminderId, active) }) running() }
     }
 
     fun setArchived(reminderId: Long, archived: Boolean) {
-        viewModelScope.launch { graph.withEngine { it.setArchived(reminderId, archived) } }
+        viewModelScope.launch { if (!graph.withEngine { it.setArchived(reminderId, archived) }) running() }
+    }
+
+    /** Pausing or archiving a running session is rejected (design.md E.3); say so instead of doing nothing. */
+    private fun running() {
+        Toast.makeText(getApplication(), "Läuft gerade – erst die Sitzung beenden", Toast.LENGTH_LONG).show()
     }
 
     val overview: StateFlow<OverviewTimes> = state(OverviewTimes(), graph.settings.overview)

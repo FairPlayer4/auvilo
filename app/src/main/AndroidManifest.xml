@@ -61,6 +61,12 @@
             android:exported="false"
             android:foregroundServiceType="systemExempted" />
 
+        <!-- The running session with timer (Anf. 7.11); sessions last too long for shortService -->
+        <service
+            android:name=".alarm.SessionService"
+            android:exported="false"
+            android:foregroundServiceType="systemExempted" />
+
         <receiver
             android:name=".alarm.AlarmReceiver"
             android:exported="false" />

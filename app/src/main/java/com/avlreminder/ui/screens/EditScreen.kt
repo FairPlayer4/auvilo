@@ -1,5 +1,6 @@
 package com.avlreminder.ui.screens
 
+import com.avlreminder.core.model.SessionSpec
 import com.avlreminder.core.model.Arrival
 import com.avlreminder.core.model.Place
 import androidx.compose.foundation.layout.Arrangement
@@ -184,6 +185,7 @@ fun EditScreen(
             Fold("Blocker", blockerSummary(form, blockers), "foldBlocker") {
                 BlockerSection(form, blockers, blockerActions) { form = it }
             }
+            Fold("Sitzung mit Timer", sessionSummary(form), "foldSession") { SessionSection(form) { form = it } }
             Fold("Checkliste", checklistSummary(form), "foldChecklist") { ChecklistSection(form.checklist) { form = form.copy(checklist = it) } }
             Fold("Nachweis", proofSummary(form), "foldProof") { ProofSection(form) { form = it } }
             Fold("Warum und Botschaft", whySummary(form), "foldWhy") {
@@ -588,6 +590,58 @@ private fun whySummary(form: ReminderForm) = listOfNotNull(
 ).joinToString(" · ").ifEmpty { "nichts hinterlegt" }
 
 private fun prepSummary(form: ReminderForm) = "${prepAnswered(form)} von ${Prep.QUESTIONS.count()} beantwortet"
+
+private fun sessionSummary(form: ReminderForm): String {
+    if (!form.session) return "aus"
+    return listOfNotNull(
+        "Nachfrage alle ${form.sessionCheck} min",
+        form.sessionGoal?.let { "Ziel ${Format.minutes(it)}" },
+        form.sessionMinimum?.let { "Minimum ${Format.minutes(it)}" },
+        "max. ${Format.minutes(form.sessionMax)}",
+    ).joinToString(" · ")
+}
+
+/** "Ich starte jetzt", timer and checks (Anf. 7.11, design.md E.3). */
+@Composable
+private fun SessionSection(form: ReminderForm, onChange: (ReminderForm) -> Unit) {
+    val c = Avl.colors
+    SwitchLine(
+        "Sitzung mit Timer",
+        "„Ich starte jetzt“ im Alarm, dann läuft ein Timer und fragt nach, ob du noch dran bist",
+        form.session,
+    ) { onChange(form.copy(session = it)) }
+    if (!form.session) return
+    Text("Nachfrage alle", Modifier.padding(top = 12.dp), color = c.text, fontSize = 14.sp)
+    NumberChoice(listOf(5, 10, 15, 30), form.sessionCheck, SessionSpec.MIN_CHECK..SessionSpec.MAX_CHECK, "Nachfrage alle", unit = "min") {
+        onChange(form.copy(sessionCheck = it))
+    }
+    Text("Nachfragen", Modifier.padding(top = 12.dp), color = c.text, fontSize = 14.sp)
+    Choice(
+        listOf(Strictness.RELAXED to "locker", Strictness.NORMAL to "normal", Strictness.STRICT to "streng"),
+        form.sessionCheckStrictness,
+    ) { onChange(form.copy(sessionCheckStrictness = it)) }
+    Text("Ziel-Dauer", Modifier.padding(top = 12.dp), color = c.text, fontSize = 14.sp)
+    NumberChoice(listOf(15, 30, 45, 60), form.sessionGoal, 1..SessionSpec.MAX_MAX, "Ziel-Dauer", unit = "min", unlimited = "keine") {
+        onChange(form.copy(sessionGoal = it))
+    }
+    Text("Minimum-Dauer", Modifier.padding(top = 12.dp), color = c.text, fontSize = 14.sp)
+    NumberChoice(listOf(5, 10, 15), form.sessionMinimum, 1..SessionSpec.MAX_MAX, "Minimum-Dauer", unit = "min", unlimited = "keine") {
+        onChange(form.copy(sessionMinimum = it))
+    }
+    Text("Höchstens", Modifier.padding(top = 12.dp), color = c.text, fontSize = 14.sp)
+    NumberChoice(listOf(60, 90, 120), form.sessionMax, 1..SessionSpec.MAX_MAX, "Höchstens", unit = "min") {
+        onChange(form.copy(sessionMax = it))
+    }
+    Text("Reaktionszeit am Ende", Modifier.padding(top = 12.dp), color = c.text, fontSize = 14.sp)
+    NumberChoice(listOf(3, 5, 10), form.sessionFinal, 1..SessionSpec.MAX_FINAL, "Reaktionszeit am Ende", unit = "min") {
+        onChange(form.copy(sessionFinal = it))
+    }
+    Text(
+        "Mit Ziel-Dauer schlägt die Nachfrage „Fertig“ vor. Nach der Höchstdauer kommt ein letzter Reminder; " +
+            "ohne Antwort zählt es als verpasst (mit erledigten Punkten als Minimum).",
+        Modifier.padding(top = 8.dp), color = c.muted, fontSize = 13.sp,
+    )
+}
 
 private fun fineSummary(form: ReminderForm) = listOfNotNull(
     "Verschieben " + (form.postponeLimit?.let { "$it×" } ?: "unbegrenzt"),

@@ -1,5 +1,6 @@
 package com.avlreminder.core.rules
 
+import com.avlreminder.core.model.SessionSpec
 import com.avlreminder.core.model.AtTimes
 import com.avlreminder.core.model.Character
 import com.avlreminder.core.model.PreNotice
@@ -55,7 +56,14 @@ object Validation {
         if (reminder.snoozeMinutes.toSet().size != reminder.snoozeMinutes.size) add("Verschiebe-Knöpfe doppelt")
         reminder.postponeLimit?.let { if (it < 0) add("Verschiebe-Limit darf nicht negativ sein") }
         reminder.minimumLimitPerWeek?.let { if (it < 0) add("Minimum-Limit darf nicht negativ sein") }
-        if (reminder.minimumLimitPerWeek != null && reminder.minimum.isNullOrBlank()) add("Limit ohne Minimum")
+        if (reminder.minimumLimitPerWeek != null && reminder.minimum.isNullOrBlank() && reminder.session?.minimumMinutes == null) add("Limit ohne Minimum")
+        reminder.session?.let { s ->
+            if (s.checkMinutes !in SessionSpec.MIN_CHECK..SessionSpec.MAX_CHECK) add("Nachfrage alle ${SessionSpec.MIN_CHECK} bis ${SessionSpec.MAX_CHECK} min")
+            if (s.maxMinutes !in 1..SessionSpec.MAX_MAX) add("Maximale Dauer 1 bis ${SessionSpec.MAX_MAX} min")
+            if (s.finalMinutes !in 1..SessionSpec.MAX_FINAL) add("Reaktionszeit 1 bis ${SessionSpec.MAX_FINAL} min")
+            if (s.goalMinutes != null && s.goalMinutes !in 1..s.maxMinutes) add("Ziel-Dauer bis zur maximalen Dauer")
+            if (s.minimumMinutes != null && s.minimumMinutes !in 1..(s.goalMinutes ?: s.maxMinutes)) add("Minimum-Dauer nicht über der Ziel-Dauer")
+        }
         if (reminder.schedule == Schedule.OnArrival && reminder.arrival == null) add("„Wenn ich zuhause bin“ braucht einen Ort")
         (reminder.schedule as? Schedule.Deadline)?.let { d ->
             if (d.until <= d.from) add("Fenster: Ende nach dem Beginn")

@@ -1,6 +1,7 @@
 package com.avlreminder.core.model
 
 import java.time.DayOfWeek
+import java.time.Duration
 import java.time.Instant
 import java.time.LocalDate
 import java.time.LocalDateTime
@@ -42,12 +43,19 @@ data class ProofSpec(
 /** Type of one stored proof. */
 enum class ProofType { PHOTO, TEXT, AUDIO }
 
-enum class OccurrenceState { PLANNED, DUE, ESCALATING, DONE, CLOSED }
+enum class OccurrenceState {
+    PLANNED, DUE, ESCALATING,
+    /** "Ich starte jetzt" (Anf. 7.11): a session with timer and checks is running. */
+    RUNNING,
+    DONE, CLOSED,
+}
 
 enum class Resolution {
     GOAL, MINIMUM, NO_PROOF, SKIPPED, MISSED,
     /** The chance did not come (not at the place at the fallback time); neutral. */
     DROPPED,
+    /** A session ended without the minimum (7.11 D3): no success, breaks the series like a miss. */
+    ABORTED,
 }
 
 enum class EventType {
@@ -64,6 +72,16 @@ enum class EventType {
     REOPENED,
     /** Arrived in the window or while waiting for it (7.29); detail = when it rings. */
     ARRIVED,
+    /** "Ich starte jetzt" (7.11 D1): the session runs. */
+    STARTED,
+    /** A check of the running session rang (D3). */
+    CHECK_ASKED,
+    /** "Noch dran" (D3); the other answers complete or abort. */
+    CHECK_ANSWERED,
+    /** The maximum duration is reached: the last reminder rang (D5); detail "still" = not audible, its time did not start. */
+    FINAL_CALL,
+    /** "Abbruch" or the session ended without an answer (D3, D5); detail = the resolution. */
+    ABORTED,
 }
 
 /** When a reminder is due. */
@@ -222,6 +240,31 @@ data class Arrival(
  */
 data class WeeklyGoal(val target: Int, val max: Int = target, val minimum: Int = 1)
 
+/**
+ * "Ich starte jetzt" with timer and checks (Anf. 7.11). Checks every [checkMinutes] with their own
+ * [checkStrictness] (D3); goal and minimum as a duration only suggest the answer (D4); after
+ * [maxMinutes] the last reminder comes with [finalMinutes] to react (D5).
+ */
+data class SessionSpec(
+    val checkMinutes: Int = DEFAULT_CHECK,
+    val checkStrictness: Strictness = Strictness.RELAXED,
+    val goalMinutes: Int? = null,
+    val minimumMinutes: Int? = null,
+    val maxMinutes: Int = DEFAULT_MAX,
+    val finalMinutes: Int = DEFAULT_FINAL,
+) {
+    companion object {
+        /** Bestätigt 2026-11-02 (design.md E.5): every 10 min, relaxed, at most 90 min, 5 min to react. */
+        const val DEFAULT_CHECK = 10
+        const val DEFAULT_MAX = 90
+        const val DEFAULT_FINAL = 5
+        const val MIN_CHECK = 2
+        const val MAX_CHECK = 120
+        const val MAX_MAX = 12 * 60
+        const val MAX_FINAL = 30
+    }
+}
+
 /** One point of a checklist; the list order is the order of the points. */
 data class ChecklistItem(val id: Long = 0, val title: String)
 
@@ -263,6 +306,8 @@ data class Reminder(
     val solvedBlockerIsMinimum: Boolean = false,
     /** The hint about snoozing (NT2) counts only occurrences due from here on; null = all. */
     val hintQuietUntil: Instant? = null,
+    /** "Ich starte jetzt" with timer and checks (7.11); null = done in one go as before. */
+    val session: SessionSpec? = null,
 )
 
 /** One concrete time a reminder is due. */
@@ -295,6 +340,12 @@ data class Occurrence(
      * postponed) clears it, as the decision is made anew.
      */
     val arrivedAt: Instant? = null,
+    /** "Ich starte jetzt" (7.11): the session began; it stays after the end, for its duration (D6). */
+    val startedAt: Instant? = null,
+    /** While running: when the next check comes (an unanswered one asks again). */
+    val nextCheckAt: Instant? = null,
+    /** The last reminder rang audibly (D5): the time to react runs from here. */
+    val finalCallAt: Instant? = null,
 ) {
     val isOpen: Boolean get() = state != OccurrenceState.DONE && state != OccurrenceState.CLOSED
 
@@ -310,6 +361,12 @@ data class Occurrence(
 
     /** Where it stands now: planned and never rung, the possibly moved time; otherwise its due time. */
     val plannedAt: Instant get() = if (hasFired) dueAt else currentAt
+
+    val isRunning: Boolean get() = state == OccurrenceState.RUNNING
+
+    /** How long the session took (D6); null without a finished session. */
+    val sessionDuration: Duration?
+        get() = if (startedAt != null && resolvedAt != null) Duration.between(startedAt, resolvedAt) else null
 }
 
 data class Proof(

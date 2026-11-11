@@ -6,6 +6,8 @@ import com.avlreminder.core.model.Occurrence
 import com.avlreminder.core.model.PrepAnswer
 import com.avlreminder.core.model.Reminder
 import com.avlreminder.core.rules.AlarmLevel
+import com.avlreminder.core.rules.SessionAnswer
+import java.time.Duration
 import com.avlreminder.core.rules.WeekStatus
 import java.time.Instant
 
@@ -51,10 +53,29 @@ data class AlarmView(
     val missedAt: Instant? = null,
     /** Taken back after a completion with complete proof: done again without a new one (Anf. 7.31). */
     val proofCarried: Boolean = false,
+    /** "Ich starte jetzt" is offered (Anf. 7.11 D1), also before it is due (7.20 V2). */
+    val canStart: Boolean = false,
+    /** The running session; the alarm is then a check or the last reminder. */
+    val session: SessionView? = null,
 ) {
     /** The first open checklist item. */
     val nextItem: ChecklistItem? get() = reminder.checklist.firstOrNull { it.id !in done }
 }
+
+/** A running session as the check, the session screen and its notification show it (7.11). */
+data class SessionView(
+    val startedAt: Instant,
+    /** When the maximum duration is reached (D5). */
+    val maxAt: Instant,
+    /** The last reminder: only the answers that end it (D5). */
+    val final: Boolean,
+    /** The answer the durations suggest (D4). */
+    val suggestion: SessionAnswer,
+    /** The average of the last sessions done (D6); null without any. */
+    val average: Duration?,
+    /** Its interval: "Noch dran" asks again after it. */
+    val checkMinutes: Int,
+)
 
 /** Something that has to ring now, and how loud. */
 data class Ring(val view: AlarmView, val level: AlarmLevel) {

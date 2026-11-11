@@ -25,6 +25,8 @@ data class Today(
     val waiting: List<Entry> = emptyList(),
     /** Deadlines passed but not done yet, oldest first; they ring in their next window. */
     val overdue: List<Entry> = emptyList(),
+    /** Sessions running (Anf. 7.11), started first; not among [dueNow]. */
+    val running: List<Entry> = emptyList(),
 )
 
 /** One day in the history. */
@@ -39,7 +41,7 @@ object Overview {
         fun Instant.isToday() = atZone(zone).toLocalDate() == today
 
         val open = entries.filter { it.occurrence.isOpen && it.reminder.active }
-        val fired = open.filter { it.occurrence.state != OccurrenceState.PLANNED }
+        val (running, fired) = open.filter { it.occurrence.state != OccurrenceState.PLANNED }.partition { it.occurrence.isRunning }
         val (waiting, timed) = open.filter { it.occurrence.state == OccurrenceState.PLANNED }
             .partition { it.reminder.schedule == Schedule.OnArrival || it.occurrence.awaitsArrival }
         val (overdue, planned) = timed.partition { e ->
@@ -54,19 +56,21 @@ object Overview {
             upcoming = planned.filter { !it.occurrence.currentAt.isToday() }.sortedBy { it.occurrence.currentAt },
             waiting = waiting.sortedBy { it.occurrence.currentAt },
             overdue = overdue.sortedBy { it.occurrence.dueAt },
+            running = running.sortedBy { it.occurrence.startedAt },
         )
     }
 
     /** The next thing that will ring, for the widget. */
-    fun next(today: Today): Entry? = today.dueNow.firstOrNull() ?: today.laterToday.firstOrNull() ?: today.upcoming.firstOrNull()
+    fun next(today: Today): Entry? =
+        today.running.firstOrNull() ?: today.dueNow.firstOrNull() ?: today.laterToday.firstOrNull() ?: today.upcoming.firstOrNull()
 
-    /** Resolved occurrences grouped by day, newest day and entry first. */
+    /** Resolved occurrences grouped by day, newest day and entry first; a session on the day it began (7.11 D7). */
     fun history(reminders: List<Reminder>, resolved: List<Occurrence>, zone: ZoneId): List<HistoryDay> {
         val byId = reminders.associateBy { it.id }
         return resolved
             .filter { !it.isOpen && it.resolvedAt != null }
             .mapNotNull { o -> byId[o.reminderId]?.let { Entry(it, o) } }
-            .groupBy { it.occurrence.resolvedAt!!.atZone(zone).toLocalDate() }
+            .groupBy { (it.occurrence.startedAt ?: it.occurrence.resolvedAt!!).atZone(zone).toLocalDate() }
             .toSortedMap(compareByDescending { it })
             .map { (date, list) -> HistoryDay(date, list.sortedByDescending { it.occurrence.resolvedAt }) }
     }

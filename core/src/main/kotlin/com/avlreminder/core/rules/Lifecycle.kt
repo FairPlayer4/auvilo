@@ -8,6 +8,7 @@ import com.avlreminder.core.model.OccurrenceState.DONE
 import com.avlreminder.core.model.OccurrenceState.DUE
 import com.avlreminder.core.model.OccurrenceState.ESCALATING
 import com.avlreminder.core.model.OccurrenceState.PLANNED
+import com.avlreminder.core.model.OccurrenceState.RUNNING
 import com.avlreminder.core.model.Reminder
 import com.avlreminder.core.model.Resolution
 import com.avlreminder.core.model.severalADay
@@ -59,6 +60,22 @@ sealed interface Action {
      * Not a postponement; whether it may happen at all decides [com.avlreminder.core.usecases.ReminderEngine.reopen].
      */
     data class Reopen(val at: Instant) : Action
+
+    /** "Ich starte jetzt" (Anf. 7.11 D1): the session runs, the alarm ends; also before it is due (7.20 V2). */
+    data object Start : Action
+    /** "Noch dran" (D3): the next check after the interval. */
+    data object StillOn : Action
+    /** "Abbruch ohne Minimalziel" (D3): not successful, honest in the statistics. */
+    data object Abort : Action
+    /** A check rings (D3); unanswered it asks again at [again]. */
+    data class AskCheck(val again: Instant) : Action
+    /** The last reminder rings (D5); only [audible] its time to react starts, it asks again at [again]. */
+    data class FinalCall(val audible: Boolean, val again: Instant) : Action
+    /**
+     * No answer to the last reminder, or the maximum reached during the pause by hand (D5, D7):
+     * checklist items done count as the minimum, otherwise missed – [paused]: aborted.
+     */
+    data class EndSession(val paused: Boolean) : Action
 }
 
 /** Facts beyond the occurrence itself that limit what is allowed. */
@@ -102,8 +119,9 @@ object Lifecycle {
     fun postponesLeft(reminder: Reminder, occurrence: Occurrence): Int? =
         reminder.postponeLimit?.let { (it - occurrence.postponeCount).coerceAtLeast(0) }
 
+    /** A minimum as text, or as a duration of the session (7.11 D4). */
     fun canUseMinimum(reminder: Reminder, limits: Limits): Boolean =
-        reminder.minimum != null && minimumLeft(reminder, limits)
+        (reminder.minimum != null || reminder.session?.minimumMinutes != null) && minimumLeft(reminder, limits)
 
     /** A solved blocker as the minimum (S7); the weekly limit for the minimum applies. */
     fun canUseSolvedBlocker(reminder: Reminder, limits: Limits): Boolean =
@@ -122,8 +140,11 @@ object Lifecycle {
         now: Instant,
         limits: Limits = Limits(),
     ): TransitionResult {
-        fun ok(o: Occurrence, type: EventType, detail: String? = null) =
-            TransitionResult.Ok(o, Event(occurrenceId = occurrence.id, at = now, type = type, detail = detail))
+        fun ok(o: Occurrence, type: EventType, detail: String? = null) = TransitionResult.Ok(
+            // A session that ended keeps its start (its duration, D6) but has no next check.
+            if (o.state == RUNNING) o else o.copy(nextCheckAt = null),
+            Event(occurrenceId = occurrence.id, at = now, type = type, detail = detail),
+        )
         if (action is Action.Reopen) {
             if (!canReopen(occurrence)) return TransitionResult.Rejected("only a done occurrence or one skipped by hand can be taken back")
             if (action.at <= now) return TransitionResult.Rejected("must ring again in the future")
@@ -133,11 +154,17 @@ object Lifecycle {
                 occurrence.copy(
                     state = PLANNED, currentAt = action.at, resolution = null, resolvedAt = null, note = null,
                     pausedUntil = null, awaitsArrival = false, arrivedAt = null, firstProgressAt = progress,
+                    startedAt = null, finalCallAt = null,
                 ),
                 EventType.REOPENED, occurrence.resolution?.name,
             )
         }
         if (!occurrence.isOpen) return TransitionResult.Rejected("occurrence is already resolved")
+        // KRITISCH: a running session ends only through an answer or its maximum duration (7.11 D7):
+        // no snoozing, no end of the day, no window closing, no miss.
+        if (occurrence.state == RUNNING && action.notWhileRunning()) return TransitionResult.Rejected("läuft gerade")
+        val spec = reminder.session
+        val started = occurrence.startedAt
 
         return when (action) {
             Action.Fire ->
@@ -281,6 +308,71 @@ object Lifecycle {
                 occurrence.copy(state = CLOSED, resolution = Resolution.MISSED, resolvedAt = now),
                 EventType.MISSED,
             )
+
+            Action.Start -> when {
+                spec == null -> TransitionResult.Rejected("no session for this reminder")
+                !Sessions.canStart(reminder, occurrence) -> TransitionResult.Rejected("already running")
+                else -> ok(
+                    occurrence.copy(
+                        state = RUNNING, startedAt = now, nextCheckAt = minOf(now.plusMinutes(spec.checkMinutes), Sessions.maxAt(spec, now)),
+                        pausedUntil = null, awaitsArrival = false, finalCallAt = null,
+                    ),
+                    EventType.STARTED,
+                )
+            }
+
+            Action.StillOn -> when {
+                spec == null || started == null || occurrence.state != RUNNING -> TransitionResult.Rejected("no session running")
+                // At the maximum only an answer that ends it is left (D5).
+                occurrence.finalCallAt != null || now >= Sessions.maxAt(spec, started) -> TransitionResult.Rejected("maximum duration reached")
+                // KRITISCH: no check after the maximum – the last reminder comes there (D5).
+                else -> ok(
+                    occurrence.copy(nextCheckAt = minOf(now.plusMinutes(spec.checkMinutes), Sessions.maxAt(spec, started)), pausedUntil = null),
+                    EventType.CHECK_ANSWERED,
+                )
+            }
+
+            Action.Abort ->
+                if (occurrence.state != RUNNING) TransitionResult.Rejected("no session running")
+                else ok(occurrence.copy(state = CLOSED, resolution = Resolution.ABORTED, resolvedAt = now), EventType.ABORTED, Resolution.ABORTED.name)
+
+            is Action.AskCheck ->
+                if (occurrence.state != RUNNING) TransitionResult.Rejected("no session running")
+                else ok(occurrence.copy(nextCheckAt = action.again), EventType.CHECK_ASKED)
+
+            is Action.FinalCall ->
+                if (occurrence.state != RUNNING) TransitionResult.Rejected("no session running")
+                else ok(
+                    occurrence.copy(nextCheckAt = action.again, finalCallAt = if (action.audible) now else null),
+                    EventType.FINAL_CALL, if (action.audible) null else "still",
+                )
+
+            is Action.EndSession -> {
+                if (occurrence.state != RUNNING) return TransitionResult.Rejected("no session running")
+                // D5: items already done count as the minimum, also beyond its weekly limit – the system ends it.
+                val resolution = when {
+                    limits.itemsDone.isNotEmpty() -> Resolution.MINIMUM
+                    action.paused -> Resolution.ABORTED
+                    else -> Resolution.MISSED
+                }
+                val state = if (resolution == Resolution.MINIMUM) DONE else CLOSED
+                val type = when (resolution) {
+                    Resolution.MINIMUM -> EventType.COMPLETED
+                    Resolution.MISSED -> EventType.MISSED
+                    else -> EventType.ABORTED
+                }
+                ok(occurrence.copy(state = state, resolution = resolution, resolvedAt = now), type, resolution.name)
+            }
         }
+    }
+
+    private fun Instant.plusMinutes(m: Int): Instant = plus(Duration.ofMinutes(m.toLong()))
+
+    /** What a running session does not allow (7.11 D7); completing, checklist items and the proof screen stay. */
+    private fun Action.notWhileRunning(): Boolean = when (this) {
+        Action.Escalate, is Action.Snooze, is Action.Postpone, is Action.Skip, Action.Miss,
+        is Action.DeferRest, is Action.CloseWindow,
+        -> true
+        else -> false
     }
 }

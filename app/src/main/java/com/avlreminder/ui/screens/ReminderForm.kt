@@ -1,5 +1,6 @@
 package com.avlreminder.ui.screens
 
+import com.avlreminder.core.model.SessionSpec
 import com.avlreminder.core.model.Arrival
 import com.avlreminder.core.model.Character
 import com.avlreminder.core.model.ChecklistItem
@@ -81,6 +82,14 @@ data class ReminderForm(
     val solvedBlockerIsMinimum: Boolean = false,
     /** Kept for a preparation task; not editable. */
     val prepFor: Long? = null,
+    /** Session with timer (Anf. 7.11); the numbers are kept when it is switched off. */
+    val session: Boolean = false,
+    val sessionCheck: Int = SessionSpec.DEFAULT_CHECK,
+    val sessionCheckStrictness: Strictness = Strictness.RELAXED,
+    val sessionGoal: Int? = null,
+    val sessionMinimum: Int? = null,
+    val sessionMax: Int = SessionSpec.DEFAULT_MAX,
+    val sessionFinal: Int = SessionSpec.DEFAULT_FINAL,
 ) {
     /** Several times a day are possible for these kinds only (VS1). */
     val timesPossible: Boolean get() = kind == ScheduleKind.DAILY || kind == ScheduleKind.WEEKDAYS
@@ -157,6 +166,11 @@ data class ReminderForm(
             },
             prepFor = prepFor,
             solvedBlockerIsMinimum = solvedBlockerIsMinimum,
+            session = if (session) {
+                SessionSpec(sessionCheck, sessionCheckStrictness, sessionGoal, sessionMinimum, sessionMax, sessionFinal)
+            } else {
+                null
+            },
         )
     }
 
@@ -202,6 +216,13 @@ data class ReminderForm(
                 preNoticeBefore = (r.preNotice as? PreNotice.Before)?.minutes ?: 30,
                 solvedBlockerIsMinimum = r.solvedBlockerIsMinimum,
                 prepFor = r.prepFor,
+                session = r.session != null,
+                sessionCheck = r.session?.checkMinutes ?: SessionSpec.DEFAULT_CHECK,
+                sessionCheckStrictness = r.session?.checkStrictness ?: Strictness.RELAXED,
+                sessionGoal = r.session?.goalMinutes,
+                sessionMinimum = r.session?.minimumMinutes,
+                sessionMax = r.session?.maxMinutes ?: SessionSpec.DEFAULT_MAX,
+                sessionFinal = r.session?.finalMinutes ?: SessionSpec.DEFAULT_FINAL,
             )
             return when (val s = r.schedule) {
                 is Schedule.Once -> base.copy(kind = ScheduleKind.ONCE, date = s.at.toLocalDate(), time = s.at.toLocalTime())

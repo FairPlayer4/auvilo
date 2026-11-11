@@ -1,5 +1,7 @@
 package com.avlreminder
 
+import com.avlreminder.alarm.SessionService
+import com.avlreminder.alarm.SessionNote
 import android.app.Application
 import android.app.NotificationManager
 import android.content.Context
@@ -88,6 +90,7 @@ class AvlApp : Application() {
         OverviewNotifications.createChannel(this)
         PreNotices.createChannel(this)
         AlarmPause.createChannel(this)
+        SessionService.createChannel(this)
         AndroidCloudNotices.createChannel(this)
         // Android reports WLAN connections from now on, also without a running process (7.29 OZ3).
         AndroidWifi.watch(this)
@@ -236,7 +239,22 @@ class AppGraph(private val context: Context) : ClaudeApi.Access {
             block(engine)
         }
         scope.launch { runCatching { AvlWidget().updateAll(context) } }
+        scope.launch { runCatching { SessionService.show(context, sessions()) } }
         return result
+    }
+
+    /** The running sessions for their notification (Anf. 7.11). */
+    private suspend fun sessions(): List<SessionNote> {
+        val running = openOccurrences().filter { it.isRunning }
+        if (running.isEmpty()) return emptyList()
+        return running.mapNotNull { o ->
+            val r = repository.reminder(o.reminderId) ?: return@mapNotNull null
+            SessionNote(
+                occurrenceId = o.id, title = r.title, startedAt = o.startedAt ?: return@mapNotNull null,
+                quickDone = !r.proof.needsEvidence,
+                minimum = r.minimum != null || r.session?.minimumMinutes != null,
+            )
+        }.sortedBy { it.startedAt }
     }
 
     // --- Interface for Claude (Anf. 7.26 AG11) ----------------------------------------------

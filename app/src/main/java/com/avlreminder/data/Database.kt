@@ -93,6 +93,13 @@ data class ReminderEntity(
     val moreTimes: String? = null,
     /** The snoozing hint (NT2) counts only occurrences due from here on. */
     val hintQuietUntil: Instant? = null,
+    /** Session with timer (Anf. 7.11): the check interval; null = no session. The others only with it. */
+    val sessionCheck: Int? = null,
+    val sessionCheckStrictness: Strictness? = null,
+    val sessionGoal: Int? = null,
+    val sessionMinimum: Int? = null,
+    val sessionMax: Int? = null,
+    val sessionFinal: Int? = null,
 )
 
 @Entity(
@@ -215,6 +222,10 @@ data class OccurrenceEntity(
     val firedAt: Instant? = null,
     @ColumnInfo(defaultValue = "0") val awaitsArrival: Boolean = false,
     val arrivedAt: Instant? = null,
+    /** The session (7.11): its start, the next check, the last reminder. */
+    val startedAt: Instant? = null,
+    val nextCheckAt: Instant? = null,
+    val finalCallAt: Instant? = null,
 )
 
 @Entity(
@@ -260,7 +271,8 @@ data class PrepAnswerEntity(
     val at: Instant,
 )
 
-private const val OPEN = "('PLANNED','DUE','ESCALATING')"
+// KRITISCH: every open state; a running session is open too (Anf. 7.11).
+private const val OPEN = "('PLANNED','DUE','ESCALATING','RUNNING')"
 
 @Dao
 interface AvlDao {
@@ -580,6 +592,19 @@ val MIGRATION_8_9 = object : Migration(8, 9) {
     }
 }
 
+/** V1.3b (Anf. 7.11): the session with timer per reminder and its times per occurrence. Only new nullable columns. */
+val MIGRATION_9_10 = object : Migration(9, 10) {
+    override fun migrate(db: SupportSQLiteDatabase) {
+        for (column in listOf("sessionCheck", "sessionGoal", "sessionMinimum", "sessionMax", "sessionFinal")) {
+            db.execSQL("ALTER TABLE reminder ADD COLUMN $column INTEGER")
+        }
+        db.execSQL("ALTER TABLE reminder ADD COLUMN sessionCheckStrictness TEXT")
+        for (column in listOf("startedAt", "nextCheckAt", "finalCallAt")) {
+            db.execSQL("ALTER TABLE occurrence ADD COLUMN $column INTEGER")
+        }
+    }
+}
+
 /** The new tables of version 6, as Room generates them (see schemas/…/6.json). */
 private val CREATE_6 = listOf(
     "CREATE TABLE IF NOT EXISTS `blocker` (`id` INTEGER PRIMARY KEY AUTOINCREMENT NOT NULL, `reminderId` INTEGER NOT NULL, " +
@@ -626,8 +651,8 @@ abstract class AvlDatabase : RoomDatabase() {
     companion object {
         const val NAME = "avlreminder.db"
 
-        val MIGRATIONS = arrayOf(MIGRATION_1_2, MIGRATION_2_3, MIGRATION_3_4, MIGRATION_4_5, MIGRATION_5_6, MIGRATION_6_7, MIGRATION_7_8, MIGRATION_8_9)
-        const val VERSION = 9
+        val MIGRATIONS = arrayOf(MIGRATION_1_2, MIGRATION_2_3, MIGRATION_3_4, MIGRATION_4_5, MIGRATION_5_6, MIGRATION_6_7, MIGRATION_7_8, MIGRATION_8_9, MIGRATION_9_10)
+        const val VERSION = 10
 
         fun create(context: Context): AvlDatabase {
             val backups = File(context.filesDir, "backup")

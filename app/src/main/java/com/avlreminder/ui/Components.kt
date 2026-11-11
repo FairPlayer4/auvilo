@@ -58,6 +58,7 @@ fun ResultBadge(resolution: Resolution) {
         Resolution.SKIPPED -> Badge(text, c.neutral, c.onNeutral)
         Resolution.MISSED -> Badge(text, c.strict, c.onStrict)
         Resolution.DROPPED -> Badge(text, Color.Transparent, c.muted, c.line)
+        Resolution.ABORTED -> Badge(text, c.surface, c.muted, c.line)
     }
 }
 
