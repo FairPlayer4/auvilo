@@ -1,20 +1,16 @@
 # Stand und nächste Schritte
 
-Stand: 2026-11-10. Bei jedem größeren Schritt aktualisieren. Erledigtes steht in git,
+Stand: 2026-11-11. Bei jedem größeren Schritt aktualisieren. Erledigtes steht in git,
 in den Entwürfen und den Review-Berichten (`.review/runs/`), nicht hier.
 
 ## Auf dem Gerät (S24)
-- **1.3b0.4** (`versionCode` 14) mit dem Cloud-Backup bis Schritt 5 (Backend-Pin
-  `6d04e02`, Zeitzonen-Fix `5b8ee18`, Diagnose bei abgebrochenem Wiederherstellen
-  `6972903`), installiert am 2026-11-09; Gerätetest S24 am selben Tag bestanden.
-  Enthält V1.3a (VS1, VS2, NT2, Notaus PS7, Schnittstelle für Claude 7.26 AG11) und
-  V1.3b0.x (Engine als Fassade, Checklisten C8, WLAN-Sonde, *Zurücknehmen*, Vorab-Alarm).
-- **Gebaut, noch nicht installiert:** `1.3b0.5-backup5` (`versionCode` 15) auf
-  `feature/backup`, Backend-Pin in `gradle/backend-commit.txt`: Fixes aus Review-Lauf 10
-  (R1 Einstellungen vor dem Tausch prüfen, R2 Room löscht keine beschädigte DB, W-7,
-  abgelehnte Sitzung meldet sich sofort, *Cloud-Daten löschen* sperrt erst alle anderen
-  Geräte, *Mit Wiederherstellungsschlüssel freischalten*), Phase C (`CloudBackup.kt`
-  geteilt, abgelehnte Sitzung wird einmal erneuert), Phase D (Token vor jedem Aufruf).
+- **1.3b0.5-backup5** (`versionCode` 15), installiert am 2026-11-11 über 1.3b0.4
+  (Backend-Pin `5845beb`). Gegenüber 1.3b0.4: Fixes aus Review-Lauf 10 (R1, R2, W-7,
+  abgelehnte Sitzung, *Cloud-Daten löschen*, *Mit Wiederherstellungsschlüssel
+  freischalten*), Phase C und D, Phase F (Eskalationsrunde ab letztem Klingeln, Wochenstand
+  einmal definiert, Checklisten-Knopf im Vollbild-Alarm und auf der Uhr). Nach dem Start:
+  Berechtigungen ok, Alarme neu geplant, keine Fehler im Diagnose-Log. Offen: Gerätetest
+  (Kerntests und C1–C4) durch Kevin.
 
 ## Cloud-Backup
 Entwürfe: [backup-entwurf.md](backup-entwurf.md) (Schritte 1–5),
