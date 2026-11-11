@@ -198,6 +198,19 @@ hilfreich ist, wenn er notiert, wann er ungefähr nach Hause kam und wegging.
 
 Welches Netz N1 ist, sieht man an der Zeile `learned N1` und der Uhrzeit.
 
+**Ergebnis (ausgelesen 2026-11-11, 05.11. 22:44 bis 11.11. 08:25, 417 Zeilen):**
+
+| # | Ergebnis |
+|---|---|
+| W1 | **Nein, nicht zuverlässig.** Bei allen 6 Ankünften meldete zuerst ein `tick` die Verbindung zu N1; `connect` kam gleichzeitig mit dem `tick` (06.11.), 15–26 min später oder erst Stunden später. Android liefert den Rückruf im Ruhezustand offenbar erst, wenn die App ohnehin geweckt wird. |
+| W2 | **Ja, immer über den Rückruf** (`/cb` in allen 390 verbundenen Zeilen), nie `/info`, nie `wifi-no-bssid`. |
+| W3 | Zuhause Median 4 min, 90 % unter 15 min, maximal 2 h; unterwegs Median 2 min, maximal 22 min. |
+| W4 | **Ja.** Nie `N1=AWAY`, solange N1 verbunden war (383 × `AT`). Nicht verbunden: 22 × `AWAY`, 4 × `UNKNOWN`; beim Weggehen war der erste `tick` 3 × `AWAY`, 3 × `UNKNOWN`. |
+| W5 | **Ja.** Abstände 20,0–20,1 min, auch nachts, keine Lücke. |
+
+Vergleich mit dem DWELL-Geofence für *Zuhause*: Die WLAN-Erkennung per `tick` kam bei allen 6 Ankünften früher (4 min, 13 min, 31 min, 31 min, 50 min und 4,5 h).
+Folge für 7.29 Z.7: Die Ankunft nicht auf den Verbindungs-Rückruf stützen, sondern auf die regelmäßige Prüfung (Takt nach Bedarf kürzer, solange ein Termin auf die Ankunft wartet). Den Rückruf nur als zusätzliches Signal nutzen; *klar weg* (`AWAY`) ist verlässlich.
+
 ## V1.3b0.4: Erledigung zurücknehmen (7.31)
 
 | # | Test | Erwartung |

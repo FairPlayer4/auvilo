@@ -42,13 +42,13 @@ ersten weiteren Nutzer kommt die Sicherheitsphase (Backend `CLAUDE.md`, b2b-entw
 4. **Vorschläge in der App:** 1, 4, 5, 6, 7 und 9 sind umgesetzt (Kevin markiert sie);
    offen VS3 (7.25).
 5. **V1.3:** Entwurf bestätigt (design.md *Entwurf V1.3*); als Nächstes Entwurf 7.29 Z.7
-   (WLAN) bestätigen, dann V1.3b (Sitzung mit Timer, Uhr) und V1.3c (Abläufe).
+   (WLAN) bestätigen (Sonde ausgewertet: geraetetest-archiv.md, V1.3b0.3), dann V1.3b (Sitzung mit Timer, Uhr) und V1.3c (Abläufe).
 6. **Später, stört aktuell nicht:** Kevin beschreibt die Szenarien zu Checklisten mit
    mehreren Uhrzeiten (vermuteter Fehler; Code und Tests am 2026-11-11 ohne Befund
    geprüft), Training-Alarm am Morgen und „Checkliste nicht richtig gespeichert“
    (möglicher Grund am 2026-11-11 behoben: Vollbild-Alarm und Uhr zeigten bei Checklisten
    „Erledigt“ statt „✓ Punkt“ und schlossen so die ganze Liste ohne Punkte ab);
-   WLAN-Sonde auslesen; aus Review-Lauf 2 optional Paket `alarm` aufteilen.
+   aus Review-Lauf 2 optional Paket `alarm` aufteilen.
 7. **Versionsname** je installiertem Stand `1.3b0.<n>-backup<Schritt>`, `versionCode` +1.
 8. **Play-Store-Release** ohne Eile, frühestens mit V2 (7.28 PS5–PS9). Branch-Regel für
    `main` setzt Kevin.
