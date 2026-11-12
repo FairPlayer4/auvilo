@@ -102,7 +102,7 @@ internal class Changes(private val c: EngineContext, private val views: AlarmVie
             if (due == null) {
                 scheduler.close(saved, open, Action.Skip(SkipReasons.SCHEDULE_CHANGED))
             } else if (due != open.dueAt) {
-                repo.saveOccurrence(open.copy(dueAt = due, currentAt = due))
+                repo.saveOccurrence(open.copy(dueAt = due, currentAt = due, arrivedAt = null))
             }
         }
         val ring = scheduler.syncReminder(saved) ?: scheduler.arriveIfThere(saved)
@@ -119,7 +119,7 @@ internal class Changes(private val c: EngineContext, private val views: AlarmVie
         val due = schedule.at.atZone(zone).toInstant()
         val open = repo.openOccurrence(reminder.id)
         if (open != null && open.state == OccurrenceState.PLANNED && !open.hasFired && open.postponeCount == 0) {
-            repo.saveOccurrence(open.copy(dueAt = due, currentAt = due))
+            repo.saveOccurrence(open.copy(dueAt = due, currentAt = due, arrivedAt = null))
             return
         }
         open?.let { scheduler.close(reminder, it, Action.Skip(SkipReasons.SCHEDULE_CHANGED)) }

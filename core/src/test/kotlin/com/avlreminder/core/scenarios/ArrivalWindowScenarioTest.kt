@@ -200,6 +200,20 @@ class ArrivalWindowScenarioTest {
         assertEquals(emptyList<String>(), sim.rings)
     }
 
+    // Z.8: Bearbeiten leert arrivedAt – die Ankunft gehört zum alten Zeitraum, nicht zum neuen.
+    @Test
+    fun `nach der Ankunft auf spaeter verlegt zaehlt die Ankunft nicht mehr`() = runTest {
+        val id = training(home())
+        sim.wifi(HOME_24, at(26, 18, 40))
+        sim.runUntil(at(26, 18, 42))
+        val edited = checkNotNull(sim.repo.reminder(id)).copy(schedule = Schedule.Weekdays(LocalTime.of(21, 0), workdays))
+        sim.engine.save(edited)
+        assertEquals(null, sim.open(id).arrivedAt)
+        // Noch zuhause: die erste Prüfung des neuen Zeitraums (19:30) findet einen da (F2), es klingelt um 21:00.
+        sim.runUntil(at(26, 21, 1))
+        assertEquals(listOf("Mo 21:00 Training FULLSCREEN"), sim.rings)
+    }
+
     private companion object {
         const val HOME_24 = "aa:bb:cc:00:00:01"
         const val HOME_5 = "AA:BB:CC:00:00:02"
