@@ -35,7 +35,7 @@ Entwürfe: [backup-entwurf.md](backup-entwurf.md) (Schritte 1–5),
 ersten weiteren Nutzer kommt die Sicherheitsphase (Backend `CLAUDE.md`, b2b-entwurf.md).
 
 ## Offen
-1. **1.3b0.6 installieren**, *Zuhause* in *Orte* neu festlegen (mit WLAN verbunden) und
+1. *Zuhause* in *Orte* neu festlegen (mit WLAN verbunden) und
    K23–K26 aus [geraetetest.md](geraetetest.md) im Alltag prüfen.
 2. **Testsession vor V2** ([testsession.md](testsession.md)): Kevin führt sie durch, danach
    wertet Claude `diag.log`, `logcat` und `adb shell dumpsys alarm` aus.

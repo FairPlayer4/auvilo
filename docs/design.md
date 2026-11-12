@@ -194,10 +194,9 @@ PLANNED ──(Zeit/Ankunft)──► DUE ──(keine Reaktion)──► ESCALA
 | `STRICT` | Vollbild + Vibration, ab `loudFrom` mit Alarmton | still | wie normal |
 
 - **Runden:** Eine Runde klingelt 3 min (`Escalation.ROUND`); die nächste liegt 10 min
-  (`REPEAT`) nach dem Planen, also etwa alle 10 min ab Rundenbeginn, bis zur Reaktion.
-  Während „Nicht stören“ laufen die Runden still weiter. Offen: Die Fälligkeit speichert
-  ihre nächste Runde nicht; jeder `sync` plant sie ab jetzt neu, dadurch kann sich eine
-  Runde nach hinten schieben.
+  (`REPEAT`) nach dem letzten Klingeln (`DUE`, `ESCALATED`), abgehakten Punkt oder
+  *Zurücknehmen*, bis zur Reaktion; ein `sync` verschiebt sie nicht, eine verpasste Runde
+  (Handy aus) klingelt sofort. Während „Nicht stören“ laufen die Runden still weiter.
 - **Mehrere gleichzeitig** (Anf. 7.3, geplant mit V1.3b): ein Vollbild zur Zeit, der
   nächste mit *+1 wartet*; seine Runden laufen weiter. Heute überschreibt der zweite
   Alarm den ersten im `AlarmService`.
@@ -448,7 +447,7 @@ umgesetzt / verworfen. Liste in den Einstellungen, *Teilen* als Markdown.
 
 ## 13. Daten, Migration, Diagnose
 
-- **Room** mit exportierten Schemas (`app/schemas/`), aktuell Version 8. Jede Version hat
+- **Room** mit exportierten Schemas (`app/schemas/`), aktuell Version 10. Jede Version hat
   eine explizite Migration (`AvlDatabase.MIGRATIONS`), kein destruktiver Fallback;
   Migrationen möglichst nur mit `ADD COLUMN` und neuen Tabellen.
 - **Fremdschlüssel mit `ON DELETE CASCADE`:** `occurrence`, `blocker`, `checklist_item`,

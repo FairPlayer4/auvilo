@@ -5,5 +5,5 @@ dass Erinnerungen tatsächlich wahrgenommen und erledigt werden ("Alignment").
 
 ## Status
 
-Prototyp V1.2b im Einsatz auf dem eigenen Gerät. Aktueller Stand: [`docs/stand.md`](docs/stand.md),
+Im Einsatz auf dem eigenen Gerät (installierte Version: siehe stand.md). Aktueller Stand: [`docs/stand.md`](docs/stand.md),
 Anforderungen: [`docs/anforderungen.md`](docs/anforderungen.md).

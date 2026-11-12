@@ -17,7 +17,7 @@ jemand außer Kevin die App gegen die Cloud nutzt, darf Claude die Schlüssel ke
 vor dem ersten weiteren Nutzer wird alles zurückgesetzt und neu eingerichtet.
 
 Weiterhin gilt (backend.md): Die App funktioniert ohne Backend vollständig, das
-Backup darf scheitern, der Export als Datei und das Migrations-Backup bleiben.
+Backup darf scheitern, das Migrations-Backup und die lokalen Tageskopien (R-1 in wiederherstellen-entwurf.md) bleiben.
 
 **Nicht** in diesem Schritt: Synchronisation (B3), Fotos und Audio, Play Integrity,
 Play-Store-Variante.

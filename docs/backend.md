@@ -53,7 +53,7 @@
 - **Wiederherstellen nur auf ausdrücklichen Wunsch**, mit Anzeige „Sicherung vom … von
   Gerät …“, nie automatisch über lokale Daten.
 - Die App zeigt, wann die letzte Sicherung erfolgreich war. Das lokale Backup vor
-  Migrationen bleibt; ein Export als Datei bleibt die eigentliche Sicherung.
+  Migrationen bleibt; ein Export als Datei ist später nachrüstbar (anforderungen.md 8.4).
 - **Einbindung:** Modul `verbindung` aus `client/` per Gradle Composite Build
   (`includeBuild`), Anmeldung über den Credential Manager, Schlüssel im Android
   Keystore. Einzelheiten in [backup-entwurf.md](backup-entwurf.md).
