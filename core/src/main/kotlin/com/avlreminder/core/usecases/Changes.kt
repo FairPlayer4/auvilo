@@ -231,7 +231,8 @@ internal class Changes(private val c: EngineContext, private val views: AlarmVie
      * reminder is open again and rings in [REOPEN_DELAY], without counting as a postponement.
      * The next occurrence, planned but not yet rung, goes; it comes again once this one is
      * resolved. What the completion itself did goes back: the checklist items it ticked and a
-     * blocker its preparation task solved. Proofs stay (see [Limits.proofCarried]).
+     * blocker its preparation task solved. Proofs stay (see [Limits.proofCarried]). An aborted
+     * session runs again with its old start instead.
      */
     suspend fun reopen(occurrenceId: Long): TransitionResult {
         val occurrence = repo.occurrence(occurrenceId) ?: return TransitionResult.Rejected("unknown occurrence")
@@ -249,7 +250,8 @@ internal class Changes(private val c: EngineContext, private val views: AlarmVie
         if (result !is TransitionResult.Ok) return result
         // Past the end of its day (several a day: the next time) it would only be missed (VS1).
         // Measured on the occurrence as it was: its day, not the day the new time falls on.
-        if (at >= views.missedAt(reminder, occurrence)) return TransitionResult.Rejected("too late for today")
+        // A session runs past the end of the day (7.11 D7); its maximum decides.
+        if (!result.occurrence.isRunning && at >= views.missedAt(reminder, occurrence)) return TransitionResult.Rejected("too late for today")
         next?.let {
             scheduler.cancel(it)
             repo.deleteOccurrence(it.id)

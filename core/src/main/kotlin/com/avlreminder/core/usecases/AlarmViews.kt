@@ -35,7 +35,9 @@ internal class AlarmViews(private val c: EngineContext) {
 
     /** Limits that apply to [reminder] right now; with [occurrence] also its checklist progress on [day]. */
     suspend fun limits(reminder: Reminder, occurrence: Occurrence?, day: LocalDate): Limits {
-        val (from, until) = Weeks.range(now(), zone)
+        // A running session counts in the week and on the day of its start (7.11 D7, 2026-11-12).
+        val counted = occurrence?.takeIf { it.isRunning }?.startedAt ?: now()
+        val (from, until) = Weeks.range(counted, zone)
         val done = occurrence?.let { checklistDone(reminder, it) }.orEmpty()
         val deadline = (reminder.schedule as? Schedule.Deadline)
             ?.takeIf { d -> occurrence == null || !Deadlines.isOverdue(d, occurrence, zone) }
@@ -44,11 +46,11 @@ internal class AlarmViews(private val c: EngineContext) {
         // Several a day: a day with the minimum counts once (VS1).
         val minimumDays = if (!reminder.schedule.severalADay) null else
             repo.recentResolved(reminder.id, MINIMUM_HISTORY)
-                .filter { o -> o.resolution == Resolution.MINIMUM && o.resolvedAt.let { it != null && it >= from && it < until } }
-                .map { it.resolvedAt!!.atZone(zone).toLocalDate() }.toSet()
+                .filter { o -> o.resolution == Resolution.MINIMUM && o.countedAt.let { it != null && it >= from && it < until } }
+                .map { it.countedAt!!.atZone(zone).toLocalDate() }.toSet()
         return Limits(
             minimumsThisWeek = minimumDays?.size ?: repo.countResolved(reminder.id, Resolution.MINIMUM, from, until),
-            minimumToday = minimumDays?.contains(now().atZone(zone).toLocalDate()) == true,
+            minimumToday = minimumDays?.contains(counted.atZone(zone).toLocalDate()) == true,
             lastProofText = repo.lastProofText(reminder.id),
             itemsDone = done.associate { it.itemId to it.withProof },
             itemDoneToday = done.any { it.doneAt.atZone(zone).toLocalDate() == day },

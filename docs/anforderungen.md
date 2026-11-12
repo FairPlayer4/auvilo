@@ -383,15 +383,21 @@ Pro Reminder einschaltbar. **[V1.3]**
   versehentlich offen. Die App fragt:
   - *Noch dran* → weiter bis zur nächsten Nachfrage
   - *Fertig* → **Ziel** erreicht (→ Nachweis, falls gefordert)
-  - *Teilschritt erreicht, beenden* → **Minimum** erreicht (zählt gegen das Limit für Minimum)
-  - *Abbruch ohne Minimalziel* → **nicht erfolgreich (abgebrochen)**, ehrlich in der Statistik
+  - *Teilschritt erreicht, beenden* → **Minimum** erreicht (zählt gegen das Limit für Minimum;
+    ist es aufgebraucht, fehlt der Knopf, und die laufende Benachrichtigung sagt es)
+  - *Abbruch ohne Minimalziel* → **nicht erfolgreich (abgebrochen)**, ehrlich in der Statistik.
+    Aus Benachrichtigung oder Uhr ohne Rückfrage, aber 60 s zurücknehmbar wie *Erledigt*
+    (7.31); die Sitzung läuft dann mit dem alten Start weiter (2026-11-12)
+  - Für Wochenziel, Limit für Minimum und Statistik zählt eine Sitzung in der Woche (und
+    am Tag) ihres **Starts**, wie im Verlauf (D7, 2026-11-12)
 - D4 Ziel und Minimum können als **Dauer** angegeben werden ("45 min" / "10 min");
   die App schlägt dann die passende Antwort vor.
 - D5 **Maximale Dauer** pro Reminder einstellbar. Ist der Reminder bis dahin nicht
   abgeschlossen, kommt ein **letzter Reminder, so streng wie zu der Uhrzeit möglich**
   (Vollbild, im lauten Fenster mit Alarmton) mit **einigen Minuten Reaktionszeit**
-  (Standard 5 min). Danach gilt er als **nicht erfüllt** – außer es wurden schon
-  Teilschritte abgeschlossen, dann zählt das **Minimum**.
+  (Standard 5 min). Danach gilt er als **nicht erfüllt** (*verpasst*) – außer es wurden
+  schon Teilschritte abgeschlossen, dann zählt das **Minimum**. Unter Notaus kommt kein
+  letzter Reminder; am Maximum endet die Sitzung als *abgebrochen*.
 - D6 **Schnell und effizient fertig werden soll sich lohnen:** Die Dauer jeder
   Sitzung wird festgehalten und im Verlauf gezeigt, mit Vergleich zu früheren
   Sitzungen (z. B. "6 min schneller als im Schnitt"). Positive Verstärkung, kein Druck.
@@ -1030,7 +1036,8 @@ falsche. Zurücknehmen soll schnell gehen, aber kein Schlupfloch sein.
   Zurücknehmen.
 - ZR2 **Was danach gilt:** Der Termin ist wieder offen und klingelt in 10 min. Das zählt
   nicht als *Später* oder *Verschieben* (keine Limits verbraucht).
-- ZR3 **Was geht:** *Erledigt* (Ziel, Minimum, ohne Nachweis) und *Auslassen* von Hand.
+- ZR3 **Was geht:** *Erledigt* (Ziel, Minimum, ohne Nachweis), *Auslassen* von Hand und
+  *Abbruch* einer Sitzung vor ihrer maximalen Dauer (dann läuft sie weiter, 7.11 D3).
   Was die App selbst setzt (*verpasst*, *entfällt*, ausgelassen wegen Pause, Notaus,
   Planänderung, Verwerfen, Wochenziel erreicht), bleibt.
 - ZR4 **Wie lange:** Nur der letzte erledigte Termin eines Reminders, solange der nächste

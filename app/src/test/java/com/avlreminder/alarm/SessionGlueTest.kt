@@ -205,4 +205,78 @@ class SessionGlueTest {
         service.onStartCommand(shadowOf(context).nextStartedService, 0, 2)
         assertTrue(shadowOf(service).isStoppedBySelf)
     }
+
+    // --- Review-Lauf 4 ---------------------------------------------------------------------------
+
+    /** A running session started [minutesAgo] ago, with the given state of its last reminder. */
+    private suspend fun running(reminderId: Long, minutesAgo: Long, finalCallAgo: Long? = null): Long {
+        val now = Instant.now()
+        return repo.saveOccurrence(
+            Occurrence(
+                reminderId = reminderId, dueAt = now.minus(Duration.ofMinutes(minutesAgo)), state = OccurrenceState.RUNNING,
+                startedAt = now.minus(Duration.ofMinutes(minutesAgo)), nextCheckAt = now.minusSeconds(30),
+                finalCallAt = finalCallAgo?.let { now.minus(Duration.ofMinutes(it)) },
+            ),
+        )
+    }
+
+    // Abbruch aus Benachrichtigung oder Uhr: 60 s „Rückgängig“, die Sitzung läuft mit dem alten Start weiter.
+    @Test
+    fun `Abbruch aus der Benachrichtigung laesst sich zuruecknehmen`() = runBlocking {
+        val id = training(minimum = false)
+        val o = running(id, minutesAgo = 20)
+        val started = repo.occurrence(o)!!.startedAt
+        press(ActionReceiver.ACTION_ABORT, o)
+        waitFor("aborted") { repo.occurrence(o)?.resolution == Resolution.ABORTED }
+        waitFor("undo offered") { shadowOf(notifications).getNotification(Undo.id(o)) != null }
+        val offered = shadowOf(notifications).getNotification(Undo.id(o))
+        assertEquals("„Training“ abgebrochen", offered.extras.getString(Notification.EXTRA_TITLE))
+        // The real button of the notification, not a rebuilt intent.
+        offered.actions.single { it.title.toString() == "Rückgängig" }.actionIntent.send()
+        ShadowLooper.idleMainLooper()
+        waitFor("running again") { repo.occurrence(o)?.state == OccurrenceState.RUNNING }
+        assertEquals(started, repo.occurrence(o)!!.startedAt)
+    }
+
+    // K29: nach dem letzten Reminder ohne Antwort endet die Sitzung, und nichts von ihr bleibt stehen.
+    @Test
+    fun `nach dem Ende der Sitzung verschwindet die Benachrichtigung des letzten Reminders`() = runBlocking {
+        val id = training(minimum = false)
+        val o = running(id, minutesAgo = 100, finalCallAgo = 5)
+        notifications.notify(Notifications.id(o), Notification.Builder(context, Notifications.CHANNEL_SILENT).setContentTitle("Training").build())
+        context.sendBroadcast(Intent(context, AlarmReceiver::class.java).putExtra(AndroidAlarmPort.EXTRA_OCCURRENCE, o))
+        ShadowLooper.idleMainLooper()
+        waitFor("ended") { repo.occurrence(o)?.isOpen == false }
+        assertEquals(Resolution.MISSED, repo.occurrence(o)!!.resolution)
+        waitFor("notification gone") { shadowOf(notifications).getNotification(Notifications.id(o)) == null }
+    }
+
+    // Teilschritt nur, solange das Wochenlimit reicht; sonst sagt die Benachrichtigung es.
+    @Test
+    fun `aufgebrauchtes Minimum – kein Teilschritt in der laufenden Benachrichtigung`() = runBlocking {
+        val id = repo.saveReminder(
+            Reminder(
+                title = "Training", schedule = Schedule.Daily(LocalTime.of(18, 0)), createdAt = Instant.now().minus(Duration.ofDays(1)),
+                character = Character.DOCUMENT, session = SessionSpec(minimumMinutes = 10), minimumLimitPerWeek = 1,
+            ),
+        )
+        val now = Instant.now()
+        repo.saveOccurrence(
+            Occurrence(reminderId = id, dueAt = now.minus(Duration.ofHours(2)), state = OccurrenceState.DONE, resolution = Resolution.MINIMUM, resolvedAt = now.minus(Duration.ofHours(1))),
+        )
+        val o = repo.saveOccurrence(Occurrence(reminderId = id, dueAt = now.minusSeconds(60), state = OccurrenceState.DUE))
+        press(ActionReceiver.ACTION_START, o)
+        waitFor("started") { repo.occurrence(o)?.state == OccurrenceState.RUNNING }
+        val app = shadowOf(context as Application)
+        var shown: Notification? = null
+        waitFor("session shown") {
+            generateSequence { app.nextStartedService }.lastOrNull { it.component?.className == SessionService::class.java.name }?.let { intent ->
+                val service = Robolectric.buildService(SessionService::class.java, intent).create().startCommand(0, 1).get()
+                shown = shadowOf(service).lastForegroundNotification
+            }
+            shown != null
+        }
+        assertEquals(listOf("Fertig", "Abbruch"), shown!!.actions.map { it.title.toString() })
+        assertTrue(shown!!.extras.getString(Notification.EXTRA_TEXT).orEmpty().contains("Teilschritt diese Woche aufgebraucht"))
+    }
 }

@@ -364,6 +364,12 @@ data class Occurrence(
 
     val isRunning: Boolean get() = state == OccurrenceState.RUNNING
 
+    /**
+     * When a resolved occurrence counts, for its day and week (goal, limits, statistics): a
+     * session at its start (7.11 D7, 2026-11-12), otherwise when it was resolved; null while open.
+     */
+    val countedAt: Instant? get() = resolvedAt?.let { startedAt ?: it }
+
     /** How long the session took (D6); null without a finished session. */
     val sessionDuration: Duration?
         get() = if (startedAt != null && resolvedAt != null) Duration.between(startedAt, resolvedAt) else null

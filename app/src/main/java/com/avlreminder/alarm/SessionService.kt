@@ -21,8 +21,10 @@ data class SessionNote(
     val startedAt: Instant,
     /** "Fertig" from the notification; not with a proof that needs photo, text or audio. */
     val quickDone: Boolean,
-    /** "Teilschritt" is allowed. */
+    /** "Teilschritt" is allowed: the reminder has a minimum and its weekly limit is not used up. */
     val minimum: Boolean,
+    /** The reminder has a minimum, but its weekly limit is used up: the notification says so. */
+    val minimumUsedUp: Boolean = false,
 )
 
 /**
@@ -81,7 +83,7 @@ class SessionService : Service() {
             val builder = Notification.Builder(context, CHANNEL)
                 .setSmallIcon(R.drawable.ic_bell)
                 .setContentTitle(note.title)
-                .setContentText("läuft seit $since")
+                .setContentText("läuft seit $since" + if (note.minimumUsedUp) " · Teilschritt diese Woche aufgebraucht" else "")
                 // The chronometer counts up from the start (D2).
                 .setWhen(note.startedAt.toEpochMilli())
                 .setShowWhen(true)

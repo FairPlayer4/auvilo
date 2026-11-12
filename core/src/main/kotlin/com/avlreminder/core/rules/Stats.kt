@@ -45,7 +45,7 @@ object Stats {
     fun of(reminder: Reminder, resolved: List<Occurrence>, now: Instant, zone: ZoneId): ReminderStats {
         val own = resolved.filter { it.reminderId == reminder.id && !it.isOpen && it.resolvedAt != null }
         val today = now.atZone(zone).toLocalDate()
-        fun since(from: LocalDate) = counts(own.filter { !it.resolvedAt!!.atZone(zone).toLocalDate().isBefore(from) })
+        fun since(from: LocalDate) = counts(own.filter { !it.countedAt!!.atZone(zone).toLocalDate().isBefore(from) })
         return ReminderStats(
             week = since(Weeks.start(today)),
             month = since(today.withDayOfMonth(1)),
@@ -113,7 +113,7 @@ object Stats {
     private fun weekStreak(reminder: Reminder, resolved: List<Occurrence>, now: Instant, zone: ZoneId): Streak {
         val goal = reminder.weeklyGoal!!
         val thisWeek = Weeks.start(now.atZone(zone).toLocalDate())
-        val byWeek = resolved.groupBy { Weeks.start(it.resolvedAt!!.atZone(zone).toLocalDate()) }
+        val byWeek = resolved.groupBy { Weeks.start(it.countedAt!!.atZone(zone).toLocalDate()) }
         val steps = byWeek.keys.sorted().mapNotNull { week ->
             val list = byWeek.getValue(week)
             val done = list.count { it.resolution == Resolution.GOAL || it.resolution == Resolution.MINIMUM }

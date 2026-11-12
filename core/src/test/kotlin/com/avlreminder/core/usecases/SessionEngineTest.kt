@@ -14,12 +14,14 @@ import com.avlreminder.core.model.Resolution
 import com.avlreminder.core.model.Schedule
 import com.avlreminder.core.model.SessionSpec
 import com.avlreminder.core.model.Strictness
+import com.avlreminder.core.model.WeeklyGoal
 import com.avlreminder.core.ports.AlarmKind
 import com.avlreminder.core.reminder
 import com.avlreminder.core.rules.Action
 import com.avlreminder.core.rules.AlarmLevel
 import com.avlreminder.core.rules.AlertSettings
 import com.avlreminder.core.rules.SessionAnswer
+import com.avlreminder.core.rules.Stats
 import com.avlreminder.core.rules.TransitionResult
 import java.time.Duration
 import java.time.Instant
@@ -200,6 +202,86 @@ class SessionEngineTest {
         val history = Overview.history(listOf(repo.reminder(id)!!), repo.recentResolved(id, 10), ZONE)
         assertEquals(LocalDate.of(2026, 10, 26), history.single().date)
         assertEquals(at(27, 18), open(id).dueAt)
+    }
+
+    // KRITISCH: Wochengrenze (Review-Lauf 4, Frage 4): Limit, Wochenziel und Statistik zählen
+    // eine Sitzung in der Woche ihres Starts, wie der Verlauf den Tag (D7).
+    @Test
+    fun `Wochengrenze – die Sitzung zaehlt in der Woche ihres Starts`() = runTest {
+        // Sa 24.10. und So 25.10. gehören zur Woche ab Mo 19.10., Mo 26.10. beginnt die nächste.
+        clock.now = at(24, 8)
+        val id = (engine.save(
+            reminder(Schedule.Daily(LocalTime.of(23, 0)), created = at(24, 8)).copy(
+                session = SessionSpec(minimumMinutes = 20), minimumLimitPerWeek = 1,
+                weeklyGoal = WeeklyGoal(target = 2, max = 7),
+            ),
+        ) as SaveResult.Saved).id
+        suspend fun ringAndStart(at: Instant): Long {
+            val o = open(id)
+            clock.now = o.dueAt
+            assertNotNull(engine.onAlarm(o.id))
+            clock.now = at
+            assertInstanceOf(TransitionResult.Ok::class.java, engine.start(o.id))
+            return o.id
+        }
+        // Samstag: Teilschritt, das Limit der Woche ist aufgebraucht.
+        val saturday = ringAndStart(at(24, 23, 5))
+        clock.now = at(24, 23, 40)
+        assertInstanceOf(TransitionResult.Ok::class.java, engine.act(saturday, Action.Complete(minimumOnly = true)))
+        // Sonntag 23:20 gestartet, Montag 0:10 beantwortet: das Limit der alten Woche gilt.
+        val sunday = ringAndStart(at(25, 23, 20))
+        clock.now = at(26, 0, 10)
+        assertFalse(engine.alarmView(sunday)!!.minimumAllowed)
+        assertInstanceOf(TransitionResult.Rejected::class.java, engine.act(sunday, Action.Complete(minimumOnly = true)))
+        assertInstanceOf(TransitionResult.Ok::class.java, engine.act(sunday, Action.Complete(minimumOnly = false)))
+        val reminder = repo.reminder(id)!!
+        assertEquals(2, engine.weekStatus(reminder, LocalDate.of(2026, 10, 25))!!.done)
+        assertEquals(0, engine.weekStatus(reminder, LocalDate.of(2026, 10, 26))!!.done)
+        val stats = Stats.of(reminder, repo.recentResolved(id, 10), clock.now, ZONE)
+        assertEquals(0, stats.week.goal + stats.week.minimum)
+    }
+
+    // Zurücknehmen nach einem Verklicken (Review-Lauf 4, Frage 2).
+    @Test
+    fun `Abbruch zuruecknehmen – die Sitzung laeuft mit dem alten Start weiter`() = runTest {
+        val id = training()
+        val o = started(id, at(26, 18, 2))
+        clock.now = at(26, 18, 30)
+        assertInstanceOf(TransitionResult.Ok::class.java, engine.act(o, Action.Abort))
+        assertEquals(Resolution.ABORTED, repo.occurrence(o)!!.resolution)
+        assertEquals(at(27, 18), open(id).dueAt)
+
+        clock.now = at(26, 18, 30).plusSeconds(40)
+        assertInstanceOf(TransitionResult.Ok::class.java, engine.reopen(o))
+        val back = repo.occurrence(o)!!
+        assertEquals(OccurrenceState.RUNNING, back.state)
+        assertEquals(at(26, 18, 2), back.startedAt)
+        assertNull(back.resolution)
+        // The next check after the interval; the next occurrence goes until this one ends.
+        assertEquals(at(26, 18, 40).plusSeconds(40), alarms.set[o]!!.first)
+        assertEquals(o, open(id).id)
+        assertEquals(Resolution.ABORTED.name, repo.events(o).last().detail)
+    }
+
+    @Test
+    fun `Abbruch zuruecknehmen – nach dem Maximum oder unter Notaus nicht mehr`() = runTest {
+        val id = training()
+        val o = started(id, at(26, 18))
+        clock.now = at(26, 19, 29)
+        engine.act(o, Action.Abort)
+        clock.now = at(26, 19, 30)
+        assertInstanceOf(TransitionResult.Rejected::class.java, engine.reopen(o))
+
+        // Notaus: am Maximum vom System abgebrochen, das Maximum ist da schon erreicht.
+        val next = open(id).id
+        clock.now = at(27, 18)
+        assertNotNull(engine.onAlarm(next))
+        assertInstanceOf(TransitionResult.Ok::class.java, engine.start(next))
+        settings = AlertSettings(alarmsPausedUntil = at(28, 8), alarmsPausedFrom = at(27, 18, 5))
+        clock.now = at(27, 19, 30)
+        assertNull(engine.onAlarm(next))
+        assertEquals(Resolution.ABORTED, repo.occurrence(next)!!.resolution)
+        assertInstanceOf(TransitionResult.Rejected::class.java, engine.reopen(next))
     }
 
     @Test

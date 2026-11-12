@@ -321,7 +321,8 @@ interface AvlDao {
 
     @Query(
         "SELECT COUNT(*) FROM occurrence WHERE reminderId = :reminderId AND resolution = :resolution " +
-            "AND resolvedAt >= :from AND resolvedAt < :until",
+            // A session counts at its start (7.11 D7): Occurrence.countedAt.
+            "AND resolvedAt IS NOT NULL AND COALESCE(startedAt, resolvedAt) >= :from AND COALESCE(startedAt, resolvedAt) < :until",
     )
     suspend fun countResolved(reminderId: Long, resolution: String, from: Instant, until: Instant): Int
 

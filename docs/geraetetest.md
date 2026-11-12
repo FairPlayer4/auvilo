@@ -48,6 +48,7 @@
 | K28 | Nachfrage und Uhr | 2 min warten | Nachfrage als Banner, auf der Uhr mit *Noch dran / Fertig / Teilschritt / Abbruch*; *Noch dran* auf der Uhr → nächste in 2 min |
 | K29 | Maximale Dauer | ohne Antwort bis 6 min | letzter Reminder im Vollbild ohne *Noch dran*; 5 min später *verpasst* im Verlauf, Benachrichtigung weg |
 | K30 | Vorab starten (7.20 V2) | vor der Uhrzeit *Vorab* → *Ich starte jetzt*, nach 1 min *Fertig* | Verlauf „Sitzung …–… · 1 min“; zur Uhrzeit kein Alarm |
+| K31 | Abbruch zurücknehmen | Sitzung starten, in der Benachrichtigung *Abbruch*, dann *Rückgängig* | „‹Titel› abgebrochen“ mit *Rückgängig*; danach läuft die Sitzung mit dem alten Start, Benachrichtigung „Die Sitzung läuft weiter …“ |
 
 ## D. Cloud-Backup (seit 1.3b0.4)
 Auf dem **S24** nur dieses kleine Set (echte Daten, Eigenbetrieb). Alles, was Geräte sperrt,

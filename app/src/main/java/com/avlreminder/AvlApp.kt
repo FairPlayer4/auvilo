@@ -47,6 +47,7 @@ import com.avlreminder.core.model.Reminder
 import com.avlreminder.data.toModel
 import com.avlreminder.core.ports.DeviceStatePort
 import com.avlreminder.core.rules.AlertSettings
+import com.avlreminder.core.rules.Lifecycle
 import com.avlreminder.core.usecases.ReminderEngine
 import com.avlreminder.core.usecases.Today
 import com.avlreminder.core.usecases.Overview
@@ -249,10 +250,12 @@ class AppGraph(private val context: Context) : ClaudeApi.Access {
         if (running.isEmpty()) return emptyList()
         return running.mapNotNull { o ->
             val r = repository.reminder(o.reminderId) ?: return@mapNotNull null
+            val hasMinimum = r.minimum != null || r.session?.minimumMinutes != null
+            val minimum = hasMinimum && Lifecycle.canUseMinimum(r, engine.limits(r, o))
             SessionNote(
                 occurrenceId = o.id, title = r.title, startedAt = o.startedAt ?: return@mapNotNull null,
                 quickDone = !r.proof.needsEvidence,
-                minimum = r.minimum != null || r.session?.minimumMinutes != null,
+                minimum = minimum, minimumUsedUp = hasMinimum && !minimum,
             )
         }.sortedBy { it.startedAt }
     }

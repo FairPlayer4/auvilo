@@ -33,6 +33,7 @@ interface ReminderRepository {
     suspend fun lastDone(reminderId: Long): Occurrence?
     /** Resolved occurrences of the reminder, newest first. */
     suspend fun recentResolved(reminderId: Long, limit: Int): List<Occurrence>
+    /** Resolved with [resolution] and counted ([Occurrence.countedAt]) in [from, until). */
     suspend fun countResolved(reminderId: Long, resolution: Resolution, from: Instant, until: Instant): Int
     suspend fun saveOccurrence(occurrence: Occurrence): Long
     /** Deletes the occurrence with its events, proofs and checklist progress. */

@@ -173,7 +173,7 @@ class FakeRepository : ReminderRepository {
         occurrences.values.filter { it.reminderId == reminderId && !it.isOpen }.sortedByDescending { it.resolvedAt!! }.take(limit)
     override suspend fun countResolved(reminderId: Long, resolution: Resolution, from: Instant, until: Instant) =
         occurrences.values.count {
-            it.reminderId == reminderId && it.resolution == resolution && it.resolvedAt!! >= from && it.resolvedAt < until
+            it.reminderId == reminderId && it.resolution == resolution && it.countedAt!! >= from && it.countedAt!! < until
         }
     override suspend fun saveOccurrence(occurrence: Occurrence): Long {
         val id = if (occurrence.id == 0L) nextId++ else occurrence.id

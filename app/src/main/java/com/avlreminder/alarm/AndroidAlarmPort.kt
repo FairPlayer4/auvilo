@@ -74,6 +74,8 @@ class AlarmReceiver : BroadcastReceiver() {
             try {
                 val ring = graph.withEngine { it.onAlarm(id) }
                 Diag.log("alarm fired occ=$id late=$late → ${if (ring == null) "nothing (stale, planned again or day ended)" else "ring"}")
+                // Ended by this alarm (a session at its maximum, the end of the day): nothing of it stays.
+                if (ring == null && graph.repository.occurrence(id)?.isOpen != true) Ringer.dismiss(context, id)
             } finally {
                 result.finish()
             }

@@ -108,10 +108,14 @@ object Lifecycle {
     /** Note of an occurrence closed with a solved blocker as the minimum. */
     const val BLOCKER_SOLVED = "Blocker gelöst"
 
-    /** Done in any way, or skipped by hand (not by the system: goal reached, pause, …); missed and dropped stay. */
+    /**
+     * Done in any way, skipped by hand (not by the system: goal reached, pause, …), or a session
+     * aborted (2026-11-12; it goes on only before its maximum duration); missed and dropped stay.
+     */
     fun canReopen(occurrence: Occurrence): Boolean =
         occurrence.state == DONE ||
-            (occurrence.state == CLOSED && occurrence.resolution == Resolution.SKIPPED && occurrence.note !in SkipReasons.SYSTEM)
+            (occurrence.state == CLOSED && occurrence.resolution == Resolution.SKIPPED && occurrence.note !in SkipReasons.SYSTEM) ||
+            (occurrence.state == CLOSED && occurrence.resolution == Resolution.ABORTED && occurrence.startedAt != null)
 
     fun canPostpone(reminder: Reminder, occurrence: Occurrence): Boolean =
         reminder.postponeLimit == null || occurrence.postponeCount < reminder.postponeLimit
@@ -148,6 +152,22 @@ object Lifecycle {
         if (action is Action.Reopen) {
             if (!canReopen(occurrence)) return TransitionResult.Rejected("only a done occurrence or one skipped by hand can be taken back")
             if (action.at <= now) return TransitionResult.Rejected("must ring again in the future")
+            if (occurrence.resolution == Resolution.ABORTED) {
+                // Aborted by a misclick: the session goes on with its old start, the next check
+                // after the interval, the last reminder at the maximum (Review-Lauf 4, Frage 2).
+                val spec = reminder.session
+                val started = occurrence.startedAt
+                if (spec == null || started == null || now >= Sessions.maxAt(spec, started)) {
+                    return TransitionResult.Rejected("maximum duration reached")
+                }
+                return ok(
+                    occurrence.copy(
+                        state = RUNNING, resolution = null, resolvedAt = null, note = null, pausedUntil = null, finalCallAt = null,
+                        nextCheckAt = minOf(now.plusMinutes(spec.checkMinutes), Sessions.maxAt(spec, started)),
+                    ),
+                    EventType.REOPENED, Resolution.ABORTED.name,
+                )
+            }
             // What the completion itself set goes back: its first progress, its note.
             val progress = occurrence.firstProgressAt?.takeIf { it != occurrence.resolvedAt }
             return ok(
