@@ -112,4 +112,33 @@ class AlarmActivityTest {
             assertTrue("$until", until <= TestClock.now().plus(Escalation.PROOF_GRACE).plusSeconds(5))
         }
     }
+
+    /**
+     * Another alarm while the proof is open: the screen starts over with the new alarm, without the
+     * proof view, photo or text of the old one (Review-Lauf 5).
+     */
+    @Test
+    fun anotherAlarmWhileTheProofIsOpenShowsTheNewAlarmFromTheStart() {
+        val (first, second) = runBlocking {
+            val proof = ProofSpec(ProofKind.EVIDENCE, textMinChars = 5)
+            fun reminder(title: String) = Reminder(title = title, schedule = Schedule.Daily(LocalTime.of(18, 0)), createdAt = TestClock.now(), proof = proof)
+            val a = repo.saveReminder(reminder("Katzenbrunnen"))
+            val b = repo.saveReminder(reminder("Fenster"))
+            fun due(id: Long) = Occurrence(reminderId = id, dueAt = TestClock.now().minusSeconds(60), state = OccurrenceState.DUE)
+            repo.saveOccurrence(due(a)) to repo.saveOccurrence(due(b))
+        }
+
+        ActivityScenario.launch<AlarmActivity>(AlarmActivity.intent(context, first)).use { scenario ->
+            compose.waitUntil(5_000) { compose.onAllNodesWithText("Erledigt").fetchSemanticsNodes().isNotEmpty() }
+            compose.onNodeWithText("Erledigt").performClick()
+            compose.waitUntil(5_000) { compose.onAllNodesWithText("Abschließen").fetchSemanticsNodes().isNotEmpty() }
+
+            scenario.onActivity { it.switchTo(AlarmActivity.intent(context, second)) }
+            graph.settle()
+
+            compose.waitUntil(5_000) { compose.onAllNodesWithText("Fenster").fetchSemanticsNodes().isNotEmpty() }
+            compose.waitUntil(5_000) { compose.onAllNodesWithText("Erledigt").fetchSemanticsNodes().isNotEmpty() }
+            assertTrue(compose.onAllNodesWithText("Abschließen").fetchSemanticsNodes().isEmpty())
+        }
+    }
 }

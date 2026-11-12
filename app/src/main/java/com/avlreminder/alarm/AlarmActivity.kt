@@ -10,6 +10,7 @@ import androidx.activity.compose.setContent
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.key
 import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.mutableLongStateOf
 import androidx.compose.runtime.produceState
@@ -130,34 +131,37 @@ class AlarmActivity : ComponentActivity() {
                 value = Instant.now()
             }
         }
-        val current = ui ?: return
-        AlarmContent(
-            ui = current,
-            now = now,
-            zone = zone,
-            onComplete = { minimumOnly, evidence, note -> act(id, Action.Complete(minimumOnly, evidence, note)) },
-            onSnooze = { act(id, Action.Snooze(Duration.ofMinutes(it.toLong()))) },
-            onPostpone = { act(id, Action.Postpone(it)) },
-            onSkip = { act(id, Action.Skip(it)) },
-            onCheckItem = { itemId, evidence -> act(id, Action.CheckItem(itemId, evidence), stay = true) },
-            onLeave = ::finish,
-            onDeferRest = { act(id, Action.DeferRest(it)) },
-            onBlockerSolved = { act(id, Action.Complete(minimumOnly = false, blockerSolved = true)) },
-            onTomorrow = { act(id, Action.CloseWindow(it)) },
-            onAnswerAsk = { text, plan -> answerAsk(id, text, plan) },
-            onSuggest = { text, important -> graph.scope.launch { graph.addSuggestion(text, important, "Alarm", current.reminder) } },
-            onStartProof = { startProof(id) },
-            onAbortProof = { abortProof(id) },
-            // Started, the screen becomes the session screen; "Noch dran" goes back to the task.
-            onStart = { act(id, Action.Start, stay = true) },
-            onStillOn = { act(id, Action.StillOn) },
-            onAbort = { act(id, Action.Abort) },
-            devices = AlarmDevices(
-                camera = { onPhoto -> ProofCamera(id, onPhoto) },
-                recorder = { onRecorded -> AudioRecorder("occ-$id", "● Aufnahme starten", onRecorded) },
-                play = { AudioPlayer.play(this, it) },
-            ),
-        )
+        // Another alarm (switchTo): nothing of the old one's screen stays – view, photo, text (Review-Lauf 5).
+        val current = ui?.takeIf { it.occurrence.id == id } ?: return
+        key(id) {
+            AlarmContent(
+                ui = current,
+                now = now,
+                zone = zone,
+                onComplete = { minimumOnly, evidence, note -> act(id, Action.Complete(minimumOnly, evidence, note)) },
+                onSnooze = { act(id, Action.Snooze(Duration.ofMinutes(it.toLong()))) },
+                onPostpone = { act(id, Action.Postpone(it)) },
+                onSkip = { act(id, Action.Skip(it)) },
+                onCheckItem = { itemId, evidence -> act(id, Action.CheckItem(itemId, evidence), stay = true) },
+                onLeave = ::finish,
+                onDeferRest = { act(id, Action.DeferRest(it)) },
+                onBlockerSolved = { act(id, Action.Complete(minimumOnly = false, blockerSolved = true)) },
+                onTomorrow = { act(id, Action.CloseWindow(it)) },
+                onAnswerAsk = { text, plan -> answerAsk(id, text, plan) },
+                onSuggest = { text, important -> graph.scope.launch { graph.addSuggestion(text, important, "Alarm", current.reminder) } },
+                onStartProof = { startProof(id) },
+                onAbortProof = { abortProof(id) },
+                // Started, the screen becomes the session screen; "Noch dran" goes back to the task.
+                onStart = { act(id, Action.Start, stay = true) },
+                onStillOn = { act(id, Action.StillOn) },
+                onAbort = { act(id, Action.Abort) },
+                devices = AlarmDevices(
+                    camera = { onPhoto -> ProofCamera(id, onPhoto) },
+                    recorder = { onRecorded -> AudioRecorder("occ-$id", "● Aufnahme starten", onRecorded) },
+                    play = { AudioPlayer.play(this, it) },
+                ),
+            )
+        }
     }
 
     private suspend fun load(id: Long): AlarmView? = graph.withEngine { it.alarmView(id, early) }
