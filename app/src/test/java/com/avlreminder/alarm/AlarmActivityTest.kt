@@ -83,4 +83,33 @@ class AlarmActivityTest {
             assertTrue("$until", until <= TestClock.now().plus(Escalation.PROOF_GRACE).plusSeconds(5))
         }
     }
+
+    /**
+     * Another alarm while the proof is open: the old proof ends and its alarm rings again after
+     * the grace, instead of staying quiet for the whole proof window (Review-Lauf 1).
+     */
+    @Test
+    fun anotherAlarmWhileTheProofIsOpenEndsTheOldProof() {
+        val (first, second) = runBlocking {
+            val proof = ProofSpec(ProofKind.EVIDENCE, textMinChars = 5)
+            fun reminder(title: String) = Reminder(title = title, schedule = Schedule.Daily(LocalTime.of(18, 0)), createdAt = TestClock.now(), proof = proof)
+            val a = repo.saveReminder(reminder("Katzenbrunnen"))
+            val b = repo.saveReminder(reminder("Fenster"))
+            fun due(id: Long) = Occurrence(reminderId = id, dueAt = TestClock.now().minusSeconds(60), state = OccurrenceState.DUE)
+            repo.saveOccurrence(due(a)) to repo.saveOccurrence(due(b))
+        }
+        fun quietUntil() = runBlocking { repo.occurrence(first)?.pausedUntil }
+
+        ActivityScenario.launch<AlarmActivity>(AlarmActivity.intent(context, first)).use { scenario ->
+            compose.waitUntil(5_000) { compose.onAllNodesWithText("Erledigt").fetchSemanticsNodes().isNotEmpty() }
+            compose.onNodeWithText("Erledigt").performClick()
+            compose.waitUntil(5_000) { quietUntil() != null }
+
+            scenario.onActivity { it.switchTo(AlarmActivity.intent(context, second)) }
+            graph.settle()
+
+            val until = quietUntil()!!
+            assertTrue("$until", until <= TestClock.now().plus(Escalation.PROOF_GRACE).plusSeconds(5))
+        }
+    }
 }

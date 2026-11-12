@@ -30,6 +30,7 @@ class AlarmService : Service() {
         private const val TAG = "AlarmService"
         private const val ACTION_START = "start"
         private const val ACTION_STOP = "stop"
+        private const val ACTION_QUIET = "quiet"
         private const val EXTRA_ID = "id"
         private const val EXTRA_INFO = "info"
         private const val EXTRA_LOUD = "loud"
@@ -59,6 +60,12 @@ class AlarmService : Service() {
             }
         }
 
+        /** Stops ringing if [occurrenceId] is the one ringing; its notification stays, silent (Notaus). */
+        fun quiet(context: Context, occurrenceId: Long) {
+            if (_ringing.value != occurrenceId) return
+            context.startService(Intent(context, AlarmService::class.java).setAction(ACTION_QUIET).putExtra(EXTRA_ID, occurrenceId))
+        }
+
         /** Stops ringing if [occurrenceId] is the one ringing. */
         fun stop(context: Context, occurrenceId: Long) {
             if (_ringing.value != occurrenceId) return
@@ -70,10 +77,12 @@ class AlarmService : Service() {
     private var player: MediaPlayer? = null
     private var info: AlarmInfo? = null
 
-    private val roundOver = Runnable {
+    private val roundOver = Runnable { quietAlarm() }
+
+    /** Stops ringing; the notification stays, silent, until the user reacts or the next round starts. */
+    private fun quietAlarm() {
         val current = info
         stopAlarm()
-        // Keep it visible until the user reacts or the next round starts.
         current?.let { Notifications.show(this, it, quiet = true) }
     }
 
@@ -86,6 +95,7 @@ class AlarmService : Service() {
                 intent.getBooleanExtra(EXTRA_LOUD, false),
             )
             ACTION_STOP -> if (intent.getLongExtra(EXTRA_ID, -1) == info?.occurrenceId) stopAlarm()
+            ACTION_QUIET -> if (intent.getLongExtra(EXTRA_ID, -1) == info?.occurrenceId) quietAlarm()
             else -> stopAlarm()
         }
         return START_NOT_STICKY

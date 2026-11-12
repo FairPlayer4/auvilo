@@ -49,6 +49,7 @@ import com.avlreminder.data.toModel
 import com.avlreminder.core.ports.DeviceStatePort
 import com.avlreminder.core.rules.AlertSettings
 import com.avlreminder.core.rules.Lifecycle
+import com.avlreminder.core.rules.TransitionResult
 import com.avlreminder.core.usecases.ReminderEngine
 import com.avlreminder.core.usecases.Today
 import com.avlreminder.core.usecases.Overview
@@ -239,6 +240,17 @@ class AppGraph(private val context: Context) : ClaudeApi.Access {
         )
     }
 
+    /**
+     * Deleting, pausing, archiving or discarding takes the alarm of [occurrenceId] away; its
+     * ringing and notification go with it (Review-Lauf 1). A rejected change (`false`, Rejected)
+     * leaves them.
+     */
+    suspend fun <T> withoutAlarm(occurrenceId: Long?, block: suspend (ReminderEngine) -> T): T {
+        val result = withEngine(block)
+        if (occurrenceId != null && result != false && result !is TransitionResult.Rejected) Ringer.dismiss(context, occurrenceId)
+        return result
+    }
+
     /** Runs use cases one at a time and refreshes the widget afterwards. */
     override suspend fun <T> withEngine(block: suspend (ReminderEngine) -> T): T {
         val result = mutex.withLock {
@@ -307,7 +319,8 @@ class AppGraph(private val context: Context) : ClaudeApi.Access {
         val wasPaused = settings.alert.first().alarmsPaused(SystemZoneClock.instant())
         settings.setAlarmsPaused(until, SystemZoneClock.instant())
         Diag.log(if (until == null) "alarms on again" else "alarms paused until $until")
-        if (until != null) AlarmService.ringing.value?.let { AlarmService.stop(context, it) }
+        // What rang stays in sight as a silent notification (Review-Lauf 1).
+        if (until != null) AlarmService.ringing.value?.let { AlarmService.quiet(context, it) }
         if (until == null && wasPaused) {
             // On again by hand: what is due rings now (PS7).
             withEngine { it.resume() }

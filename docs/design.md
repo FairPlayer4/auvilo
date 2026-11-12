@@ -568,6 +568,7 @@ umgesetzt / verworfen. Liste in den Einstellungen, *Teilen* als Markdown.
 | Alarm | `setAlarmClock()` für normal/streng, `setExactAndAllowWhileIdle()` für locker; Übersicht und Vorab-Reminder mit `setWindow()`; Prüf-Alarme der Orte exakt bzw. `setWindow()` (6.) |
 | Dauer-Alarm, Sitzung | Foreground-Services Typ `systemExempted` (`AlarmService`, `SessionService`) |
 | Vollbild | Full-Screen-Intent + Activity mit `showWhenLocked`/`turnScreenOn` |
+| Was vom Alarm bleibt | Löschen, Pausieren, Archivieren und Verwerfen aus der App nehmen Klingeln und Benachrichtigung des offenen Termins weg (`AppGraph.withoutAlarm`), eine abgelehnte Änderung nicht. *Notaus* stoppt das Klingeln und lässt eine stille Benachrichtigung, wie nach einer Runde. Ein anderer Alarm, während ein Nachweis offen ist, beendet diesen Nachweis (N0) |
 | Neuaufbau | `sync` bei Änderung, Alarm, App-Start, `BOOT_COMPLETED`, `MY_PACKAGE_REPLACED`, Zeit-/Zonenänderung |
 | Ort | WLAN (`NetworkCallback` mit PendingIntent, letzte Suchergebnisse), Play-Services Geofencing (Dwell), Fused Location für die aktive Prüfung |
 | Berechtigungen | Seite in den Einstellungen, Warnung auf *Heute*: Benachrichtigungen, Vollbild, Akku, Kamera, Mikrofon; Standort „Immer“ und DND-Ausnahme nur, wenn ein Reminder sie braucht |
