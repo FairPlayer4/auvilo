@@ -40,6 +40,10 @@ einer Fassung.
 6. **Versionsname** je installiertem Stand `1.3b<n>-backup<Schritt>`, `versionCode` +1.
 7. **Play-Store-Release** ohne Eile, frühestens mit V2 (7.28 PS5–PS9). Branch-Regel für
    `main` setzt Kevin.
+8. **Vor der Sicherheitsphase** (Backend-Prüfung 2026-11-12; Liste „Vorher fertig“ in
+   Backend `docs/b2b-entwurf.md`): A-15 neu (Papier als Standard, Hinweis vor dem
+   Speichern), *Konto löschen*, Bestätigung mit der Displaysperre für *Cloud-Daten
+   löschen*, *Konto löschen* und *Gerät sperren*; Format v2 kommt über `client/`.
 
 ## Beobachtungen aus der echten Nutzung
 - „Test-Reminder“ klingelte am 2026-10-31 in Runden um 11:30 und 12:00; prüfen, ob das zur

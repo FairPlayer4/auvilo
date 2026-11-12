@@ -1084,12 +1084,13 @@ vorher schieben oder auslassen können, wie man Checklisten-Punkte vorab abhakt.
 ### 7.33 Wiederherstellungsschlüssel im Passwortdienst (2026-11-08)
 Beim ersten Gerätetest war das Aufschreiben des Wiederherstellungsschlüssels umständlich
 (langen Code abtippen). Die App soll das Sichern deshalb selbst anbieten.
-- WS1 **Automatisch angeboten:** Zeigt die App einen neuen Wiederherstellungsschlüssel,
-  öffnet sie sofort den Speicher-Dialog des Passwortdienstes (Credential Manager,
+- WS1 **Auf Knopfdruck angeboten** (geändert 2026-11-12, vorher automatisch): Zeigt die
+  App einen neuen Wiederherstellungsschlüssel, ist „aufgeschrieben“ der Hauptweg (Papier
+  ist der Standard). *Im Passwortmanager speichern* nennt vorher die Folge (WS4) und
+  öffnet dann den Speicher-Dialog des Passwortdienstes (Credential Manager,
   `CreatePasswordRequest`; Standard ist der Google Passwortmanager, andere Dienste wie
   Bitwarden gehen genauso). Name: „avlreminder Wiederherstellung“, als Nutzername das
-  Konto-Pseudonym. Gespeichert → fertig, eine Bestätigung genügt. Abgelehnt oder kein
-  Dienst → wie bisher anzeigen und „aufgeschrieben“ bestätigen.
+  Konto-Pseudonym. Gespeichert → fertig, eine Bestätigung genügt.
 - WS2 **Automatisch geholt:** Fragt die App nach dem Schlüssel (neues Gerät, App-Daten
   gelöscht), bietet sie zuerst den gespeicherten aus dem Passwortdienst an
   (`GetPasswordOption`); Eintippen bleibt möglich.
@@ -1097,8 +1098,10 @@ Beim ersten Gerätetest war das Aufschreiben des Wiederherstellungsschlüssels u
   Zwischenablage oder ans Backend.
 - WS4 **Hinweis:** Der Google Passwortmanager verschlüsselt nur mit eingeschalteter
   **Geräteverschlüsselung** Ende-zu-Ende; ohne sie könnte Google Schlüssel und (in GCP
-  liegende) Sicherung zusammenbringen. Die App sagt das in einem Satz; Papier bleibt als
-  zusätzliche Kopie empfohlen.
+  liegende) Sicherung zusammenbringen. Die App sagt das **vor** dem Speichern und nennt
+  die Folge: Wer das Google-Konto übernimmt, kann dann ein eigenes Gerät freischalten
+  und alles entschlüsseln (Backend `anforderungen.md` Kap. 11, 2026-11-12). Papier
+  bleibt als zusätzliche Kopie empfohlen.
 
 ## 8. Zielplattform und Technik
 
@@ -1177,6 +1180,7 @@ Neueste zuerst. Kap. 7 enthält immer den gültigen Stand; diese Tabelle ist die
 
 | Datum | Entscheidung |
 |---|---|
+| 2026-11-12 | Nach der Sicherheits- und Datenschutzprüfung des Backends (Backend `anforderungen.md` Kap. 11): **Papier ist der Standard** für den Wiederherstellungsschlüssel; den Passwortdienst bietet die App nur auf Knopfdruck nach dem Hinweis an (7.33 WS1, WS4; A-15). Vor der Sicherheitsphase kommen in die App außerdem *Konto löschen* und die Bestätigung mit der Displaysperre für *Cloud-Daten löschen*, *Konto löschen* und *Gerät sperren* (Backend B1, SE5) |
 | 2026-11-12 | Antworten auf Review-Lauf 4 (`.review/runs/2026-11-12.md`): (1) Ein Vollbild zur Zeit, „+1 wartet“, *Rest später* (7.3, 7.4) auf V1.3c verschoben, nicht verworfen. (2) *Abgebrochen* aus Benachrichtigung oder Uhr ohne Rückfrage, aber 60 s zurücknehmbar wie *Erledigt* (7.31); danach läuft die Sitzung mit dem alten Start weiter; auf dem Bildschirm bleibt der Dialog. (3) F2 und WLAN-Meldung: die erste Prüfung des Zeitraums exakt auch im Doze; F2 gilt, wenn die *erste Prüfung dieses Zeitraums* einen schon da findet, egal wie spät sie kommt; eine WLAN-Meldung zählt nur als Ankunft, wenn vorher nicht dasselbe WLAN verbunden war. (4) Sitzungen zählen für Wochenziel, Minimum-Limit und Statistik in der Woche ihres Starts. (5) Doku: Cloud-Entwürfe zu `cloud-entscheidungen.md` zusammengelegt, `testsession.md` bis zur Überarbeitung vor V2 gelöscht, Kap.-9-Einträge bis 2026-10-31 nach `anforderungen-archiv.md`. Außerdem: *Teilschritt* bei aufgebrauchtem Minimum-Limit ausgeblendet, mit Hinweis; „Fassung wählen“ (R-4) in der App erst mit dem Wiederherstellen |
 | 2026-11-11 | Sitzung mit Timer (7.11, 7.20 V2) in V1.3b1 umgesetzt (design.md 3.1). Bei der Umsetzung festgelegt: ohne Antwort am Ende *Minimum* mit erledigten Punkten, unter Notaus *abgebrochen*, sonst *verpasst*; unbeantwortete Nachfrage fragt nach höchstens 10 min erneut; *Teilschritt* nur mit Minimum; Schnitt aus den letzten 10 abgeschlossenen Sitzungen; während der Sitzung nur Texte änderbar; Vorlagen ohne Sitzung. Versionsname ab jetzt `1.3b<n>-backup<Schritt>` (erster: `1.3b1-backup5`, Code 17) |
 | 2026-11-11 | Entwurf 7.29 Z.7 bestätigt und in V1.3b0.6 umgesetzt (design.md 6). Bei der Umsetzung festgelegt: F2 gilt, wenn die erste Prüfung im Zeitraum (bis 5 min nach Beginn) einen schon da findet (→ präzisiert 2026-11-12: die für den Beginn geplante Prüfung, egal wie spät sie kommt); Prüfungen im Raster Beginn + k·Prüfabstand, die späteste Uhrzeit prüft der Alarm des Termins selbst; der Puffer gilt auch für verschobene Termine (`awaitsArrival`), nicht für *Wenn ich ankomme*; Vorlauf 0 = genau das alte Verhalten (kein Puffer, keine Prüfungen); WLAN-Namen und BSSIDs bleiben auf dem Handy (nicht im Diagnose-Log, nicht in der Claude-Schnittstelle, im Testdaten-Export ersetzt); die WLAN-Sonde ist entfernt. Einstellungen *Orte*: Zuhause und ein weiterer Ort, *Hier festlegen* übernimmt Standort und verbundenes WLAN |
@@ -1188,7 +1192,7 @@ Neueste zuerst. Kap. 7 enthält immer den gültigen Stand; diese Tabelle ist die
 | 2026-11-09 | Cloud-Backup Schritt 5 (W-1…W-8, R-1…R-6 in cloud-entscheidungen.md) bestätigt: erst *Sicherung prüfen* in einer eigenen Prüfdatei, kein Umschalten zwischen Datenbanken; Wiederherstellen tauscht beim nächsten Start und behält die alten Daten 7 Tage zum Rückgängigmachen; nach dem Wiederherstellen von einem anderen Gerät sichert die App erst wieder nach *Jetzt sichern* mit Rückfrage. *Zurücksetzen* aufgeteilt in *Dieses Gerät abmelden* (löscht nichts auf dem Server) und *Cloud-Daten löschen* (nur mit eingetipptem „löschen“). Bremse: fehlen mehr als 10 oder mehr als die Hälfte der Reminder, sichert die App nicht automatisch. Lokale Kopien: 7 tägliche und 4 wöchentliche. Gerätetest des Wiederherstellens auf einem Emulator mit Google Play |
 | 2026-11-08 | Cloud-Backup Schritt 4: Trifft das automatische Sichern auf die Sicherung eines anderen Geräts, ruht es sofort (wie nach „Nein“) und meldet das per Benachrichtigung; die Rückfrage „Überschreiben?“ kommt erst mit *Jetzt sichern* in den Einstellungen (cloud-entscheidungen.md A-10). Der Hinweis nach 3 Tagen zählt ab der letzten Stunde, in der die Sicherung aktuell war |
 | 2026-11-08 | Android Lint in Build und CI (`:app:lintDebug`): Altfunde in `app/lint-baseline.xml`, jeder neue Fund (auch Warnung) macht den Build rot; Versions-Hinweise sind abgeschaltet. Go bleibt bei gofmt, go vet und golangci-lint im Backend; detekt erst, wenn Lint ruhig läuft, kein Qodana |
-| 2026-11-08 | Wiederherstellungsschlüssel: Die App bietet automatisch an, ihn im Passwortdienst zu sichern, und holt ihn von dort beim Wiederherstellen (7.33, Wunsch aus dem ersten Gerätetest von Backup Schritt 2). Papier bleibt der Weg ohne Passwortdienst |
+| 2026-11-08 | Wiederherstellungsschlüssel: Die App bietet automatisch an, ihn im Passwortdienst zu sichern, und holt ihn von dort beim Wiederherstellen (7.33, Wunsch aus dem ersten Gerätetest von Backup Schritt 2). Papier bleibt der Weg ohne Passwortdienst → ersetzt 2026-11-12 (Papier ist Standard) |
 | 2026-11-07 | Cloud-Backup in der App: Entwurf A-1 bis A-14 (cloud-entscheidungen.md) bestätigt. Keine eigene App-Variante, solange nur Kevin die App nutzt (Schalter aus PS8 im normalen Build); Composite Build mit festem Backend-Commit und Deploy-Key in der CI; neue Berechtigung `INTERNET` (8.4 präzisiert); Credential Manager, Geräteschlüssel und Keysets im Android Keystore; ZIP aus Datenbank und Einstellungen; stündlich per WorkManager nur bei Änderung; Wiederherstellen ersetzt die Datenbank nach lokaler Kopie; Diagnose ans Backend nur mit eigenem Logger ohne Inhalte. App und `core` bauen für Java 21 statt 17 |
 | 2026-11-07 | Vorab verschieben und auslassen (7.32): Alarm-Bildschirm vorab mit *Verschieben* und *Auslassen*, „heute später“ +30 min/+1/+2 Std ab der geplanten Zeit, zählt aufs Verschieben-Konto, bei *streng* mit Rückfrage; Ort behält die neue Zeit, wartet sonst auf die Ankunft; Vorab-Reminder wandert mit; NT2 zählt Verschieben mit. Umgesetzt in V1.3b0.4 |
 | 2026-11-07 | Erledigung zurücknehmen (7.31): Rückgängig-Benachrichtigung 1 min, danach *Zurücknehmen* auf *Heute*; wieder offen, klingelt in 10 min ohne als *Später* zu zählen; nur der letzte Termin, bis der nächste klingelt bzw. bis zur Tagesgrenze; *Auslassen* auch, *verpasst*/*entfällt* nicht; Nachweis zählt wieder; neues Ereignis statt Löschen. Umgesetzt in V1.3b0.4 |
