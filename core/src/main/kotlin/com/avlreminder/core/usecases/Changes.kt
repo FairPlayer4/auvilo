@@ -50,6 +50,8 @@ internal class Changes(private val c: EngineContext, private val views: AlarmVie
         val schedule = edited.schedule
         // A one-off moved to another time is meant to happen again, also when it was paused.
         val stored = if (edited.id == 0L) null else repo.reminder(edited.id)
+        // KRITISCH: a running session keeps its settings and its time; only the texts may change (7.11 D7).
+        if (stored != null && running(stored.id) && !onlyTexts(stored, edited)) return SaveResult.Invalid(listOf(RUNNING))
         val moved = (schedule is Schedule.Once || schedule is Schedule.Deadline) && stored != null && stored.schedule != schedule
         // The form does not know the archive; moving a one-off brings it back.
         val reminder = if (moved) edited.copy(active = true, archivedAt = null) else edited.copy(archivedAt = stored?.archivedAt)
@@ -74,7 +76,7 @@ internal class Changes(private val c: EngineContext, private val views: AlarmVie
             problems += "Startklar-Fragen beantworten"
         }
         reminder.arrival?.let { a ->
-            if (repo.places().none { it.id == a.placeId }) problems += "Zuhause zuerst in den Einstellungen festlegen"
+            if (repo.places().none { it.id == a.placeId }) problems += "Ort zuerst in den Einstellungen festlegen"
         }
         if (problems.isNotEmpty()) return SaveResult.Invalid(problems)
         val id = repo.saveReminder(reminder)
@@ -100,7 +102,7 @@ internal class Changes(private val c: EngineContext, private val views: AlarmVie
             if (due == null) {
                 scheduler.close(saved, open, Action.Skip(SkipReasons.SCHEDULE_CHANGED))
             } else if (due != open.dueAt) {
-                repo.saveOccurrence(open.copy(dueAt = due, currentAt = due))
+                repo.saveOccurrence(open.copy(dueAt = due, currentAt = due, arrivedAt = null))
             }
         }
         val ring = scheduler.syncReminder(saved) ?: scheduler.arriveIfThere(saved)
@@ -117,13 +119,23 @@ internal class Changes(private val c: EngineContext, private val views: AlarmVie
         val due = schedule.at.atZone(zone).toInstant()
         val open = repo.openOccurrence(reminder.id)
         if (open != null && open.state == OccurrenceState.PLANNED && !open.hasFired && open.postponeCount == 0) {
-            repo.saveOccurrence(open.copy(dueAt = due, currentAt = due))
+            repo.saveOccurrence(open.copy(dueAt = due, currentAt = due, arrivedAt = null))
             return
         }
         open?.let { scheduler.close(reminder, it, Action.Skip(SkipReasons.SCHEDULE_CHANGED)) }
         val created = repo.saveOccurrence(Occurrence(reminderId = reminder.id, dueAt = due))
         repo.addEvent(Event(occurrenceId = created, at = now(), type = EventType.CREATED))
     }
+
+    /** A session of the reminder is running (7.11 D7). */
+    private suspend fun running(reminderId: Long): Boolean = repo.openOccurrence(reminderId)?.isRunning == true
+
+    /** Only title, why, goal or minimum differ – what the app may change during a session. */
+    private fun onlyTexts(stored: Reminder, edited: Reminder): Boolean =
+        edited.copy(
+            title = stored.title, why = stored.why, goal = stored.goal, minimum = stored.minimum,
+            archivedAt = stored.archivedAt, hintQuietUntil = stored.hintQuietUntil,
+        ) == stored
 
     suspend fun delete(reminderId: Long) {
         val reminder = repo.reminder(reminderId)
@@ -136,31 +148,36 @@ internal class Changes(private val c: EngineContext, private val views: AlarmVie
         scheduler.watchPlaces()
     }
 
-    suspend fun setActive(reminderId: Long, active: Boolean) {
-        val reminder = repo.reminder(reminderId) ?: return
+    /** False if it was not changed: unknown, or a session is running (7.11 D7). */
+    suspend fun setActive(reminderId: Long, active: Boolean): Boolean {
+        val reminder = repo.reminder(reminderId) ?: return false
+        if (running(reminderId)) return false
         repo.saveReminder(reminder.copy(active = active, archivedAt = if (active) null else reminder.archivedAt))
         val open = repo.openOccurrence(reminderId)
         if (!active) {
             open?.let { scheduler.cancel(it) }
             scheduler.watchPlaces()
-            return
+            return true
         }
         // Resuming must not report the paused time as missed: plan the open occurrence anew.
         if (open != null && open.currentAt < now()) {
             val due = scheduler.nextDue(reminder, repo.lastResolved(reminderId))
             if (due == null || due <= now()) scheduler.close(reminder, open, Action.Skip(SkipReasons.PAUSED))
             else repo.saveOccurrence(
-                open.copy(state = OccurrenceState.PLANNED, dueAt = due, currentAt = due, pausedUntil = null, firedAt = null, awaitsArrival = false),
+                open.copy(state = OccurrenceState.PLANNED, dueAt = due, currentAt = due, pausedUntil = null, firedAt = null, awaitsArrival = false, arrivedAt = null),
             )
         }
         scheduler.syncReminder(reminder.copy(active = true))
         scheduler.watchPlaces()
+        return true
     }
 
-    suspend fun setArchived(reminderId: Long, archived: Boolean) {
-        if (archived) setActive(reminderId, false)
-        val reminder = repo.reminder(reminderId) ?: return
+    /** False if it was not changed: unknown, or a session is running (7.11 D7). */
+    suspend fun setArchived(reminderId: Long, archived: Boolean): Boolean {
+        if (archived && !setActive(reminderId, false)) return false
+        val reminder = repo.reminder(reminderId) ?: return false
         repo.saveReminder(reminder.copy(archivedAt = if (archived) now() else null))
+        return true
     }
 
     suspend fun savePlace(place: Place): Long {
@@ -214,7 +231,8 @@ internal class Changes(private val c: EngineContext, private val views: AlarmVie
      * reminder is open again and rings in [REOPEN_DELAY], without counting as a postponement.
      * The next occurrence, planned but not yet rung, goes; it comes again once this one is
      * resolved. What the completion itself did goes back: the checklist items it ticked and a
-     * blocker its preparation task solved. Proofs stay (see [Limits.proofCarried]).
+     * blocker its preparation task solved. Proofs stay (see [Limits.proofCarried]). An aborted
+     * session runs again with its old start instead.
      */
     suspend fun reopen(occurrenceId: Long): TransitionResult {
         val occurrence = repo.occurrence(occurrenceId) ?: return TransitionResult.Rejected("unknown occurrence")
@@ -232,7 +250,8 @@ internal class Changes(private val c: EngineContext, private val views: AlarmVie
         if (result !is TransitionResult.Ok) return result
         // Past the end of its day (several a day: the next time) it would only be missed (VS1).
         // Measured on the occurrence as it was: its day, not the day the new time falls on.
-        if (at >= views.missedAt(reminder, occurrence)) return TransitionResult.Rejected("too late for today")
+        // A session runs past the end of the day (7.11 D7); its maximum decides.
+        if (!result.occurrence.isRunning && at >= views.missedAt(reminder, occurrence)) return TransitionResult.Rejected("too late for today")
         next?.let {
             scheduler.cancel(it)
             repo.deleteOccurrence(it.id)
@@ -252,7 +271,9 @@ internal class Changes(private val c: EngineContext, private val views: AlarmVie
         val occurrence = repo.occurrence(occurrenceId) ?: return TransitionResult.Rejected("unknown occurrence")
         val reminder = repo.reminder(occurrence.reminderId) ?: return TransitionResult.Rejected("unknown reminder")
         val window = now().plus(Duration.ofMinutes(reminder.proof.windowMinutes.toLong()))
-        return act(occurrenceId, Action.StartProof(minOf(window, views.missedAt(reminder, occurrence))))
+        // A session has no end of the day (7.11 D7).
+        val until = if (occurrence.isRunning) window else minOf(window, views.missedAt(reminder, occurrence))
+        return act(occurrenceId, Action.StartProof(until))
     }
 
     suspend fun abortProof(occurrenceId: Long): TransitionResult =
@@ -361,6 +382,8 @@ internal class Changes(private val c: EngineContext, private val views: AlarmVie
     }
 
     companion object {
+        /** Why a change was refused during a session. */
+        const val RUNNING = "läuft gerade – nur Texte änderbar"
         /** A taken-back occurrence rings again after this, not right away: one is in the app just now. */
         val REOPEN_DELAY: Duration = Duration.ofMinutes(10)
     }

@@ -6,6 +6,7 @@ import android.content.Context
 import com.avlreminder.R
 import com.avlreminder.core.model.Occurrence
 import com.avlreminder.core.model.OccurrenceState
+import com.avlreminder.core.model.Resolution
 import com.avlreminder.core.rules.Lifecycle
 import com.avlreminder.core.rules.TransitionResult
 import com.avlreminder.graph
@@ -16,7 +17,8 @@ import java.time.format.DateTimeFormatter
 
 /**
  * "Zurücknehmen" after a misclick (Anf. 7.31): after "Erledigt" or "Auslassen" in the alarm, the
- * notification or on the watch, a quiet notification offers "Rückgängig" for [TIMEOUT_MS].
+ * notification or on the watch, and after "Abbruch" of a session there, a quiet notification
+ * offers "Rückgängig" for [TIMEOUT_MS].
  * Later the same is on "Heute" under "Erledigt", until the next time or the end of the day.
  */
 object Undo {
@@ -29,7 +31,11 @@ object Undo {
     suspend fun offer(context: Context, occurrence: Occurrence) {
         if (!Lifecycle.canReopen(occurrence)) return
         val title = context.graph.repository.reminder(occurrence.reminderId)?.title ?: return
-        val what = if (occurrence.state == OccurrenceState.DONE) "erledigt" else "ausgelassen"
+        val what = when {
+            occurrence.state == OccurrenceState.DONE -> "erledigt"
+            occurrence.resolution == Resolution.ABORTED -> "abgebrochen"
+            else -> "ausgelassen"
+        }
         notify(context, occurrence.id, "„$title“ $what", "Verklickt? Hier zurücknehmen.", undo = true)
     }
 
@@ -44,7 +50,9 @@ object Undo {
 
     /** What happened, for the notification and "Heute". */
     fun message(result: TransitionResult, zone: ZoneId = ZoneId.systemDefault()): String = when (result) {
-        is TransitionResult.Ok -> "Klingelt wieder um ${time(result.occurrence.currentAt, zone)}."
+        is TransitionResult.Ok -> result.occurrence.startedAt?.takeIf { result.occurrence.isRunning }
+            ?.let { "Die Sitzung läuft weiter, seit ${time(it, zone)}." }
+            ?: "Klingelt wieder um ${time(result.occurrence.currentAt, zone)}."
         else -> "Geht nicht mehr: Der nächste Termin läuft schon, oder es wäre nach dem Ende des Tages."
     }
 

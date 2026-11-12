@@ -25,7 +25,7 @@
     <!-- WLAN as a place signal (Anf. 7.29): connection and Android's own scan results, no scanning -->
     <uses-permission android:name="android.permission.ACCESS_WIFI_STATE" />
     <uses-permission android:name="android.permission.ACCESS_NETWORK_STATE" />
-    <!-- Cloud-Backup, nur nach Einschalten (Anf. 7.28 PS8, 8.4; docs/backup-entwurf.md A-3) -->
+    <!-- Cloud-Backup, nur nach Einschalten (Anf. 7.28 PS8, 8.4; docs/cloud-entscheidungen.md A-3) -->
     <uses-permission android:name="android.permission.INTERNET" />
 
     <application
@@ -61,6 +61,12 @@
             android:exported="false"
             android:foregroundServiceType="systemExempted" />
 
+        <!-- The running session with timer (Anf. 7.11); sessions last too long for shortService -->
+        <service
+            android:name=".alarm.SessionService"
+            android:exported="false"
+            android:foregroundServiceType="systemExempted" />
+
         <receiver
             android:name=".alarm.AlarmReceiver"
             android:exported="false" />
@@ -86,7 +92,11 @@
             android:exported="false" />
 
         <receiver
-            android:name=".location.WifiProbeReceiver"
+            android:name=".location.WifiReceiver"
+            android:exported="false" />
+
+        <receiver
+            android:name=".location.PlaceCheckReceiver"
             android:exported="false" />
 
         <receiver

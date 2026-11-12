@@ -14,8 +14,8 @@ android {
         applicationId = "com.avlreminder"
         minSdk = 37
         targetSdk = 37
-        versionCode = 15
-        versionName = "1.3b0.5-backup5"
+        versionCode = 18
+        versionName = "1.3b2-backup5"
     }
 
     buildFeatures {
@@ -54,7 +54,7 @@ ksp {
 dependencies {
     implementation(project(":core"))
     // Cloud-Backup: protokoll und verbindung aus ../avlreminder-backend/client
-    // (Composite Build, settings.gradle.kts; docs/backup-entwurf.md A-2).
+    // (Composite Build, settings.gradle.kts; docs/cloud-entscheidungen.md A-2).
     implementation("com.avlreminder.client:verbindung")
     // "Mit Google anmelden" for the cloud backup (A-4).
     implementation("androidx.credentials:credentials:1.6.0")
@@ -75,7 +75,7 @@ dependencies {
     implementation("androidx.room:room-ktx:2.8.5")
     ksp("androidx.room:room-compiler:2.8.5")
     implementation("androidx.datastore:datastore-preferences:1.3.0")
-    // Hourly cloud backup (backup-entwurf.md, A-9); Glance brings an older version along.
+    // Hourly cloud backup (cloud-entscheidungen.md A-9); Glance brings an older version along.
     implementation("androidx.work:work-runtime-ktx:2.12.0")
     // Geofence and current position (V1.1b, tried in the spike)
     implementation("com.google.android.gms:play-services-location:21.4.0")

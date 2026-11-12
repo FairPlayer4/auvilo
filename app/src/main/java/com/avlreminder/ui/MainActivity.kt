@@ -1,5 +1,6 @@
 package com.avlreminder.ui
 
+import com.avlreminder.PlaceSetResult
 import com.avlreminder.graph
 import com.avlreminder.ui.screens.CloudActions
 
@@ -94,7 +95,8 @@ class MainActivity : ComponentActivity() {
             val proofs by vm.proofs.collectAsStateWithLifecycle()
             val prep by vm.prep.collectAsStateWithLifecycle()
             val alert by vm.alert.collectAsStateWithLifecycle()
-            val home by vm.home.collectAsStateWithLifecycle()
+            val places by vm.places.collectAsStateWithLifecycle()
+            val arrivalHintSeen by vm.arrivalHintSeen.collectAsStateWithLifecycle()
             val dwell by vm.dwellMinutes.collectAsStateWithLifecycle()
             val itemsDone by vm.itemsDone.collectAsStateWithLifecycle()
             val reminderSort by vm.reminderSort.collectAsStateWithLifecycle()
@@ -123,7 +125,7 @@ class MainActivity : ComponentActivity() {
                     AvlAppUi(
                         state = AppState(
                             today, reminders, openByReminder, history, proofs, theme, permissions, prep, alert, dnd,
-                            home = home, dwellMinutes = dwell, itemsDone = itemsDone,
+                            places = places, arrivalHint = !arrivalHintSeen, dwellMinutes = dwell, itemsDone = itemsDone,
                             reminderSort = reminderSort, suggestions = suggestions, overview = overview,
                             blockers = blockers, templates = templates, snoozeHints = snoozeHints,
                             claudeAccess = claudeAccess, cloud = cloud, local = local,
@@ -240,12 +242,14 @@ class MainActivity : ComponentActivity() {
             val send = Intent(Intent.ACTION_SEND).setType("text/plain").putExtra(Intent.EXTRA_TEXT, text)
             startActivity(Intent.createChooser(send, "Vorschläge teilen"))
         }
-        override fun setHomeHere(onResult: (Boolean) -> Unit) {
+        override fun dismissArrivalHint() = vm.dismissArrivalHint()
+        override fun setPlaceHere(placeId: Long?, name: String, onResult: (PlaceSetResult) -> Unit) {
             if (hasLocation()) {
-                vm.setHomeHere(onResult)
+                vm.setPlaceHere(placeId, name, onResult)
             } else {
+                // Position and WLAN (BSSID) both need the location permission.
                 requestLocation.launch(arrayOf(Manifest.permission.ACCESS_FINE_LOCATION, Manifest.permission.ACCESS_COARSE_LOCATION))
-                onResult(false)
+                onResult(PlaceSetResult.NoPosition)
             }
         }
     }
@@ -280,7 +284,7 @@ class MainActivity : ComponentActivity() {
             },
             // Only asked for when a reminder waits for the arrival at home.
             if (!locationNeeded) null else PermissionItem(
-                "Standort „Immer erlauben“", "für die Ankunft zuhause; der Standort bleibt auf dem Handy", hasBackgroundLocation(),
+                "Standort „Immer erlauben“", "für die Ankunft an einem Ort (Standort und WLAN); bleibt auf dem Handy", hasBackgroundLocation(),
             ) {
                 if (!hasLocation()) {
                     requestLocation.launch(arrayOf(Manifest.permission.ACCESS_FINE_LOCATION, Manifest.permission.ACCESS_COARSE_LOCATION))

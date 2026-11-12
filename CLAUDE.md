@@ -7,11 +7,11 @@ Strenge und invasive Mechanismen sind gewollt. Kommunikation auf **Deutsch, mit 
 
 ## Wo was steht
 - [docs/stand.md](docs/stand.md) – aktueller Stand, offene Punkte, nächste Schritte (zuerst lesen)
-- [docs/anforderungen.md](docs/anforderungen.md) – Kevins Anforderungen, Entscheidungen (Kap. 9), Planung (Kap. 10)
-- [docs/design.md](docs/design.md) – technisches Design je Version
+- [docs/anforderungen.md](docs/anforderungen.md) – Kevins Anforderungen, Entscheidungen (Kap. 9, bis 2026-10-31 in `anforderungen-archiv.md`), Planung (Kap. 10)
+- [docs/design.md](docs/design.md) – technisches Design nach Themen; am Ende höchstens der Entwurf der nächsten Etappe
 - [docs/geraetetest.md](docs/geraetetest.md) – Kerntests auf dem echten Gerät (Archiv pro Version: `geraetetest-archiv.md`)
 - [docs/backend.md](docs/backend.md) – Backend (`../avlreminder-backend`) aus Sicht der App
-- [docs/backup-entwurf.md](docs/backup-entwurf.md) – Einbindung des Cloud-Backups (Entscheidungen A-1 bis A-14)
+- [docs/cloud-entscheidungen.md](docs/cloud-entscheidungen.md) – Entscheidungen zum Cloud-Backup (A-, W-, R-) und Einrichtung
 - [docs/entwicklungsumgebung.md](docs/entwicklungsumgebung.md) – Toolchain und Pfade auf Kevins Rechner
 - Module: `core` (reine Kotlin-Logik, Kover-Abdeckung), `app` (Android, Compose, Room)
 
@@ -22,6 +22,8 @@ Strenge und invasive Mechanismen sind gewollt. Kommunikation auf **Deutsch, mit 
   Abschluss-Box ersetzt sie nie.
 - Neue Anforderungen und Entscheidungen in `docs/anforderungen.md` festhalten
   (Abschnitt 7.x und Tabelle in Kap. 9 mit Datum).
+- Eine Etappe ist erst fertig, wenn ihr Entwurf in die Themen von `design.md` eingearbeitet
+  und der Entwurfsabschnitt gelöscht ist; `stand.md` und Kap. 10.1 nachziehen.
 
 ## Bauen und testen (Git Bash)
 ```bash
@@ -31,7 +33,7 @@ Strenge und invasive Mechanismen sind gewollt. Kommunikation auf **Deutsch, mit 
   (Pfade in entwicklungsumgebung.md).
 - Gradle, adb und `git push` brauchen in Claude Code Netz/Geräte außerhalb der Sandbox.
 - Der Build braucht das Backend-Repo daneben (`../avlreminder-backend`, Composite Build,
-  [backup-entwurf.md](docs/backup-entwurf.md) A-2). Steht dort ein anderer Commit als in
+  [cloud-entscheidungen.md](docs/cloud-entscheidungen.md) A-2). Steht dort ein anderer Commit als in
   `gradle/backend-commit.txt` oder gibt es uncommittete Änderungen in `client/`/`proto/`,
   warnt der Build: **eine solche APK nicht installieren**. Nach Änderungen im Backend den
   Commit dort pushen und in `gradle/backend-commit.txt` eintragen.

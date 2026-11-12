@@ -25,7 +25,7 @@ dependencyResolutionManagement {
 rootProject.name = "avlreminder"
 include(":core", ":app")
 
-// Cloud-Backup (docs/backup-entwurf.md A-2): Die Module protokoll und verbindung
+// Cloud-Backup (docs/cloud-entscheidungen.md A-2): Die Module protokoll und verbindung
 // kommen als Quellcode aus dem Backend-Repo daneben (Composite Build), nicht als
 // veröffentlichte Bibliothek. Lokal baut Gradle, was dort gerade liegt; die CI
 // checkt genau den Commit aus gradle/backend-commit.txt aus.

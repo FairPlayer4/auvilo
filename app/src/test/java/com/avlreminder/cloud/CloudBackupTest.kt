@@ -72,7 +72,7 @@ import java.time.Instant
 import java.util.zip.GZIPInputStream
 
 /**
- * Switching on, signing in and setting up (backup-entwurf.md "Ablauf Einrichtung"). Server and
+ * Switching on, signing in and setting up (cloud-entscheidungen.md "Einrichtung"). Server and
  * Google are replaced; the flows themselves are tested in the backend (`EinrichtungTest`).
  */
 @RunWith(AndroidJUnit4::class)
@@ -830,7 +830,7 @@ class CloudBackupTest {
         assertEquals(0, serversCreated)
     }
 
-    // --- Step 5: checking, restoring, brake, deleting (wiederherstellen-entwurf.md) ---------
+    // --- Step 5: checking, restoring, brake, deleting (cloud-entscheidungen.md W, R) ---------
 
     /** A payload the app could restore (the fake does not open the database). */
     private fun zip(db: String, settings: String = "{}") = BackupZip.pack(BackupContents(db.toByteArray(), settings))

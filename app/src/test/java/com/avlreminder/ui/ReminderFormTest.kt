@@ -1,5 +1,7 @@
 package com.avlreminder.ui
 
+import org.junit.Assert.assertFalse
+import org.junit.Assert.assertTrue
 import com.avlreminder.core.model.Arrival
 import com.avlreminder.core.model.ChecklistItem
 import com.avlreminder.core.model.ProofSpec
@@ -98,7 +100,7 @@ class ReminderFormTest {
 
     @Test
     fun arrivalNeedsTheHomeAndSurvivesEditing() {
-        val base = ReminderForm.new(now, zone, homeId = 7).copy(title = "Training", time = LocalTime.of(19, 0))
+        val base = ReminderForm.new(now, zone, placeId = 7).copy(title = "Training", time = LocalTime.of(19, 0))
         assertNull(base.toReminder(now)!!.arrival)
 
         val dropped = base.copy(atHome = true).toReminder(now)!!
@@ -114,6 +116,20 @@ class ReminderFormTest {
         }
         // Without "Zuhause" the arrival is left out, so the validation can say what is missing.
         assertNull(ReminderForm.new(now, zone).copy(kind = ScheduleKind.ON_ARRIVAL).toReminder(now)!!.arrival)
+    }
+
+    // KRITISCH: Vorlauf, Puffer und Prüfabstand überstehen das Bearbeiten (Anf. 7.29); Feineinstellungen nur mit Zeitraum.
+    @Test
+    fun theArrivalWindowSurvivesEditingAndHasFineSettingsOnlyWithALead() {
+        val base = ReminderForm.new(now, zone, placeId = 7).copy(title = "Training", time = LocalTime.of(19, 30), atHome = true)
+        val r = base.copy(lead = 60, buffer = 10, check = 30).toReminder(now)!!
+        assertEquals(Arrival(7, WhenAway.DROP, leadMinutes = 60, bufferMinutes = 10, checkMinutes = 30), r.arrival)
+        assertEquals(r, ReminderForm.of(r.copy(id = 5), LocalDate.of(2026, 11, 11)).toReminder(now)!!.copy(id = 0))
+
+        assertTrue("Standard: 90 min Zeitraum", base.hasWindow)
+        assertFalse("Vorlauf 0 wie bisher", base.copy(lead = 0).hasWindow)
+        assertFalse("nur Uhrzeit", base.copy(atHome = false).hasWindow)
+        assertFalse("wenn ich ankomme", base.copy(kind = ScheduleKind.ON_ARRIVAL).hasWindow)
     }
 
     @Test

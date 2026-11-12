@@ -5,7 +5,7 @@
 angeschlossenem Handy und installiertem Debug-Build:
 
 ```bash
-python -I tools/testdata/export_testdata.py testdata/real-2026-11-04.json
+python -I tools/testdata/export_testdata.py testdata/real-2026-11-12.json
 ```
 
 - Alle freien Texte sind durch Fülltext gleicher Länge ersetzt: Titel, Warum, Ziel,

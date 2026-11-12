@@ -1,5 +1,9 @@
 package com.avlreminder.claude
 
+import com.avlreminder.core.model.WhenAway
+import com.avlreminder.core.model.PlaceWifi
+import com.avlreminder.core.model.Place
+import com.avlreminder.core.model.Arrival
 import android.content.Context
 import androidx.room.Room
 import androidx.test.core.app.ApplicationProvider
@@ -120,6 +124,28 @@ class ClaudeApiTest {
         assertEquals(Presets.of(Strictness.NORMAL).proof, r.proof)
     }
 
+    // KRITISCH: Ein Edit ohne Zeitraum setzt Vorlauf und Puffer nicht zurück, und die WLANs der Orte bleiben auf dem Handy (Anf. 7.29).
+    @Test
+    fun theArrivalWindowSurvivesAnEditAndTheWlansStayOnTheDevice() = runTest {
+        val home = repo.savePlace(Place(name = "Zuhause", lat = 48.1, lon = 11.5, wifis = listOf(PlaceWifi("aa:bb:cc:dd:ee:01", "HeimNetz"))))
+        val created = call(
+            "save",
+            """{"reminder": {"title": "Training", "strictness": "NORMAL", "schedule": {"type": "daily", "times": ["19:30"]},
+                "arrival": {"placeId": $home, "leadMinutes": 60, "bufferMinutes": 10}}}""",
+        )
+        assertTrue(created.toString(), created.getBoolean("ok"))
+        val id = created.getLong("id")
+        assertEquals(Arrival(home, WhenAway.DROP, leadMinutes = 60, bufferMinutes = 10), repo.reminder(id)!!.arrival)
+
+        call("save", """{"reminder": {"id": $id, "arrival": {"placeId": $home, "whenAway": "RING"}}}""")
+        assertEquals(Arrival(home, WhenAway.RING, leadMinutes = 60, bufferMinutes = 10), repo.reminder(id)!!.arrival)
+
+        val shown = listOf(call("reminders"), call("reminder", """{"id": $id}"""), call("today")).joinToString()
+        assertTrue(shown, shown.contains("\"leadMinutes\":60"))
+        assertFalse("keine BSSID", shown.contains("aa:bb", ignoreCase = true))
+        assertFalse("kein WLAN-Name", shown.contains("HeimNetz"))
+    }
+
     @Test
     fun readsRemindersTodayAndDetails() = runTest {
         val id = call("save", testReminder).getLong("id")
@@ -168,6 +194,10 @@ class ClaudeApiTest {
         // Planned but already past (the alarm is late): the same.
         repo.saveOccurrence(open.copy(currentAt = now))
         assertFalse(call("setActive", """{"id": $id, "active": false}""").getBoolean("ok"))
+        // It rang and now waits for the arrival, planned again for later (AG5, Review-Lauf 4 M4).
+        repo.saveOccurrence(open.copy(currentAt = now.plusSeconds(3600), awaitsArrival = true))
+        assertEquals("läuft gerade – nur in der App", call("archive", """{"id": $id}""").getString("error"))
+        assertTrue(repo.reminder(id)!!.archivedAt == null)
         // A blocker is fine.
         assertTrue(call("addBlocker", """{"reminderId": $id, "text": "x"}""").getBoolean("ok"))
     }

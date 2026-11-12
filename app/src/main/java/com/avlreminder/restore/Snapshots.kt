@@ -17,7 +17,7 @@ import java.time.DayOfWeek
 import java.util.concurrent.TimeUnit
 
 /**
- * Daily copies of the database on the phone (wiederherstellen-entwurf.md, R-1): independent of
+ * Daily copies of the database on the phone (cloud-entscheidungen.md R-1): independent of
  * the cloud, the sign-in and the network. `backup/taeglich-<Datum>.db`; kept are the newest 7 and,
  * of the older ones, the newest of each of the last 4 weeks ([keep]).
  *

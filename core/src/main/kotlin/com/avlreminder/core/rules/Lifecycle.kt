@@ -8,6 +8,7 @@ import com.avlreminder.core.model.OccurrenceState.DONE
 import com.avlreminder.core.model.OccurrenceState.DUE
 import com.avlreminder.core.model.OccurrenceState.ESCALATING
 import com.avlreminder.core.model.OccurrenceState.PLANNED
+import com.avlreminder.core.model.OccurrenceState.RUNNING
 import com.avlreminder.core.model.Reminder
 import com.avlreminder.core.model.Resolution
 import com.avlreminder.core.model.severalADay
@@ -23,6 +24,11 @@ sealed interface Action {
     data object Drop : Action
     /** Snoozed or postponed and not at the place at the new time: waits for the arrival (7.29 OZ5). */
     data object AwaitArrival : Action
+    /**
+     * Arrived in the window or while waiting for it (7.29 OZ1, OZ4): stays planned and rings at
+     * [at], after the buffer or at the latest time when already there at the start (F2).
+     */
+    data class Arrived(val at: Instant) : Action
     /** Another ringing round without reaction. */
     data object Escalate : Action
     data class Snooze(val duration: Duration) : Action
@@ -54,6 +60,22 @@ sealed interface Action {
      * Not a postponement; whether it may happen at all decides [com.avlreminder.core.usecases.ReminderEngine.reopen].
      */
     data class Reopen(val at: Instant) : Action
+
+    /** "Ich starte jetzt" (Anf. 7.11 D1): the session runs, the alarm ends; also before it is due (7.20 V2). */
+    data object Start : Action
+    /** "Noch dran" (D3): the next check after the interval. */
+    data object StillOn : Action
+    /** "Abbruch ohne Minimalziel" (D3): not successful, honest in the statistics. */
+    data object Abort : Action
+    /** A check rings (D3); unanswered it asks again at [again]. */
+    data class AskCheck(val again: Instant) : Action
+    /** The last reminder rings (D5); only [audible] its time to react starts, it asks again at [again]. */
+    data class FinalCall(val audible: Boolean, val again: Instant) : Action
+    /**
+     * No answer to the last reminder, or the maximum reached during the pause by hand (D5, D7):
+     * checklist items done count as the minimum, otherwise missed – [paused]: aborted.
+     */
+    data class EndSession(val paused: Boolean) : Action
 }
 
 /** Facts beyond the occurrence itself that limit what is allowed. */
@@ -86,10 +108,14 @@ object Lifecycle {
     /** Note of an occurrence closed with a solved blocker as the minimum. */
     const val BLOCKER_SOLVED = "Blocker gelöst"
 
-    /** Done in any way, or skipped by hand (not by the system: goal reached, pause, …); missed and dropped stay. */
+    /**
+     * Done in any way, skipped by hand (not by the system: goal reached, pause, …), or a session
+     * aborted (2026-11-12; it goes on only before its maximum duration); missed and dropped stay.
+     */
     fun canReopen(occurrence: Occurrence): Boolean =
         occurrence.state == DONE ||
-            (occurrence.state == CLOSED && occurrence.resolution == Resolution.SKIPPED && occurrence.note !in SkipReasons.SYSTEM)
+            (occurrence.state == CLOSED && occurrence.resolution == Resolution.SKIPPED && occurrence.note !in SkipReasons.SYSTEM) ||
+            (occurrence.state == CLOSED && occurrence.resolution == Resolution.ABORTED && occurrence.startedAt != null)
 
     fun canPostpone(reminder: Reminder, occurrence: Occurrence): Boolean =
         reminder.postponeLimit == null || occurrence.postponeCount < reminder.postponeLimit
@@ -97,8 +123,9 @@ object Lifecycle {
     fun postponesLeft(reminder: Reminder, occurrence: Occurrence): Int? =
         reminder.postponeLimit?.let { (it - occurrence.postponeCount).coerceAtLeast(0) }
 
+    /** A minimum as text, or as a duration of the session (7.11 D4). */
     fun canUseMinimum(reminder: Reminder, limits: Limits): Boolean =
-        reminder.minimum != null && minimumLeft(reminder, limits)
+        (reminder.minimum != null || reminder.session?.minimumMinutes != null) && minimumLeft(reminder, limits)
 
     /** A solved blocker as the minimum (S7); the weekly limit for the minimum applies. */
     fun canUseSolvedBlocker(reminder: Reminder, limits: Limits): Boolean =
@@ -117,32 +144,57 @@ object Lifecycle {
         now: Instant,
         limits: Limits = Limits(),
     ): TransitionResult {
-        fun ok(o: Occurrence, type: EventType, detail: String? = null) =
-            TransitionResult.Ok(o, Event(occurrenceId = occurrence.id, at = now, type = type, detail = detail))
+        fun ok(o: Occurrence, type: EventType, detail: String? = null) = TransitionResult.Ok(
+            // A session that ended keeps its start (its duration, D6) but has no next check.
+            if (o.state == RUNNING) o else o.copy(nextCheckAt = null),
+            Event(occurrenceId = occurrence.id, at = now, type = type, detail = detail),
+        )
         if (action is Action.Reopen) {
             if (!canReopen(occurrence)) return TransitionResult.Rejected("only a done occurrence or one skipped by hand can be taken back")
             if (action.at <= now) return TransitionResult.Rejected("must ring again in the future")
+            if (occurrence.resolution == Resolution.ABORTED) {
+                // Aborted by a misclick: the session goes on with its old start, the next check
+                // after the interval, the last reminder at the maximum (Review-Lauf 4, Frage 2).
+                val spec = reminder.session
+                val started = occurrence.startedAt
+                if (spec == null || started == null || now >= Sessions.maxAt(spec, started)) {
+                    return TransitionResult.Rejected("maximum duration reached")
+                }
+                return ok(
+                    occurrence.copy(
+                        state = RUNNING, resolution = null, resolvedAt = null, note = null, pausedUntil = null, finalCallAt = null,
+                        nextCheckAt = minOf(now.plusMinutes(spec.checkMinutes), Sessions.maxAt(spec, started)),
+                    ),
+                    EventType.REOPENED, Resolution.ABORTED.name,
+                )
+            }
             // What the completion itself set goes back: its first progress, its note.
             val progress = occurrence.firstProgressAt?.takeIf { it != occurrence.resolvedAt }
             return ok(
                 occurrence.copy(
                     state = PLANNED, currentAt = action.at, resolution = null, resolvedAt = null, note = null,
-                    pausedUntil = null, awaitsArrival = false, firstProgressAt = progress,
+                    pausedUntil = null, awaitsArrival = false, arrivedAt = null, firstProgressAt = progress,
+                    startedAt = null, finalCallAt = null,
                 ),
                 EventType.REOPENED, occurrence.resolution?.name,
             )
         }
         if (!occurrence.isOpen) return TransitionResult.Rejected("occurrence is already resolved")
+        // KRITISCH: a running session ends only through an answer or its maximum duration (7.11 D7):
+        // no snoozing, no end of the day, no window closing, no miss.
+        if (occurrence.state == RUNNING && action.notWhileRunning()) return TransitionResult.Rejected("läuft gerade")
+        val spec = reminder.session
+        val started = occurrence.startedAt
 
         return when (action) {
             Action.Fire ->
                 if (occurrence.state != PLANNED) TransitionResult.Rejected("only a planned occurrence can fire")
-                else ok(occurrence.copy(state = DUE, firedAt = occurrence.firedAt ?: now, awaitsArrival = false), EventType.DUE)
+                else ok(occurrence.copy(state = DUE, firedAt = occurrence.firedAt ?: now, awaitsArrival = false, arrivedAt = null), EventType.DUE)
 
             Action.Arrive ->
                 if (occurrence.state != PLANNED) TransitionResult.Rejected("only a planned occurrence can fire")
                 else ok(
-                    occurrence.copy(state = DUE, currentAt = now, firedAt = occurrence.firedAt ?: now, awaitsArrival = false),
+                    occurrence.copy(state = DUE, currentAt = now, firedAt = occurrence.firedAt ?: now, awaitsArrival = false, arrivedAt = null),
                     EventType.DUE, "Ankunft",
                 )
 
@@ -153,6 +205,15 @@ object Lifecycle {
                     occurrence.copy(state = CLOSED, resolution = Resolution.DROPPED, resolvedAt = now),
                     EventType.DROPPED,
                 )
+
+            is Action.Arrived -> when {
+                occurrence.state != PLANNED -> TransitionResult.Rejected("only a planned occurrence can arrive")
+                occurrence.arrivedAt != null -> TransitionResult.Rejected("the first arrival counts")
+                else -> ok(
+                    occurrence.copy(currentAt = action.at, arrivedAt = now, awaitsArrival = false),
+                    EventType.ARRIVED, action.at.toString(),
+                )
+            }
 
             Action.AwaitArrival ->
                 if (occurrence.state != PLANNED || !occurrence.rangOrMoved) TransitionResult.Rejected("only a snoozed or postponed occurrence awaits the arrival")
@@ -165,7 +226,7 @@ object Lifecycle {
             is Action.Snooze ->
                 if (occurrence.state == PLANNED) TransitionResult.Rejected("nothing to snooze yet")
                 else ok(
-                    occurrence.copy(state = PLANNED, currentAt = now.plus(action.duration), pausedUntil = null, awaitsArrival = false),
+                    occurrence.copy(state = PLANNED, currentAt = now.plus(action.duration), pausedUntil = null, awaitsArrival = false, arrivedAt = null),
                     EventType.SNOOZED, "${action.duration.toMinutes()} min",
                 )
 
@@ -176,7 +237,7 @@ object Lifecycle {
                 limits.nextTime != null && action.to >= limits.nextTime -> TransitionResult.Rejected("postpone target after the next time")
                 else -> ok(
                     occurrence.copy(
-                        state = PLANNED, currentAt = action.to, postponeCount = occurrence.postponeCount + 1, pausedUntil = null, awaitsArrival = false,
+                        state = PLANNED, currentAt = action.to, postponeCount = occurrence.postponeCount + 1, pausedUntil = null, awaitsArrival = false, arrivedAt = null,
                     ),
                     EventType.POSTPONED, action.to.toString(),
                 )
@@ -246,7 +307,7 @@ object Lifecycle {
                     counts && !canPostpone(reminder, occurrence) -> TransitionResult.Rejected("postpone limit reached")
                     else -> ok(
                         occurrence.copy(
-                            state = PLANNED, currentAt = action.to, pausedUntil = null, awaitsArrival = false,
+                            state = PLANNED, currentAt = action.to, pausedUntil = null, awaitsArrival = false, arrivedAt = null,
                             postponeCount = occurrence.postponeCount + if (counts) 1 else 0,
                         ),
                         EventType.DEFERRED, action.to.toString(),
@@ -256,7 +317,7 @@ object Lifecycle {
 
             is Action.CloseWindow ->
                 if (action.to <= now) TransitionResult.Rejected("next window must lie in the future")
-                else ok(occurrence.copy(state = PLANNED, currentAt = action.to, pausedUntil = null, awaitsArrival = false), EventType.WINDOW_CLOSED, action.to.toString())
+                else ok(occurrence.copy(state = PLANNED, currentAt = action.to, pausedUntil = null, awaitsArrival = false, arrivedAt = null), EventType.WINDOW_CLOSED, action.to.toString())
 
             is Action.Skip -> ok(
                 occurrence.copy(state = CLOSED, resolution = Resolution.SKIPPED, resolvedAt = now, note = action.reason),
@@ -267,6 +328,71 @@ object Lifecycle {
                 occurrence.copy(state = CLOSED, resolution = Resolution.MISSED, resolvedAt = now),
                 EventType.MISSED,
             )
+
+            Action.Start -> when {
+                spec == null -> TransitionResult.Rejected("no session for this reminder")
+                !Sessions.canStart(reminder, occurrence) -> TransitionResult.Rejected("already running")
+                else -> ok(
+                    occurrence.copy(
+                        state = RUNNING, startedAt = now, nextCheckAt = minOf(now.plusMinutes(spec.checkMinutes), Sessions.maxAt(spec, now)),
+                        pausedUntil = null, awaitsArrival = false, finalCallAt = null,
+                    ),
+                    EventType.STARTED,
+                )
+            }
+
+            Action.StillOn -> when {
+                spec == null || started == null || occurrence.state != RUNNING -> TransitionResult.Rejected("no session running")
+                // At the maximum only an answer that ends it is left (D5).
+                occurrence.finalCallAt != null || now >= Sessions.maxAt(spec, started) -> TransitionResult.Rejected("maximum duration reached")
+                // KRITISCH: no check after the maximum – the last reminder comes there (D5).
+                else -> ok(
+                    occurrence.copy(nextCheckAt = minOf(now.plusMinutes(spec.checkMinutes), Sessions.maxAt(spec, started)), pausedUntil = null),
+                    EventType.CHECK_ANSWERED,
+                )
+            }
+
+            Action.Abort ->
+                if (occurrence.state != RUNNING) TransitionResult.Rejected("no session running")
+                else ok(occurrence.copy(state = CLOSED, resolution = Resolution.ABORTED, resolvedAt = now), EventType.ABORTED, Resolution.ABORTED.name)
+
+            is Action.AskCheck ->
+                if (occurrence.state != RUNNING) TransitionResult.Rejected("no session running")
+                else ok(occurrence.copy(nextCheckAt = action.again), EventType.CHECK_ASKED)
+
+            is Action.FinalCall ->
+                if (occurrence.state != RUNNING) TransitionResult.Rejected("no session running")
+                else ok(
+                    occurrence.copy(nextCheckAt = action.again, finalCallAt = if (action.audible) now else null),
+                    EventType.FINAL_CALL, if (action.audible) null else "still",
+                )
+
+            is Action.EndSession -> {
+                if (occurrence.state != RUNNING) return TransitionResult.Rejected("no session running")
+                // D5: items already done count as the minimum, also beyond its weekly limit – the system ends it.
+                val resolution = when {
+                    limits.itemsDone.isNotEmpty() -> Resolution.MINIMUM
+                    action.paused -> Resolution.ABORTED
+                    else -> Resolution.MISSED
+                }
+                val state = if (resolution == Resolution.MINIMUM) DONE else CLOSED
+                val type = when (resolution) {
+                    Resolution.MINIMUM -> EventType.COMPLETED
+                    Resolution.MISSED -> EventType.MISSED
+                    else -> EventType.ABORTED
+                }
+                ok(occurrence.copy(state = state, resolution = resolution, resolvedAt = now), type, resolution.name)
+            }
         }
+    }
+
+    private fun Instant.plusMinutes(m: Int): Instant = plus(Duration.ofMinutes(m.toLong()))
+
+    /** What a running session does not allow (7.11 D7); completing, checklist items and the proof screen stay. */
+    private fun Action.notWhileRunning(): Boolean = when (this) {
+        Action.Escalate, is Action.Snooze, is Action.Postpone, is Action.Skip, Action.Miss,
+        is Action.DeferRest, is Action.CloseWindow,
+        -> true
+        else -> false
     }
 }

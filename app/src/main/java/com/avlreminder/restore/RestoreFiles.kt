@@ -19,7 +19,7 @@ import java.time.ZoneId
 import java.time.format.DateTimeFormatter
 
 /**
- * The files of restoring (wiederherstellen-entwurf.md, W-1, W-5), all in the app's own storage:
+ * The files of restoring (cloud-entscheidungen.md W-1, W-5), all in the app's own storage:
  *
  *   restore/pruefung.db        the backup, unpacked and checked; never the running database
  *   restore/einstellungen.json the settings that come with it

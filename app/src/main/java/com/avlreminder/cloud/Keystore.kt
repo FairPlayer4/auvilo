@@ -13,7 +13,7 @@ import java.security.Signature
 import java.security.spec.ECGenParameterSpec
 
 /**
- * The device key (backup-entwurf.md A-5): ECDSA P-256 in the Android Keystore, created on first
+ * The device key (cloud-entscheidungen.md A-5): ECDSA P-256 in the Android Keystore, created on first
  * use, never exportable. The server knows this device by its public key; if the key is lost
  * (app data cleared), the app signs in as a new device.
  */

@@ -58,7 +58,7 @@ object WeeklyGoals {
         val goal = reminder.weeklyGoal ?: return null
         val week = Weeks.start(day)
         val own = resolved.filter { o ->
-            o.reminderId == reminder.id && o.resolvedAt?.let { Weeks.start(it.atZone(zone).toLocalDate()) } == week
+            o.reminderId == reminder.id && o.countedAt?.let { Weeks.start(it.atZone(zone).toLocalDate()) } == week
         }
         return status(
             goal, reminder.schedule,

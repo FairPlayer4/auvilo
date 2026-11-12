@@ -1,5 +1,7 @@
 package com.avlreminder.ui
 
+import com.avlreminder.core.model.Schedule
+import com.avlreminder.PlaceSetResult
 import com.avlreminder.cloud.CloudStatus
 import com.avlreminder.ui.screens.CloudActions
 
@@ -92,7 +94,10 @@ data class AppState(
     val alert: AlertSettings = AlertSettings(),
     /** "Nicht stören" is on right now. */
     val doNotDisturb: Boolean = false,
-    val home: Place? = null,
+    /** The first is "Zuhause" (Anf. 7.29 OZ6). */
+    val places: List<Place> = emptyList(),
+    /** The one-time hint about the arrival window (OZ9) is still to show. */
+    val arrivalHint: Boolean = false,
     val dwellMinutes: Int = Settings.DEFAULT_DWELL,
     /** Done checklist items per occurrence. */
     val itemsDone: Map<Long, List<ItemDone>> = emptyMap(),
@@ -123,8 +128,9 @@ interface AppActions {
     /** "Vorab erledigen": the alarm screen for an occurrence that is not due yet. */
     fun completeEarly(occurrenceId: Long)
     fun play(path: String)
-    /** Sets "Zuhause" to the current position; false if there was none. */
-    fun setHomeHere(onResult: (Boolean) -> Unit) {}
+    /** Sets a place (null: a new one) to the current position and WLAN. */
+    fun setPlaceHere(placeId: Long?, name: String, onResult: (PlaceSetResult) -> Unit) {}
+    fun dismissArrivalHint() {}
     fun setDwellMinutes(minutes: Int) {}
     fun setReminderSort(sort: ReminderSort) {}
     /** Archive pauses; restore keeps it paused. */
@@ -243,6 +249,11 @@ fun AvlAppUi(
                             weeks = state.reminders.filter { it.active }.mapNotNull { r -> WeeklyGoals.status(r, resolved, date, zone)?.let { r to it } },
                             pausedUntil = state.alert.alarmsPausedUntil?.takeIf { state.alert.alarmsPaused(now) }?.let { AlarmPause.untilText(it, now, zone) },
                             onResume = { actions.setAlarmsPaused(null) },
+                            places = state.places,
+                            arrivalHint = state.arrivalHint && state.reminders.any { r ->
+                                r.active && r.schedule != Schedule.OnArrival && r.arrival?.hasWindow == true
+                            },
+                            onDismissArrivalHint = actions::dismissArrivalHint,
                             hints = state.snoozeHints,
                             onHint = { h, choice -> actions.answerSnoozeHint(h.reminder.id, choice) },
                             onReopen = { actions.reopen(it.occurrence.id) },
@@ -262,6 +273,7 @@ fun AvlAppUi(
                     onSetActive = { r, active -> actions.setActive(r.id, active) },
                     sort = state.reminderSort, onSort = actions::setReminderSort,
                     onRestore = { actions.setArchived(it.id, false) },
+                    places = state.places,
                 )
                 TopActions(Modifier.align(Alignment.TopEnd), { suggestHere("Reminder") }) { go(Routes.SETTINGS) }
             }
@@ -273,7 +285,7 @@ fun AvlAppUi(
                     cloud = state.cloud, cloudActions = actions.cloud,
                     local = state.local, localActions = actions.local,
                     permissions = state.permissions, onBack = { go(Routes.TODAY) },
-                    home = state.home, onSetHome = actions::setHomeHere,
+                    places = state.places, onSetPlace = actions::setPlaceHere,
                     dwellMinutes = state.dwellMinutes, onDwell = actions::setDwellMinutes,
                     openSuggestions = state.suggestions.count { it.status == SuggestionStatus.OPEN },
                     onSuggestions = { go(Routes.SUGGESTIONS) },
@@ -328,13 +340,14 @@ fun AvlAppUi(
                 val existing = state.reminders.firstOrNull { it.id == id }
                 val initial = remember(route, existing != null) {
                     val template = if (fromTemplate) state.templates?.firstOrNull { it.id == route.removePrefix("template:").toLong() } else null
-                    existing?.let { ReminderForm.of(it, date, state.prep[it.id].orEmpty(), state.home?.id) }
-                        ?: ReminderForm.new(now, zone, state.home?.id).let { f -> template?.let { f.withTemplate(it) } ?: f }
+                    existing?.let { ReminderForm.of(it, date, state.prep[it.id].orEmpty(), state.places.firstOrNull()?.id) }
+                        ?: ReminderForm.new(now, zone, state.places.firstOrNull()?.id).let { f -> template?.let { f.withTemplate(it) } ?: f }
                 }
                 val blockers = existing?.let { state.blockers[it.id] }.orEmpty()
                 EditScreen(
                     initial = initial,
                     problems = problems,
+                    places = state.places,
                     onSave = { form ->
                         val reminder = form.toReminder(now)
                         if (reminder == null) {

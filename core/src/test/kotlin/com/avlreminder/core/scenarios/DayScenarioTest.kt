@@ -9,7 +9,10 @@ import com.avlreminder.core.model.Resolution
 import com.avlreminder.core.model.Schedule
 import com.avlreminder.core.model.WhenAway
 import com.avlreminder.core.reminder
+import com.avlreminder.core.model.Strictness
 import com.avlreminder.core.rules.Action
+import com.avlreminder.core.rules.AlertSettings
+import com.avlreminder.core.rules.DayTimes
 import java.time.DayOfWeek
 import java.time.Duration
 import java.time.LocalTime
@@ -44,10 +47,11 @@ class DayScenarioTest {
         val (home, id) = training()
         sim.leave(at(26, 7, 45))
         sim.arrive(home, at(26, 18, 30))
-        sim.act(id, at(26, 18, 45)) { Action.Complete(minimumOnly = false) }
+        sim.act(id, at(26, 18, 50)) { Action.Complete(minimumOnly = false) }
         sim.runUntil(at(27, 6))
 
-        assertEquals(listOf("Mo 18:30 Training FULLSCREEN", "Mo 18:40 Training FULLSCREEN"), ringsOf("Training"))
+        // In the window (17:30–19:00): rings after the buffer of 5 min, then every 10 min.
+        assertEquals(listOf("Mo 18:35 Training FULLSCREEN", "Mo 18:45 Training FULLSCREEN"), ringsOf("Training"))
         assertEquals(at(27, 19), sim.open(id).dueAt)
     }
 
@@ -80,27 +84,31 @@ class DayScenarioTest {
     }
 
     /**
-     * Today's rule (Anf. 5.1, T2b): an arrival before the time makes it due at once, there is no
-     * earliest time. A geofence that reports home in the morning thus rings the evening training
-     * in the morning. Kevin's case of 2026-11-03 may be this; open until his scenario is known.
+     * Until 7.29 an arrival before the time made it due at once: the geofence reported home in
+     * the morning of 2026-11-04 and the evening training rang at 07:12. Now it does not count
+     * before the window, only the diagnostic log notes it (OZ1).
      */
     @Test
-    fun `an arrival in the morning rings the evening training at once (open point)`() = runTest {
+    fun `an arrival in the morning does not count, the training waits for its window`() = runTest {
         val (home, _) = training()
         sim.arrive(home, at(26, 7, 10))
-        assertEquals(listOf("Mo 07:10 Training FULLSCREEN"), sim.rings)
+        assertEquals(emptyList<String>(), sim.rings)
+        assertTrue(sim.diag.any { "too early" in it }, sim.diag.toString())
+        // At home at its time it rings then, as always.
+        sim.runUntil(at(26, 19, 5))
+        assertEquals(listOf("Mo 19:00 Training FULLSCREEN"), sim.rings)
     }
 
     @Test
     fun `a second arrival the same day does not ring again once done`() = runTest {
         val (home, id) = training()
         sim.leave(at(26, 7, 45))
-        sim.arrive(home, at(26, 17))
-        sim.act(id, at(26, 17, 5)) { Action.Complete(minimumOnly = false) }
-        sim.leave(at(26, 17, 30))
+        sim.arrive(home, at(26, 17, 40))
+        sim.act(id, at(26, 17, 50)) { Action.Complete(minimumOnly = false) }
+        sim.leave(at(26, 18))
         sim.arrive(home, at(26, 18, 30))
         sim.runUntil(at(26, 23, 30))
-        assertEquals(listOf("Mo 17:00 Training FULLSCREEN"), ringsOf("Training"))
+        assertEquals(listOf("Mo 17:45 Training FULLSCREEN"), ringsOf("Training"))
     }
 
     // --- Postponed with an arrival: the decision is made (7.29 OZ5, Review B2) ---------------
@@ -121,7 +129,9 @@ class DayScenarioTest {
         sim.runUntil(at(26, 20, 35))
         assertTrue(sim.open(id).awaitsArrival)
         sim.arrive(home, at(26, 21, 10))
-        assertEquals(listOf("Mo 19:00 Training FULLSCREEN", "Mo 21:10 Training FULLSCREEN"), ringsOf("Training"))
+        sim.runUntil(at(26, 21, 20))
+        // After the buffer (7.29 OZ4).
+        assertEquals(listOf("Mo 19:00 Training FULLSCREEN", "Mo 21:15 Training FULLSCREEN"), ringsOf("Training"))
     }
 
     @Test
@@ -159,7 +169,9 @@ class DayScenarioTest {
         sim.phoneOff(until = at(26, 21))
         assertTrue(sim.open(id).awaitsArrival)
         sim.arrive(home, at(26, 21, 10))
-        assertEquals(listOf("Mo 19:00 Training FULLSCREEN", "Mo 21:10 Training FULLSCREEN"), ringsOf("Training"))
+        sim.runUntil(at(26, 21, 20))
+        // After the buffer (7.29 OZ4).
+        assertEquals(listOf("Mo 19:00 Training FULLSCREEN", "Mo 21:15 Training FULLSCREEN"), ringsOf("Training"))
     }
 
     // --- An ordinary daily reminder -----------------------------------------------------------
@@ -175,6 +187,26 @@ class DayScenarioTest {
         assertEquals(30, rings.size)
         assertEquals(Resolution.MISSED, sim.repo.occurrences.values.single { it.dueAt == at(26, 18) }.resolution)
         assertEquals(at(27, 18), sim.open(id).dueAt)
+    }
+
+    /**
+     * A strict reminder ignored on Friday and Saturday: loud only from the loud time of its day,
+     * on the weekend its own (VS2). The simulation checks every ring against that, not only the
+     * last one (Review-Lauf 4, E15).
+     */
+    @Test
+    fun `a strict reminder gets loud at the loud time of its day, on the weekend its own`() = runTest {
+        val weekend = Simulation(at(30, 6), AlertSettings(weekend = DayTimes(LocalTime.of(17, 0), LocalTime.of(22, 0))))
+        weekend.create(reminder(Schedule.Daily(LocalTime.of(16, 30))).copy(title = "Steuer", strictness = Strictness.STRICT))
+        weekend.runUntil(at(31, 23))
+
+        fun firstLoud(day: String) = weekend.rings.first { it.startsWith(day) && it.endsWith("FULLSCREEN_LOUD") }
+        assertEquals("Fr 16:30 Steuer FULLSCREEN", weekend.rings.first())
+        assertEquals("Fr 18:00 Steuer FULLSCREEN_LOUD", firstLoud("Fr"))
+        assertEquals("Sa 16:50 Steuer FULLSCREEN", weekend.rings.last { it.startsWith("Sa") && !it.endsWith("LOUD") })
+        assertEquals("Sa 17:00 Steuer FULLSCREEN_LOUD", firstLoud("Sa"))
+        // The weekend's day ends at 22:00.
+        assertEquals("Sa 21:50 Steuer FULLSCREEN_LOUD", weekend.rings.last())
     }
 
     @Test

@@ -34,7 +34,7 @@ import java.time.Instant
 import java.time.LocalTime
 import java.time.ZoneId
 
-/** Light and dark preview of every screen (docs/design.md, section 8). */
+/** Light and dark preview of every screen (docs/design.md 11.1). */
 @Preview(name = "Hell", widthDp = 390, heightDp = 844)
 @Preview(name = "Dunkel", widthDp = 390, heightDp = 844, uiMode = Configuration.UI_MODE_NIGHT_YES)
 annotation class LightDark

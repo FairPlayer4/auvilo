@@ -18,6 +18,12 @@ import com.avlreminder.core.ports.AlarmPort
 import com.avlreminder.core.ports.DeviceStatePort
 import com.avlreminder.core.ports.GeofencePort
 import com.avlreminder.core.ports.LocationPort
+import com.avlreminder.core.ports.PlaceAlarmPort
+import com.avlreminder.core.ports.PlaceCheck
+import com.avlreminder.core.ports.PlaceResult
+import com.avlreminder.core.ports.PlaceSource
+import com.avlreminder.core.ports.WifiPort
+import com.avlreminder.core.ports.WifiScan
 import com.avlreminder.core.ports.PreNoticePort
 import com.avlreminder.core.ports.ReminderRepository
 import java.time.Clock
@@ -75,12 +81,36 @@ class FakePreNotices : PreNoticePort {
     }
 }
 
-/** [here]: null = position unknown. */
+/** [here]: null = position unknown; the same answer with or without fallback. */
 class FakeLocation(var here: Boolean? = null) : LocationPort {
     var checks = 0
-    override suspend fun isAt(place: Place): Boolean? {
+    override suspend fun check(place: Place, fallback: Boolean): PlaceCheck {
         checks++
-        return here
+        return when (here) {
+            true -> PlaceCheck(PlaceResult.AT, PlaceSource.FALLBACK)
+            false -> PlaceCheck(PlaceResult.AWAY, PlaceSource.FALLBACK)
+            null -> PlaceCheck(PlaceResult.UNKNOWN, null)
+        }
+    }
+}
+
+/** The WLAN as Android reports it: the connected access point and the last scan. */
+class FakeWifi(var connected: String? = null, var scan: WifiScan? = null) : WifiPort {
+    override suspend fun connected() = connected
+    override suspend fun lastScan() = scan
+}
+
+class FakePlaceAlarms : PlaceAlarmPort {
+    val set = mutableMapOf<Long, Instant>()
+    /** The places whose current check is exact (also in Doze). */
+    val exact = mutableSetOf<Long>()
+    override fun set(placeId: Long, at: Instant, exact: Boolean) {
+        set[placeId] = at
+        if (exact) this.exact += placeId else this.exact -= placeId
+    }
+    override fun cancel(placeId: Long) {
+        set.remove(placeId)
+        exact -= placeId
     }
 }
 
@@ -116,9 +146,18 @@ class FakeRepository : ReminderRepository {
 
     override suspend fun reminders() = reminders.values.toList()
     override suspend fun reminder(id: Long) = reminders[id]
+    /**
+     * Like Room (Review-Lauf 4, E14): an unknown id changes nothing; items of this reminder keep
+     * their id, others get a new one; a removed item takes its progress along (foreign key).
+     */
     override suspend fun saveReminder(reminder: Reminder): Long {
+        if (reminder.id != 0L && reminder.id !in reminders) return reminder.id
         val id = if (reminder.id == 0L) nextId++ else reminder.id
-        reminders[id] = reminder.copy(id = id, checklist = reminder.checklist.map { if (it.id == 0L) it.copy(id = nextId++) else it })
+        val own = reminders[id]?.checklist.orEmpty().map { it.id }.toSet()
+        val items = reminder.checklist.map { if (it.id in own) it else it.copy(id = nextId++) }
+        val removed = own - items.map { it.id }.toSet()
+        done.removeAll { it.itemId in removed }
+        reminders[id] = reminder.copy(id = id, checklist = items)
         return id
     }
     override suspend fun deleteReminder(id: Long) {
@@ -127,6 +166,7 @@ class FakeRepository : ReminderRepository {
         ids.forEach { occurrences.remove(it) }
         events.removeAll { it.occurrenceId in ids }
         proofs.removeAll { it.occurrenceId in ids }
+        done.removeAll { it.occurrenceId in ids }
         prep.removeAll { it.reminderId == id }
         blockers.values.removeAll { it.reminderId == id }
     }
@@ -134,16 +174,16 @@ class FakeRepository : ReminderRepository {
     override suspend fun occurrence(id: Long) = occurrences[id]
     override suspend fun openOccurrences() = occurrences.values.filter { it.isOpen }
     override suspend fun openOccurrence(reminderId: Long) =
-        occurrences.values.firstOrNull { it.reminderId == reminderId && it.isOpen }
+        occurrences.values.filter { it.reminderId == reminderId && it.isOpen }.minByOrNull { it.id }
     override suspend fun lastResolved(reminderId: Long) =
         occurrences.values.filter { it.reminderId == reminderId && !it.isOpen }.maxWithOrNull(compareBy({ it.resolvedAt!! }, { it.id }))
     override suspend fun lastDone(reminderId: Long) =
         occurrences.values.filter { it.reminderId == reminderId && it.state == OccurrenceState.DONE }.maxWithOrNull(compareBy({ it.resolvedAt!! }, { it.id }))
     override suspend fun recentResolved(reminderId: Long, limit: Int) =
-        occurrences.values.filter { it.reminderId == reminderId && !it.isOpen }.sortedByDescending { it.resolvedAt!! }.take(limit)
+        occurrences.values.filter { it.reminderId == reminderId && !it.isOpen }.sortedWith(compareByDescending<Occurrence> { it.resolvedAt!! }.thenByDescending { it.id }).take(limit)
     override suspend fun countResolved(reminderId: Long, resolution: Resolution, from: Instant, until: Instant) =
         occurrences.values.count {
-            it.reminderId == reminderId && it.resolution == resolution && it.resolvedAt!! >= from && it.resolvedAt < until
+            it.reminderId == reminderId && it.resolution == resolution && it.countedAt!! >= from && it.countedAt!! < until
         }
     override suspend fun saveOccurrence(occurrence: Occurrence): Long {
         val id = if (occurrence.id == 0L) nextId++ else occurrence.id

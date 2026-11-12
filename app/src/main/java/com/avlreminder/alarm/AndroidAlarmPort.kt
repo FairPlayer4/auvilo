@@ -74,6 +74,8 @@ class AlarmReceiver : BroadcastReceiver() {
             try {
                 val ring = graph.withEngine { it.onAlarm(id) }
                 Diag.log("alarm fired occ=$id late=$late → ${if (ring == null) "nothing (stale, planned again or day ended)" else "ring"}")
+                // Ended by this alarm (a session at its maximum, the end of the day): nothing of it stays.
+                if (ring == null && graph.repository.occurrence(id)?.isOpen != true) Ringer.dismiss(context, id)
             } finally {
                 result.finish()
             }
@@ -98,6 +100,10 @@ class ActionReceiver : BroadcastReceiver() {
         }
         val action = when (intent.action) {
             ACTION_DONE -> Action.Complete(minimumOnly = false)
+            ACTION_MINIMUM -> Action.Complete(minimumOnly = true)
+            ACTION_START -> Action.Start
+            ACTION_STILL_ON -> Action.StillOn
+            ACTION_ABORT -> Action.Abort
             ACTION_SNOOZE -> Action.Snooze(Duration.ofMinutes(intent.getIntExtra(EXTRA_MINUTES, 10).toLong()))
             ACTION_CHECK -> Action.CheckItem(intent.getLongExtra(EXTRA_ITEM, -1), Evidence())
             else -> return
@@ -118,7 +124,8 @@ class ActionReceiver : BroadcastReceiver() {
                 when (next) {
                     is AlarmInfo -> Notifications.show(context, next, quiet = true)
                     // Done from the notification or the watch: "Rückgängig" for a minute (Anf. 7.31).
-                    is Occurrence -> Undo.offer(context, next)
+                    // A session started or going on shows its own notification (SessionService).
+                    is Occurrence -> if (next.state != OccurrenceState.RUNNING) Undo.offer(context, next)
                 }
             } finally {
                 result.finish()
@@ -131,6 +138,11 @@ class ActionReceiver : BroadcastReceiver() {
         const val ACTION_SNOOZE = "com.avlreminder.SNOOZE"
         const val ACTION_CHECK = "com.avlreminder.CHECK"
         const val ACTION_REOPEN = "com.avlreminder.REOPEN"
+        /** The session (Anf. 7.11): "Ich starte jetzt", "Noch dran", "Teilschritt", "Abbruch"; "Fertig" is [ACTION_DONE]. */
+        const val ACTION_START = "com.avlreminder.START"
+        const val ACTION_STILL_ON = "com.avlreminder.STILL_ON"
+        const val ACTION_MINIMUM = "com.avlreminder.MINIMUM"
+        const val ACTION_ABORT = "com.avlreminder.ABORT"
         private const val EXTRA_MINUTES = "minutes"
         private const val EXTRA_ITEM = "item"
 

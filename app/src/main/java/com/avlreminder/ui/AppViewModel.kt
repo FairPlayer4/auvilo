@@ -1,5 +1,7 @@
 package com.avlreminder.ui
 
+import android.widget.Toast
+import com.avlreminder.PlaceSetResult
 import android.app.Application
 import androidx.lifecycle.AndroidViewModel
 import androidx.lifecycle.viewModelScope
@@ -10,7 +12,6 @@ import com.avlreminder.core.model.Place
 import com.avlreminder.core.model.PrepAnswer
 import com.avlreminder.core.model.Proof
 import com.avlreminder.core.model.Reminder
-import com.avlreminder.core.model.severalADay
 import com.avlreminder.core.rules.Action
 import com.avlreminder.core.rules.AlertSettings
 import com.avlreminder.core.rules.Checklists
@@ -70,8 +71,16 @@ class AppViewModel(app: Application) : AndroidViewModel(app) {
         },
     )
 
-    /** V1.1b knows one place, "Zuhause". */
-    val home: StateFlow<Place?> = state(null, dao.observePlaces().map { l -> l.firstOrNull()?.toModel() })
+    /** The places with their WLANs; the first is "Zuhause" (Anf. 7.29 OZ6). */
+    val places: StateFlow<List<Place>> = state(
+        emptyList(),
+        combine(dao.observePlaces(), dao.observePlaceWifis()) { places, wifis ->
+            val byPlace = wifis.groupBy { it.placeId }
+            places.map { it.toModel(byPlace[it.id].orEmpty()) }
+        },
+    )
+
+    val arrivalHintSeen: StateFlow<Boolean> = state(true, graph.settings.arrivalHintSeen)
 
 
     val dwellMinutes: StateFlow<Int> = state(com.avlreminder.data.Settings.DEFAULT_DWELL, graph.settings.dwellMinutes)
@@ -91,15 +100,7 @@ class AppViewModel(app: Application) : AndroidViewModel(app) {
     val itemsDone: StateFlow<Map<Long, List<ItemDone>>> = state(
         emptyMap(),
         combine(dao.observeItemsDone(), reminders, open, resolved) { l, r, o, d ->
-            val done = l.map { it.toModel() }
-            val byOccurrence = done.groupBy { it.occurrenceId }
-            val reminderOf = (o + d).associate { it.id to it.reminderId }
-            val rounds = o.mapNotNull { open ->
-                val reminder = r.firstOrNull { it.id == open.reminderId }?.takeIf { it.checklist.isNotEmpty() && it.schedule.severalADay }
-                    ?: return@mapNotNull null
-                open.id to Checklists.round(reminder.checklist, done.filter { reminderOf[it.occurrenceId] == reminder.id })
-            }
-            byOccurrence + rounds
+            Checklists.doneByOccurrence(r, o, d, l.map { it.toModel() })
         },
     )
 
@@ -142,7 +143,7 @@ class AppViewModel(app: Application) : AndroidViewModel(app) {
 
     /** "Verwerfen" for an overdue deadline. */
     fun discard(occurrenceId: Long) {
-        viewModelScope.launch { graph.withEngine { it.act(occurrenceId, Action.Skip(SkipReasons.DISCARDED)) } }
+        viewModelScope.launch { graph.withoutAlarm(occurrenceId) { it.act(occurrenceId, Action.Skip(SkipReasons.DISCARDED)) } }
     }
 
     /** "Zurücknehmen" (Anf. 7.31); [onResult] says what happened. */
@@ -203,8 +204,12 @@ class AppViewModel(app: Application) : AndroidViewModel(app) {
         }
     }
 
-    fun setHomeHere(onResult: (Boolean) -> Unit) {
-        viewModelScope.launch { onResult(graph.setHomeHere()) }
+    fun setPlaceHere(placeId: Long?, name: String, onResult: (PlaceSetResult) -> Unit) {
+        viewModelScope.launch { onResult(graph.setPlaceHere(placeId, name)) }
+    }
+
+    fun dismissArrivalHint() {
+        viewModelScope.launch { graph.settings.setArrivalHintSeen() }
     }
 
     /** The geofences are registered again with the new time. */
@@ -216,15 +221,22 @@ class AppViewModel(app: Application) : AndroidViewModel(app) {
     }
 
     fun delete(reminderId: Long) {
-        viewModelScope.launch { graph.withEngine { it.delete(reminderId) } }
+        viewModelScope.launch { graph.withoutAlarm(open(reminderId)) { it.delete(reminderId) } }
     }
 
     fun setActive(reminderId: Long, active: Boolean) {
-        viewModelScope.launch { graph.withEngine { it.setActive(reminderId, active) } }
+        viewModelScope.launch { if (!graph.withoutAlarm(if (active) null else open(reminderId)) { it.setActive(reminderId, active) }) running() }
     }
 
     fun setArchived(reminderId: Long, archived: Boolean) {
-        viewModelScope.launch { graph.withEngine { it.setArchived(reminderId, archived) } }
+        viewModelScope.launch { if (!graph.withoutAlarm(if (archived) open(reminderId) else null) { it.setArchived(reminderId, archived) }) running() }
+    }
+
+    private suspend fun open(reminderId: Long): Long? = graph.repository.openOccurrence(reminderId)?.id
+
+    /** Pausing or archiving a running session is rejected (design.md 3.1); say so instead of doing nothing. */
+    private fun running() {
+        Toast.makeText(getApplication(), "Läuft gerade – erst die Sitzung beenden", Toast.LENGTH_LONG).show()
     }
 
     val overview: StateFlow<OverviewTimes> = state(OverviewTimes(), graph.settings.overview)
@@ -237,7 +249,11 @@ class AppViewModel(app: Application) : AndroidViewModel(app) {
 
     fun answerSnoozeHint(reminderId: Long, choice: SnoozeHintChoice) {
         viewModelScope.launch {
-            graph.withEngine { it.answerSnoozeHint(reminderId, choice) }
+            val result = graph.withEngine { it.answerSnoozeHint(reminderId, choice) }
+            // Rejected (e.g. "Überwindung" without the "Startklar" answers): say why (Review-Lauf 1).
+            if (result is SaveResult.Invalid) {
+                Toast.makeText(getApplication(), "Nicht möglich: ${result.problems.joinToString("; ")}", Toast.LENGTH_LONG).show()
+            }
         }
     }
 

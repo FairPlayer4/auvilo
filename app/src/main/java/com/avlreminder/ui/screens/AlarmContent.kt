@@ -95,6 +95,10 @@ fun AlarmContent(
     onTomorrow: (Instant) -> Unit = {},
     /** Leaves "Vorab erledigen" with the items checked so far; the reminder stays as planned. */
     onLeave: () -> Unit = {},
+    /** The session (Anf. 7.11): "Ich starte jetzt", "Noch dran", "Abbruch". */
+    onStart: () -> Unit = {},
+    onStillOn: () -> Unit = {},
+    onAbort: () -> Unit = {},
 ) {
     val c = Avl.colors
     var view by remember { mutableStateOf(View.MAIN) }
@@ -143,8 +147,12 @@ fun AlarmContent(
     }
     Box(Modifier.fillMaxSize().background(c.background)) {
         Column(Modifier.fillMaxSize().verticalScroll(rememberScrollState()).imePadding().padding(24.dp)) {
-            when (view) {
-                View.MAIN -> {
+            val session = ui.session
+            when {
+                view == View.MAIN && session != null -> SessionMain(
+                    ui, session, zone, onStillOn = onStillOn, onComplete = ::complete, onAbort = onAbort,
+                )
+                view == View.MAIN -> {
                     val head = if (ui.early) "Vorab · fällig um ${Format.time(ui.occurrence.currentAt, zone)}"
                     else "${Format.strictness(r.strictness).replaceFirstChar { it.uppercase() }} · fällig seit ${Format.time(ui.occurrence.currentAt, zone)}"
                     Text(head, color = c.muted, fontSize = 14.sp)
@@ -166,6 +174,12 @@ fun AlarmContent(
                     }
                     if (checklist) Checklist(r.checklist, ui.done, ::check)
                     Spacer(Modifier.height(24.dp))
+                    // Into the session right away (D1), also before it is due (7.20 V2).
+                    if (ui.canStart) {
+                        Button(onClick = onStart, modifier = Modifier.fillMaxWidth().height(56.dp).padding(bottom = 8.dp).testTag("start")) {
+                            Text("Ich starte jetzt", fontSize = 18.sp)
+                        }
+                    }
                     val nextItem = r.checklist.firstOrNull { it.id !in ui.done }
                     if (oneItem && nextItem != null) {
                         Button(onClick = { check(nextItem) }, modifier = Modifier.fillMaxWidth().height(56.dp).testTag("doItem")) {
@@ -238,7 +252,7 @@ fun AlarmContent(
                         Text("Verbesserung vorschlagen", color = c.muted, fontSize = 13.sp)
                     }
                 }
-                View.PROOF -> ProofStep(
+                view == View.PROOF -> ProofStep(
                     ui,
                     subtitle = proofItem?.title ?: if (minimumOnly) "Minimum" else "Ziel",
                     onDone = { evidence, note ->
@@ -257,8 +271,8 @@ fun AlarmContent(
                     },
                     devices = devices,
                 )
-                View.POSTPONE -> PostponeStep(ui, now, zone, onPostpone, onBack = { view = View.MAIN })
-                View.SKIP -> SkipStep(onSkip, onBack = { view = View.MAIN })
+                view == View.POSTPONE -> PostponeStep(ui, now, zone, onPostpone, onBack = { view = View.MAIN })
+                else -> SkipStep(onSkip, onBack = { view = View.MAIN })
             }
         }
     }

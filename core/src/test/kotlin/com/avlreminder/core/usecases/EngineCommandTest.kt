@@ -11,7 +11,9 @@ import com.avlreminder.core.model.Schedule
 import com.avlreminder.core.model.WeeklyGoal
 import com.avlreminder.core.ports.AlarmKind
 import com.avlreminder.core.ports.AlarmPort
-import com.avlreminder.core.ports.LocationPort
+import com.avlreminder.core.ports.PlaceCheck
+import com.avlreminder.core.ports.PlaceResult
+import com.avlreminder.core.ports.PlaceSource
 import com.avlreminder.core.ports.ReminderRepository
 import com.avlreminder.core.reminder
 import com.avlreminder.core.rules.Action
@@ -47,7 +49,7 @@ class EngineCommandTest {
     private val repo = TransactionRepo()
     private val rung = mutableListOf<Ring>()
     private var settings = AlertSettings()
-    private var location = LocationPort { null }
+    private var location: suspend (Place) -> Boolean? = { null }
     private val alarms = FakeAlarms()
     private var checks = 0
     private val engine = ReminderEngine(
@@ -63,10 +65,14 @@ class EngineCommandTest {
             }
         },
         clock, settings = { settings },
-        location = {
+        location = { place, _ ->
             assertFalse(repo.inTransaction, "no position check inside the transaction (E6)")
             checks++
-            location.isAt(it)
+            when (location(place)) {
+                true -> PlaceCheck(PlaceResult.AT, PlaceSource.FALLBACK)
+                false -> PlaceCheck(PlaceResult.AWAY, PlaceSource.FALLBACK)
+                null -> PlaceCheck(PlaceResult.UNKNOWN, null)
+            }
         },
         ringer = { ring ->
             assertFalse(repo.inTransaction, "rings only once the command is stored")
@@ -103,10 +109,10 @@ class EngineCommandTest {
         create(reminder(Schedule.OnArrival).copy(title = "Paket", arrival = Arrival(first)))
         create(reminder(Schedule.OnArrival).copy(title = "Brief", arrival = Arrival(second)))
         // At home, but the second position check fails.
-        location = LocationPort { place -> if (place.id == first) true else error("kein GPS") }
+        location = { place -> if (place.id == first) true else error("kein GPS") }
         assertThrows(IllegalStateException::class.java) { kotlinx.coroutines.runBlocking { engine.checkPlaces() } }
         assertTrue(rung.isEmpty())
-        location = LocationPort { false }
+        location = { false }
         engine.sync()
         assertTrue(rung.isEmpty())
     }
@@ -116,7 +122,7 @@ class EngineCommandTest {
         val home = engine.savePlace(Place(name = "Zuhause", lat = 48.1, lon = 11.5))
         create(reminder(Schedule.OnArrival).copy(title = "Paket", arrival = Arrival(home)))
         create(reminder(Schedule.OnArrival).copy(title = "Brief", arrival = Arrival(home)))
-        location = LocationPort { true }
+        location = { true }
         checks = 0
         repo.transactions = 0
         val rings = engine.checkPlaces()

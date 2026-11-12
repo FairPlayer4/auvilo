@@ -1,5 +1,8 @@
 package com.avlreminder
 
+import com.avlreminder.alarm.SessionService
+import com.avlreminder.alarm.SessionNote
+import androidx.annotation.VisibleForTesting
 import android.app.Application
 import android.app.NotificationManager
 import android.content.Context
@@ -45,6 +48,8 @@ import com.avlreminder.core.model.Reminder
 import com.avlreminder.data.toModel
 import com.avlreminder.core.ports.DeviceStatePort
 import com.avlreminder.core.rules.AlertSettings
+import com.avlreminder.core.rules.Lifecycle
+import com.avlreminder.core.rules.TransitionResult
 import com.avlreminder.core.usecases.ReminderEngine
 import com.avlreminder.core.usecases.Today
 import com.avlreminder.core.usecases.Overview
@@ -55,7 +60,9 @@ import com.avlreminder.data.SuggestionEntity
 import com.avlreminder.location.AndroidGeofences
 import com.avlreminder.system.Diag
 import com.avlreminder.location.AndroidLocation
-import com.avlreminder.location.WifiProbe
+import com.avlreminder.location.AndroidPlaceAlarms
+import com.avlreminder.location.AndroidWifi
+import com.avlreminder.core.rules.WifiLocation
 import com.avlreminder.widget.AvlWidget
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Job
@@ -66,6 +73,7 @@ import kotlinx.coroutines.launch
 import kotlinx.coroutines.sync.Mutex
 import kotlinx.coroutines.sync.withLock
 import java.time.Clock
+import java.time.Duration
 import java.time.Instant
 import java.time.ZoneId
 
@@ -86,9 +94,10 @@ class AvlApp : Application() {
         OverviewNotifications.createChannel(this)
         PreNotices.createChannel(this)
         AlarmPause.createChannel(this)
+        SessionService.createChannel(this)
         AndroidCloudNotices.createChannel(this)
-        // WLAN device test before 7.29, debug build only (design.md *Entwurf 7.29*).
-        if (graph.debuggable) runCatching { WifiProbe.start(this) }
+        // Android reports WLAN connections from now on, also without a running process (7.29 OZ3).
+        AndroidWifi.watch(this)
         // Alarms may have been lost (reboot, force-stop, update): rebuild them from the database.
         started = graph.scope.launch {
             // A restore swapped data in at this start: take its settings before anything plans alarms.
@@ -108,9 +117,15 @@ val Context.graph: AppGraph get() = (applicationContext as AvlApp).graph
 
 /** Clock that always follows the current system time zone. */
 object SystemZoneClock : Clock() {
+    /**
+     * Moves the engine's time: the glue tests run on the real time and set a fixed time of day
+     * (Review-Lauf 4, E15). Always zero in the app.
+     */
+    @VisibleForTesting @Volatile var shift: Duration = Duration.ZERO
+
     override fun getZone(): ZoneId = ZoneId.systemDefault()
     override fun withZone(zone: ZoneId): Clock = system(zone)
-    override fun instant(): Instant = Instant.now()
+    override fun instant(): Instant = Instant.now().plus(shift)
 }
 
 /** "Do not disturb" in any form; an unknown filter counts as off. */
@@ -137,8 +152,9 @@ class AppGraph(private val context: Context) : ClaudeApi.Access {
     @Volatile private var alert = AlertSettings()
     @Volatile private var dwell = Settings.DEFAULT_DWELL
     val location = AndroidLocation(context)
+    val wifi = AndroidWifi(context)
 
-    /** Cloud backup (backup-entwurf.md); nothing touches the network until it is switched on. */
+    /** Cloud backup (design.md 16); nothing touches the network until it is switched on. */
     private val cloudStore = CloudStore(context)
     private val cloudLog = CloudLog(File(context.filesDir, "cloud-diag"), header = ::diagnosisHeader)
     private val restoreTarget = DatabaseRestore(context, db, settings, restoreFiles)
@@ -197,9 +213,12 @@ class AppGraph(private val context: Context) : ClaudeApi.Access {
         repository, AndroidAlarmPort(context), SystemZoneClock, AndroidDeviceState(context),
         settings = { alert },
         geofences = AndroidGeofences(context) { dwell },
-        location = location,
+        // The WLAN first; only at the latest time a coarse position when it is unclear (7.29 OZ2).
+        location = WifiLocation(wifi, SystemZoneClock) { location.isAt(it) },
         preNotices = PreNotices.Port(context),
         ringer = { Ringer.ring(context, it) },
+        placeAlarms = AndroidPlaceAlarms(context),
+        diag = Diag::log,
     )
     private val mutex = Mutex()
 
@@ -221,6 +240,17 @@ class AppGraph(private val context: Context) : ClaudeApi.Access {
         )
     }
 
+    /**
+     * Deleting, pausing, archiving or discarding takes the alarm of [occurrenceId] away; its
+     * ringing and notification go with it (Review-Lauf 1). A rejected change (`false`, Rejected)
+     * leaves them.
+     */
+    suspend fun <T> withoutAlarm(occurrenceId: Long?, block: suspend (ReminderEngine) -> T): T {
+        val result = withEngine(block)
+        if (occurrenceId != null && result != false && result !is TransitionResult.Rejected) Ringer.dismiss(context, occurrenceId)
+        return result
+    }
+
     /** Runs use cases one at a time and refreshes the widget afterwards. */
     override suspend fun <T> withEngine(block: suspend (ReminderEngine) -> T): T {
         val result = mutex.withLock {
@@ -230,7 +260,24 @@ class AppGraph(private val context: Context) : ClaudeApi.Access {
             block(engine)
         }
         scope.launch { runCatching { AvlWidget().updateAll(context) } }
+        scope.launch { runCatching { SessionService.show(context, sessions()) } }
         return result
+    }
+
+    /** The running sessions for their notification (Anf. 7.11). */
+    private suspend fun sessions(): List<SessionNote> {
+        val running = openOccurrences().filter { it.isRunning }
+        if (running.isEmpty()) return emptyList()
+        return running.mapNotNull { o ->
+            val r = repository.reminder(o.reminderId) ?: return@mapNotNull null
+            val hasMinimum = r.minimum != null || r.session?.minimumMinutes != null
+            val minimum = hasMinimum && Lifecycle.canUseMinimum(r, engine.limits(r, o))
+            SessionNote(
+                occurrenceId = o.id, title = r.title, startedAt = o.startedAt ?: return@mapNotNull null,
+                quickDone = !r.proof.needsEvidence,
+                minimum = minimum, minimumUsedUp = hasMinimum && !minimum,
+            )
+        }.sortedBy { it.startedAt }
     }
 
     // --- Interface for Claude (Anf. 7.26 AG11) ----------------------------------------------
@@ -239,7 +286,7 @@ class AppGraph(private val context: Context) : ClaudeApi.Access {
     override suspend fun reminders(): List<Reminder> = repository.reminders()
     override suspend fun openOccurrences(): List<Occurrence> = db.dao().openOccurrences().map { it.toModel() }
     override suspend fun resolvedOccurrences(): List<Occurrence> = db.dao().observeResolved().first().map { it.toModel() }
-    override fun now(): Instant = Instant.now()
+    override fun now(): Instant = SystemZoneClock.instant()
     override val zone: ZoneId get() = ZoneId.systemDefault()
 
     /**
@@ -272,7 +319,8 @@ class AppGraph(private val context: Context) : ClaudeApi.Access {
         val wasPaused = settings.alert.first().alarmsPaused(SystemZoneClock.instant())
         settings.setAlarmsPaused(until, SystemZoneClock.instant())
         Diag.log(if (until == null) "alarms on again" else "alarms paused until $until")
-        if (until != null) AlarmService.ringing.value?.let { AlarmService.stop(context, it) }
+        // What rang stays in sight as a silent notification (Review-Lauf 1).
+        if (until != null) AlarmService.ringing.value?.let { AlarmService.quiet(context, it) }
         if (until == null && wasPaused) {
             // On again by hand: what is due rings now (PS7).
             withEngine { it.resume() }
@@ -290,14 +338,36 @@ class AppGraph(private val context: Context) : ClaudeApi.Access {
         withEngine { it.checkPlaces() }
     }
 
-    /** Sets "Zuhause" to the current position; false if there is no position. */
-    suspend fun setHomeHere(): Boolean {
-        val here = location.current() ?: return false
-        withEngine { e ->
-            val home = e.places().firstOrNull()
-            e.savePlace(Place(id = home?.id ?: 0, name = "Zuhause", lat = here.latitude, lon = here.longitude))
+    /**
+     * "Hier festlegen" for a place (Anf. 7.29 OZ3, OZ6): the current position and the connected
+     * WLAN with all its access points. What is not available now stays as it was; a new place
+     * needs a position.
+     */
+    suspend fun setPlaceHere(placeId: Long?, name: String): PlaceSetResult {
+        val here = location.current()
+        val network = wifi.currentNetwork()
+        val saved = withEngine { e ->
+            val old = e.places().firstOrNull { it.id == placeId }
+            val lat = here?.latitude ?: old?.lat
+            val lon = here?.longitude ?: old?.lon
+            if (lat == null || lon == null || (here == null && network == null)) return@withEngine false
+            e.savePlace(
+                Place(
+                    id = old?.id ?: 0, name = name.trim().ifEmpty { old?.name ?: "Ort" }, lat = lat, lon = lon,
+                    radiusMeters = old?.radiusMeters ?: 150, wifis = network ?: old?.wifis.orEmpty(),
+                ),
+            )
+            true
         }
+        if (!saved) return PlaceSetResult.NoPosition
         checkPlacesAndRing()
-        return true
+        return PlaceSetResult.Saved(position = here != null, ssid = network?.firstNotNullOfOrNull { it.ssid }, wifi = network != null)
     }
+}
+
+/** What "Hier festlegen" could take over; the SSID is only shown on the device, never logged. */
+sealed interface PlaceSetResult {
+    /** No position (and nothing else to update). */
+    data object NoPosition : PlaceSetResult
+    data class Saved(val position: Boolean, val wifi: Boolean, val ssid: String?) : PlaceSetResult
 }

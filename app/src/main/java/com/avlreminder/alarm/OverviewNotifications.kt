@@ -1,5 +1,6 @@
 package com.avlreminder.alarm
 
+import com.avlreminder.SystemZoneClock
 import android.app.AlarmManager
 import android.app.Notification
 import android.app.NotificationChannel
@@ -40,7 +41,7 @@ object OverviewNotifications {
     }
 
     /** Sets both alarms from the settings; a time of null cancels its alarm. */
-    fun schedule(context: Context, times: OverviewTimes, now: Instant = Instant.now()) {
+    fun schedule(context: Context, times: OverviewTimes, now: Instant = SystemZoneClock.instant()) {
         val alarms = context.getSystemService(AlarmManager::class.java)
         listOf<Pair<String, (OverviewTimes) -> LocalTime?>>(MORNING to { it.morning }, EVENING to { it.evening }).forEach { (kind, time) ->
             val pending = pending(context, kind)
@@ -104,7 +105,7 @@ class OverviewReceiver : BroadcastReceiver() {
         val graph = context.graph
         graph.scope.launch {
             try {
-                val now = Instant.now()
+                val now = SystemZoneClock.instant()
                 val zone = graph.zone
                 val today = graph.today(now)
                 val digest = if (morning) Digests.morning(today, zone)

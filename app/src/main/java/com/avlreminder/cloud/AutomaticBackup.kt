@@ -10,7 +10,7 @@ import java.time.Duration
 import java.time.Instant
 
 /**
- * The hourly backup (backup-entwurf.md, step 4) with its brake (R-2) and the notice after 3 days
+ * The hourly backup (cloud-entscheidungen.md A-9) with its brake (R-2) and the notice after 3 days
  * (A-13). [CloudBackup.backUpAutomatically] runs it as one of its steps.
  */
 internal class AutomaticBackup(

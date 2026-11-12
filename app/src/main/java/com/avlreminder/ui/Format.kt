@@ -1,5 +1,8 @@
 package com.avlreminder.ui
 
+import java.time.Duration
+import com.avlreminder.core.model.Occurrence
+import com.avlreminder.core.model.Place
 import com.avlreminder.core.model.Reminder
 import com.avlreminder.core.model.Resolution
 import com.avlreminder.core.model.Schedule
@@ -44,6 +47,36 @@ object Format {
         }
     }
 
+    /** The session timer (Anf. 7.11 D2): "12:34", from an hour on "1:02:03". */
+    fun elapsed(d: Duration): String {
+        val s = d.seconds.coerceAtLeast(0)
+        val (h, m, sec) = Triple(s / 3600, s % 3600 / 60, s % 60)
+        return if (h > 0) "%d:%02d:%02d".format(h, m, sec) else "%02d:%02d".format(m, sec)
+    }
+
+    /** "45 min", "1 h", "1 h 30 min". */
+    fun minutes(m: Int): String = when {
+        m < 60 -> "$m min"
+        m % 60 == 0 -> "${m / 60} h"
+        else -> "${m / 60} h ${m % 60} min"
+    }
+
+    /** A duration in whole minutes, rounded: "42 min". */
+    fun duration(d: Duration): String = minutes(((d.seconds + 30) / 60).toInt())
+
+    /**
+     * How [duration] compares with the [average] (D6): "6 min schneller als im Schnitt", "3 min
+     * länger als im Schnitt", within a minute "wie im Schnitt".
+     */
+    fun pace(duration: Duration, average: Duration): String {
+        val diff = ((duration.seconds - average.seconds) / 60.0).let { kotlin.math.round(it).toInt() }
+        return when {
+            diff == 0 -> "wie im Schnitt"
+            diff < 0 -> "${minutes(-diff)} schneller als im Schnitt"
+            else -> "${minutes(diff)} länger als im Schnitt"
+        }
+    }
+
     fun strictness(s: Strictness) = when (s) {
         Strictness.RELAXED -> "locker"
         Strictness.NORMAL -> "normal"
@@ -57,6 +90,7 @@ object Format {
         Resolution.SKIPPED -> "ausgelassen"
         Resolution.MISSED -> "verpasst"
         Resolution.DROPPED -> "entfallen"
+        Resolution.ABORTED -> "abgebrochen"
     }
 
     fun schedule(s: Schedule): String = when (s) {
@@ -81,13 +115,31 @@ object Format {
         }
     }
 
-    /** Schedule plus the arrival trigger, e.g. "täglich 19:00 · bei Ankunft zuhause". */
-    fun plan(r: Reminder): String {
-        val arrival = r.arrival
-        return when {
-            arrival == null || r.schedule == Schedule.OnArrival -> schedule(r.schedule)
-            arrival.whenAway == WhenAway.RING -> "${schedule(r.schedule)} · bei Ankunft zuhause, sonst klingeln"
-            else -> "${schedule(r.schedule)} · bei Ankunft zuhause, sonst entfällt"
-        }
+    /** "zuhause" for the first place or an unknown one, otherwise "am Ort „Arbeit“". */
+    fun at(placeId: Long, places: List<Place>): String {
+        val place = places.firstOrNull { it.id == placeId }
+        return if (place == null || place.id == places.first().id) "zuhause" else "am Ort „${place.name}“"
+    }
+
+    /** Schedule plus the arrival trigger, e.g. "täglich 19:00 · ab 90 min vorher bei Ankunft zuhause, sonst klingeln". */
+    fun plan(r: Reminder, places: List<Place> = emptyList()): String {
+        val arrival = r.arrival ?: return schedule(r.schedule)
+        val at = at(arrival.placeId, places)
+        if (r.schedule == Schedule.OnArrival) return "wenn ich $at bin"
+        val window = if (arrival.hasWindow) "ab ${arrival.leadMinutes} min vorher " else ""
+        val away = if (arrival.whenAway == WhenAway.RING) "sonst klingeln" else "sonst entfällt"
+        return "${schedule(r.schedule)} · ${window}bei Ankunft $at, $away"
+    }
+
+    /**
+     * For *Heute* (design.md 6): "ab 18:00 bei Ankunft zuhause, sonst 19:30", or "angekommen –
+     * klingelt 18:35"; null without an arrival window.
+     */
+    fun arrival(r: Reminder, o: Occurrence, zone: ZoneId, places: List<Place>): String? {
+        val arrival = r.arrival?.takeIf { it.hasWindow && r.schedule != Schedule.OnArrival } ?: return null
+        if (o.arrivedAt != null) return "angekommen – klingelt ${time(o.currentAt, zone)}"
+        if (o.awaitsArrival) return null
+        val from = o.currentAt.minus(Duration.ofMinutes(arrival.leadMinutes.toLong()))
+        return "ab ${time(from, zone)} bei Ankunft ${at(arrival.placeId, places)}, sonst ${time(o.currentAt, zone)}"
     }
 }

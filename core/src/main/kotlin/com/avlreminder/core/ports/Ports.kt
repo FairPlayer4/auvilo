@@ -9,6 +9,7 @@ import com.avlreminder.core.model.PrepAnswer
 import com.avlreminder.core.model.Proof
 import com.avlreminder.core.model.Reminder
 import com.avlreminder.core.model.Resolution
+import java.time.Duration
 import java.time.Instant
 
 /** Storage; the database behind it is the single source of truth. */
@@ -18,7 +19,11 @@ interface ReminderRepository {
 
     suspend fun reminders(): List<Reminder>
     suspend fun reminder(id: Long): Reminder?
-    /** Inserts when id is 0, otherwise updates; also stores the checklist (items get ids). Returns the id. */
+    /**
+     * Inserts when id is 0, otherwise updates; an unknown id changes nothing. Also stores the
+     * checklist: items of this reminder keep their id, others get a new one, a removed item takes
+     * its progress along. Returns the id.
+     */
     suspend fun saveReminder(reminder: Reminder): Long
     /** Deletes the reminder with its occurrences, events, proofs, prep answers and blockers. */
     suspend fun deleteReminder(id: Long)
@@ -32,6 +37,7 @@ interface ReminderRepository {
     suspend fun lastDone(reminderId: Long): Occurrence?
     /** Resolved occurrences of the reminder, newest first. */
     suspend fun recentResolved(reminderId: Long, limit: Int): List<Occurrence>
+    /** Resolved with [resolution] and counted ([Occurrence.countedAt]) in [from, until). */
     suspend fun countResolved(reminderId: Long, resolution: Resolution, from: Instant, until: Instant): Int
     suspend fun saveOccurrence(occurrence: Occurrence): Long
     /** Deletes the occurrence with its events, proofs and checklist progress. */
@@ -86,10 +92,64 @@ fun interface GeofencePort {
     fun watch(places: List<Place>)
 }
 
-/** Active check of the current position. */
+/**
+ * Is the phone at [Place] right now (Anf. 7.29 OZ2, OZ3)? First the WLAN; with [fallback] (only
+ * at the latest time) an unclear WLAN falls back to a coarse position.
+ */
 fun interface LocationPort {
-    /** null = position unknown (no permission, no fix in time). */
-    suspend fun isAt(place: Place): Boolean?
+    suspend fun check(place: Place, fallback: Boolean): PlaceCheck
+}
+
+enum class PlaceResult { AT, AWAY, UNKNOWN }
+
+enum class PlaceSource {
+    /** Connected to a WLAN of the place. */
+    WIFI_CONNECTED,
+    /** Android's last WLAN scan. */
+    WIFI_SCAN,
+    GEOFENCE,
+    /** A coarse position, only at the latest time. */
+    FALLBACK,
+}
+
+/**
+ * One check of a place as a fact for the diagnostic log (OZ8): where the answer came from and how
+ * old the scan was. [source] null: nothing could tell (no WLAN, no position).
+ */
+data class PlaceCheck(val result: PlaceResult, val source: PlaceSource?, val scanAge: Duration? = null)
+
+/**
+ * The checks of a place in its arrival window (design.md 6): one alarm per place, not per occurrence.
+ * It hands [at] back to [com.avlreminder.core.usecases.ReminderEngine.onPlaceCheck]; [exact]: also
+ * in Doze on time (the check at the start of a window).
+ */
+interface PlaceAlarmPort {
+    fun set(placeId: Long, at: Instant, exact: Boolean)
+    fun cancel(placeId: Long)
+
+    companion object {
+        val NONE = object : PlaceAlarmPort {
+            override fun set(placeId: Long, at: Instant, exact: Boolean) = Unit
+            override fun cancel(placeId: Long) = Unit
+        }
+    }
+}
+
+/**
+ * What Android knows about the WLAN without searching itself (OZ7). [connected]: the BSSID of the
+ * connected access point, null if none or Android does not tell.
+ */
+interface WifiPort {
+    suspend fun connected(): String?
+    suspend fun lastScan(): WifiScan?
+}
+
+/** Android's last WLAN scan: the access points seen and when. */
+data class WifiScan(val bssids: Set<String>, val at: Instant)
+
+/** Why the engine decided what it did (OZ8), for the diagnostic log; no names, no positions. */
+fun interface DiagPort {
+    fun log(message: String)
 }
 
 /** The silent notice before a reminder (T6); like alarms derived from the database. */

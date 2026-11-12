@@ -1,5 +1,6 @@
 package com.avlreminder.alarm
 
+import android.os.Bundle
 import android.app.Service
 import android.content.Context
 import android.content.Intent
@@ -15,7 +16,6 @@ import android.os.VibrationEffect
 import android.os.VibratorManager
 import android.util.Log
 import com.avlreminder.system.Diag
-import com.avlreminder.core.model.ChecklistItem
 import com.avlreminder.core.rules.Escalation
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
@@ -30,14 +30,10 @@ class AlarmService : Service() {
         private const val TAG = "AlarmService"
         private const val ACTION_START = "start"
         private const val ACTION_STOP = "stop"
+        private const val ACTION_QUIET = "quiet"
         private const val EXTRA_ID = "id"
-        private const val EXTRA_TITLE = "title"
-        private const val EXTRA_TEXT = "text"
-        private const val EXTRA_QUICK_DONE = "quickDone"
-        private const val EXTRA_SNOOZE = "snooze"
+        private const val EXTRA_INFO = "info"
         private const val EXTRA_LOUD = "loud"
-        private const val EXTRA_ITEM_ID = "itemId"
-        private const val EXTRA_ITEM_TITLE = "itemTitle"
 
         /** Long, unusual pattern (ms): off/on pairs, easy to tell apart from normal notifications. */
         private val VIBRATION_PATTERN = longArrayOf(0, 800, 200, 800, 200, 100, 100, 100, 100, 100, 1200)
@@ -50,14 +46,10 @@ class AlarmService : Service() {
             val intent = Intent(context, AlarmService::class.java)
                 .setAction(ACTION_START)
                 .putExtra(EXTRA_ID, info.occurrenceId)
-                .putExtra(EXTRA_TITLE, info.title)
-                .putExtra(EXTRA_TEXT, info.text)
-                .putExtra(EXTRA_QUICK_DONE, info.quickDone)
-                .putExtra(EXTRA_SNOOZE, info.snooze.toIntArray())
+                // KRITISCH: Alles aus AlarmInfo muss mit (toBundle), sonst fehlt es in den Benachrichtigungen
+                // des Dienstes; ohne nextItem schlösse "Erledigt" eine Checkliste ganz ab.
+                .putExtra(EXTRA_INFO, info.toBundle())
                 .putExtra(EXTRA_LOUD, loud)
-            // KRITISCH: Alles aus AlarmInfo muss mit, sonst fehlt es in den Benachrichtigungen
-            // des Dienstes; ohne nextItem schlösse "Erledigt" eine Checkliste ganz ab.
-            info.nextItem?.let { intent.putExtra(EXTRA_ITEM_ID, it.id).putExtra(EXTRA_ITEM_TITLE, it.title) }
             try {
                 context.startForegroundService(intent)
             } catch (e: Exception) {
@@ -66,6 +58,12 @@ class AlarmService : Service() {
                 Diag.log("service not startable, banner instead: ${e.message}")
                 Notifications.show(context, info, quiet = false)
             }
+        }
+
+        /** Stops ringing if [occurrenceId] is the one ringing; its notification stays, silent (Notaus). */
+        fun quiet(context: Context, occurrenceId: Long) {
+            if (_ringing.value != occurrenceId) return
+            context.startService(Intent(context, AlarmService::class.java).setAction(ACTION_QUIET).putExtra(EXTRA_ID, occurrenceId))
         }
 
         /** Stops ringing if [occurrenceId] is the one ringing. */
@@ -79,10 +77,12 @@ class AlarmService : Service() {
     private var player: MediaPlayer? = null
     private var info: AlarmInfo? = null
 
-    private val roundOver = Runnable {
+    private val roundOver = Runnable { quietAlarm() }
+
+    /** Stops ringing; the notification stays, silent, until the user reacts or the next round starts. */
+    private fun quietAlarm() {
         val current = info
         stopAlarm()
-        // Keep it visible until the user reacts or the next round starts.
         current?.let { Notifications.show(this, it, quiet = true) }
     }
 
@@ -91,17 +91,11 @@ class AlarmService : Service() {
     override fun onStartCommand(intent: Intent?, flags: Int, startId: Int): Int {
         when (intent?.action) {
             ACTION_START -> startAlarm(
-                AlarmInfo(
-                    occurrenceId = intent.getLongExtra(EXTRA_ID, -1),
-                    title = intent.getStringExtra(EXTRA_TITLE) ?: "",
-                    text = intent.getStringExtra(EXTRA_TEXT),
-                    quickDone = intent.getBooleanExtra(EXTRA_QUICK_DONE, false),
-                    snooze = intent.getIntArrayExtra(EXTRA_SNOOZE)?.toList().orEmpty(),
-                    nextItem = intent.getStringExtra(EXTRA_ITEM_TITLE)?.let { ChecklistItem(intent.getLongExtra(EXTRA_ITEM_ID, -1), it) },
-                ),
+                AlarmInfo.of(intent.getBundleExtra(EXTRA_INFO) ?: Bundle()),
                 intent.getBooleanExtra(EXTRA_LOUD, false),
             )
             ACTION_STOP -> if (intent.getLongExtra(EXTRA_ID, -1) == info?.occurrenceId) stopAlarm()
+            ACTION_QUIET -> if (intent.getLongExtra(EXTRA_ID, -1) == info?.occurrenceId) quietAlarm()
             else -> stopAlarm()
         }
         return START_NOT_STICKY

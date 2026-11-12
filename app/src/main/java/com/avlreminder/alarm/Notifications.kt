@@ -1,5 +1,7 @@
 package com.avlreminder.alarm
 
+import com.avlreminder.core.rules.SessionAnswer
+import android.os.Bundle
 import android.app.Notification
 import android.app.NotificationChannel
 import android.app.NotificationManager
@@ -23,26 +25,93 @@ data class AlarmInfo(
     val snooze: List<Int> = emptyList(),
     /** Next open checklist item, to tick off from the notification; only without proof. */
     val nextItem: ChecklistItem? = null,
+    /** "Ich starte jetzt" (Anf. 7.11 D1). */
+    val canStart: Boolean = false,
+    /** A running session: the alarm is a check or its last reminder (D3, D5). */
+    val session: SessionCheck? = null,
 ) {
+    /** KRITISCH: everything, for the intent of [AlarmService]; what is missing there is missing in its notifications. */
+    fun toBundle(): Bundle = Bundle().apply {
+        putLong("id", occurrenceId)
+        putString("title", title)
+        putString("text", text)
+        putBoolean("quickDone", quickDone)
+        putIntArray("snooze", snooze.toIntArray())
+        nextItem?.let { putLong("itemId", it.id); putString("itemTitle", it.title) }
+        putBoolean("canStart", canStart)
+        session?.let {
+            putLong("sessionStart", it.startedAt.toEpochMilli())
+            putBoolean("sessionFinal", it.final)
+            putBoolean("sessionMinimum", it.minimum)
+            putString("sessionSuggestion", it.suggestion.name)
+        }
+    }
+
     companion object {
         fun of(ring: Ring) = of(ring.view)
 
-        fun of(view: AlarmView): AlarmInfo {
+        fun of(view: AlarmView, zone: ZoneId = ZoneId.systemDefault()): AlarmInfo {
             val reminder = view.reminder
-            val nextItem = view.nextItem
             // Photo, text or audio cannot be given from the notification, so "done" there would always count as without proof.
             val quick = !reminder.proof.needsEvidence
+            val session = view.session?.let { SessionCheck(it.startedAt, it.final, view.minimumAllowed, it.suggestion) }
+            // In a session the checklist is not ticked off from the notification; the answers come first.
+            val nextItem = view.nextItem?.takeIf { session == null }
             return AlarmInfo(
                 occurrenceId = view.occurrence.id,
                 title = reminder.title,
-                text = nextItem?.let { "Als Nächstes: ${it.title}" } ?: reminder.why ?: reminder.goal,
+                text = session?.let { sessionText(it, zone) } ?: nextItem?.let { "Als Nächstes: ${it.title}" } ?: reminder.why ?: reminder.goal,
                 quickDone = quick,
-                snooze = view.snooze,
+                snooze = if (session == null) view.snooze else emptyList(),
                 nextItem = nextItem?.takeIf { quick },
+                canStart = view.canStart,
+                session = session,
             )
+        }
+
+        fun of(bundle: Bundle): AlarmInfo = AlarmInfo(
+            occurrenceId = bundle.getLong("id", -1),
+            title = bundle.getString("title") ?: "",
+            text = bundle.getString("text"),
+            quickDone = bundle.getBoolean("quickDone"),
+            snooze = bundle.getIntArray("snooze")?.toList().orEmpty(),
+            nextItem = bundle.getString("itemTitle")?.let { ChecklistItem(bundle.getLong("itemId", -1), it) },
+            canStart = bundle.getBoolean("canStart"),
+            session = if (bundle.containsKey("sessionStart")) {
+                SessionCheck(
+                    Instant.ofEpochMilli(bundle.getLong("sessionStart")),
+                    final = bundle.getBoolean("sessionFinal"),
+                    minimum = bundle.getBoolean("sessionMinimum"),
+                    suggestion = SessionAnswer.valueOf(bundle.getString("sessionSuggestion") ?: SessionAnswer.STILL_ON.name),
+                )
+            } else {
+                null
+            },
+        )
+
+        /** "Noch dran? · seit 18:42" or "Maximale Dauer erreicht · seit 18:42". */
+        fun sessionText(s: SessionCheck, zone: ZoneId): String {
+            val since = DateTimeFormatter.ofPattern("HH:mm").format(s.startedAt.atZone(zone))
+            val ask = when {
+                s.final -> "Maximale Dauer erreicht"
+                s.suggestion == SessionAnswer.DONE -> "Ziel erreicht – Fertig?"
+                s.suggestion == SessionAnswer.MINIMUM -> "Minimum erreicht – Teilschritt?"
+                else -> "Noch dran?"
+            }
+            return "$ask · seit $since"
         }
     }
 }
+
+/** The check of a running session in a notification (Anf. 7.11 D3–D5). */
+data class SessionCheck(
+    val startedAt: Instant,
+    /** The last reminder: "Noch dran" is no longer offered. */
+    val final: Boolean,
+    /** "Teilschritt" is allowed. */
+    val minimum: Boolean,
+    val suggestion: SessionAnswer,
+)
 
 object Notifications {
     const val CHANNEL_ALARM = "alarm"
@@ -146,28 +215,68 @@ object Notifications {
             .setContentTitle(info.title)
             .setContentIntent(openAlarm(context, info.occurrenceId))
         info.text?.let { builder.setContentText(it) }
-        // A checklist is ticked off item by item; "Alles erledigt" is in the alarm screen.
-        if (info.nextItem != null) {
-            builder.addAction(
-                Notification.Action.Builder(null, "✓ ${info.nextItem.title}", ActionReceiver.check(context, info.occurrenceId, info.nextItem.id)).build(),
-            )
-        } else if (info.quickDone) {
-            builder.addAction(action(context, ActionReceiver.ACTION_DONE, "Erledigt", info.occurrenceId))
-        }
-        // At most three actions fit; "done" plus two snooze buttons.
-        info.snooze.take(2).forEach { minutes ->
-            builder.addAction(
-                Notification.Action.Builder(null, "+$minutes min", ActionReceiver.snooze(context, info.occurrenceId, minutes)).build(),
-            )
+        val buttons = buttons(info)
+        // At most three fit on the phone; the watch shows all of them (design.md 3.1, G2).
+        buttons.phone.forEach { builder.addAction(it.toAction(context, info.occurrenceId)) }
+        if (buttons.watch != buttons.phone) {
+            builder.extend(Notification.WearableExtender().addActions(buttons.watch.map { it.toAction(context, info.occurrenceId) }))
         }
         return builder
     }
 
-    private fun openAlarm(context: Context, occurrenceId: Long): PendingIntent = PendingIntent.getActivity(
+    /** A button of an alarm notification; [Buttons] decides which and in what order. */
+    sealed interface Button {
+        data object Start : Button
+        data object Done : Button
+        data class Item(val item: ChecklistItem) : Button
+        data class Snooze(val minutes: Int) : Button
+        data object StillOn : Button
+        data object SessionDone : Button
+        data object Minimum : Button
+        data object Abort : Button
+    }
+
+    data class Buttons(val phone: List<Button>, val watch: List<Button>)
+
+    /**
+     * The buttons of [info]. A session check: *Noch dran* (not at the last reminder), the
+     * suggested way to end it, *Abbruch* – on the watch all four. An alarm with a session:
+     * *Ich starte jetzt* first.
+     */
+    fun buttons(info: AlarmInfo): Buttons {
+        val session = info.session
+        if (session != null) {
+            val stillOn = Button.StillOn.takeIf { !session.final }
+            val done = Button.SessionDone.takeIf { info.quickDone }
+            val minimum = Button.Minimum.takeIf { session.minimum }
+            val ends = if (session.suggestion == SessionAnswer.MINIMUM) listOfNotNull(minimum, done) else listOfNotNull(done, minimum)
+            return Buttons(
+                phone = listOfNotNull(stillOn, ends.firstOrNull(), Button.Abort),
+                watch = listOfNotNull(stillOn) + ends + Button.Abort,
+            )
+        }
+        // A checklist is ticked off item by item; "Alles erledigt" is in the alarm screen.
+        val done = info.nextItem?.let { Button.Item(it) } ?: Button.Done.takeIf { info.quickDone }
+        val all = listOfNotNull(Button.Start.takeIf { info.canStart }, done) + info.snooze.take(2).map { Button.Snooze(it) }
+        return Buttons(phone = all.take(3), watch = all)
+    }
+
+    private fun Button.toAction(context: Context, occurrenceId: Long): Notification.Action = when (this) {
+        Button.Start -> action(context, ActionReceiver.ACTION_START, "Ich starte jetzt", occurrenceId)
+        Button.Done -> action(context, ActionReceiver.ACTION_DONE, "Erledigt", occurrenceId)
+        is Button.Item -> Notification.Action.Builder(null, "✓ ${item.title}", ActionReceiver.check(context, occurrenceId, item.id)).build()
+        is Button.Snooze -> Notification.Action.Builder(null, "+$minutes min", ActionReceiver.snooze(context, occurrenceId, minutes)).build()
+        Button.StillOn -> action(context, ActionReceiver.ACTION_STILL_ON, "Noch dran", occurrenceId)
+        Button.SessionDone -> action(context, ActionReceiver.ACTION_DONE, "Fertig", occurrenceId)
+        Button.Minimum -> action(context, ActionReceiver.ACTION_MINIMUM, "Teilschritt", occurrenceId)
+        Button.Abort -> action(context, ActionReceiver.ACTION_ABORT, "Abbruch", occurrenceId)
+    }
+
+    fun openAlarm(context: Context, occurrenceId: Long): PendingIntent = PendingIntent.getActivity(
         context, 0, AlarmActivity.intent(context, occurrenceId),
         PendingIntent.FLAG_IMMUTABLE or PendingIntent.FLAG_UPDATE_CURRENT,
     )
 
-    private fun action(context: Context, action: String, title: String, occurrenceId: Long) =
+    fun action(context: Context, action: String, title: String, occurrenceId: Long) =
         Notification.Action.Builder(null, title, ActionReceiver.pending(context, action, occurrenceId)).build()
 }

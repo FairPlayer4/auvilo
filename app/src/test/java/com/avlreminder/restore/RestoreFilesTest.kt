@@ -25,7 +25,7 @@ import java.io.File
 import java.time.Instant
 
 /**
- * The files of restoring (wiederherstellen-entwurf.md): the swap at the start (W-5, step 5), the
+ * The files of restoring (cloud-entscheidungen.md W-5, W-6): the swap at the start (W-5, step 5), the
  * check file (W-1, W-4) and the comparison without contents (W-1, W-3).
  */
 @RunWith(AndroidJUnit4::class)

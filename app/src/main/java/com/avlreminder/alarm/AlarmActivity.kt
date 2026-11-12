@@ -1,5 +1,6 @@
 package com.avlreminder.alarm
 
+import androidx.annotation.VisibleForTesting
 import android.content.Context
 import android.content.Intent
 import android.os.Bundle
@@ -67,7 +68,21 @@ class AlarmActivity : ComponentActivity() {
 
     override fun onNewIntent(intent: Intent) {
         super.onNewIntent(intent)
-        occurrenceId = intent.getLongExtra(EXTRA_ID, -1)
+        switchTo(intent)
+    }
+
+    /**
+     * Another alarm while the proof of this one is open: the old proof ends, so its alarm rings
+     * again after the grace (N0, Review-Lauf 1), and coming back does not start a proof for the new one.
+     */
+    @VisibleForTesting
+    internal fun switchTo(intent: Intent) {
+        val id = intent.getLongExtra(EXTRA_ID, -1)
+        if (id != occurrenceId) {
+            if (proofRunning) abortProof(occurrenceId)
+            proofLeft = false
+        }
+        occurrenceId = id
         early = intent.getBooleanExtra(EXTRA_EARLY, false)
     }
 
@@ -97,9 +112,16 @@ class AlarmActivity : ComponentActivity() {
         }
         // Close as soon as the occurrence is resolved or snoozed elsewhere (notification, other device action).
         LaunchedEffect(id) {
+            var last: OccurrenceState? = null
             graph.db.dao().observeOpenOccurrences().collect { open ->
                 val o = open.firstOrNull { it.id == id }
-                if (o == null || (o.state == OccurrenceState.PLANNED && !early)) finish()
+                if (o == null || (o.state == OccurrenceState.PLANNED && !early)) {
+                    finish()
+                } else if (o.state != last) {
+                    // Started, or a check answered elsewhere: the screen shows the new state (Anf. 7.11).
+                    if (last != null) version++
+                    last = o.state
+                }
             }
         }
         val now by produceState(Instant.now()) {
@@ -126,6 +148,10 @@ class AlarmActivity : ComponentActivity() {
             onSuggest = { text, important -> graph.scope.launch { graph.addSuggestion(text, important, "Alarm", current.reminder) } },
             onStartProof = { startProof(id) },
             onAbortProof = { abortProof(id) },
+            // Started, the screen becomes the session screen; "Noch dran" goes back to the task.
+            onStart = { act(id, Action.Start, stay = true) },
+            onStillOn = { act(id, Action.StillOn) },
+            onAbort = { act(id, Action.Abort) },
             devices = AlarmDevices(
                 camera = { onPhoto -> ProofCamera(id, onPhoto) },
                 recorder = { onRecorded -> AudioRecorder("occ-$id", "● Aufnahme starten", onRecorded) },
@@ -177,6 +203,7 @@ class AlarmActivity : ComponentActivity() {
             }
             Ringer.dismiss(this@AlarmActivity, id)
             if (stay && result.occurrence.state != OccurrenceState.DONE) {
+                early = false
                 version++
                 return@launch
             }

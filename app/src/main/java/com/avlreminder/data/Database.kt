@@ -27,6 +27,7 @@ import com.avlreminder.core.model.ProofKind
 import com.avlreminder.core.model.ProofType
 import com.avlreminder.core.model.Resolution
 import com.avlreminder.core.model.Strictness
+import com.avlreminder.core.model.Arrival
 import com.avlreminder.core.model.WhenAway
 import kotlinx.coroutines.flow.Flow
 import java.io.File
@@ -70,6 +71,10 @@ data class ReminderEntity(
     /** Arrival trigger; both null = time only. */
     val arrivalPlaceId: Long? = null,
     val arrivalWhenAway: WhenAway? = null,
+    /** Arrival window (Anf. 7.29): lead, buffer and check interval in minutes; F3 defaults. */
+    @ColumnInfo(defaultValue = "90") val arrivalLead: Int = Arrival.DEFAULT_LEAD,
+    @ColumnInfo(defaultValue = "5") val arrivalBuffer: Int = Arrival.DEFAULT_BUFFER,
+    @ColumnInfo(defaultValue = "20") val arrivalCheck: Int = Arrival.DEFAULT_CHECK,
     val archivedAt: Instant? = null,
     /** Weekly goal; all three null = none. */
     val weekTarget: Int? = null,
@@ -88,6 +93,13 @@ data class ReminderEntity(
     val moreTimes: String? = null,
     /** The snoozing hint (NT2) counts only occurrences due from here on. */
     val hintQuietUntil: Instant? = null,
+    /** Session with timer (Anf. 7.11): the check interval; null = no session. The others only with it. */
+    val sessionCheck: Int? = null,
+    val sessionCheckStrictness: Strictness? = null,
+    val sessionGoal: Int? = null,
+    val sessionMinimum: Int? = null,
+    val sessionMax: Int? = null,
+    val sessionFinal: Int? = null,
 )
 
 @Entity(
@@ -145,6 +157,23 @@ data class PlaceEntity(
     val radiusMeters: Int,
 )
 
+/**
+ * A WLAN access point of a place (Anf. 7.29 OZ3). Private like a position: never in the
+ * diagnostic log, replaced in the test data export.
+ */
+@Entity(
+    tableName = "place_wifi",
+    foreignKeys = [ForeignKey(PlaceEntity::class, ["id"], ["placeId"], onDelete = ForeignKey.CASCADE)],
+    indices = [Index("placeId")],
+)
+data class PlaceWifiEntity(
+    @PrimaryKey(autoGenerate = true) val id: Long = 0,
+    val placeId: Long,
+    val bssid: String,
+    /** Only shown. */
+    val ssid: String?,
+)
+
 @Entity(
     tableName = "checklist_item",
     foreignKeys = [ForeignKey(ReminderEntity::class, ["id"], ["reminderId"], onDelete = ForeignKey.CASCADE)],
@@ -192,6 +221,11 @@ data class OccurrenceEntity(
     val firstProgressAt: Instant? = null,
     val firedAt: Instant? = null,
     @ColumnInfo(defaultValue = "0") val awaitsArrival: Boolean = false,
+    val arrivedAt: Instant? = null,
+    /** The session (7.11): its start, the next check, the last reminder. */
+    val startedAt: Instant? = null,
+    val nextCheckAt: Instant? = null,
+    val finalCallAt: Instant? = null,
 )
 
 @Entity(
@@ -237,7 +271,8 @@ data class PrepAnswerEntity(
     val at: Instant,
 )
 
-private const val OPEN = "('PLANNED','DUE','ESCALATING')"
+// KRITISCH: every open state; a running session is open too (Anf. 7.11).
+private const val OPEN = "('PLANNED','DUE','ESCALATING','RUNNING')"
 
 @Dao
 interface AvlDao {
@@ -272,7 +307,8 @@ interface AvlDao {
     @Query("SELECT * FROM occurrence WHERE state IN $OPEN")
     fun observeOpenOccurrences(): Flow<List<OccurrenceEntity>>
 
-    @Query("SELECT * FROM occurrence WHERE reminderId = :reminderId AND state IN $OPEN LIMIT 1")
+    // The oldest, like the fake; there should only ever be one (Review-Lauf 4).
+    @Query("SELECT * FROM occurrence WHERE reminderId = :reminderId AND state IN $OPEN ORDER BY id LIMIT 1")
     suspend fun openOccurrence(reminderId: Long): OccurrenceEntity?
 
     @Query("SELECT * FROM occurrence WHERE reminderId = :reminderId AND state IN ('DONE','CLOSED') ORDER BY resolvedAt DESC, id DESC LIMIT 1")
@@ -281,12 +317,13 @@ interface AvlDao {
     @Query("SELECT * FROM occurrence WHERE reminderId = :reminderId AND state = 'DONE' ORDER BY resolvedAt DESC, id DESC LIMIT 1")
     suspend fun lastDone(reminderId: Long): OccurrenceEntity?
 
-    @Query("SELECT * FROM occurrence WHERE reminderId = :reminderId AND state IN ('DONE','CLOSED') ORDER BY resolvedAt DESC LIMIT :limit")
+    @Query("SELECT * FROM occurrence WHERE reminderId = :reminderId AND state IN ('DONE','CLOSED') ORDER BY resolvedAt DESC, id DESC LIMIT :limit")
     suspend fun recentResolved(reminderId: Long, limit: Int): List<OccurrenceEntity>
 
     @Query(
         "SELECT COUNT(*) FROM occurrence WHERE reminderId = :reminderId AND resolution = :resolution " +
-            "AND resolvedAt >= :from AND resolvedAt < :until",
+            // A session counts at its start (7.11 D7): Occurrence.countedAt.
+            "AND resolvedAt IS NOT NULL AND COALESCE(startedAt, resolvedAt) >= :from AND COALESCE(startedAt, resolvedAt) < :until",
     )
     suspend fun countResolved(reminderId: Long, resolution: String, from: Instant, until: Instant): Int
 
@@ -340,6 +377,18 @@ interface AvlDao {
 
     @Update
     suspend fun update(place: PlaceEntity)
+
+    @Query("SELECT * FROM place_wifi ORDER BY placeId, id")
+    suspend fun placeWifis(): List<PlaceWifiEntity>
+
+    @Query("SELECT * FROM place_wifi ORDER BY placeId, id")
+    fun observePlaceWifis(): Flow<List<PlaceWifiEntity>>
+
+    @Query("DELETE FROM place_wifi WHERE placeId = :placeId")
+    suspend fun deletePlaceWifis(placeId: Long)
+
+    @Insert
+    suspend fun insert(wifis: List<PlaceWifiEntity>)
 
     @Query("SELECT * FROM checklist_item WHERE reminderId = :reminderId ORDER BY position")
     suspend fun items(reminderId: Long): List<ChecklistItemEntity>
@@ -526,6 +575,38 @@ val MIGRATION_7_8 = object : Migration(7, 8) {
     }
 }
 
+/**
+ * V1.3b1 (Anf. 7.29): arrival window per reminder with the F3 defaults for existing ones (OZ9),
+ * the WLANs of the places, the arrival that counts for an occurrence.
+ */
+val MIGRATION_8_9 = object : Migration(8, 9) {
+    override fun migrate(db: SupportSQLiteDatabase) {
+        db.execSQL("ALTER TABLE reminder ADD COLUMN arrivalLead INTEGER NOT NULL DEFAULT 90")
+        db.execSQL("ALTER TABLE reminder ADD COLUMN arrivalBuffer INTEGER NOT NULL DEFAULT 5")
+        db.execSQL("ALTER TABLE reminder ADD COLUMN arrivalCheck INTEGER NOT NULL DEFAULT 20")
+        db.execSQL("ALTER TABLE occurrence ADD COLUMN arrivedAt INTEGER")
+        db.execSQL(
+            "CREATE TABLE IF NOT EXISTS `place_wifi` (`id` INTEGER PRIMARY KEY AUTOINCREMENT NOT NULL, `placeId` INTEGER NOT NULL, " +
+                "`bssid` TEXT NOT NULL, `ssid` TEXT, " +
+                "FOREIGN KEY(`placeId`) REFERENCES `place`(`id`) ON UPDATE NO ACTION ON DELETE CASCADE )",
+        )
+        db.execSQL("CREATE INDEX IF NOT EXISTS `index_place_wifi_placeId` ON `place_wifi` (`placeId`)")
+    }
+}
+
+/** V1.3b (Anf. 7.11): the session with timer per reminder and its times per occurrence. Only new nullable columns. */
+val MIGRATION_9_10 = object : Migration(9, 10) {
+    override fun migrate(db: SupportSQLiteDatabase) {
+        for (column in listOf("sessionCheck", "sessionGoal", "sessionMinimum", "sessionMax", "sessionFinal")) {
+            db.execSQL("ALTER TABLE reminder ADD COLUMN $column INTEGER")
+        }
+        db.execSQL("ALTER TABLE reminder ADD COLUMN sessionCheckStrictness TEXT")
+        for (column in listOf("startedAt", "nextCheckAt", "finalCallAt")) {
+            db.execSQL("ALTER TABLE occurrence ADD COLUMN $column INTEGER")
+        }
+    }
+}
+
 /** The new tables of version 6, as Room generates them (see schemas/…/6.json). */
 private val CREATE_6 = listOf(
     "CREATE TABLE IF NOT EXISTS `blocker` (`id` INTEGER PRIMARY KEY AUTOINCREMENT NOT NULL, `reminderId` INTEGER NOT NULL, " +
@@ -559,7 +640,7 @@ private val CREATE_3 = listOf(
 @Database(
     entities = [
         ReminderEntity::class, OccurrenceEntity::class, EventEntity::class, ProofEntity::class, PrepAnswerEntity::class,
-        PlaceEntity::class, ChecklistItemEntity::class, ItemDoneEntity::class, SuggestionEntity::class,
+        PlaceEntity::class, PlaceWifiEntity::class, ChecklistItemEntity::class, ItemDoneEntity::class, SuggestionEntity::class,
         BlockerEntity::class, TemplateEntity::class,
     ],
     version = AvlDatabase.VERSION,
@@ -572,8 +653,8 @@ abstract class AvlDatabase : RoomDatabase() {
     companion object {
         const val NAME = "avlreminder.db"
 
-        val MIGRATIONS = arrayOf(MIGRATION_1_2, MIGRATION_2_3, MIGRATION_3_4, MIGRATION_4_5, MIGRATION_5_6, MIGRATION_6_7, MIGRATION_7_8)
-        const val VERSION = 8
+        val MIGRATIONS = arrayOf(MIGRATION_1_2, MIGRATION_2_3, MIGRATION_3_4, MIGRATION_4_5, MIGRATION_5_6, MIGRATION_6_7, MIGRATION_7_8, MIGRATION_8_9, MIGRATION_9_10)
+        const val VERSION = 10
 
         fun create(context: Context): AvlDatabase {
             val backups = File(context.filesDir, "backup")

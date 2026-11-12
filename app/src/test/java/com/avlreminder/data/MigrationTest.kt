@@ -1,17 +1,23 @@
 package com.avlreminder.data
 
+import com.avlreminder.core.model.OccurrenceState
+import com.avlreminder.core.model.Strictness
+import com.avlreminder.core.model.SessionSpec
 import android.content.Context
 import android.database.sqlite.SQLiteDatabase
 import androidx.room.Room
 import androidx.test.core.app.ApplicationProvider
 import androidx.test.ext.junit.runners.AndroidJUnit4
+import com.avlreminder.core.model.Arrival
 import com.avlreminder.core.model.BlockerOrigin
 import com.avlreminder.core.model.ChecklistItem
 import com.avlreminder.core.model.ItemDone
+import com.avlreminder.core.model.PlaceWifi
 import com.avlreminder.core.model.ProofSpec
 import com.avlreminder.core.model.ProofType
 import com.avlreminder.core.model.Schedule
 import com.avlreminder.core.model.WeeklyGoal
+import com.avlreminder.core.model.WhenAway
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.test.runTest
 import org.json.JSONObject
@@ -133,6 +139,94 @@ class MigrationTest {
                 "(1, 5, 500, 'CREATED', NULL), (2, 5, 1000, 'DUE', NULL), (3, 5, 1100, 'SNOOZED', '10 min'), (4, 5, 2000, 'DUE', NULL), " +
                 "(5, 6, 600, 'CREATED', NULL)",
         )
+    }
+
+    private fun createV8() = create(8) { db ->
+        db.execSQL("INSERT INTO place (id, name, lat, lon, radiusMeters) VALUES (1, 'Zuhause', 48.1, 11.5, 150)")
+        db.execSQL(
+            "INSERT INTO reminder (id, title, character, strictness, scheduleType, timeMinutes, weekdays, proof, active, createdAt, " +
+                "proofPhoto, ignoreDnd, snoozeMinutes, solvedBlockerIsMinimum, arrivalPlaceId, arrivalWhenAway) " +
+                "VALUES (1, 'Training', 'DOCUMENT', 'NORMAL', 'DAILY', 1170, 0, 'CONFIRM', 1, 0, 0, 0, '10', 0, 1, 'DROP')",
+        )
+        db.execSQL(
+            "INSERT INTO occurrence (id, reminderId, dueAt, currentAt, state, postponeCount, resolvedAt, resolution, note, awaitsArrival) " +
+                "VALUES (5, 1, 1000, 1000, 'PLANNED', 0, NULL, NULL, NULL, 0)",
+        )
+    }
+
+    private fun createV9() = create(9) { db ->
+        db.execSQL(
+            "INSERT INTO reminder (id, title, character, strictness, scheduleType, timeMinutes, weekdays, proof, active, createdAt, " +
+                "proofPhoto, ignoreDnd, snoozeMinutes, solvedBlockerIsMinimum, arrivalLead, arrivalBuffer, arrivalCheck) " +
+                "VALUES (1, 'Training', 'OVERCOME', 'NORMAL', 'DAILY', 1080, 0, 'CONFIRM', 1, 0, 0, 0, '10', 0, 90, 5, 20)",
+        )
+        db.execSQL(
+            "INSERT INTO occurrence (id, reminderId, dueAt, currentAt, state, postponeCount, resolvedAt, resolution, note, awaitsArrival) " +
+                "VALUES (5, 1, 1000, 1000, 'DUE', 0, NULL, NULL, NULL, 0)",
+        )
+    }
+
+    // KRITISCH: Bestehende Reminder bleiben ohne Sitzung (Anf. 7.11); eine laufende Sitzung zählt als offen.
+    @Test
+    fun version9KeepsDataWithoutSessionAndARunningSessionIsOpen() = runTest {
+        createV9()
+        val db = open()
+        try {
+            val repo = RoomReminderRepository(db)
+            val training = repo.reminder(1)!!
+            assertNull(training.session)
+            val spec = SessionSpec(checkMinutes = 15, checkStrictness = Strictness.NORMAL, goalMinutes = 45, minimumMinutes = 10, maxMinutes = 60, finalMinutes = 3)
+            repo.saveReminder(training.copy(session = spec))
+            assertEquals(spec, repo.reminder(1)!!.session)
+            val running = repo.occurrence(5)!!.copy(
+                state = OccurrenceState.RUNNING, startedAt = Instant.ofEpochMilli(2000),
+                nextCheckAt = Instant.ofEpochMilli(3000), finalCallAt = Instant.ofEpochMilli(4000),
+            )
+            repo.saveOccurrence(running)
+            assertEquals(running, repo.occurrence(5))
+            assertEquals(running, repo.openOccurrence(1))
+            assertEquals(listOf(running), repo.openOccurrences())
+        } finally {
+            db.close()
+        }
+    }
+
+    @Test
+    fun backupIsTakenBeforeTheUpgradeFromVersion9() {
+        createV9()
+        val dir = File(context.filesDir, "backup-test-9").apply { deleteRecursively() }
+        assertTrue(AvlDatabase.backupBeforeMigration(file, dir)!!.name.startsWith("avlreminder-v9-"))
+    }
+
+    // KRITISCH: Bestehende Ankunfts-Reminder bekommen die Standardwerte aus F3 (Anf. 7.29 OZ9).
+    @Test
+    fun version8KeepsDataAndGetsTheArrivalWindowWithDefaults() = runTest {
+        createV8()
+        val db = open()
+        try {
+            val repo = RoomReminderRepository(db)
+            assertEquals(Arrival(1, WhenAway.DROP, leadMinutes = 90, bufferMinutes = 5, checkMinutes = 20), repo.reminder(1)!!.arrival)
+            assertNull(repo.occurrence(5)!!.arrivedAt)
+            assertEquals(emptyList<PlaceWifi>(), repo.places().single().wifis)
+            // The new columns and the table work both ways.
+            repo.saveOccurrence(repo.occurrence(5)!!.copy(arrivedAt = Instant.ofEpochMilli(900)))
+            assertEquals(Instant.ofEpochMilli(900), repo.occurrence(5)!!.arrivedAt)
+            val wifis = listOf(PlaceWifi("aa:bb:cc:00:00:01", "Heim"), PlaceWifi("aa:bb:cc:00:00:02", "Heim"))
+            repo.savePlace(repo.places().single().copy(wifis = wifis))
+            assertEquals(wifis, repo.places().single().wifis)
+            // Saving the place again replaces its WLANs instead of adding them twice.
+            repo.savePlace(repo.places().single().copy(wifis = wifis.take(1)))
+            assertEquals(wifis.take(1), repo.places().single().wifis)
+        } finally {
+            db.close()
+        }
+    }
+
+    @Test
+    fun backupIsTakenBeforeTheUpgradeFromVersion8() {
+        createV8()
+        val dir = File(context.filesDir, "backup-test-8").apply { deleteRecursively() }
+        assertTrue(AvlDatabase.backupBeforeMigration(file, dir)!!.name.startsWith("avlreminder-v8-"))
     }
 
     @Test
@@ -370,5 +464,36 @@ class MigrationTest {
         open().apply { openHelper.writableDatabase }.close()
         assertNull(AvlDatabase.backupBeforeMigration(file, dir))
         assertNull(AvlDatabase.backupBeforeMigration(File(dir, "missing.db"), dir))
+    }
+
+    /** A failed copy must not keep the app from starting, nor cost the data (Review-Lauf 4). */
+    @Test
+    fun aFailedBackupLetsTheAppStartAndKeepsTheData() {
+        createV1()
+        // The backup folder cannot be made: a file stands where it should be.
+        val blocked = File(context.filesDir, "backup-blocked").apply { deleteRecursively(); writeText("x") }
+
+        assertNull(AvlDatabase.backupBeforeMigration(file, blocked))
+
+        // Room still migrates the untouched database.
+        val db = open()
+        try {
+            assertEquals(2, kotlinx.coroutines.runBlocking { db.dao().observeReminders().first() }.size)
+        } finally {
+            db.close()
+        }
+    }
+
+    @Test
+    fun aDamagedDatabaseIsNeitherCopiedNorDeleted() {
+        file.parentFile!!.mkdirs()
+        val garbage = ByteArray(8192) { (it * 31).toByte() }
+        file.writeBytes(garbage)
+        val dir = File(context.filesDir, "backup-damaged").apply { deleteRecursively() }
+
+        assertNull(AvlDatabase.backupBeforeMigration(file, dir))
+
+        assertTrue(file.readBytes().contentEquals(garbage))
+        assertTrue(dir.listFiles().isNullOrEmpty())
     }
 }

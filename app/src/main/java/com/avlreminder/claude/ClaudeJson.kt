@@ -1,5 +1,6 @@
 package com.avlreminder.claude
 
+import com.avlreminder.core.model.SessionSpec
 import com.avlreminder.core.model.Arrival
 import com.avlreminder.core.model.Blocker
 import com.avlreminder.core.model.Character
@@ -54,12 +55,29 @@ internal class ClaudeJson(private val zone: ZoneId) {
         .put("ignoreDnd", r.ignoreDnd)
         .put("snoozeMinutes", JSONArray(r.snoozeMinutes))
         .put("motivationAudio", r.motivationAudio != null)
-        .put("arrival", r.arrival?.let { JSONObject().put("placeId", it.placeId).put("whenAway", it.whenAway.name) } ?: JSONObject.NULL)
+        .put(
+            "arrival",
+            r.arrival?.let {
+                // The window (Anf. 7.29); the places' WLANs stay on the device.
+                JSONObject().put("placeId", it.placeId).put("whenAway", it.whenAway.name)
+                    .put("leadMinutes", it.leadMinutes).put("bufferMinutes", it.bufferMinutes).put("checkMinutes", it.checkMinutes)
+            } ?: JSONObject.NULL,
+        )
         .put("checklist", JSONArray(r.checklist.map { JSONObject().put("id", it.id).put("title", it.title) }))
         .put("weeklyGoal", r.weeklyGoal?.let { JSONObject().put("target", it.target).put("max", it.max).put("minimum", it.minimum) } ?: JSONObject.NULL)
         .put("preNotice", preNotice(r.preNotice))
         .put("prepFor", r.prepFor ?: JSONObject.NULL)
         .put("solvedBlockerIsMinimum", r.solvedBlockerIsMinimum)
+        .put("session", r.session?.let(::session) ?: JSONObject.NULL)
+
+    /** The session with timer (Anf. 7.11). */
+    private fun session(s: SessionSpec): JSONObject = JSONObject()
+        .put("checkMinutes", s.checkMinutes)
+        .put("checkStrictness", s.checkStrictness.name)
+        .put("goalMinutes", s.goalMinutes ?: JSONObject.NULL)
+        .put("minimumMinutes", s.minimumMinutes ?: JSONObject.NULL)
+        .put("maxMinutes", s.maxMinutes)
+        .put("finalMinutes", s.finalMinutes)
 
     fun schedule(s: Schedule): JSONObject = when (s) {
         is Schedule.Once -> JSONObject().put("type", "once").put("at", s.at.toString())
@@ -99,6 +117,9 @@ internal class ClaudeJson(private val zone: ZoneId) {
         .put("resolution", o.resolution?.name ?: JSONObject.NULL)
         .put("resolvedAt", instant(o.resolvedAt))
         .put("note", o.note ?: JSONObject.NULL)
+        .put("startedAt", instant(o.startedAt))
+        .put("nextCheckAt", instant(o.nextCheckAt))
+        .put("finalCallAt", instant(o.finalCallAt))
 
     fun blocker(b: Blocker): JSONObject = JSONObject()
         .put("id", b.id)
@@ -114,7 +135,7 @@ internal class ClaudeJson(private val zone: ZoneId) {
 
     fun counts(c: Counts): JSONObject = JSONObject()
         .put("goal", c.goal).put("minimum", c.minimum).put("noProof", c.noProof).put("skipped", c.skipped)
-        .put("missed", c.missed).put("dropped", c.dropped).put("early", c.early)
+        .put("missed", c.missed).put("dropped", c.dropped).put("early", c.early).put("aborted", c.aborted)
 
     fun streak(s: Streak?): Any = s?.let { JSONObject().put("unit", it.unit.name).put("current", it.current).put("best", it.best) } ?: JSONObject.NULL
 
@@ -144,7 +165,14 @@ internal class ClaudeJson(private val zone: ZoneId) {
         if (o.has("arrival")) {
             r = r.copy(
                 arrival = o.optJSONObject("arrival")?.let {
-                    Arrival(it.getLong("placeId"), WhenAway.valueOf(it.optString("whenAway", WhenAway.DROP.name)))
+                    // Missing window values stay as they were, for a new arrival the defaults.
+                    val old = r.arrival
+                    Arrival(
+                        it.getLong("placeId"), WhenAway.valueOf(it.optString("whenAway", WhenAway.DROP.name)),
+                        leadMinutes = it.optInt("leadMinutes", old?.leadMinutes ?: Arrival.DEFAULT_LEAD),
+                        bufferMinutes = it.optInt("bufferMinutes", old?.bufferMinutes ?: Arrival.DEFAULT_BUFFER),
+                        checkMinutes = it.optInt("checkMinutes", old?.checkMinutes ?: Arrival.DEFAULT_CHECK),
+                    )
                 },
             )
         }
@@ -165,6 +193,21 @@ internal class ClaudeJson(private val zone: ZoneId) {
             )
         }
         if (o.has("solvedBlockerIsMinimum")) r = r.copy(solvedBlockerIsMinimum = o.getBoolean("solvedBlockerIsMinimum"))
+        if (o.has("session")) {
+            val old = r.session
+            r = r.copy(
+                session = o.optJSONObject("session")?.let {
+                    SessionSpec(
+                        checkMinutes = it.optInt("checkMinutes", old?.checkMinutes ?: SessionSpec.DEFAULT_CHECK),
+                        checkStrictness = if (it.has("checkStrictness")) Strictness.valueOf(it.getString("checkStrictness")) else old?.checkStrictness ?: Strictness.RELAXED,
+                        goalMinutes = if (it.has("goalMinutes")) it.optIntOrNull("goalMinutes") else old?.goalMinutes,
+                        minimumMinutes = if (it.has("minimumMinutes")) it.optIntOrNull("minimumMinutes") else old?.minimumMinutes,
+                        maxMinutes = it.optInt("maxMinutes", old?.maxMinutes ?: SessionSpec.DEFAULT_MAX),
+                        finalMinutes = it.optInt("finalMinutes", old?.finalMinutes ?: SessionSpec.DEFAULT_FINAL),
+                    )
+                },
+            )
+        }
         // Like the form: without a minimum a weekly limit means nothing.
         if (r.minimum.isNullOrBlank() && !o.has("minimumLimitPerWeek")) r = r.copy(minimumLimitPerWeek = null)
         return r

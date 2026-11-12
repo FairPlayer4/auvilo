@@ -94,7 +94,7 @@ Vorher: 1.1b mit echten Daten installiert lassen; 1.2a darüber installieren (ni
 ## V1.2b
 
 Vorher: 1.2a mit echten Daten installiert lassen; 1.2b darüber installieren (nicht deinstallieren).
-Ablauf für eine Stunde am Stück: [testsession.md](testsession.md) (vor V2).
+Ablauf für eine Stunde am Stück: damals `testsession.md` (gelöscht 2026-11-12, wird vor V2 neu geschrieben).
 
 | # | Test | Erwartung |
 |---|---|---|

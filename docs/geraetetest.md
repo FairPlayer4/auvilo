@@ -32,7 +32,7 @@
 | K12 | Neustart | Handy neu starten bzw. über die Fälligkeit aus (11, 12) | Alarm kommt; Verpasstes wird sofort nachgeholt |
 | K13 | Nachweis | Foto, Text, Audio; Nachweis offen lassen bzw. App verlassen (5, 29–33) | Alarm pausiert; nach Ablauf bzw. ca. 1 min wieder da; Prüfungen greifen |
 | K14 | Uhr | Reminder *normal* (26) | Aktionen auf der Uhr, verschwinden mit dem Alarm |
-| K15 | Ort | Heimkommen vor der Uhrzeit, nicht zuhause zur Uhrzeit (42, 44) | Alarm nach der Verweildauer; sonst „entfallen“ |
+| K15 | Ort ohne WLAN, Vorlauf 0 | Reminder mit *Bei Ankunft*, *ab* 0 min; am Tag vor der Uhrzeit heimkommen, an einem anderen Tag zur Uhrzeit weg (42, 44) | Alarm nach der Verweildauer des Geofence; sonst „entfallen“ (Ankunft im Zeitraum: K24–K26) |
 | K16 | Checkliste | Punkt abhaken, *Rest auf morgen* (49, 50, 52) | Alarm still; Rest morgen, zählt nicht als Verschieben |
 | K17 | Wochenziel | Ziel erreicht, knapp (70, 71) | stille Angebote bzw. eine Stufe strenger |
 | K18 | Übersicht, Vorab-Reminder | Übersicht morgens, Vorab 15 min (75, 92, 93) | stille Benachrichtigung; entfällt, wenn schon erledigt |
@@ -41,7 +41,7 @@
 | K21 | Zurücknehmen (7.31) | *Erledigt*, dann innerhalb 1 min *Zurücknehmen* auf *Heute* | wieder offen, klingelt in 10 min; Nachweis zählt wieder |
 | K22 | Vorab verschieben (7.32) | im Vorab-Reminder „heute später“ | +30 min/+1/+2 Std ab der geplanten Zeit; zählt aufs Verschieben-Konto |
 
-## D. Cloud-Backup (seit 1.3b0.4)
+## C. Cloud-Backup
 Auf dem **S24** nur dieses kleine Set (echte Daten, Eigenbetrieb). Alles, was Geräte sperrt,
 löscht oder ein zweites Gerät braucht, läuft im **Emulator** mit einem eigenen Testkonto
 (Kevin 2026-11-09; Backend-Review Lauf 9 R5).
@@ -61,7 +61,21 @@ löscht oder ein zweites Gerät braucht, läuft im **Emulator** mit einem eigene
 
 **Nie auf dem S24:** C13–C15 und *Dieses Gerät abmelden* (sperrt das Gerät beim Server).
 
-## C. Nach dem Test
+## D. Neu seit 1.3b0.6 (nach dem ersten bestandenen Test in B einsortieren)
+
+| # | Bereich | Test | Erwartung |
+|---|---|---|---|
+| K23 | Orte (7.29) | *Einstellungen → Orte*, zuhause im WLAN *Hier festlegen* | „Standort übernommen · WLAN „…“ übernommen“, Zugangspunkte gezählt; `diag.log` ohne WLAN-Namen und BSSIDs |
+| K24 | Ankunft im Zeitraum (7.29) | Reminder 19:30 *Bei Ankunft*, ab 90 min; vor 18:00 heimkommen, dann um 18:30 ins WLAN | vor 18:00 kein Alarm (Diag „too early“); *Heute* „ab 18:00 bei Ankunft zuhause, sonst 19:30“; Alarm 5 min nach der Ankunft, wie Android sie erkennt: nach der Verbindungsmeldung oder spätestens nach der nächsten Prüfung (≤ 20 min, W1) |
+| K25 | Schon da (F2) | zuhause bleiben, Zeitraum beginnt; dazwischen einmal die App neu starten | kein Alarm zu Beginn und keiner nach dem Neustart (Diag „same connection as before“); genau eine Prüfung um 18:00 im Log („place check … AT“, ohne oder mit kleinem `late=`), danach keine; Alarm um 19:30 |
+| K26 | Nicht da (F1) | zur spätesten Uhrzeit weg, WLAN aus Reichweite | *entfällt* bzw. bei *trotzdem klingeln* Alarm; bei „unklar“ klingelt es |
+| K27 | Sitzung starten (7.11) | Reminder mit *Sitzung mit Timer* (Nachfrage 2 min, max. 6 min); im Alarm *Ich starte jetzt* | Alarm endet; Sitzungsbildschirm mit Timer; laufende Benachrichtigung mit Timer, *Fertig*/*Abbruch*; *Heute* „läuft seit …“ |
+| K28 | Nachfrage und Uhr | 2 min warten | Nachfrage als Banner, auf der Uhr mit *Noch dran / Fertig / Teilschritt / Abbruch*; *Noch dran* auf der Uhr → nächste in 2 min |
+| K29 | Maximale Dauer | ohne Antwort bis 6 min | letzter Reminder im Vollbild ohne *Noch dran*; 5 min später *verpasst* im Verlauf, Benachrichtigung weg |
+| K30 | Vorab starten (7.20 V2) | vor der Uhrzeit *Vorab* → *Ich starte jetzt*, nach 1 min *Fertig* | Verlauf „Sitzung …–… · 1 min“; zur Uhrzeit kein Alarm |
+| K31 | Abbruch zurücknehmen | Sitzung starten, in der Benachrichtigung *Abbruch*, dann *Rückgängig* | „‹Titel› abgebrochen“ mit *Rückgängig*; danach läuft die Sitzung mit dem alten Start, Benachrichtigung „Die Sitzung läuft weiter …“ |
+| K32 | Teilschritt nach Limit | Reminder mit Minimum 1×/Woche und Sitzung; Minimum einmal nutzen, dann Sitzung starten | laufende Benachrichtigung ohne *Teilschritt*; Sitzungsbildschirm sagt, dass das Minimum diese Woche aufgebraucht ist |
+
+## E. Nach dem Test
 - Claude liest `adb logcat -d -s AvlDiag` und `files/diag/diag.log` (per `run-as`) und
   gleicht sie mit den Erwartungen ab. Simulationen (DND, Standort, Zeit) zurücksetzen.
-- Ablauf für eine Stunde am Stück: [testsession.md](testsession.md) (vor V2).

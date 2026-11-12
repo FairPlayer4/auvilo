@@ -1,5 +1,6 @@
 package com.avlreminder.alarm
 
+import com.avlreminder.SystemZoneClock
 import android.app.Notification
 import android.app.NotificationChannel
 import android.app.NotificationManager
@@ -54,7 +55,7 @@ object AlarmPause {
     }
 
     /** Shows the notification while [until] lies ahead, removes it otherwise. */
-    fun update(context: Context, until: Instant?, now: Instant = Instant.now()) {
+    fun update(context: Context, until: Instant?, now: Instant = SystemZoneClock.instant()) {
         val manager = context.getSystemService(NotificationManager::class.java)
         if (until == null || until <= now) {
             manager.cancel(NOTIFICATION_ID)

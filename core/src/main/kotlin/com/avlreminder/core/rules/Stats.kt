@@ -19,6 +19,8 @@ data class Counts(
     val missed: Int = 0,
     val dropped: Int = 0,
     val early: Int = 0,
+    /** Sessions aborted (7.11 D3). */
+    val aborted: Int = 0,
 ) {
     val done: Int get() = goal + minimum
 }
@@ -43,7 +45,7 @@ object Stats {
     fun of(reminder: Reminder, resolved: List<Occurrence>, now: Instant, zone: ZoneId): ReminderStats {
         val own = resolved.filter { it.reminderId == reminder.id && !it.isOpen && it.resolvedAt != null }
         val today = now.atZone(zone).toLocalDate()
-        fun since(from: LocalDate) = counts(own.filter { !it.resolvedAt!!.atZone(zone).toLocalDate().isBefore(from) })
+        fun since(from: LocalDate) = counts(own.filter { !it.countedAt!!.atZone(zone).toLocalDate().isBefore(from) })
         return ReminderStats(
             week = since(Weeks.start(today)),
             month = since(today.withDayOfMonth(1)),
@@ -61,6 +63,7 @@ object Stats {
         missed = occurrences.count { it.resolution == Resolution.MISSED },
         dropped = occurrences.count { it.resolution == Resolution.DROPPED },
         early = occurrences.count { it.state == OccurrenceState.DONE && it.resolvedAt!! < it.dueAt },
+        aborted = occurrences.count { it.resolution == Resolution.ABORTED },
     )
 
     /**
@@ -101,7 +104,8 @@ object Stats {
 
     private fun outcome(resolution: Resolution?) = when (resolution) {
         Resolution.GOAL, Resolution.MINIMUM -> Outcome.COUNT
-        Resolution.MISSED -> Outcome.MISS
+        // An aborted session breaks the series like a miss (design.md 3.1).
+        Resolution.MISSED, Resolution.ABORTED -> Outcome.MISS
         else -> Outcome.KEEP
     }
 
@@ -109,7 +113,7 @@ object Stats {
     private fun weekStreak(reminder: Reminder, resolved: List<Occurrence>, now: Instant, zone: ZoneId): Streak {
         val goal = reminder.weeklyGoal!!
         val thisWeek = Weeks.start(now.atZone(zone).toLocalDate())
-        val byWeek = resolved.groupBy { Weeks.start(it.resolvedAt!!.atZone(zone).toLocalDate()) }
+        val byWeek = resolved.groupBy { Weeks.start(it.countedAt!!.atZone(zone).toLocalDate()) }
         val steps = byWeek.keys.sorted().mapNotNull { week ->
             val list = byWeek.getValue(week)
             val done = list.count { it.resolution == Resolution.GOAL || it.resolution == Resolution.MINIMUM }
@@ -117,7 +121,7 @@ object Stats {
                 done >= goal.minimum -> Step(Outcome.COUNT, week.withDayOfMonth(1))
                 // The running week can still make it.
                 week == thisWeek -> null
-                list.any { it.resolution == Resolution.MISSED } -> Step(Outcome.MISS, week.withDayOfMonth(1))
+                list.any { it.resolution == Resolution.MISSED || it.resolution == Resolution.ABORTED } -> Step(Outcome.MISS, week.withDayOfMonth(1))
                 else -> Step(Outcome.KEEP, week.withDayOfMonth(1))
             }
         }

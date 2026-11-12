@@ -1,5 +1,7 @@
 package com.avlreminder.alarm
 
+import com.avlreminder.TestClock
+import com.avlreminder.settle
 import android.app.AlarmManager
 import android.app.NotificationManager
 import android.content.Context
@@ -23,6 +25,7 @@ import kotlinx.coroutines.runBlocking
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertNotNull
 import org.junit.Assert.assertNull
+import org.junit.After
 import org.junit.Before
 import org.junit.Test
 import org.junit.runner.RunWith
@@ -36,19 +39,23 @@ class AlarmGlueTest {
     private val context = ApplicationProvider.getApplicationContext<Context>()
     private val alarmManager = context.getSystemService(AlarmManager::class.java)
     private val notifications = context.getSystemService(NotificationManager::class.java)
-    private val at = Instant.now().plusSeconds(3600)
+    private val at by lazy { TestClock.now().plusSeconds(3600) }
 
     @Before
     fun setUp() {
+        TestClock.at()
         // The app syncs on start (on Dispatchers.Default); let that finish so it does not race
         // with the test. Idling the main looper alone did not wait for it.
         runBlocking { (context as AvlApp).started.join() }
         ShadowLooper.idleMainLooper()
     }
 
+    @After
+    fun tearDown() = TestClock.reset()
+
     private fun reminder(strictness: Strictness, proof: ProofSpec) = Reminder(
         id = 7, title = "Katzenbrunnen", why = "Katzen trinken", strictness = strictness,
-        schedule = Schedule.Daily(LocalTime.of(18, 0)), proof = proof, createdAt = Instant.now(),
+        schedule = Schedule.Daily(LocalTime.of(18, 0)), proof = proof, createdAt = TestClock.now(),
     )
 
     private fun ring(level: AlarmLevel, proof: ProofSpec = ProofSpec.CONFIRM, snooze: List<Int> = listOf(10, 30)) =
@@ -123,10 +130,15 @@ class AlarmGlueTest {
     }
 
     @Test
-    fun fullScreenStartsTheAlarmService() {
-        Ringer.ring(context, ring(AlarmLevel.FULLSCREEN_LOUD))
-        val started = shadowOf(context as android.app.Application).nextStartedService
-        assertEquals(AlarmService::class.java.name, started.component?.className)
+    fun fullScreenStartsTheAlarmServiceLoudOnlyAtTheLoudLevel() {
+        val app = shadowOf(context as android.app.Application)
+        for ((level, loud) in listOf(AlarmLevel.FULLSCREEN_LOUD to true, AlarmLevel.FULLSCREEN to false)) {
+            Ringer.ring(context, ring(level))
+            val started = app.nextStartedService
+            assertEquals(AlarmService::class.java.name, started.component?.className)
+            // The tone is the point of the loud level (Review-Lauf 4, A4).
+            assertEquals(level.name, loud, started.getBooleanExtra("loud", !loud))
+        }
     }
 
     @Test
@@ -134,7 +146,7 @@ class AlarmGlueTest {
         val graph = context.graph
         val id = graph.repository.saveReminder(reminder(Strictness.NORMAL, ProofSpec.CONFIRM).copy(id = 0))
         val occurrenceId = graph.repository.saveOccurrence(
-            Occurrence(reminderId = id, dueAt = Instant.now().minusSeconds(60), state = OccurrenceState.DUE),
+            Occurrence(reminderId = id, dueAt = TestClock.now().minusSeconds(60), state = OccurrenceState.DUE),
         )
 
         context.sendBroadcast(

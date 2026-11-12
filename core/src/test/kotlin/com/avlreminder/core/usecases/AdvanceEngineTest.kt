@@ -94,8 +94,12 @@ class AdvanceEngineTest {
         val waiting = repo.occurrence(o.id)!!
         assertTrue(waiting.awaitsArrival)
         assertTrue(waiting.isOpen)
+        // Back home: rings after the buffer (7.29 OZ4).
         clock.now = at(26, 19, 40)
-        assertEquals(o.id, engine.onArrival(place).single().occurrence.id)
+        assertTrue(engine.onArrival(place).isEmpty())
+        assertEquals(at(26, 19, 45), alarms.set[o.id]!!.first)
+        clock.now = at(26, 19, 45)
+        assertEquals(o.id, engine.onAlarm(o.id)!!.occurrence.id)
     }
 
     @Test

@@ -1,5 +1,7 @@
 package com.avlreminder.data
 
+import com.avlreminder.core.model.Strictness
+import com.avlreminder.core.model.SessionSpec
 import androidx.room.withTransaction
 import com.avlreminder.core.model.Arrival
 import com.avlreminder.core.model.AtTimes
@@ -9,6 +11,7 @@ import com.avlreminder.core.model.Event
 import com.avlreminder.core.model.ItemDone
 import com.avlreminder.core.model.Occurrence
 import com.avlreminder.core.model.Place
+import com.avlreminder.core.model.PlaceWifi
 import com.avlreminder.core.model.PreNotice
 import com.avlreminder.core.model.PrepAnswer
 import com.avlreminder.core.model.Proof
@@ -36,6 +39,7 @@ class RoomReminderRepository(private val db: AvlDatabase) : ReminderRepository {
 
     override suspend fun reminder(id: Long) = dao.reminder(id)?.toModel(dao.items(id))
 
+    /** An unknown id changes nothing, as in the fake (Review-Lauf 4, E14). */
     override suspend fun saveReminder(reminder: Reminder): Long {
         var oldAudio: String? = null
         val id = db.withTransaction {
@@ -43,7 +47,8 @@ class RoomReminderRepository(private val db: AvlDatabase) : ReminderRepository {
             val id = if (reminder.id == 0L) {
                 dao.insert(entity)
             } else {
-                oldAudio = dao.reminder(reminder.id)?.motivationAudio
+                val old = dao.reminder(reminder.id) ?: return@withTransaction reminder.id
+                oldAudio = old.motivationAudio
                 dao.update(entity)
                 reminder.id
             }
@@ -115,13 +120,18 @@ class RoomReminderRepository(private val db: AvlDatabase) : ReminderRepository {
         PrepAnswerEntity(reminderId = answer.reminderId, question = answer.question, text = answer.text, unknown = answer.unknown, at = answer.at),
     )
 
-    override suspend fun places() = dao.places().map { it.toModel() }
+    override suspend fun places(): List<Place> {
+        val wifis = dao.placeWifis().groupBy { it.placeId }
+        return dao.places().map { it.toModel(wifis[it.id].orEmpty()) }
+    }
 
+    /** The place with exactly its WLANs; the old ones are replaced. */
     override suspend fun savePlace(place: Place): Long {
         val entity = PlaceEntity(place.id, place.name, place.lat, place.lon, place.radiusMeters)
-        if (place.id == 0L) return dao.insert(entity)
-        dao.update(entity)
-        return place.id
+        val id = if (place.id == 0L) dao.insert(entity) else place.id.also { dao.update(entity) }
+        dao.deletePlaceWifis(id)
+        dao.insert(place.wifis.map { PlaceWifiEntity(placeId = id, bssid = it.bssid, ssid = it.ssid) })
+        return id
     }
 
     override suspend fun itemsDone(occurrenceId: Long) = dao.itemsDone(occurrenceId).map { it.toModel() }
@@ -179,7 +189,7 @@ fun ReminderEntity.toModel(items: List<ChecklistItemEntity> = emptyList()): Remi
     ignoreDnd = ignoreDnd,
     snoozeMinutes = snoozeMinutes.split(',').mapNotNull { it.trim().toIntOrNull() }.ifEmpty { listOf(10) },
     motivationAudio = motivationAudio,
-    arrival = arrivalPlaceId?.let { Arrival(it, arrivalWhenAway ?: WhenAway.DROP) },
+    arrival = arrivalPlaceId?.let { Arrival(it, arrivalWhenAway ?: WhenAway.DROP, arrivalLead, arrivalBuffer, arrivalCheck) },
     checklist = items.sortedBy { it.position }.map { ChecklistItem(it.id, it.title) },
     archivedAt = archivedAt,
     weeklyGoal = weekTarget?.let { WeeklyGoal(it, weekMax ?: it, weekMinimum ?: 1) },
@@ -187,6 +197,16 @@ fun ReminderEntity.toModel(items: List<ChecklistItemEntity> = emptyList()): Remi
     prepFor = prepFor,
     solvedBlockerIsMinimum = solvedBlockerIsMinimum,
     hintQuietUntil = hintQuietUntil,
+    session = sessionCheck?.let {
+        SessionSpec(
+            checkMinutes = it,
+            checkStrictness = sessionCheckStrictness ?: Strictness.RELAXED,
+            goalMinutes = sessionGoal,
+            minimumMinutes = sessionMinimum,
+            maxMinutes = sessionMax ?: SessionSpec.DEFAULT_MAX,
+            finalMinutes = sessionFinal ?: SessionSpec.DEFAULT_FINAL,
+        )
+    },
 )
 
 /** The first time plus the further ones of several a day (VS1). */
@@ -248,6 +268,9 @@ fun Reminder.toEntity(): ReminderEntity {
         motivationAudio = motivationAudio,
         arrivalPlaceId = arrival?.placeId,
         arrivalWhenAway = arrival?.whenAway,
+        arrivalLead = arrival?.leadMinutes ?: Arrival.DEFAULT_LEAD,
+        arrivalBuffer = arrival?.bufferMinutes ?: Arrival.DEFAULT_BUFFER,
+        arrivalCheck = arrival?.checkMinutes ?: Arrival.DEFAULT_CHECK,
         archivedAt = archivedAt,
         weekTarget = weeklyGoal?.target,
         weekMax = weeklyGoal?.max,
@@ -260,6 +283,12 @@ fun Reminder.toEntity(): ReminderEntity {
         solvedBlockerIsMinimum = solvedBlockerIsMinimum,
         moreTimes = s.moreTimes(),
         hintQuietUntil = hintQuietUntil,
+        sessionCheck = session?.checkMinutes,
+        sessionCheckStrictness = session?.checkStrictness,
+        sessionGoal = session?.goalMinutes,
+        sessionMinimum = session?.minimumMinutes,
+        sessionMax = session?.maxMinutes,
+        sessionFinal = session?.finalMinutes,
     )
 }
 
@@ -275,18 +304,23 @@ fun OccurrenceEntity.toModel() = Occurrence(
     id = id, reminderId = reminderId, dueAt = dueAt, currentAt = currentAt, state = state,
     postponeCount = postponeCount, resolvedAt = resolvedAt, resolution = resolution, note = note,
     pausedUntil = pausedUntil, firstProgressAt = firstProgressAt, firedAt = firedAt, awaitsArrival = awaitsArrival,
+    arrivedAt = arrivedAt, startedAt = startedAt, nextCheckAt = nextCheckAt, finalCallAt = finalCallAt,
 )
 
 fun Occurrence.toEntity() = OccurrenceEntity(
     id = id, reminderId = reminderId, dueAt = dueAt, currentAt = currentAt, state = state,
     postponeCount = postponeCount, resolvedAt = resolvedAt, resolution = resolution, note = note,
     pausedUntil = pausedUntil, firstProgressAt = firstProgressAt, firedAt = firedAt, awaitsArrival = awaitsArrival,
+    arrivedAt = arrivedAt, startedAt = startedAt, nextCheckAt = nextCheckAt, finalCallAt = finalCallAt,
 )
 
 fun PrepAnswerEntity.toModel() = PrepAnswer(id = id, reminderId = reminderId, question = question, text = text, unknown = unknown, at = at)
 
 fun ProofEntity.toModel() = Proof(id = id, occurrenceId = occurrenceId, type = type, filePath = filePath, takenAt = takenAt, text = text, itemId = itemId)
 
-fun PlaceEntity.toModel() = Place(id = id, name = name, lat = lat, lon = lon, radiusMeters = radiusMeters)
+fun PlaceEntity.toModel(wifis: List<PlaceWifiEntity> = emptyList()) = Place(
+    id = id, name = name, lat = lat, lon = lon, radiusMeters = radiusMeters,
+    wifis = wifis.map { PlaceWifi(it.bssid, it.ssid) },
+)
 
 fun ItemDoneEntity.toModel() = ItemDone(id = id, occurrenceId = occurrenceId, itemId = itemId, doneAt = doneAt, withProof = withProof)
