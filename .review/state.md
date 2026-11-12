@@ -5,15 +5,16 @@ Letztes Architektur-Review: Lauf 5 (2026-11-12, Bericht `runs/2026-11-12-2.md`);
 ## Beabsichtigte Architektur
 - **Schichten:** `:core` ist reines Kotlin (model, rules, ports, usecases) und kennt kein Android. `:app` ist Android (ui, alarm, data, location, system, widget, claude) und hängt von `:core` ab, nie umgekehrt. Regeln gehören nach `:core`, `:app` setzt sie nur um.
 - **Änderungen:** Alle Änderungen an Remindern und Fälligkeiten laufen über `ReminderEngine`, auch aus UI, Receivern, Benachrichtigungen und der Claude-Schnittstelle. Die Engine ist eine Fassade mit internen Teilen (`Scheduler`, `AlarmViews`, `Changes`).
-- **Wahrheit:** Die Room-DB und die Einstellungen im DataStore (die mit ins Backup gehen) sind die Wahrheit. Alarme, Geofences, Übersicht und Vorab-Reminder werden daraus abgeleitet und per `sync` neu aufgebaut.
-- **Zeit und Container:** In `:core` kommt Zeit nur über `Clock`; in `:app` ist das ein Ziel, keine Regel. Es gibt keine DI-Bibliothek, nur den Container `AppGraph`. Engine-Aufrufe laufen nacheinander über `withEngine`.
+- **Wahrheit:** Die Room-DB und die Einstellungen im DataStore (die mit ins Backup gehen) sind die Wahrheit. Alarme, Geofences, Übersicht und Vorab-Reminder werden daraus abgeleitet und per `sync` neu aufgebaut. Gerätezustand, der nicht ins Backup geht (Cloud-Status, WLAN-Entprellung, Schlüsseldateien, *Notaus*, `claudeAccess`), ist eine eigene Kategorie.
+- **Effekte:** Ein Befehl der Engine plant, klingelt und beendet (Klingeln und Benachrichtigung weg) über `EngineContext`, erst nach dem Speichern (ab V1.3c0).
+- **Zeit und Container:** In `:core` kommt Zeit nur über `Clock`; in `:app` gilt das für jede Zeit, nach der die App etwas entscheidet (`graph.clock`), Log-Stempel und Dateinamen ausgenommen. Es gibt keine DI-Bibliothek, nur den Container `AppGraph`. Engine-Aufrufe laufen nacheinander über `withEngine`.
 - **Vertrauensgrenzen:**
   - adb-Provider `com.avlreminder.claude`: `DUMP`, nur im Debug-Build, Schalter in der App.
   - Exportierte Receiver und PendingIntents.
   - Migrationen (Datenverlust), mit Backup vor jeder Migration.
   - Private Inhalte (Nachweise, Positionen) dürfen nicht ins Log.
 
-Vom Entwickler bestätigt am 2026-11-03, die Anpassungen aus Lauf 2 (Wahrheit, Zeit, Fassade) am 2026-11-09.
+Vom Entwickler bestätigt am 2026-11-03, die Anpassungen aus Lauf 2 (Wahrheit, Zeit, Fassade) am 2026-11-09, aus Lauf 5 (Gerätezustand, Zeit in `:app`, Effekte) am 2026-11-12.
 
 Das Cloud-Backup (`app/…/cloud`, `restore`) prüft der review-loop des Backend-Repos mit (Bereich „App: Wiederherstellen“, zuletzt Lauf 10 am 2026-11-09).
 
@@ -64,7 +65,7 @@ Das Cloud-Backup (`app/…/cloud`, `restore`) prüft der review-loop des Backend
 - 2026-11-12: `Database.kt` (693 Z., Schema 10) weiter ungeteilt (Lauf 2: „mit Migration 8“). E23.
 
 ## Offene Fragen an den Entwickler
-Aus Lauf 5 (Bericht `runs/2026-11-12-2.md`): 1. Umbau-Etappe „V1.3c0“ (E17, E18, E20, nebenher E19) vor V1.3c? 2. Architekturbild nachziehen (Room + DataStore, Gerätezustand, Zeit-Regel in `:app`, Effekte inkl. *beenden*)? 3. Benachrichtigung eines von `sync`/Tagesende geschlossenen Termins beenden? 4. F2: vor dem Fensterstart geplante, verspätete Prüfung zählt als Startprüfung (`<= start`)? 5. `arrivedAt` auch bei Änderung der Ankunftsregel leeren? 6. Formular: a) Entwurf retten, b) Limit für die Minimum-Dauer einer Sitzung, c) Startklar-Antwort nicht leerbar.
+Keine aus Lauf 5 (alle am 2026-11-12 nach Vorschlag beantwortet).
 
 Kleine offene Unklarheiten (Sommerzeit, Handy aus im Zeitraum, *Auslassen* bei mehrmals täglich, Begriff „Pause“) stehen in anforderungen.md Kap. 11.
 
@@ -84,3 +85,4 @@ Kleine offene Unklarheiten (Sommerzeit, Handy aus im Zeitraum, *Auslassen* bei m
 - 2026-11-12 (Lauf 4): Kevin wollte Doku und Tests im Fokus; das Architektur-Review ist deshalb auf Lauf 5 verschoben (Hauptagent).
 - 2026-11-12: Aus Lauf 1 gefixt (Kevin: „jetzt fixen“): abgelehnte Antwort auf die Hinweis-Karte sagt warum; Löschen/Pausieren/Archivieren/Verwerfen nehmen Klingeln und Benachrichtigung weg; anderer Alarm beendet einen offenen Nachweis; Notaus lässt eine stille Benachrichtigung. Offen aus Lauf 1 und mit V1.3c: abgelehnte Aktion in `ActionReceiver` entfernt trotzdem, mehrere Vollbild-Alarme/„Nachweis läuft“ (Gerätetest); nicht nachgeprüft: `Stats.streak` mehrmals täglich, `ClaudeApi.save` bei Ankunft.
 - 2026-11-12 (Lauf 4, Fragen 1–8, alle nach Vorschlag): Vollbild/*+1 wartet*/*Rest später* → V1.3c; *Abgebrochen* 60 s zurücknehmbar; F2 über die geplante erste Prüfung, wiederholte WLAN-Meldung keine Ankunft; Sitzung zählt in der Woche ihres Starts; Doku zusammengelegt und gekürzt; *Teilschritt* nach aufgebrauchtem Limit ausgeblendet. Umgesetzt in V1.3b2 (anforderungen.md Kap. 9, 2026-11-12).
+- 2026-11-12 (Lauf 5, Fragen 1–6, alle nach Vorschlag): Umbau-Etappe V1.3c0 (E17–E21, E23) vor V1.3c; Architekturbild: Room + DataStore, Gerätezustand eigene Kategorie, Zeitregel in `:app`, Effekte inkl. beenden; vom System geschlossene Termine räumen auf; F2 `plannedCheck <= start`; `arrivedAt` bei jeder Änderung der Ankunftsregel leeren; Formular-Entwurf retten, Limit für Sitzungs-Minimum, Startklar nicht leerbar (anforderungen.md Kap. 9). Offene Funde und E22 in V1.3b3.
