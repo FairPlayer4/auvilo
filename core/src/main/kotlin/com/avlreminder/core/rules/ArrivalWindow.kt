@@ -85,8 +85,9 @@ object ArrivalWindow {
         return when {
             now < start -> ArrivalDecision.TooEarly(start)
             // KRITISCH: Already there when the window starts (Homeoffice): the latest time, not now (F2).
-            // The check planned for the start decides, however late Doze delivers it (2026-11-12).
-            plannedCheck == start -> ArrivalDecision.At(occurrence.currentAt)
+            // The check planned for the start decides, however late Doze delivers it (2026-11-12),
+            // also one planned before it, e.g. for another reminder's earlier window (Review-Lauf 5).
+            plannedCheck != null && plannedCheck <= start -> ArrivalDecision.At(occurrence.currentAt)
             else -> ArrivalDecision.At(afterBuffer)
         }
     }

@@ -111,6 +111,12 @@ internal class Changes(private val c: EngineContext, private val views: AlarmVie
                 repo.saveOccurrence(open.copy(dueAt = due, currentAt = due, arrivedAt = null))
             }
         }
+        // A changed arrival rule (place, buffer, lead, rule gone) decides the arrival anew: the
+        // occurrence goes back to its time; a mere text change keeps it (Review-Lauf 5, Frage 5).
+        if (stored != null && stored.arrival != saved.arrival) {
+            repo.openOccurrence(id)?.takeIf { it.state == OccurrenceState.PLANNED && it.arrivedAt != null && !it.rangOrMoved }
+                ?.let { repo.saveOccurrence(it.copy(currentAt = it.dueAt, arrivedAt = null)) }
+        }
         val ring = scheduler.syncReminder(saved) ?: scheduler.arriveIfThere(saved)
         scheduler.watchPlaces()
         return SaveResult.Saved(id, ring)
