@@ -33,7 +33,7 @@ import java.time.Instant
 import java.time.ZoneId
 
 /**
- * The running session (Anf. 7.11, design.md E.3): big timer, the four answers with the suggested
+ * The running session (Anf. 7.11, design.md 3.1): big timer, the four answers with the suggested
  * one first, goal, minimum and the average of the last sessions. At the last reminder "Noch
  * dran" is gone (D5).
  * [clock]: the current time each second; tests pass a fixed one.

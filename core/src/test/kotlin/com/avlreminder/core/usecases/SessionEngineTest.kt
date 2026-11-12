@@ -39,7 +39,7 @@ import org.junit.jupiter.params.ParameterizedTest
 import org.junit.jupiter.params.provider.Arguments.arguments
 import org.junit.jupiter.params.provider.MethodSource
 
-/** Sitzung mit Timer im Ablauf der Engine (Anf. 7.11 D1–D7, 7.20 V2, design.md E.3). */
+/** Sitzung mit Timer im Ablauf der Engine (Anf. 7.11 D1–D7, 7.20 V2, design.md 3.1). */
 class SessionEngineTest {
     private val clock = MutableClock(at(26, 8))
     private val repo = FakeRepository()

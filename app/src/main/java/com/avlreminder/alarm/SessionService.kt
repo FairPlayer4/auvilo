@@ -28,7 +28,7 @@ data class SessionNote(
 )
 
 /**
- * Keeps the running sessions visible (design.md E.3): one ongoing notification each with a
+ * Keeps the running sessions visible (design.md 3.1): one ongoing notification each with a
  * chronometer and *Fertig*, *Teilschritt*, *Abbruch*. It does not time anything itself – the checks
  * and the last reminder come over the `AlarmPort` and survive a restart through `sync`.
  * Foreground service of type `systemExempted` like the alarm; sessions last too long for `shortService`.

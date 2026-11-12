@@ -64,7 +64,7 @@ interface CloudActions {
 
 /**
  * "Cloud-Backup (experimentell)" (A-14): setting up, backing up, checking and restoring
- * (wiederherstellen-entwurf.md), deleting and sending a diagnosis.
+ * (cloud-entscheidungen.md W, R-3), deleting and sending a diagnosis.
  */
 @Composable
 fun CloudBackupSetting(status: CloudStatus, actions: CloudActions) {

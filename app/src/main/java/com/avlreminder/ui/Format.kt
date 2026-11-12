@@ -132,7 +132,7 @@ object Format {
     }
 
     /**
-     * For *Heute* (Anf. 7.29 Z.5): "ab 18:00 bei Ankunft zuhause, sonst 19:30", or "angekommen –
+     * For *Heute* (design.md 6): "ab 18:00 bei Ankunft zuhause, sonst 19:30", or "angekommen –
      * klingelt 18:35"; null without an arrival window.
      */
     fun arrival(r: Reminder, o: Occurrence, zone: ZoneId, places: List<Place>): String? {

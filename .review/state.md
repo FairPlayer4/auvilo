@@ -20,16 +20,16 @@ Das Cloud-Backup (`app/…/cloud`, `restore`) prüft der review-loop des Backend
 ## Bereiche
 | Bereich | Pfade | Anforderungen/Doku | Tests | Zuletzt reviewt | Zustand |
 |---|---|---|---|---|---|
-| core-Regeln | core/…/rules | design.md 2–10, E.3, Z | core/src/test/…/rules (Kover ≥ 90 %, 98,7 %) | 2026-11-12 (Sessions, ArrivalWindow, PlaceChecks) | gut, Mutanten entdeckt; Wochengrenze nach `resolvedAt` (Frage) |
-| core-Engine | core/…/usecases | design.md 1, 3, 4 | core/src/test/…/usecases, scenarios | 2026-11-12 (Sitzung/Ankunft) | Runden bei sync behoben aabd19f; `arrivedAt` beim Bearbeiten gefixt 7248e01; F2/Doze offen (Frage) |
+| core-Regeln | core/…/rules | design.md 2–10, 3.1, 6 | core/src/test/…/rules (Kover ≥ 90 %, 98,7 %) | 2026-11-12 (Sessions, ArrivalWindow, PlaceChecks) | gut, Mutanten entdeckt; Sitzung zählt seit V1.3b2 in der Woche ihres Starts (`countedAt`) |
+| core-Engine | core/…/usecases | design.md 1, 3, 4 | core/src/test/…/usecases, scenarios | 2026-11-12 (Sitzung/Ankunft) | Runden bei sync behoben aabd19f; `arrivedAt` beim Bearbeiten gefixt 7248e01; F2 über die geplante erste Prüfung (3f49b58), am Gerät noch prüfen |
 | core-Modell/Ports | core/…/model, ports | design.md 2 | indirekt | – | – |
-| app-Alarm | app/…/alarm, system | design.md 4, 5, 11.2, 12, E.3 | AlarmGlueTest, ReceiverGlueTest, SessionGlueTest, AlarmServiceTest | 2026-11-12 (Tests, Sitzung) | Verdrahtung dünn: A2–A5 unentdeckt (E13); Schlussruf-Benachrichtigung nach TimeOut bleibt |
-| app-Daten | app/…/data | design.md 13 | MigrationTest, RoomReminderRepositoryTest | 2026-11-03 (nur Migration 6→7) | gut |
+| app-Alarm | app/…/alarm, system | design.md 3.1, 4, 5, 11.2, 12 | AlarmGlueTest, ReceiverGlueTest, SessionGlueTest, AlarmServiceTest | 2026-11-12 (Tests, Sitzung) | Verdrahtung seit 5f2c6a2 über echte PendingIntents getestet (E13); Schlussruf-Benachrichtigung entfernt (55c7ac2) |
+| app-Daten | app/…/data | design.md 13 | MigrationTest, RoomReminderRepositoryTest, RoomRepositoryCasesTest | 2026-11-03 (nur Migration 6→7) | gut |
 | app-UI | app/…/ui | design.md 11 | ui-Tests (Robolectric) | – | – |
 | app-Claude | app/…/claude, app/src/debug | anforderungen.md 7.26 AG11, design.md 15 | ClaudeApiTest | 2026-11-03 | AG5-Frage offen; Freigabe-Prüfung ungetestet |
-| app-Ort/Widget | app/…/location, widget | design.md 6, 11.2, Z | ReceiverGlueTest (PlaceCheck über echten PendingIntent) | 2026-11-12 (Ankunft, WLAN) | `setWindow`/WLAN-Meldung beim Start (F2, Frage); A6, M5 unentdeckt; Widget ohne Test |
-| Doku | CLAUDE.md, README, docs/*.md | – | – | 2026-11-12 (Lauf 4, alle Dokumente) | design.md auf V1.3b0.2 (E11), Kürzen ≈ 30–60 KB (E12); eindeutige Fehler gefixt 7f16054 |
-| Tests gesamt | core/src/test, testFixtures, app/src/test | design.md 14 | – | 2026-11-12 (Lauf 4) | core sehr gut; app-Verdrahtung, Fake vs. Room, Uhr in Glue-Tests (E13–E16) |
+| app-Ort/Widget | app/…/location, widget | design.md 6, 11.2 | ReceiverGlueTest (PlaceCheck über echten PendingIntent) | 2026-11-12 (Ankunft, WLAN) | wiederholte WLAN-Meldung keine Ankunft (3f49b58); Geofence-Test in 5f2c6a2; Widget ohne Test |
+| Doku | CLAUDE.md, README, docs/*.md | – | – | 2026-11-12 (Lauf 4, alle Dokumente) | nach Lauf 4 umgebaut: design.md nach Themen (3.1 Sitzung, 6 Ankunft), Cloud-Entwürfe → cloud-entscheidungen.md, Kap.-9-Archiv, testsession.md gelöscht |
+| Tests gesamt | core/src/test, testFixtures, app/src/test | design.md 14 | – | 2026-11-12 (Lauf 4) | core sehr gut; E13–E15 umgesetzt (5f2c6a2, 247b44b), E16 Testdaten offen |
 
 ## Bekannte Schulden und beobachtete Drift
 - 2026-11-03: Regel-Logik in `:app`: `AlarmActivity.canDeferRest`, das Anbieten des nächsten Punkts in `ActionReceiver`. Beginnende Drift. **Trend (Lauf 2):** Die Alarm-Ansicht gibt es viermal (`Ring`, `AlarmUi`, `AlarmInfo`, `ActionReceiver`); `ActionReceiver` nutzt `Checklists.round` nicht. Empfehlung E1.
@@ -49,12 +49,12 @@ Das Cloud-Backup (`app/…/cloud`, `restore`) prüft der review-loop des Backend
 ## Bekannte Schulden und beobachtete Drift (Lauf 4)
 - 2026-11-12, **Trend (Lauf 3 → 4): Doku-Drift wächst mit jeder Etappe.** Umgesetzte Entwürfe (E.3, Z.8) werden nicht in design.md eingearbeitet, Statuszeilen in sechs Dokumenten veralten. Empfehlung E11 (Version nur in stand.md, Einarbeiten als Teil von „fertig“).
 - 2026-11-12, **Trend (Lauf 1 → 2 → 4): Android-Schicht dünn getestet.** Neu belegt mit 7 von 8 unentdeckten App-Mutanten (A2–A6, M4, M5); Tests bauen Intents nach, statt die erzeugten PendingIntents auszulösen. Empfehlung E13.
-- 2026-11-12: Fake weicht von Room ab (Checklisten-Punkte, unbekannte Id). E14.
-- 2026-11-12: Glue-Tests nutzen die echte Uhr und werden 22:30–0:30 übersprungen. E15.
+- 2026-11-12: Fake weicht von Room ab (Checklisten-Punkte, unbekannte Id). E14. **Behoben 247b44b** (gemeinsame `RepositoryCases`).
+- 2026-11-12: Glue-Tests nutzen die echte Uhr und werden 22:30–0:30 übersprungen. E15. **Behoben 5f2c6a2** (`TestClock`).
 - 2026-11-12: `testdata/` auf Schema 7. E16.
 
 ## Offene Fragen an den Entwickler
-Aus Lauf 4 (Bericht `runs/2026-11-12.md`): 1. Ein Vollbild zur Zeit / *Rest später* verschoben oder verworfen? 2. Sitzungs-Abbruch aus Benachrichtigung/Uhr ohne Rückgängig gewollt? 3. F2/Doze und WLAN-Meldung beim Prozessstart im diag.log prüfen und fixen? 4. Sitzung über die Wochengrenze nach Start zählen? 5. Doku kürzen: Cloud-Entwürfe zusammenlegen, testsession.md löschen, Kap.-9-Archiv?
+Keine aus Lauf 4 (alle am 2026-11-12 beantwortet).
 
 Kleine offene Unklarheiten (Sommerzeit, Handy aus im Zeitraum, *Auslassen* bei mehrmals täglich, Begriff „Pause“) stehen in anforderungen.md Kap. 11.
 
@@ -72,3 +72,4 @@ Kleine offene Unklarheiten (Sommerzeit, Handy aus im Zeitraum, *Auslassen* bei m
 - 2026-11-05 (Lauf 3, Fragen 1–7, nach Vorschlag): siehe anforderungen.md Kap. 9 (2026-11-05). Frage 6 beruhte auf einer falschen Prämisse (Fristen werden ohne und mit Notaus *verpasst* und bleiben *überfällig*); nur Klarstellung.
 - 2026-11-05 (Lauf 3, E7–E10): angenommen und in der Doku umgesetzt (Entwurf 7.29, Tabelle `RUNNING` in E.3, Statuszeilen, Kap. 9 neueste zuerst).
 - 2026-11-12 (Lauf 4): Kevin wollte Doku und Tests im Fokus; das Architektur-Review ist deshalb auf Lauf 5 verschoben (Hauptagent).
+- 2026-11-12 (Lauf 4, Fragen 1–8, alle nach Vorschlag): Vollbild/*+1 wartet*/*Rest später* → V1.3c; *Abgebrochen* 60 s zurücknehmbar; F2 über die geplante erste Prüfung, wiederholte WLAN-Meldung keine Ankunft; Sitzung zählt in der Woche ihres Starts; Doku zusammengelegt und gekürzt; *Teilschritt* nach aufgebrauchtem Limit ausgeblendet. Umgesetzt in V1.3b2 (anforderungen.md Kap. 9, 2026-11-12).

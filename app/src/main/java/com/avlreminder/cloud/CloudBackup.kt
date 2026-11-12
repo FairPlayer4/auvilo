@@ -34,7 +34,7 @@ import java.time.Instant
 import java.util.concurrent.atomic.AtomicBoolean
 
 /**
- * Switching on, signing in and setting up the cloud backup (backup-entwurf.md, "Ablauf
+ * Switching on, signing in and setting up the cloud backup (cloud-entscheidungen.md, "Einrichtung
  * Einrichtung"). The flows themselves come from the backend (`Anmeldung`, `Einrichtung`); this
  * class only connects them to the settings screen and keeps one step running at a time.
  *
@@ -164,7 +164,7 @@ class CloudBackup(
     fun dismissNotes() = state.update { it.copy(notes = emptyList(), error = null, report = null) }
 
     /**
-     * Backs up now, by hand (backup-entwurf.md, step 3): the app's data, encrypted with the
+     * Backs up now, by hand (cloud-entscheidungen.md A-9): the app's data, encrypted with the
      * account's vault key, through `Sicherungsablauf` from the backend.
      *
      * KRITISCH: Switched off or not set up, nothing is read and the network is not touched. Did
@@ -422,7 +422,7 @@ class CloudBackup(
     }
 
     /**
-     * The hourly backup (backup-entwurf.md, step 4), called by the worker: like [backUp], but
+     * The hourly backup (cloud-entscheidungen.md A-9, A-10), called by the worker: like [backUp], but
      * without anyone to ask ([AutomaticBackup.run]). Afterwards it checks whether the backup is
      * older than 3 days ([AutomaticBackup.checkStale]).
      */

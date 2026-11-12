@@ -16,7 +16,7 @@ jobs:
     runs-on: ubuntu-24.04
     timeout-minutes: 30
     # Beide Repos nebeneinander wie auf Kevins Rechner: Die App bindet
-    # ../avlreminder-backend/client per Composite Build ein (docs/backup-entwurf.md A-2).
+    # ../avlreminder-backend/client per Composite Build ein (docs/cloud-entscheidungen.md A-2).
     defaults:
       run:
         working-directory: avlreminder
@@ -30,7 +30,7 @@ jobs:
         run: echo "commit=$(tr -d '[:space:]' < gradle/backend-commit.txt)" >> "$GITHUB_OUTPUT"
 
       # Das Backend-Repo ist privat. Der Deploy-Key darf nur dieses Repo lesen
-      # (Secret BACKEND_DEPLOY_KEY, Anleitung in docs/backup-entwurf.md).
+      # (Secret BACKEND_DEPLOY_KEY, Anleitung in docs/cloud-entscheidungen.md).
       - uses: actions/checkout@v5
         with:
           repository: FairPlayer4/avlreminder-backend

@@ -36,7 +36,7 @@ import java.time.Instant
 import java.time.LocalTime
 
 /**
- * Die Sitzung mit Timer auf Android (Anf. 7.11, design.md E.3): welche Knöpfe Benachrichtigung
+ * Die Sitzung mit Timer auf Android (Anf. 7.11, design.md 3.1): welche Knöpfe Benachrichtigung
  * und Uhr zeigen, was sie in der Engine auslösen, und die laufende Benachrichtigung mit Timer.
  */
 @RunWith(AndroidJUnit4::class)

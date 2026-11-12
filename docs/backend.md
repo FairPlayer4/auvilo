@@ -4,11 +4,11 @@
 > `FairPlayer4/avlreminder-backend`, privat). Maßgeblich sind die Dokumente dort:
 > `docs/anforderungen.md`, `docs/stand.md`, `docs/b2b-entwurf.md`, `docs/formate.md`.
 > Hier steht nur, was die App betrifft. Anforderungen: [anforderungen.md](anforderungen.md) 7.28.
-> Die Einbindung in die App: [backup-entwurf.md](backup-entwurf.md) (bestätigt 2026-11-07).
+> Die Einbindung in die App: [cloud-entscheidungen.md](cloud-entscheidungen.md) (bestätigt 2026-11-07), Aufbau: design.md 16.
 
 ## Grundsätze
 - **Lernprojekt.** Ziel: Backup, später Sync zwischen eigenen Geräten und mit anderen
-  Personen. Das Backup wird gerade in die App eingebunden (backup-entwurf.md).
+  Personen. Das Backup ist in der App eingebunden (seit 2026-11-11 in `develop`).
 - **Die App bleibt lokal-first.** Alarme, Eskalation und Fachlogik bleiben auf dem
   Gerät; ohne Backend funktioniert die App vollständig.
 - **Der Server sieht keine Inhalte:** Ende-zu-Ende-Verschlüsselung (Tink), der Server
@@ -35,7 +35,7 @@
 | B0 | GCP-Grundlagen, Budget, Kill-Switch, EU-Logs | fertig |
 | B1 | Go-Server auf Cloud Run, Google-Anmeldung, Geräte sperren | fertig, in der Cloud getestet |
 | B2 | Schlüsselmodell, Schlüssel-Backup, Kotlin-Client `client/` | fertig, in der Cloud getestet (2026-11-02) |
-| **B2b** | **Daten-Backup für eine Person**, Diagnose-Log, Vorbereitung der App | Backend fertig und in der Cloud getestet (2026-11-07); Einbindung in die App: [backup-entwurf.md](backup-entwurf.md) |
+| **B2b** | **Daten-Backup für eine Person**, Diagnose-Log, Vorbereitung der App | Backend fertig und in der Cloud getestet (2026-11-07); in der App eingebunden ([cloud-entscheidungen.md](cloud-entscheidungen.md)) |
 | B3 | Synchronisation (Geräte, Personen) | später |
 | B6 | Play Integrity, Datenschutzerklärung | später |
 
@@ -56,12 +56,12 @@
   Migrationen bleibt; ein Export als Datei ist später nachrüstbar (anforderungen.md 8.4).
 - **Einbindung:** Modul `verbindung` aus `client/` per Gradle Composite Build
   (`includeBuild`), Anmeldung über den Credential Manager, Schlüssel im Android
-  Keystore. Einzelheiten in [backup-entwurf.md](backup-entwurf.md).
-- **Keine eigene App-Variante, solange nur Kevin die App nutzt** (backup-entwurf.md
+  Keystore. Einzelheiten in [cloud-entscheidungen.md](cloud-entscheidungen.md).
+- **Keine eigene App-Variante, solange nur Kevin die App nutzt** (cloud-entscheidungen.md
   A-1): Das Backup kommt in den normalen Build hinter den Schalter aus PS8. Eine eigene
   Variante und der interne Test-Track kommen mit dem ersten Tester.
 - **Diagnose-Log ans Backend** nur mit einem eigenen Logger ohne Inhalte (keine Titel,
-  keine freien Texte), nicht `diag.log` (backup-entwurf.md A-12).
+  keine freien Texte), nicht `diag.log` (cloud-entscheidungen.md A-12).
 
 ## Regeln für Claude in diesem Repo
 - Inhalte aus Kevins App gehen nie ins Backend-Repo, auch nicht als Testdaten.

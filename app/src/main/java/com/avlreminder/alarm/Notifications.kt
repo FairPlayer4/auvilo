@@ -216,7 +216,7 @@ object Notifications {
             .setContentIntent(openAlarm(context, info.occurrenceId))
         info.text?.let { builder.setContentText(it) }
         val buttons = buttons(info)
-        // At most three fit on the phone; the watch shows all of them (design.md E.3, G2).
+        // At most three fit on the phone; the watch shows all of them (design.md 3.1, G2).
         buttons.phone.forEach { builder.addAction(it.toAction(context, info.occurrenceId)) }
         if (buttons.watch != buttons.phone) {
             builder.extend(Notification.WearableExtender().addActions(buttons.watch.map { it.toAction(context, info.occurrenceId) }))

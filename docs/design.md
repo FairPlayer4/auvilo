@@ -1,11 +1,11 @@
 # Design – avlreminder
 
-> Stand: V1.3b0.2 (2026-11-05). Beschreibt nur den **aktuellen** Stand, nach Themen.
-> Frühere Entwürfe und ihre Abweichungen stehen im Git-Verlauf (bis Commit `a33d59b`
-> war das Dokument nach Versionen gegliedert). Anforderungen:
-> [anforderungen.md](anforderungen.md), Spike: [spike.md](spike.md).
-> Neue Entwürfe kommen als eigener Abschnitt *Entwurf* ans Ende und werden nach der
-> Umsetzung in die Themen eingearbeitet.
+> Beschreibt nur den **aktuellen** Stand, nach Themen. Welche Version was gebracht hat, steht
+> in [stand.md](stand.md) und anforderungen.md Kap. 10.1; frühere Entwürfe und ihre
+> Abweichungen im Git-Verlauf. Anforderungen: [anforderungen.md](anforderungen.md),
+> Spike: [spike.md](spike.md).
+> Neue Entwürfe kommen als eigener Abschnitt *Entwurf* ans Ende. Eine Etappe ist erst
+> fertig, wenn ihr Entwurf in die Themen eingearbeitet und der Abschnitt gelöscht ist.
 
 ## 1. Architektur
 
@@ -13,20 +13,22 @@
 ┌──────────────────────────── :app (Android) ────────────────────────────┐
 │  ui/        Compose-Screens, AppViewModel, MainActivity                 │
 │  widget/    Glance-Widget                                               │
-│  alarm/     AlarmPort, AlarmService, AlarmActivity, Benachrichtigungen, │
-│             Übersicht, Vorab-Reminder, Kamera, Audio                    │
-│  location/  Geofence und aktive Standortprüfung                         │
+│  alarm/     AlarmPort, AlarmService, SessionService, AlarmActivity,     │
+│             Benachrichtigungen, Übersicht, Vorab-Reminder, Kamera, Audio│
+│  location/  Geofence, WLAN, Prüf-Alarme der Orte, Standortprüfung       │
 │  system/    Boot/Update/Zeitänderung, Diagnose-Log                      │
 │  data/      Room-DB, Repository, DataStore-Einstellungen, Vorschläge    │
 │  claude/    Schnittstelle für Claude (Provider nur im Debug-Build)      │
+│  cloud/, restore/  Cloud-Backup, Wiederherstellen, Tageskopien (16.)    │
 └───────────────┬─────────────────────────────────────────────────────────┘
                 │ nutzt
 ┌───────────────▼──────────── :core (reines Kotlin, kein Android) ────────┐
-│  model/     Reminder, Schedule, Occurrence, Proof, Event, Blocker, …    │
+│  model/     Reminder, Schedule, Occurrence, SessionSpec, Arrival, …     │
 │  rules/     ScheduleRules, Lifecycle, Escalation, Presets/Validation,   │
-│             Proofs, WeeklyGoals, Stats, Deadlines, Blockers             │
-│  ports/     ReminderRepository, AlarmPort, GeofencePort, LocationPort,  │
-│             DeviceStatePort, PreNoticePort (Zeit: java.time.Clock)      │
+│             Proofs, WeeklyGoals, Stats, Deadlines, Blockers, Sessions,  │
+│             ArrivalWindow, PlaceChecks, Checklists, Snoozing            │
+│  ports/     ReminderRepository, AlarmPort, PlaceAlarmPort, GeofencePort,│
+│             LocationPort, WifiPort, DeviceStatePort, PreNoticePort      │
 │  usecases/  ReminderEngine (Fassade) mit Scheduler, AlarmViews, Changes,│
 │             EngineContext; AlarmView, RingPort; Overview, Digest        │
 └─────────────────────────────────────────────────────────────────────────┘
@@ -36,7 +38,7 @@
   (Kover ≥ 90 %, Build schlägt sonst fehl).
 - **`ReminderEngine`** ist der einzige Weg, Reminder und Fälligkeiten zu ändern:
   Oberfläche, Benachrichtigungen, Receiver und später Agenten (Anf. 7.26) nutzen dieselben
-  Befehle. Seit V1.3b0 ist sie eine Fassade über drei interne Teile: `Scheduler` (Zeit:
+  Befehle. Sie ist eine Fassade über drei interne Teile: `Scheduler` (Zeit:
   nächste Fälligkeit, Alarm planen, auslösen, eskalieren, Tagesgrenze), `AlarmViews` (was
   jetzt gilt: Limits, Woche, Strenge, Alarm-Ansicht) und `Changes` (was der Nutzer ändert:
   Reminder, Aktionen, Blocker, Hinweise).
@@ -50,12 +52,12 @@
 - **Die Datenbank ist die einzige Wahrheit.** Alarme, Geofences, Übersicht und
   Vorab-Reminder sind abgeleitet und werden jederzeit aus der DB neu aufgebaut
   (`sync` bei Änderung, Alarm, App-Start, Neustart, Update, Zeitänderung).
-- **Keine langsame I/O im Befehl** (seit V1.3b0.2, Review-Lauf 3 E6). Alarm- und
-  Vorab-Änderungen sammelt `EngineContext` während des Befehls und führt sie erst nach dem
-  Speichern aus; bei einem Rollback fallen sie weg. Braucht ein Befehl den Ort, wirft
-  `EngineContext.isAt` beim ersten Mal `PositionNeeded`: Die Engine rollt zurück, fragt
-  `LocationPort.isAt` außerhalb der Transaktion und startet den Befehl neu, jetzt mit dem
-  Ergebnis. Höchstens eine Prüfung pro Ort und Befehl.
+- **Keine langsame I/O im Befehl.** Alarm- und Vorab-Änderungen sammelt `EngineContext`
+  während des Befehls und führt sie erst nach dem Speichern aus; bei einem Rollback fallen
+  sie weg. Braucht ein Befehl den Ort, wirft `EngineContext` beim ersten Mal
+  `PositionNeeded`: Die Engine rollt zurück, fragt `LocationPort.check` außerhalb der
+  Transaktion und startet den Befehl neu, jetzt mit dem Ergebnis. Höchstens eine Prüfung
+  pro Ort und Befehl. Am Ende jedes Befehls plant `planChecks()` die Prüf-Alarme der Orte (6.).
 - Zeit kommt in `:core` immer über `Clock` (in `:app` teils direkt). Keine DI-Bibliothek:
   ein kleiner Container (`AppGraph`). Engine-Aufrufe laufen nacheinander (`withEngine`).
 
@@ -69,8 +71,9 @@ Paket `com.avlreminder`.
 | Bereich | Felder |
 |---|---|
 | Grunddaten | `title`, `why`, `character` (`OVERCOME` Überwindung / `DOCUMENT` Dokumentation), `strictness` (`RELAXED` / `NORMAL` / `STRICT`), `active`, `archivedAt`, `createdAt` |
-| Takt | `schedule` (2.2), `arrival` (Ort, 6.) |
+| Takt | `schedule` (2.2), `arrival` (Ort, Vorlauf, Puffer, Prüfabstand, 6.) |
 | Ziel | `goal`, `minimum`, `minimumLimitPerWeek`, `weeklyGoal` (Ziel, höchstens, mindestens) |
+| Sitzung | `session: SessionSpec?` (Nachfrage-Intervall und -Strenge, Ziel- und Minimum-Dauer, maximale Dauer, Reaktionszeit; 3.1) |
 | Nachweis | `proof: ProofSpec` (5.) |
 | Alarm | `postponeLimit`, `snoozeMinutes` (1–2 Werte), `ignoreDnd` |
 | Inhalt | `checklist`, `motivationAudio` |
@@ -86,36 +89,40 @@ Paket `com.avlreminder`.
 | `OnArrival` | – | einmalig, wenn ich zuhause bin |
 | `Deadline` | Frist, Tage, Fenster von–bis, Intervall | bis Fr 12:00, Mo–Fr 9–17, alle 60 min |
 
-**Mehrmals täglich (VS1, V1.3a):** Weiterhin eine offene Fälligkeit pro Reminder; nach
+**Mehrmals täglich (VS1):** Weiterhin eine offene Fälligkeit pro Reminder; nach
 dem Abschluss folgt die nächste Uhrzeit desselben Tages, sonst der nächste Tag. Ein
 Termin gilt als **verpasst, sobald der nächste beginnt** (spätestens an der
 Tagesgrenze); ein Alarm bis 2 min zu spät klingelt noch den gerade begonnenen Termin.
 Wird das erst später bemerkt (Handy aus), folgt der Termin, der heute zuletzt begonnen
-hat, und klingelt sofort (`ScheduleRules.currentTime`, seit V1.3a3).
+hat, und klingelt sofort (`ScheduleRules.currentTime`).
 *Später* und *Verschieben* nur bis vor den nächsten Termin. Eine Checkliste läuft über
 die Termine, ein Punkt pro Termin (8.). Das Wochenlimit für das *Minimum* zählt Tage
 (`Limits.minimumToday`). Nicht kombinierbar mit Wochenziel und Ankunft (Validierung, das Formular
 blendet beides aus). Vorab erledigen betrifft nur den nächsten Termin.
 
 ### 2.3 Fälligkeit (`Occurrence`)
-`dueAt` (geplant), `currentAt` (aktuell, nach Später/Verschieben), `state`,
-`postponeCount`, `pausedUntil` (Nachweis läuft), `firstProgressAt` (erster
-Checklistenpunkt), `firedAt` (erstes Klingeln, `hasFired`), `awaitsArrival` (wartet nach
-Verschieben auf die Ankunft, 6.), `resolvedAt`, `resolution` (`GOAL`, `MINIMUM`,
-`NO_PROOF`, `SKIPPED`, `MISSED`, `DROPPED`), `note`. `firedAt` und `awaitsArrival` gibt es
-seit V1.3b0.2 (Review-Lauf 3 E5): `PLANNED` allein sagt nicht, ob ein Termin schon
-geklungen hat. Pro Reminder gibt es höchstens **eine offene** Fälligkeit;
-nach dem Abschluss legt die Engine die nächste an.
+| Bereich | Felder |
+|---|---|
+| Zeit | `dueAt` (geplant), `currentAt` (aktuell, nach Später/Verschieben), `postponeCount` |
+| Zustand | `state` (`PLANNED`, `DUE`, `ESCALATING`, `RUNNING`, `DONE`, `CLOSED`), `resolvedAt`, `resolution` (`GOAL`, `MINIMUM`, `NO_PROOF`, `SKIPPED`, `MISSED`, `DROPPED`, `ABORTED`), `note` |
+| Verlauf | `firedAt` (erstes Klingeln, `hasFired`; `PLANNED` allein sagt nicht, ob ein Termin schon geklungen hat), `pausedUntil` (Nachweis läuft), `firstProgressAt` (erster Checklistenpunkt) |
+| Ort | `awaitsArrival` (wartet nach Später/Verschieben auf die Ankunft), `arrivedAt` (erkannte Ankunft im Zeitraum, 6.) |
+| Sitzung | `startedAt` (bleibt nach dem Ende, für die Dauer), `nextCheckAt`, `finalCallAt` (wann der letzte Reminder hörbar kam; 3.1) |
+
+Pro Reminder gibt es höchstens **eine offene** Fälligkeit; nach dem Abschluss legt die
+Engine die nächste an. **Gezählt** (Wochenziel, Minimum-Limit, Statistik, Verlauf) wird
+eine Fälligkeit an `countedAt`: eine Sitzung an ihrem Start, sonst an `resolvedAt`.
 
 ### 2.4 Weitere Tabellen
 | Tabelle | Inhalt |
 |---|---|
-| `event` | unveränderliches Protokoll pro Fälligkeit: `CREATED`, `DUE`, `ESCALATED`, `SNOOZED`, `POSTPONED`, `COMPLETED`, `SKIPPED`, `MISSED`, `MISSED_DETECTED`, `PROOF_STARTED`, `PROOF_ABORTED`, `DROPPED`, `ITEM_DONE`, `DEFERRED`, `WINDOW_CLOSED`, `BLOCKER_ASKED`, `AWAITING_ARRIVAL`, `REOPENED` (Detail: die zurückgenommene Auflösung) |
+| `event` | unveränderliches Protokoll pro Fälligkeit: `CREATED`, `DUE`, `ESCALATED`, `SNOOZED`, `POSTPONED`, `COMPLETED`, `SKIPPED`, `MISSED`, `MISSED_DETECTED`, `PROOF_STARTED`, `PROOF_ABORTED`, `DROPPED`, `ITEM_DONE`, `DEFERRED`, `WINDOW_CLOSED`, `BLOCKER_ASKED`, `AWAITING_ARRIVAL`, `REOPENED` (Detail: die zurückgenommene Auflösung), `ARRIVED` (Detail: wann es klingelt), `STARTED`, `CHECK_ASKED`, `CHECK_ANSWERED`, `FINAL_CALL` (Detail `still`: nicht hörbar), `ABORTED` (Detail: die Auflösung) |
 | `proof` | Foto, Text oder Audio pro Fälligkeit, optional pro Checklistenpunkt (`itemId`) |
 | `checklist_item`, `item_done` | Punkte eines Reminders; erledigte Punkte pro Fälligkeit mit `withProof` |
 | `prep_answer` | Startklar-Antworten, nur anhängen; aktuell ist die neueste pro Frage |
 | `blocker` | Text, angelegt, gelöst am, Herkunft (`STARTKLAR` / `ASKED`), Vorbereitungsaufgabe |
-| `place` | Orte (*Zuhause* und ein weiterer), Radius Standard 150 m; ihre WLANs in `place_wifi` (7.29, Entwurf unten) |
+| `place` | Orte (*Zuhause* und ein weiterer), Radius Standard 150 m |
+| `place_wifi` | Zugangspunkte eines Orts: `bssid`, `ssid` nur zur Anzeige; privat (6.) |
 | `template` | Vorlagen (11.3) |
 | `suggestion` | Verbesserungsvorschläge (11.5), ohne Fremdschlüssel |
 
@@ -132,6 +139,7 @@ PLANNED ──(Zeit/Ankunft)──► DUE ──(keine Reaktion)──► ESCALA
   │  ▲                       │ ▲                         │
   │  │                       │ └─ Nachweis läuft (pausedUntil) ─┘
   │  └─ Später · Verschieben · Rest auf morgen · Fenster zu / Auf morgen (Frist)
+  ├── Ich starte jetzt (auch vorab) ──► RUNNING ──► DONE | CLOSED (ABORTED, MISSED; 3.1)
   ├── Erledigt (auch vorab) ──► DONE (GOAL | MINIMUM | NO_PROOF)
   ├── Ort: nicht da zur Uhrzeit, nie geklungen ──► CLOSED (DROPPED, neutral)
   ├── Ort: nicht da nach Später/Verschieben ──► PLANNED + awaitsArrival ──Ankunft──► DUE
@@ -146,7 +154,7 @@ PLANNED ──(Zeit/Ankunft)──► DUE ──(keine Reaktion)──► ESCALA
   Alarm (Akku, Force-Stop), wird `MISSED_DETECTED` vermerkt und sofort nachgeholt.
 - System-Gründe beim Auslassen (`SkipReasons`): Wochenziel erreicht, pausiert, Takt
   geändert, verworfen, Notaus. Sie zählen nicht als „hängen“ (9.3).
-- **Hat geklungen** (`firedAt`, seit V1.3b0.2): `Fire` und die Ankunft setzen es beim
+- **Hat geklungen** (`firedAt`): `Fire` und die Ankunft setzen es beim
   ersten Klingeln. Ein Termin, der geklungen hat, kann nicht mehr *entfallen* (`Drop`
   wird abgelehnt).
 - **Takt geändert** (`Changes.save`): Ein offener Termin, der nie geklungen hat und nie
@@ -156,7 +164,7 @@ PLANNED ──(Zeit/Ankunft)──► DUE ──(keine Reaktion)──► ESCALA
 - **Fortsetzen** eines pausierten Reminders (`setActive`): Der offene Termin startet neu
   ab der nächsten Fälligkeit (`firedAt`, `awaitsArrival`, `pausedUntil` zurückgesetzt).
   Für die pausierte Zeit werden keine Verpasser nachgemeldet.
-- **Zurücknehmen** (`ReminderEngine.reopen`, V1.3b0.4, Anf. 7.31): `Action.Reopen(at)`
+- **Zurücknehmen** (`ReminderEngine.reopen`, Anf. 7.31): `Action.Reopen(at)`
   macht aus `DONE` oder von Hand `SKIPPED` wieder `PLANNED` mit `currentAt = jetzt + 10 min`
   (`Changes.REOPEN_DELAY`); `postponeCount`, `firedAt` und der Fortschritt einer Checkliste
   aus früheren Haken bleiben, Ereignis `REOPENED`. `Lifecycle.canReopen` sagt, was geht.
@@ -168,8 +176,9 @@ PLANNED ──(Zeit/Ankunft)──► DUE ──(keine Reaktion)──► ESCALA
   (`deleteItemsDone`), einen dabei gelösten Blocker der Hauptaufgabe wieder öffnen,
   `syncReminder`. Nachweise bleiben; `Limits.proofCarried` (letztes `REOPENED` mit Detail
   `GOAL`/`MINIMUM`) lässt das nächste *Erledigt* ohne neuen Nachweis als Ziel zählen, die
-  Alarm-Ansicht überspringt dann den Nachweis (`AlarmView.proofCarried`).
-- **Vorab verschieben und auslassen** (V1.3b0.4, Anf. 7.32): `Postpone` und `Skip` gelten
+  Alarm-Ansicht überspringt dann den Nachweis (`AlarmView.proofCarried`). Eine
+  *abgebrochene* Sitzung läuft nach dem Zurücknehmen weiter (3.1).
+- **Vorab verschieben und auslassen** (Anf. 7.32): `Postpone` und `Skip` gelten
   auch für einen geplanten Termin, der noch nicht geklungen hat. `Occurrence.rangOrMoved`
   (geklungen oder verschoben) ersetzt `hasFired` bei der Ortsentscheidung: Eine Ankunft vor
   der verschobenen Zeit lässt ihn nicht klingeln, zur Zeit nicht da → `AwaitArrival` statt
@@ -180,10 +189,72 @@ PLANNED ──(Zeit/Ankunft)──► DUE ──(keine Reaktion)──► ESCALA
   mit +30 min/+1/+2 Std ab `currentAt`, nur vor `AlarmView.missedAt`; bei *streng* mit
   Rückfrage.
 - **Rückgängig in der App** (`alarm/Undo.kt`): Nach *Erledigt*/*Auslassen* im Alarm oder
-  in der Benachrichtigung eine stille Benachrichtigung mit *Rückgängig*, eigene Id,
+  in der Benachrichtigung, ebenso nach *Abbruch* einer Sitzung aus Benachrichtigung oder
+  Uhr, eine stille Benachrichtigung mit *Rückgängig*, eigene Id,
   `setTimeoutAfter(60 s)`; das Ergebnis kommt als zweite stille Benachrichtigung. Auf
-  *Heute* unter *Erledigt* *Zurücknehmen* mit Rückfrage, Ergebnis als Toast. Keine
-  Migration (Ereignistypen stehen als Name in der Datenbank).
+  *Heute* unter *Erledigt* *Zurücknehmen* mit Rückfrage, Ergebnis als Toast.
+
+### 3.1 Sitzung mit Timer (Anf. 7.11, 7.20 V2)
+
+```
+PLANNED/DUE/ESCALATING ─Ich starte jetzt─► RUNNING ─Fertig──────► Nachweis? ─► DONE (GOAL)
+                                            │ ▲   ├─Teilschritt─────────────► DONE (MINIMUM)
+                              Noch dran ────┘ │   ├─Abbruch─────────────────► CLOSED (ABORTED)
+                       Nachfrage alle x min ──┘   └─max. Dauer → letzter Reminder
+                                                        └─ keine Antwort ─► MISSED | MINIMUM | ABORTED
+```
+
+- **Modell:** `SessionSpec` pro Reminder (aus = keine Sitzung): Nachfrage alle 10 min
+  (2–120), Strenge der Nachfragen Standard *locker*, Ziel- und Minimum-Dauer optional,
+  maximale Dauer 90 min, Reaktionszeit des letzten Reminders 5 min. Die Fälligkeit wird
+  `RUNNING` mit `startedAt` und `nextCheckAt` (`Sessions`, Aktionen `Start`, `StillOn`,
+  `Abort`, `FinalCall`, `EndSession`).
+- **Start:** *Ich starte jetzt* beendet die Eskalation sofort; auch **vorab**, dann
+  entfällt der Alarm wie beim Vorab-Erledigen.
+- **Nachfragen** sind Alarme mit eigener Strenge; unbeantwortet fragen sie nach
+  min(Intervall, 10 min) erneut, wie die Runden eines Alarms. Nie nach der maximalen
+  Dauer; eine danach gefundene (Handy aus) ist der letzte Reminder. Vorschlag (D4):
+  Ziel-Dauer erreicht → *Fertig*; ohne Ziel und Minimum-Dauer erreicht → *Teilschritt*;
+  sonst *Noch dran*. Nur ein Vorschlag, nichts ist gesperrt.
+- **Teilschritt** nur mit Minimum (Text oder Dauer) und solange das Minimum-Limit der
+  Woche nicht aufgebraucht ist; sonst fehlt der Knopf und ein Hinweis sagt warum.
+- **Ende ohne Antwort** (`EndSession`, nach der Reaktionszeit): *Minimum*, wenn
+  Checklistenpunkte erledigt sind; unter Notaus *abgebrochen* (ohne letzten Alarm); sonst
+  *verpasst*. Der Alarm räumt die Benachrichtigung der Sitzung ab.
+- **Abbruch** zählt nicht als Erfolg und bricht die Serie wie *verpasst*. Im Bildschirm mit
+  Rückfrage; aus Benachrichtigung oder Uhr ohne, aber 60 s zurücknehmbar (3.): Die Sitzung
+  läuft mit dem alten Start weiter, die nächste Nachfrage nach dem Intervall; nach der
+  maximalen Dauer geht das nicht mehr.
+- **Dauer** = `resolvedAt − startedAt`. Der Schnitt (D6) nimmt die letzten 10 mit Ziel oder
+  Minimum abgeschlossenen Sitzungen; *Heute* zeigt bei erledigten die Dauer. Eine Sitzung
+  zählt in Tag und Woche ihres Starts (`countedAt`, 2.3).
+- **`RUNNING` gegen die anderen Regeln** (D7). Grundsatz: `missedAt` gilt nicht; eine
+  Sitzung endet nur über eine Antwort oder die maximale Dauer.
+
+  | Ereignis während `RUNNING` | Verhalten |
+  |---|---|
+  | Tagesgrenze | nicht verpasst; die Sitzung zählt für ihren Starttag |
+  | nächster Termin (*mehrmals täglich*) | wartet; danach folgt der nächste noch nicht begonnene Termin |
+  | Fensterende / Frist abgelaufen | kein `CloseWindow`, kein `Miss`; die Sitzung läuft weiter |
+  | Notaus | Nachfragen still; maximale Dauer gilt, danach Minimum bzw. `ABORTED` ohne letzten Alarm |
+  | „Nicht stören“ | Nachfragen still; die Reaktionszeit des letzten Reminders beginnt erst ohne DND (`FINAL_CALL` mit Detail `still`) |
+  | Pausieren, Archivieren, Takt ändern | abgelehnt, die App sagt „Läuft gerade“; Titel, Warum, Ziel und Minimum darf sie ändern |
+  | Schnittstelle (`save`, `setActive`, `archive`) | abgelehnt wie beim klingelnden Reminder (15.) |
+  | anderer Reminder klingelt | sein Alarm läuft; die Sitzung läuft mit ihrer Benachrichtigung weiter |
+  | Handy aus / Neustart | `sync` plant die nächste Nachfrage; war die maximale Dauer schon um, gilt sofort der letzte Reminder |
+
+- **Android:** `SessionService` (Foreground-Service `systemExempted`; Sitzungen dauern zu
+  lange für `shortService`) mit einer laufenden Benachrichtigung je Sitzung: Chronometer,
+  am Handy höchstens drei Knöpfe (*Noch dran*, die vorgeschlagene Antwort zum Beenden,
+  *Abbruch*), auf der Uhr alle vier (`WearableExtender`, zweite spiegelbare
+  Benachrichtigung, weil die laufende nicht auf die Uhr kommt). *Fertig* dort nur ohne
+  Foto-, Text- oder Audio-Nachweis. Der Dienst misst nichts selbst: Die App aktualisiert
+  ihn nach jedem Befehl aus den laufenden Fälligkeiten; fällt er aus, bleibt eine normale
+  laufende Benachrichtigung. Nachfragen und letzter Reminder kommen über den `AlarmPort`
+  und den `AlarmService` (Alarm-Ansicht im Modus *Nachfrage*), neben dem Sitzungsdienst
+  mit eigener Benachrichtigungs-Id. Sitzungsansicht mit großem Timer, erreichbar aus *Heute*
+  (*läuft seit …*) und über die Benachrichtigung.
+- Vorlagen speichern die Sitzung noch nicht.
 
 ## 4. Alarm und Eskalation
 
@@ -197,9 +268,9 @@ PLANNED ──(Zeit/Ankunft)──► DUE ──(keine Reaktion)──► ESCALA
   (`REPEAT`) nach dem letzten Klingeln (`DUE`, `ESCALATED`), abgehakten Punkt oder
   *Zurücknehmen*, bis zur Reaktion; ein `sync` verschiebt sie nicht, eine verpasste Runde
   (Handy aus) klingelt sofort. Während „Nicht stören“ laufen die Runden still weiter.
-- **Mehrere gleichzeitig** (Anf. 7.3, geplant mit V1.3b): ein Vollbild zur Zeit, der
-  nächste mit *+1 wartet*; seine Runden laufen weiter. Heute überschreibt der zweite
-  Alarm den ersten im `AlarmService`.
+- **Mehrere gleichzeitig:** Der zweite Alarm überschreibt den ersten im `AlarmService`;
+  die Runden des ersten laufen weiter. *Ein Vollbild zur Zeit, +1 wartet* (Anf. 7.3) ist
+  noch offen ([stand.md](stand.md)).
 - **Tagesgrenze:** Ohne Reaktion gilt die Fälligkeit an `dayEnd` ihres Tages als verpasst
   (liegt sie danach, am Folgetag). Fristen haben eigene Regeln (7.), mehrere Uhrzeiten
   am Tag auch (2.2).
@@ -211,10 +282,10 @@ PLANNED ──(Zeit/Ankunft)──► DUE ──(keine Reaktion)──► ESCALA
   nächste Alarm liegt am Pausenende (bzw. an der Tagesgrenze). Bleibt eine Fälligkeit
   bis zur Tagesgrenze offen, wird sie *ausgelassen* mit System-Grund *Notaus* (bricht
   keine Serie, zählt nicht als *hängen*), aber nur, wenn die Pause vor ihrer Fälligkeit
-  begann (`alarmsPausedFrom`, `excusedByPause`, seit V1.3a3); sonst *verpasst*. Eine
+  begann (`alarmsPausedFrom`, `excusedByPause`); sonst *verpasst*. Eine
   verlängerte Pause behält ihren Beginn. Ein laufender Alarm stoppt beim Pausieren.
   Endet die Pause, klingelt eine offene Fälligkeit sofort, auch beim Einschalten von Hand
-  (`ReminderEngine.resume`, seit V1.3a3).
+  (`ReminderEngine.resume`).
   Fristen sind hart: Eine Frist, die während der Pause abläuft, ist *verpasst* und bleibt
   *überfällig* wie ohne Pause (7.); der Notaus macht sie nicht neutral (Anf. 7.2, PS7).
 - **Später** (+x min): Knöpfe pro Reminder; Knöpfe über die Tagesgrenze werden
@@ -242,29 +313,78 @@ PLANNED ──(Zeit/Ankunft)──► DUE ──(keine Reaktion)──► ESCALA
 - Fotos (CameraX) in `filesDir/proofs/`, Audio (`MediaRecorder`, AAC) in
   `filesDir/audio/` – nur im App-Speicher, nicht in der Galerie.
 
-## 6. Ort: Ankunft zuhause
+## 6. Ort: Ankunft im Zeitraum (Anf. 7.29)
 
-- `Reminder.arrival = Arrival(placeId, whenAway)`: **Der Takt bestimmt den Tag, die
-  Ankunft den Moment.** Die Uhrzeit des Takts ist die Rückfallzeit; `whenAway` ist
-  *entfällt* (`DROP`, Standard) oder *trotzdem klingeln* (`RING`). Nicht bei Fristen.
-- Ankunft klingelt nur die heutige, noch geplante Fälligkeit vor ihrer Uhrzeit.
-- **Geofence** *Dwell* pro benötigtem Ort, Verweildauer 1/3/5/10 min (Standard 3); ohne
-  „Immer erlauben“ zählt nur die Uhrzeit. Neu registriert, wenn Orte oder Verweildauer
-  sich ändern und nach Neustart.
-- **Aktive Prüfung** (ein frischer Fix, höchstens 8 s) zur Rückfallzeit bei `DROP`:
-  sicher drin → Alarm, sicher draußen → `DROPPED`, unklar → Alarm. Bei *Wenn ich zuhause
-  bin* nach dem Speichern, nach dem Setzen von *Zuhause* und nach Neustart/Update. Die
-  Prüfung läuft außerhalb der Transaktion (1., `PositionNeeded`).
-- **Nach Später oder Verschieben** (Anf. 7.29 OZ5, seit V1.3b0.2): Hat der Termin schon
-  geklungen und ist man zur neuen Zeit nicht sicher da (*weg* oder *unklar*), wird er nicht
-  `DROPPED`, sondern wartet (`AwaitArrival`, `awaitsArrival`, Ereignis
-  `AWAITING_ARRIVAL`). Die Ankunft lässt ihn klingeln; der Alarm liegt an der
-  Tagesgrenze, dort wird er *verpasst*. *Heute* zeigt ihn unter *Wenn du zuhause bist*
-  („verschoben – klingelt bei Ankunft, sonst heute verpasst“). `checkPlaces` prüft
-  wartende Termine mit, seit V1.3b0.6 auch die Prüf-Alarme des Orts (Entwurf 7.29 Z.8).
-- `AndroidGeofences` merkt sich im Prozess, was registriert ist. Meldet ein Geofence
-  `GEOFENCE_NOT_AVAILABLE` (Standort aus), vergisst die App das und registriert neu; klappt
-  das nicht, versucht es der nächste Sync (seit V1.3b0.6).
+- `Reminder.arrival = Arrival(placeId, whenAway, leadMinutes, bufferMinutes, checkMinutes)`:
+  **Der Takt bestimmt den Tag, die Ankunft den Moment.** Die Uhrzeit des Takts ist die
+  *späteste Uhrzeit*; `whenAway` ist *entfällt* (`DROP`, Standard) oder *trotzdem
+  klingeln* (`RING`). Nicht bei Fristen und nicht mit mehreren Uhrzeiten (2.2). Orte:
+  *Zuhause* und ein weiterer (`place`), je mit Radius und WLANs (`place_wifi`).
+- **Zeitraum** = [`currentAt` − Vorlauf, `currentAt`] (Vorlauf Standard 90 min, bis 12 h),
+  solange `arrivedAt` leer ist. Eine erkannte Ankunft im Zeitraum (`ArrivalWindow.decide`,
+  Ereignis `ARRIVED`) setzt `arrivedAt` und legt `currentAt` auf Ankunft + Puffer (0–30,
+  Standard 5 min); liegt das schon hinter jetzt, klingelt es sofort. Kurz wieder weg ändert
+  daran nichts. *Später*, *Verschieben*, *Rest auf morgen*, Fenster schließen,
+  Zurücknehmen, Klingeln und Bearbeiten leeren `arrivedAt`.
+
+  | Wann | da | klar weg | unklar |
+  |---|---|---|---|
+  | Ankunft vor dem Zeitraum (Geofence, WLAN) | ignoriert, Diag „too early“ | – | – |
+  | erste Prüfung des Zeitraums | klingelt zur spätesten Uhrzeit (F2) | weiter prüfen | weiter prüfen |
+  | im Zeitraum (Prüfung, WLAN, Geofence) | `arrivedAt`, Alarm nach dem Puffer | weiter prüfen | weiter prüfen |
+  | späteste Uhrzeit (Alarm des Termins, mit Rückfall) | klingelt | `DROP`: entfällt (F1); `RING`: klingelt | klingelt |
+  | nach Später/Verschieben (`awaitsArrival`) | Alarm nach dem Puffer | weiter prüfen | weiter prüfen; Tagesgrenze → verpasst |
+
+- **F2:** Findet die Prüfung, die für den Beginn des Zeitraums geplant war, einen schon da
+  (Homeoffice), klingelt es zur spätesten Uhrzeit, auch wenn Android sie verspätet zustellt:
+  Der Prüf-Alarm trägt seine geplante Zeit (`plannedAt`). Eine Verbindung oder ein
+  Geofence ist dagegen eine echte Ankunft (Puffer).
+- **Prüfungen** im Raster Beginn + k·Prüfabstand (15–30, Standard 20 min), jeweils vor der
+  spätesten Uhrzeit; die späteste Uhrzeit prüft der Alarm des Termins selbst. Wartende
+  verschobene Termine prüfen ab `currentAt` bis zur Tagesgrenze. Mehrere Reminder am Ort:
+  Die früheste fällige Prüfung gilt. `planChecks()` setzt am Ende jedes Befehls je Ort einen
+  Prüf-Alarm (`PlaceAlarmPort`) oder löscht ihn: die erste Prüfung eines Zeitraums exakt
+  auch im Doze (`setExactAndAllowWhileIdle`, sie entscheidet F2), die übrigen `setWindow`
+  2 min. `PlaceCheckReceiver` ruft `onPlaceCheck`; das Diagnose-Log nennt eine Verspätung
+  (`late=…min`).
+- **Ortsergebnis** (`PlaceCheck` mit Quelle und Alter der Suche; `WifiLocation` aus dem
+  `WifiPort`): verbunden mit einer BSSID des Orts → `AT`; Ort ohne WLAN oder keine Suche →
+  `UNKNOWN`; WLAN des Orts nicht in einer Suche ≤ 10 min → `AWAY`, älter → `UNKNOWN`. Nur
+  zur spätesten Uhrzeit (`check(fallback = true)`) fällt `UNKNOWN` auf die aktive Prüfung
+  zurück (Geofence-Stand, ein frischer Fix, höchstens 8 s): sicher drin → Alarm, sicher
+  draußen → `DROPPED`, unklar → Alarm. Kein GPS (Anf. 7.30, später). Die Prüfung läuft
+  außerhalb der Transaktion (1., `PositionNeeded`).
+- **Vorlauf 0** = kein Zeitraum: kein Puffer, keine Prüfungen; die Ankunft klingelt die
+  heutige, noch geplante Fälligkeit vor ihrer Uhrzeit sofort. *Wenn ich ankomme*
+  (`OnArrival`) klingelt bei Ankunft sofort; eine WLAN-Verbindung zählt wie eine Ankunft.
+- **Nach Später oder Verschieben** (OZ5): Hat der Termin schon geklungen oder ist er
+  verschoben (`rangOrMoved`) und ist man zur neuen Zeit nicht sicher da (*weg* oder
+  *unklar*), wird er nicht `DROPPED`, sondern wartet (`AwaitArrival`, `awaitsArrival`,
+  Ereignis `AWAITING_ARRIVAL`). Die Ankunft lässt ihn nach dem Puffer klingeln; sein Alarm
+  liegt an der Tagesgrenze, dort wird er *verpasst*. *Heute* zeigt ihn unter *Wenn du
+  zuhause bist* („verschoben – klingelt bei Ankunft, sonst heute verpasst“).
+- **WLAN:** `AndroidWifi.watch` registriert bei jedem Prozessstart einen `NetworkCallback`
+  mit PendingIntent auf `WifiReceiver` (ruft `onWifi`). Android meldet dabei eine schon
+  bestehende Verbindung erneut; `WifiConnections` merkt sich das Handle der zuletzt
+  gemeldeten Verbindung (`Network.networkHandle`), und nur eine neue Verbindung zählt als
+  Ankunft. Suchergebnisse nur über `getScanResults`, nie `startScan`. BSSID und SSID gibt es
+  nur mit Standort-Berechtigung, im Hintergrund mit „Immer erlauben“; eine geschwärzte
+  BSSID gilt als keine.
+- **Geofence** *Dwell* pro benötigtem Ort, Verweildauer 1/3/5/10 min (Standard 3, nur für
+  ihn); ohne „Immer erlauben“ zählt nur die Uhrzeit. Neu registriert, wenn Orte (nur Kreis,
+  nicht WLAN) oder Verweildauer sich ändern und nach Neustart. `AndroidGeofences` merkt sich
+  im Prozess, was registriert ist. Meldet ein Geofence `GEOFENCE_NOT_AVAILABLE` (Standort
+  aus), vergisst die App das und registriert sofort neu (`GeofenceReceiver.meaning`,
+  `lost`); klappt das nicht, versucht es der nächste Sync.
+- **Oberfläche:** Formular *Bei Ankunft* mit Ortswahl (ab zwei Orten), *Ankunft zählt ab*
+  30/60/90/120 min/*andere…* und *entfällt*/*trotzdem klingeln*; Puffer und Prüfabstand
+  unter *Feineinstellungen*. Einstellungen *Orte*: *Hier festlegen* übernimmt Standort und
+  das verbundene WLAN mit allen Zugangspunkten derselben SSID aus der letzten Suche.
+  *Heute*: „ab 18:00 bei Ankunft zuhause, sonst 19:30“ bzw. „angekommen – klingelt 18:35“.
+- **Privat:** WLAN-Namen und BSSIDs bleiben auf dem Handy. Das Diagnose-Log nennt je
+  Prüfung Ort-Id, Quelle, Ergebnis und Alter der Suche, keine Koordinaten und keine WLANs;
+  die Claude-Schnittstelle kennt Vorlauf, Puffer und Prüfabstand, aber keine WLANs; der
+  Testdaten-Export ersetzt SSIDs und BSSIDs.
 
 ## 7. Fristen
 
@@ -284,7 +404,7 @@ um …*, Fenstertage, *von / bis*, Intervall (Standard Mo–Fr 9–17, 60 min).
 ## 8. Checklisten
 
 - Bis 20 Punkte. Punkte werden einzeln abgehakt (`CheckItem`), auch vorab und jederzeit
-  aus *Heute* und dem Reminder (Anf. 7.13 C8, V1.3b0.1). Der letzte
+  aus *Heute* und dem Reminder (Anf. 7.13 C8). Der letzte
   schließt: `GOAL`, wenn jeder Punkt seinen Nachweis hat, sonst `NO_PROOF`. *Alles
   erledigt* schließt mit einem Nachweis für den Rest; *Minimum* schließt mit `MINIMUM`,
   ohne die Punkte abzuhaken.
@@ -292,18 +412,20 @@ um …*, Fenstertage, *von / bis*, Intervall (Standard Mo–Fr 9–17, 60 min).
   nächsten Tag zur selben Uhrzeit wieder (zählt nicht als Verschieben); sonst verpasst.
   *Rest auf morgen* im Alarm ist nach einem Punkt am selben Tag frei, sonst eine
   Verschiebung.
-- **Mehrere Uhrzeiten am Tag (V1.3a3):** Die Liste läuft über die Termine. Ein
+- **Mehrere Uhrzeiten am Tag:** Die Liste läuft über die Termine. Ein
   abgehakter Punkt schließt den Termin (`GOAL` bzw. `NO_PROOF` nach dem Nachweis dieses
   Punkts), der nächste Termin zeigt nur die offenen Punkte. Erledigt ist, was seit dem
   letzten vollständigen Durchlauf abgehakt wurde (`Checklists.round` über
-  `itemsDoneOfReminder`); danach beginnt die Liste von vorn. Ein Termin ohne Punkt ist
+  `itemsDoneOfReminder`, für *Heute* `Checklists.doneByOccurrence`); danach beginnt die Liste von vorn. Ein Termin ohne Punkt ist
   *verpasst*, kein *Rest auf morgen*. Im Alarm: „Erledigt: ‹nächster Punkt›“, „Danach:
   Rest um …“, klein *Alles auf einmal erledigt*.
 - *Nach Erledigung* zählt ab dem **ersten** erledigten Punkt (`firstProgressAt`).
 - Benachrichtigung: „✓ nächster Punkt“ nur ohne Nachweis; danach eine stille
   Benachrichtigung mit dem nächsten Punkt.
 - Bearbeiten: Gebliebene Punkte behalten Id und Fortschritt; entfernte nehmen ihren
-  Fortschritt mit, ihre Nachweise bleiben.
+  Fortschritt mit, ihre Nachweise bleiben. Punkte mit fremder Id werden neu angelegt; eine
+  unbekannte Reminder-Id speichert nichts (`ReminderRepository.saveReminder`, für Fake und
+  Room mit denselben `RepositoryCases` geprüft, 14.).
 
 ## 9. Startklar, Blocker und Nachfragen
 
@@ -340,7 +462,7 @@ Fälligkeit *Was hält dich gerade ab?* (`BLOCKER_ASKED`). Antwort → Blocker (
 ### 10.1 Wochenziel
 `WeeklyGoal(target, max, minimum)`, nur bei *täglich* und *Wochentage*;
 `minimum ≤ target ≤ max ≤ Angebotstage`. Woche Mo–So in der Zone des Geräts.
-- Zählen: *Ziel* und *Minimum*, nicht *ohne Nachweis*; maßgeblich ist `resolvedAt`.
+- Zählen: *Ziel* und *Minimum*, nicht *ohne Nachweis*; maßgeblich ist `countedAt` (2.3).
 - **Ziel erreicht:** weitere Angebote nur als stille Benachrichtigung; offen bis zur
   Tagesgrenze → *ausgelassen – Wochenziel erreicht*.
 - **Höchstens erreicht:** nächstes Angebot erst nächste Woche.
@@ -371,8 +493,9 @@ Fälligkeit *Was hält dich gerade ab?* (`BLOCKER_ASKED`). Antwort → Blocker (
 ### 11.1 Bildschirme
 Klickbare Mocks (Stand V1.0, inzwischen veraltet; maßgeblich ist die App):
 https://claude.ai/artifact/PXA9YgWi8XoHupYnN7Z3cS
-- **Heute:** Jetzt fällig, Überfällig (Fristen), Später heute (mit *Erledigen* = vorab),
-  Wenn du zuhause bist, Diese Woche (Wochenziele, knappe hervorgehoben), Erledigt.
+- **Heute:** Läuft (Sitzungen), Jetzt fällig, Überfällig (Fristen), Später heute (mit
+  *Erledigen* = vorab), Wenn du zuhause bist, Diese Woche (Wochenziele, knappe
+  hervorgehoben), Erledigt.
 - **Verlauf:** Erledigungen nach Tagen mit Ergebnis und Nachweisen; „vor dem Reminder
   erledigt“ aus `resolvedAt < dueAt`.
 - **Reminder:** Gruppen *aktiv*, *Pausiert*, *Abgeschlossen* (archiviert oder ein
@@ -384,8 +507,10 @@ https://claude.ai/artifact/PXA9YgWi8XoHupYnN7Z3cS
   Nachweis, Warum und Botschaft, Startklar, Feineinstellungen). Zahlen als Chips plus
   *andere…*.
 - **Alarm (Vollbild, immer dunkel):** Titel, Warum, Botschaft, Startklar, Blocker,
-  Woche, Ziel/Minimum, Checkliste; Erledigt, Minimum, Blocker gelöst, Rest auf morgen,
-  Auf morgen, Später, Verschieben, Auslassen; Nachweis als eigener Schritt.
+  Woche, Ziel/Minimum, Checkliste; Ich starte jetzt, Erledigt, Minimum, Blocker gelöst,
+  Rest auf morgen, Auf morgen, Später, Verschieben, Auslassen; Nachweis als eigener
+  Schritt. Als *Nachfrage* einer Sitzung die Antworten statt Erledigt/Später.
+- **Sitzung:** großer Timer, die vier Antworten, die vorgeschlagene hervorgehoben (3.1).
 - **Einstellungen:** Vorschläge, Darstellung, Alarmzeiten, Nachfragen, Vorlagen,
   Übersicht, Zuhause, Berechtigungen. Zahnrad auf allen Tabs.
 
@@ -394,7 +519,7 @@ https://claude.ai/artifact/PXA9YgWi8XoHupYnN7Z3cS
   Benachrichtigung mit denselben Aktionen für die Uhr (Kanal *Alarm auf der Uhr*, ohne
   Ton), die laufende ist `setLocalOnly`.
 - **Übersicht:** stille Benachrichtigung morgens (heute) und abends (Rückblick,
-  Wochenziele, morgen; jede Uhrzeit eines Reminders einzeln, Anf. O1 seit V1.3b0.1),
+  Wochenziele, morgen; jede Uhrzeit eines Reminders einzeln, Anf. O1),
   Standard 7:30 und 20:30, einzeln *aus*, Sa–So mit eigenen
   Zeiten (VS2, derselbe Schalter wie bei den Alarmzeiten). Inexakter Alarm
   (`setWindow`, 10 min), Inhalt beim Auslösen aus der DB.
@@ -404,6 +529,8 @@ https://claude.ai/artifact/PXA9YgWi8XoHupYnN7Z3cS
 - **Vorab-Reminder (T6, S6):** *am Vorabend* (Uhrzeit) oder *x min vorher*, nicht bei
   *wenn ich zuhause bin*. Stiller Kanal, inexakt (`setWindow`, 5 min), mit erstem Schritt
   und offenen Blockern; entfällt, wenn schon erledigt. Tipp öffnet den Reminder.
+- **Sitzung:** laufende Benachrichtigung des `SessionService` und eine spiegelbare für die
+  Uhr (3.1).
 - **Widget** (Glance, folgt dem System-Modus): *+ Reminder* und nächste Fälligkeit.
 
 ### 11.3 Vorlagen
@@ -438,11 +565,11 @@ umgesetzt / verworfen. Liste in den Einstellungen, *Teilen* als Markdown.
 
 | Thema | Lösung |
 |---|---|
-| Alarm | `setAlarmClock()` für normal/streng, `setExactAndAllowWhileIdle()` für locker; Übersicht und Vorab-Reminder mit `setWindow()` |
-| Dauer-Alarm | Foreground-Service Typ `systemExempted` |
+| Alarm | `setAlarmClock()` für normal/streng, `setExactAndAllowWhileIdle()` für locker; Übersicht und Vorab-Reminder mit `setWindow()`; Prüf-Alarme der Orte exakt bzw. `setWindow()` (6.) |
+| Dauer-Alarm, Sitzung | Foreground-Services Typ `systemExempted` (`AlarmService`, `SessionService`) |
 | Vollbild | Full-Screen-Intent + Activity mit `showWhenLocked`/`turnScreenOn` |
 | Neuaufbau | `sync` bei Änderung, Alarm, App-Start, `BOOT_COMPLETED`, `MY_PACKAGE_REPLACED`, Zeit-/Zonenänderung |
-| Ort | Play-Services Geofencing (Dwell), Fused Location für die aktive Prüfung |
+| Ort | WLAN (`NetworkCallback` mit PendingIntent, letzte Suchergebnisse), Play-Services Geofencing (Dwell), Fused Location für die aktive Prüfung |
 | Berechtigungen | Seite in den Einstellungen, Warnung auf *Heute*: Benachrichtigungen, Vollbild, Akku, Kamera, Mikrofon; Standort „Immer“ und DND-Ausnahme nur, wenn ein Reminder sie braucht |
 
 ## 13. Daten, Migration, Diagnose
@@ -457,46 +584,55 @@ umgesetzt / verworfen. Liste in den Einstellungen, *Teilen* als Markdown.
   wieder ein – sonst löscht das `DROP TABLE` alle abhängigen Zeilen. Migration 5→6 übernimmt
   die neueste Antwort auf Frage 3 als Blocker. Migration 6→7: `reminder.moreTimes` und
   `template.moreTimes` (weitere Uhrzeiten als Minuten, z. B. `780,1200`; die erste bleibt
-  in `timeMinutes`), `reminder.hintQuietUntil`. Migration 7→8 (V1.3b0.2):
+  in `timeMinutes`), `reminder.hintQuietUntil`. Migration 7→8:
   `occurrence.firedAt` (aus dem ersten `DUE`-Ereignis nachgetragen) und
-  `occurrence.awaitsArrival`.
+  `occurrence.awaitsArrival`. Migration 8→9: `reminder.arrivalLead`/`arrivalBuffer`/
+  `arrivalCheck` mit den Standardwerten (bestehende Ankunfts-Reminder bekommen den
+  Zeitraum, *Heute* zeigt einmal einen Hinweis), `occurrence.arrivedAt`, Tabelle
+  `place_wifi`. Migration 9→10: `reminder.session…` (leer = keine Sitzung),
+  `occurrence.startedAt`/`nextCheckAt`/`finalCallAt`. Ereignistypen und Auflösungen stehen
+  als Name in der Datenbank; neue brauchen keine Migration.
 - **Einstellungen** (DataStore): Wochenend-Zeiten als eigene Schlüssel (fehlen = wie
   Mo–Fr), `alarmsPausedUntil` und `alarmsPausedFrom` in Millisekunden (fehlt = keine
-  Pause bzw. Beginn unbekannt).
+  Pause bzw. Beginn unbekannt), `claudeAccess` (1 = Schnittstelle für Claude an, Kap. 15).
 - **Backup vor jeder Migration** (Schutz gegen Datenverlust beim Update, kein
   Nutzer-Backup, Anf. 8.4) per `VACUUM INTO` nach
   `filesDir/backup/avlreminder-v<alt>-<Zeit>.db`; scheitert es, startet die App trotzdem.
+- **Beschädigte Datenbank:** Die App löscht sie nie (anders als Androids Standard).
+  `KeepDamaged` lässt die Datei stehen, nur die Abfrage auf der kaputten Seite scheitert;
+  die Rohdateien kommen einmal am Tag nach `filesDir/backup/beschaedigt-<Tag>/` zur Rettung.
 - **Diagnose-Log** (`Diag`): logcat-Tag `AvlDiag` und `files/diag/diag.log` (rotiert bei
   512 KB). Zeiten, IDs, Titel, Zustände, Berechtigungen; keine Nachweis-Inhalte, keine
   Positionen. Titel nur in der Entwicklungsphase; vor einem offiziellen Release
   werden sie entfernt (Entscheidung 2026-11-03).
-- **Einstellungen** außerdem: `claudeAccess` (1 = Schnittstelle für Claude an, 15).
 - Alle Daten bleiben auf dem Gerät; nur das Cloud-Backup bringt sie, wenn es
-  eingeschaltet ist, Ende-zu-Ende verschlüsselt zum Backend (Anf. 8.4,
-  [backup-entwurf.md](backup-entwurf.md)).
+  eingeschaltet ist, Ende-zu-Ende verschlüsselt zum Backend (Anf. 8.4, 16.).
 
 ## 14. Tests und Qualität
 
 | Bereich | Test-Art | Ziel |
 |---|---|---|
-| `:core` | JUnit, Fake-Clock, Fake-Repository | Kover ≥ 90 % (aktuell 98,2 %) |
+| `:core` | JUnit, Fake-Clock, Fake-Repository | Kover ≥ 90 % (aktuell 98,7 %) |
 | `:core` Szenarien | `scenarios/Simulation`: ganze Tage mit Uhr, Alarmen, Ort und Handlungen; prüft nach jedem Schritt die Invarianten | je gemeldetem Fehler ein Tag |
-| `:app` data | Robolectric + Room, `MigrationTest` gegen die Schemas | jede Migration, Backup |
+| `:app` data | Robolectric + Room, `MigrationTest` gegen die Schemas; `RoomRepositoryCasesTest` | jede Migration, Backup |
 | `:app` echte Daten | `RealDataTest` mit `testdata/real-*.json`: Migration, Alarm-Ansicht, eine Woche mit allen Remindern | bei jeder neuen Version neu ziehen |
-| `:app` Verbindung | `ReceiverGlueTest`: Broadcast (Alarm, Knopf, Ankunft, Neustart) → Engine mit echter Room-DB → Benachrichtigung, Dienst, Alarm | jeder Receiver |
+| `:app` Verbindung | `ReceiverGlueTest`, `AlarmGlueTest`, `SessionGlueTest`: Broadcast (Alarm, Knopf, Ankunft, WLAN, Geofence, Neustart) → Engine mit echter Room-DB → Benachrichtigung, Dienst, Alarm; feste Uhrzeit über `TestClock` | jeder Receiver und Knopf |
 | `:app` ui | Compose-UI-Tests mit Robolectric für Kernabläufe; Previews hell und dunkel | keine Zahl |
 | Gerät | [geraetetest.md](geraetetest.md), Diagnose-Log | vor jeder Freigabe |
 
-- **Szenario-Tests** (seit 2026-11-04): `Simulation` stellt die Uhr vor und löst jeden Alarm
+- **Szenario-Tests:** `Simulation` stellt die Uhr vor und löst jeden Alarm
   zu seiner Zeit aus, `arrive`/`leave` spielen Ort und Geofence nach, `act` die Handlungen,
   `phoneOff` ein ausgeschaltetes Handy. Nach jedem Schritt gilt: je aktivem Reminder genau
   ein offener Termin, jeder offene Termin hat einen Alarm (außer er wartet nur auf eine
-  Ankunft), geschlossene haben keinen, laut erst ab `loudFrom`. Ein Fehler aus der echten
+  Ankunft), geschlossene haben keinen, laut erst ab *laut ab* des Tages. Ein Fehler aus der echten
   Nutzung wird zuerst als Tag in `DayScenarioTest` nachgestellt. Tests mit „(open point)“
   im Namen halten das heutige Verhalten fest, über das noch entschieden wird.
 - **Emulator** nur gezielt (der Rechner ist langsam): exakte Alarme im Doze-Modus, Vollbild
   auf dem Sperrbildschirm, echte Geofences, Neustart. Noch nicht eingerichtet.
-- **Echte Daten** (seit 2026-11-04): Kevins Daten pseudonymisiert als JSON in
+- **Fake wie Room:** Fälle, deren Ergebnis davon abhängt, wie das Repository speichert
+  (`scenarios/RepositoryCases` in den Testhilfen), laufen in `core` gegen das
+  Fake-Repository und in `:app` gegen Room.
+- **Echte Daten:** Kevins Daten pseudonymisiert als JSON in
   `testdata/` ([README](../testdata/README.md)), erzeugt mit
   `tools/testdata/export_testdata.py` über adb, ohne Import/Export in der App.
   `RealDataTest` lädt sie in das Schema ihrer Version, migriert, baut die Alarm-Ansicht
@@ -508,7 +644,7 @@ umgesetzt / verworfen. Liste in den Einstellungen, *Teilen* als Markdown.
 - Ein Befehl für alles, lokal wie in CI:
   `./gradlew :core:check :core:koverLog :app:testDebugUnitTest :app:lintDebug :app:assembleDebug`.
 
-## 15. Schnittstelle für Claude (V1.3a2, Anf. 7.26 AG11)
+## 15. Schnittstelle für Claude (Anf. 7.26 AG11)
 
 - **Weg:** `ContentProvider` `com.avlreminder.claude`, nur im Debug-Source-Set
   (`app/src/debug`), geschützt mit `android.permission.DUMP` (hat nur die adb-Shell).
@@ -530,9 +666,9 @@ umgesetzt / verworfen. Liste in den Einstellungen, *Teilen* als Markdown.
   ohne `id` neu mit `title` und `schedule`, Strenge-Voreinstellung wie im Formular; mit
   `id` ändern sich nur die angegebenen Felder), `setActive`, `archive`, `addBlocker`.
   Kein Erledigen, Auslassen, Alarm beenden, Nachweis, Löschen (AG5). Klingelt der
-  Reminder gerade oder ist er überfällig (offene Fälligkeit nicht mehr `PLANNED`,
-  `currentAt` erreicht oder wartet auf die Ankunft), lehnen `save`, `setActive` und `archive` ab: „läuft gerade –
-  nur in der App“ (seit V1.3a3).
+  Reminder gerade, läuft eine Sitzung oder ist er überfällig (offene Fälligkeit nicht mehr
+  `PLANNED`, `currentAt` erreicht oder wartet auf die Ankunft), lehnen `save`, `setActive`
+  und `archive` ab: „läuft gerade – nur in der App“.
 - **JSON** (`ClaudeJson`): Zeiten lokal ohne Zone (`2026-11-03T19:15`), Enums mit ihrem
   Namen. Takt z. B. `{"type":"daily","times":["12:30","19:15"]}`, `weekdays` mit `days`,
   `once` mit `at`, `afterDone` mit `intervalDays`/`time`/`firstOn`, `onArrival`,
@@ -542,10 +678,9 @@ umgesetzt / verworfen. Liste in den Einstellungen, *Teilen* als Markdown.
 
 ---
 
-## 16. Cloud-Backup (Backend B2b, seit 1.3b0.4)
-Stand der Umsetzung; die Begründungen stehen in den Entscheidungstabellen von
-[backup-entwurf.md](backup-entwurf.md) (A-1…A-15) und
-[wiederherstellen-entwurf.md](wiederherstellen-entwurf.md) (W-1…W-8, R-1…R-6).
+## 16. Cloud-Backup (Backend B2b)
+Stand der Umsetzung; die Begründungen stehen in
+[cloud-entscheidungen.md](cloud-entscheidungen.md) (A-1…A-15, W-1…W-8, R-1…R-6).
 
 **Aufteilung.** Abläufe, die auch der Test-Client braucht (Einrichten, Sichern,
 Wiederherstellen, W-7, Löschen, Diagnose), liegen im Backend-Modul `protokoll`; die
@@ -594,120 +729,12 @@ aus der App (A-12); *Diagnose senden* nur für Konten mit Diagnose-Erlaubnis.
 Schlüssel-Backup), `RestoreFilesTest`, `LocalRestoreTest`, `CorruptCopyTest`; auf dem
 Gerät [geraetetest.md](geraetetest.md) Abschnitt D.
 
-## Entwurf V1.3 (2026-11-02, bestätigt; V1.3a und V1.3b0 umgesetzt)
+## Entwurf V1.3c – Abläufe (Skizze)
 
-> Grundlage: anforderungen.md 7.11 (Timer), 7.12 (Abläufe), 7.14 G2/G3 (Uhr über
-> Benachrichtigungen), 7.20 V2 (vorgezogen starten), 7.25 VS1/VS2, 7.27 NT2 und 7.28 PS7.
-> **[E]** = Empfehlung, von Kevin zu bestätigen; **[P]** = vorher auf dem Gerät prüfen.
-> Nach der Umsetzung wandert alles in die Themen oben.
+> Grundlage: anforderungen.md 7.12 A1–A7; dazu aus 7.3/7.4 *ein Vollbild zur Zeit, +1
+> wartet* und *Rest später* (verschoben am 2026-11-12). **[P]** = vorher auf dem Gerät
+> prüfen. Genauer Entwurf nach einer Woche Training mit der Sitzung.
 
-### E.1 Aufteilung
-
-| Etappe | Inhalt | Warum so |
-|---|---|---|
-| **V1.3a – Alltag** | Mehrmals täglich (VS1), Wochenend-Zeiten (VS2), Hinweis bei ständigem *Später* (NT2), Notausschalter (PS7) | Klein, sofort im Alltag spürbar, passt zur Beobachtungsphase. Keine neuen Bildschirme, nur Regeln und Einstellungen. |
-| **V1.3b0 – Umbau** | Engine als Fassade, Befehle in einer Transaktion, Alarm-Ansicht in `core` (Review-Lauf 2); V1.3b0.2: `firedAt`/`awaitsArrival`, Ortsprüfung vor der Transaktion (Review-Lauf 3) | Umgesetzt. Macht die Sitzung (neuer Zustand) und 7.29 (Ort im Befehl) sicher. |
-| **7.29 – Ankunft im Zeitraum** | Zeitraum und WLAN, ohne GPS (Entwurf unten); GPS später mit Anf. 7.30 | Umgesetzt in V1.3b0.6 (2026-11-11). |
-| **V1.3b – Sitzung mit Timer** | *Ich starte jetzt*, Timer, Nachfragen, Ziel/Minimum als Dauer, maximale Dauer, Dauer-Vergleich (7.11 D1–D6), vorgezogen starten (7.20 V2), Aktionen und Timer auf der Uhr per Benachrichtigung (G2, G3) | Der große neue Mechanismus. Braucht einen neuen Zustand *läuft* im Lebenszyklus und einen Dienst für den Timer. |
-| **V1.3c – Abläufe** | Schritte, Pausen, Wiederholungen, Signale, Fortschritt, Abläufe als Vorlagen (7.12 A1–A7) | Baut vollständig auf der Sitzung aus V1.3b auf; erst sinnvoll, wenn der Timer im Alltag trägt. |
-
-**[E]** Reihenfolge a → b → c, jede Etappe einzeln installieren. Nach V1.3b eine
-Woche Training mit Timer, bevor die Abläufe festgelegt werden – die Erfahrung mit den
-Nachfragen zeigt, wie viel Ablauf wirklich nötig ist (passt zu NT1, *trimmen*).
-
-### E.2 V1.3a – Alltag
-Umgesetzt (2026-11-02) und in die Themen oben übernommen: mehrmals täglich (2.2, 10.2),
-Wochenend-Zeiten (4., 11.2), Notaus (4., 11.2), Hinweis bei ständigem *Später* (10.2),
-Migration und Einstellungen (13.).
-
-### E.3 V1.3b – Sitzung mit Timer
-
-**Modell**
-- Pro Reminder `session: SessionSpec?` (aus = wie bisher): Nachfrage-Intervall
-  (Standard 10 min), Strenge der Nachfragen, Ziel- und Minimum-Dauer (optional, D4),
-  maximale Dauer (Standard 90 min, D5), Reaktionszeit des letzten Reminders (5 min).
-- Neuer Zustand **`RUNNING`** der Fälligkeit mit den Feldern `startedAt` und
-  `nextCheckAt`. Neue Ereignisse `STARTED`, `CHECK_ASKED`, `CHECK_ANSWERED`,
-  `FINAL_CALL`. Neues Ergebnis **`ABORTED`** (*abgebrochen*: zählt nicht als Erfolg und
-  bricht die Serie wie *verpasst* – ehrlich in der Statistik, D3). **[E]**
-- Dauer = `resolvedAt − startedAt`, ohne eigene Tabelle. Vergleich mit dem Schnitt
-  der letzten 10 Sitzungen (D6) im Verlauf und nach dem Abschluss.
-
-**Ablauf**
-```
-PLANNED/DUE/ESCALATING ─Ich starte jetzt─► RUNNING ─Fertig──────► Nachweis? ─► DONE (GOAL)
-                                            │ ▲   ├─Teilschritt─────────────► DONE (MINIMUM)
-                              Noch dran ────┘ │   ├─Abbruch─────────────────► CLOSED (ABORTED)
-                       Nachfrage alle x min ──┘   └─max. Dauer → letzter Reminder (5 min)
-                                                        └─ keine Antwort ─► MISSED bzw. MINIMUM*
-```
-\* MINIMUM, wenn schon Checklistenpunkte erledigt sind (D5), in V1.3c auch erreichte
-Schritte eines Ablaufs.
-- *Ich starte jetzt* beendet die Eskalation sofort. Auch **vorab** möglich (7.20 V2) –
-  dann entfällt der Alarm wie beim Vorab-Erledigen.
-- Mit Ziel-Dauer schlägt die Nachfrage die passende Antwort vor („45 min erreicht –
-  *Fertig*?“).
-- Nachfragen sind Alarme mit eigener Strenge: **[E]** Standard *locker* (Banner +
-  Vibration), damit das Training nicht ständig vom Vollbild unterbrochen wird; ohne
-  Antwort eskaliert die Nachfrage wie ein normaler Alarm.
-- **`RUNNING` gegen die anderen Regeln** (Anf. 7.11 D7, Review-Lauf 3 E8). Grundsatz:
-  `missedAt` gilt für `RUNNING` nicht; eine Sitzung endet nur über eine Antwort oder die
-  maximale Dauer.
-
-  | Ereignis während `RUNNING` | Verhalten |
-  |---|---|
-  | Tagesgrenze | nicht verpasst; die Sitzung zählt für ihren Starttag |
-  | nächster Termin (*mehrmals täglich*) | wartet; nach dem Abschluss folgt der nächste noch nicht begonnene Termin, in der Sitzung vergangene zählen nicht extra |
-  | Fensterende / Frist abgelaufen | kein `CloseWindow`, kein `Miss`; die Sitzung läuft weiter |
-  | Notaus | Nachfragen still; maximale Dauer gilt, danach Minimum bzw. `ABORTED` ohne letzten Alarm |
-  | „Nicht stören“ | Nachfragen still; die Reaktionszeit der letzten beginnt erst ohne DND |
-  | Pausieren, Archivieren, Bearbeiten, `save` (Takt) | abgelehnt („läuft gerade“); Text-Felder darf die App ändern |
-  | Schnittstelle (`save`, `setActive`, `archive`) | abgelehnt wie beim klingelnden Reminder (`notRunning`) |
-  | anderer Reminder klingelt | ein Vollbild zur Zeit (4.); die Sitzung läuft mit ihrer Benachrichtigung weiter |
-  | Handy aus / Neustart | `sync` plant die nächste Nachfrage; war die maximale Dauer schon um, gilt sofort der letzte Reminder |
-
-- **Zwei Dienste:** Der Sitzungsdienst und der `AlarmService` laufen nebeneinander, jeder
-  mit eigener Benachrichtigungs-ID. Eine Nachfrage nutzt den `AlarmService` mit der
-  `AlarmView` im Modus *Nachfrage* (Antworten statt Erledigt/Später).
-
-**Android**
-- Foreground-Service (Typ `systemExempted` wie der Alarm; Sitzungen dauern zu lange für
-  `shortService`) mit laufender Benachrichtigung: Chronometer, *Fertig*, *Teilschritt*,
-  *Abbruch*.
-- Nachfragen und letzter Reminder über den `AlarmPort` (exakt); sie überleben einen
-  Neustart über `sync`.
-- **Uhr (G2, G3):** Die laufende Benachrichtigung erscheint nicht auf der Uhr (G1).
-  Deshalb wie in V1.1 eine **zweite, spiegelbare Benachrichtigung**: Nachfragen mit
-  *Noch dran / Fertig / Teilschritt / Abbruch*, im Alarm zusätzlich *Ich starte
-  jetzt*. **[P]** ob die Uhr einen Chronometer aus einer gespiegelten Benachrichtigung
-  anzeigt; falls nicht, zeigt sie die Startzeit („seit 18:42“).
-- Bildschirm: Sitzungsansicht mit großem Timer und den vier Antworten; erreichbar aus
-  *Heute* (*läuft seit …*) und über die Benachrichtigung.
-
-**Bei der Umsetzung festgelegt (V1.3b1, 2026-11-11)**
-- Zusätzliches Feld `finalCallAt` (wann der letzte Reminder hörbar kam) und eigenes
-  Ereignis `ABORTED`. Ohne Antwort endet die Sitzung (`EndSession`) mit *Minimum*, wenn
-  Checklistenpunkte erledigt sind, unter Notaus mit `ABORTED`, sonst `MISSED`.
-- Eine unbeantwortete Nachfrage fragt nach min(Intervall, 10 min) erneut, wie die Runden
-  eines Alarms. Nachfragen liegen nie nach der maximalen Dauer; eine nach dem Maximum
-  gefundene (Handy aus) ist der letzte Reminder.
-- Vorschlag (D4): Ziel-Dauer erreicht → *Fertig*; ohne Ziel und Minimum-Dauer erreicht →
-  *Teilschritt*; sonst *Noch dran*. *Teilschritt* gibt es nur mit Minimum (Text oder Dauer).
-- Schnitt (D6): die letzten 10 mit Ziel oder Minimum abgeschlossenen Sitzungen;
-  abgebrochene und verpasste sagen nichts über das Tempo.
-- Während der Sitzung lässt `save` nur Titel, Warum, Ziel und Minimum ändern;
-  `setActive` und `setArchived` melden `false`, die App sagt „Läuft gerade“.
-- Im Verlauf zählt eine Sitzung für ihren Starttag; *Heute* zeigt bei erledigten die Dauer.
-- Benachrichtigung: am Handy höchstens drei Knöpfe (*Noch dran*, die vorgeschlagene
-  Antwort zum Beenden, *Abbruch*), auf der Uhr alle vier (`WearableExtender`). *Fertig*
-  nur ohne Foto-, Text- oder Audio-Nachweis; sonst über den Bildschirm. *Abbruch* im
-  Bildschirm erst nach Rückfrage.
-- Der Sitzungsdienst misst nichts selbst; die App aktualisiert ihn nach jedem Anwendungsfall
-  aus den laufenden Fälligkeiten. Fällt der Vordergrunddienst aus, bleibt eine normale
-  laufende Benachrichtigung.
-- Vorlagen speichern die Sitzung noch nicht.
-
-### E.4 V1.3c – Abläufe (Skizze)
 - Tabelle `routine` (Name, Schritte als JSON): Schritt = Art (*Zeit*, *offen*,
   *Pause*), Titel, Dauer, Signal; Gruppen mit Wiederholungen (A3). Der Reminder
   verweist per `routineId`; mehrere Reminder können denselben Ablauf nutzen (A7).
@@ -716,159 +743,7 @@ Schritte eines Ablaufs.
 - Signale (A4): drei feste Vibrationsmuster (*Schritt vorbei*, *Pause vorbei*,
   *nächster Satz*), per spiegelbarer Benachrichtigung auch auf der Uhr. **[P]** ob die
   Uhr die Muster unterscheidbar wiedergibt.
-- Minimum über den Ablauf (A6): „bis Schritt x“.
+- Minimum über den Ablauf (A6): „bis Schritt x“; ohne Antwort am Ende zählen erreichte
+  Schritte wie erledigte Checklistenpunkte (3.1).
 - Vor dem Start anpassbar (A7): Schritt überspringen, Pause verlängern – nur für diese
   Sitzung.
-- Genauer Entwurf nach den Erfahrungen mit V1.3b.
-
-### E.5 Entschieden (2026-11-02)
-1. Aufteilung a/b/c und Reihenfolge (E.1).
-2. Mehrere Uhrzeiten: verpasst beim nächsten Termin; kein Wochenziel und kein Ort mit
-   mehreren Uhrzeiten (E.2).
-3. NT2-Schwelle (3 Fälligkeiten × 2 *Später*) und Karte auf *Heute* statt im Alarm.
-4. Notausschalter: *Notaus*-Auslassen bricht keine Serie.
-5. `ABORTED` bricht die Serie; Nachfragen standardmäßig *locker*; eine Sitzung ignoriert
-   die Tagesgrenze und endet nur über die maximale Dauer (Standard 90 min).
-
-Alle fünf bestätigt am 2026-11-02 (anforderungen.md Kap. 9). Die Tabelle *`RUNNING` gegen
-die anderen Regeln* in E.3 kam am 2026-11-05 dazu (Review-Lauf 3).
-
----
-
-## Entwurf 7.29 – Ankunft im Zeitraum (2026-11-05, bestätigt und umgesetzt 2026-11-11)
-
-> Grundlage: anforderungen.md 7.29 OZ1–OZ9 und F1–F3, Review-Lauf 3 E7. Seit 2026-11-05 nur
-> WLAN, GPS ist nach 7.30 ausgelagert. **[E]** = Empfehlung,
-> **[P]** = vorher auf dem Gerät prüfen. Kevin hat Z.7 am 2026-11-11 bestätigt; umgesetzt in
-> V1.3b0.6, die Abweichungen und Präzisierungen stehen in Z.8.
-
-### Z.1 Datenmodell (Migration 8→9)
-- `Arrival` bekommt `leadMinutes` (Vorlauf, Standard 90; 0 = kein Zeitraum wie bisher),
-  `bufferMinutes` (0–30, Standard 5) und `checkMinutes` (15–30, Standard 20). In der DB
-  `reminder.arrivalLead`, `arrivalBuffer`, `arrivalCheck` per `ADD COLUMN` mit den
-  Standardwerten: Bestehende Ankunfts-Reminder bekommen F3 (OZ9), *Heute* zeigt einmal
-  einen Hinweis.
-- Neue Tabelle `place_wifi` (`placeId` → `place` mit `ON DELETE CASCADE`, `bssid`, `ssid`
-  nur zur Anzeige), eine Zeile pro Zugangspunkt (Anf. 7.29 OZ3). Beim Festlegen übernimmt
-  die App die verbundene BSSID und alle BSSIDs derselben SSID aus den letzten
-  Suchergebnissen. WLAN-Namen und BSSIDs sind privat: nicht ins Diagnose-Log, im
-  Testdaten-Export ersetzt.
-- `Occurrence.arrivedAt: Instant?` **[E]**: erkannte Ankunft im Zeitraum. Der Alarm liegt bei
-  `arrivedAt + Puffer`; kurz wieder weg ändert daran nichts (OZ4). Ohne eigenes Feld müsste
-  man den Puffer aus Ereignissen raten – genau das Problem, das E5 gelöst hat.
-- `place` bleibt allgemein (OZ6), Radius pro Ort.
-
-### Z.2 Ablauf
-Zeitraum = [späteste Uhrzeit − Vorlauf, späteste Uhrzeit]; die Uhrzeit des Takts ist die
-späteste Uhrzeit.
-
-| Wann | da | klar weg | unklar |
-|---|---|---|---|
-| Ankunft vor dem Zeitraum (Geofence, WLAN) | ignoriert, Diag „zu früh“ | – | – |
-| Beginn des Zeitraums (Prüfung) | klingelt zur spätesten Uhrzeit (F2) | weiter prüfen | weiter prüfen |
-| im Zeitraum (Prüfung, WLAN, Geofence) | `arrivedAt`, Alarm nach dem Puffer | weiter prüfen | weiter prüfen |
-| späteste Uhrzeit | klingelt | `DROP`: entfällt (F1); `RING`: klingelt | klingelt |
-| nach Später/Verschieben (`awaitsArrival`) | klingelt | weiter prüfen | weiter prüfen; Tagesgrenze → verpasst |
-
-- *Wenn ich zuhause bin* (ohne Uhrzeit): eine WLAN-Verbindung zählt wie eine Ankunft,
-  keine Prüfungen, kein Zeitraum (OZ9).
-- „Weiter prüfen“ heißt: der nächste Prüf-Alarm des Orts (Z.3). Mehrere Reminder am
-  selben Ort teilen sich die Prüfung; es gilt der kürzeste Prüfabstand.
-
-### Z.3 Ports
-- **Prüf-Alarme pro Ort:** `PlaceAlarmPort.set(placeId, at, exact)` / `cancel(placeId)`. Der
-  `AlarmPort` kennt nur einen Alarm pro Fälligkeit, Prüfungen gehören aber zum Ort.
-  `ReminderEngine.onPlaceCheck(placeId, plannedAt)` sammelt alle
-  Fälligkeiten, die an dem Ort warten, prüft einmal und plant den nächsten Prüf-Alarm.
-- **Ortsergebnis als Fakt:** `LocationPort.check(place): PlaceCheck(placeId, source, result,
-  scanAge, at)` mit `source` = `WIFI_CONNECTED` / `WIFI_SCAN` / `GEOFENCE` / `FALLBACK` und
-  `result` = `AT` / `AWAY` / `UNKNOWN`. Er ersetzt `isAt(): Boolean?`; die Engine bekommt
-  ihn über denselben Weg wie heute (`EngineContext.positions`, außerhalb der Transaktion,
-  1.). Reihenfolge: verbunden → `AT`; Suche ≤ 10 min ohne WLAN des Orts → `AWAY`; sonst
-  `UNKNOWN`. Erst zur spätesten Uhrzeit fällt `UNKNOWN` auf die heutige Prüfung (Geofence-
-  Stand, grobe Ortsabfrage) zurück (OZ2). 7.30 ergänzt später `GPS` und eine Genauigkeit.
-- **WLAN:** `WifiPort.connected(): Bssid?` und `WifiPort.lastScan(): Scan(bssids, at)?`
-  (`WifiManager.getScanResults`, nie `startScan`). Verbindungen über
-  `ConnectivityManager.registerNetworkCallback(request, PendingIntent)`; der Receiver ruft
-  `ReminderEngine.onWifi(bssid)`. **[P]** BSSID und SSID gibt es nur mit
-  Standort-Berechtigung (`FLAG_INCLUDE_LOCATION_INFO`), im Hintergrund mit „Immer
-  erlauben“. Auf dem S24 mit Android 17 prüfen: Kommt der Callback zuverlässig, wie alt
-  sind die Suchergebnisse im Hintergrund typischerweise, und muss der PendingIntent nach
-  einem Neustart neu registriert werden (dann über `sync`)?
-
-### Z.4 Android
-- **Kein GPS** (Anf. 7.30, später). Wenn es kommt: `getCurrentLocation(PRIORITY_HIGH_ACCURACY)`
-  mit Zeitlimit 30 s, nur im Zeitraum und nur bei `UNKNOWN`; notfalls ein kurzer
-  Vordergrunddienst vom Typ `location`. Davor die Messung aus 7.30 GP3.
-- **Geofence** bleibt (Ankunft ohne WLAN); die Verweildauer gilt nur für ihn (Anf. T2).
-  Bei der Gelegenheit den offenen Punkt aus 6. lösen (Neuregistrierung nach
-  `GEOFENCE_NOT_AVAILABLE`).
-- **Diagnose (OZ8):** jede Prüfung mit Quelle, Ergebnis, Alter der Suche und Grund. Keine
-  Koordinaten, keine WLAN-Namen, keine BSSIDs (nur „WLAN von Zuhause“).
-
-### Z.5 Oberfläche
-- Formular, Ankunft: *spätestens um* (die Uhrzeit), *ab* als Vorlauf-Chips (30 / 60 / 90 /
-  120 min, *andere…*), Puffer und Prüfabstand unter *Feineinstellungen*.
-- Orte: `setHomeHere` wird zu `setPlaceHere(placeId)`; Einstellungen *Orte* mit Zuhause und
-  einem weiteren Ort (OZ6), jeweils *mit diesem WLAN verbunden* übernehmen. Die Meldung
-  „Zuhause zuerst festlegen“ wird zu „Ort zuerst festlegen“.
-- *Heute*: „Training – ab 18:00 bei Ankunft, sonst 19:30“.
-
-### Z.6 Tests
-- `Simulation` bekommt `wifi(bssid?)` und `scan(bssids, at)`; die Prüf-Alarme laufen wie die
-  anderen Alarme.
-- Tage in `DayScenarioTest`: 2026-11-04 nachgestellt (Ankunft 07:12 → kein Alarm; auf 20:30
-  verschoben, *unklar* → wartet; Ankunft 20:34 → Alarm 20:39), Homeoffice (F2), nicht da
-  (F1), zwei Reminder am selben Ort mit verschiedenen Prüfabständen.
-- `MigrationTest` 8→9, `RealDataTest` mit den Standardwerten.
-
-### Z.7 Zum Bestätigen
-1. `Occurrence.arrivedAt` als eigenes Feld (Z.1).
-2. Prüf-Alarme pro Ort mit eigenem Port (Z.3).
-3. Ohne GPS (2026-11-05): *klar weg* nur aus einer Suche ≤ 10 min ohne WLAN des Orts,
-   sonst *unklar* und Rückfall zur spätesten Uhrzeit (Z.3). Die **[P]**-Punkte zum WLAN
-   prüfe ich zuerst mit einem kleinen Gerätetest.
-4. Vorlauf 0 bedeutet „wie bisher“, auch als Ausweg, falls 7.29 im Alltag stört.
-
-### Z.8 Umsetzung (V1.3b0.6, 2026-11-11)
-- **Zeitraum** = [`currentAt` − Vorlauf, `currentAt`], solange `arrivedAt` leer ist. Eine
-  erkannte Ankunft (`Action.Arrived`, Ereignis `ARRIVED`) setzt `arrivedAt` und legt
-  `currentAt` auf Ankunft + Puffer; liegt das schon hinter jetzt, klingelt es sofort.
-  *Später*, *Verschieben*, *Rest auf morgen*, Fenster schließen, Wiederöffnen, Klingeln
-  und Bearbeiten leeren `arrivedAt`.
-- **F2:** Findet die Prüfung, die für den Beginn des Zeitraums geplant war, einen schon da,
-  klingelt es zur spätesten Uhrzeit, auch wenn Android sie verspätet zustellt (der
-  Prüf-Alarm trägt seine geplante Zeit, `plannedAt`; seit Review-Lauf 4, vorher
-  „bis 5 min nach Beginn“). Eine Verbindung oder ein Geofence ist dagegen eine echte
-  Ankunft (Puffer). Ankunft vor dem Zeitraum: ignoriert, Diag „too early“.
-- **Prüfungen** im Raster Beginn + k·Prüfabstand, jeweils vor der spätesten Uhrzeit; die
-  späteste Uhrzeit prüft der Alarm des Termins selbst (mit Rückfall auf die grobe
-  Ortsabfrage, `check(fallback = true)`). Wartende verschobene Termine (`awaitsArrival`)
-  prüfen ab `currentAt` bis zur Tagesgrenze. Mehrere Reminder am Ort: die früheste fällige
-  Prüfung gilt. `planChecks()` läuft am Ende jedes Befehls in der Transaktion und setzt je
-  Ort einen Prüf-Alarm (`PlaceAlarmPort`) oder löscht ihn: die Prüfung zu Beginn eines
-  Zeitraums exakt auch im Doze (`setExactAndAllowWhileIdle`, sie entscheidet F2), die
-  übrigen `setWindow` 2 min. Das Diagnose-Log nennt eine Verspätung (`late=…min`).
-- **Ortsergebnis:** `WifiLocation` (core) aus `WifiPort`: verbunden mit einer BSSID des
-  Orts → `AT`; Ort ohne WLAN oder keine Suche → `UNKNOWN`; sonst WLAN des Orts nicht in
-  einer Suche ≤ 10 min → `AWAY`, älter → `UNKNOWN`. Nur mit `fallback` fällt `UNKNOWN` auf
-  `AndroidLocation.isAt` zurück.
-- **Vorlauf 0** = genau das alte Verhalten: kein Puffer, keine Prüfungen. *Wenn ich
-  ankomme* (`OnArrival`) klingelt bei Ankunft sofort, ohne Puffer.
-- **Android:** `AndroidWifi.watch` registriert bei jedem Prozessstart einen
-  `NetworkCallback` mit PendingIntent auf `WifiReceiver` (ruft `onWifi`). Android meldet
-  dabei eine schon bestehende Verbindung erneut; `WifiConnections` merkt sich das Handle
-  der zuletzt gemeldeten Verbindung (`Network.networkHandle`, SharedPreferences `wifi`),
-  und nur eine neue Verbindung ruft `onWifi` (Review-Lauf 4). `PlaceCheckReceiver` ruft
-  `onPlaceCheck`. Die WLAN-Sonde aus V1.3b0.3 ist entfernt.
-- **Oberfläche:** Formular *Bei Ankunft* mit Ortswahl (ab zwei Orten), *Ankunft zählt ab*
-  30/60/90/120 min/*andere…* und *entfällt*/*trotzdem klingeln*; Puffer und Prüfabstand
-  unter *Feineinstellungen*. Einstellungen *Orte*: Zuhause und ein weiterer Ort mit Namen,
-  *Hier festlegen* übernimmt Standort und das verbundene WLAN mit allen Zugangspunkten
-  derselben SSID aus der letzten Suche. *Heute*: „ab 18:00 bei Ankunft zuhause, sonst
-  19:30“ bzw. „angekommen – klingelt 18:35“ und einmal der Hinweis auf die Umstellung (OZ9).
-- **Privat:** Diagnose nur mit Ort-Id, Ergebnis, Quelle und Alter der Suche; die
-  Claude-Schnittstelle kennt Vorlauf, Puffer und Prüfabstand, aber keine WLANs; der
-  Testdaten-Export ersetzt SSIDs und BSSIDs.
-- **Tests:** `ArrivalWindowScenarioTest` (u. a. 2026-11-04 nachgestellt, F1, F2, zwei
-  Reminder am Ort), `ArrivalWindowTest`, `MigrationTest` 8→9, `FormatArrivalTest`.

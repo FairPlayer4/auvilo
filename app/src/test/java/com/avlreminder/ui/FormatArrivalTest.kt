@@ -13,7 +13,7 @@ import java.time.LocalTime
 import java.time.ZoneId
 import java.time.ZonedDateTime
 
-/** What *Heute* and the list say about an arrival (Anf. 7.29 Z.5). */
+/** What *Heute* and the list say about an arrival (design.md 6). */
 class FormatArrivalTest {
     private val zone = ZoneId.of("Europe/Berlin")
     private val home = Place(1, "Zuhause", 0.0, 0.0)

@@ -254,7 +254,7 @@ data class SessionSpec(
     val finalMinutes: Int = DEFAULT_FINAL,
 ) {
     companion object {
-        /** Bestätigt 2026-11-02 (design.md E.5): every 10 min, relaxed, at most 90 min, 5 min to react. */
+        /** Bestätigt 2026-11-02 (anforderungen.md Kap. 9): every 10 min, relaxed, at most 90 min, 5 min to react. */
         const val DEFAULT_CHECK = 10
         const val DEFAULT_MAX = 90
         const val DEFAULT_FINAL = 5

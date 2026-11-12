@@ -75,7 +75,7 @@ class ReminderEngine(
             depth++
             c.begin()
             val result = try {
-                // The checks of the places follow from what the command left (7.29 Z.3).
+                // The checks of the places follow from what the command left (design.md 6).
                 repo.transaction { block().also { scheduler.planChecks() } }
             } catch (e: PositionNeeded) {
                 c.rollback()

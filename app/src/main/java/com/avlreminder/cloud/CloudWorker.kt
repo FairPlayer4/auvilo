@@ -21,7 +21,7 @@ import java.time.format.DateTimeFormatter
 import java.util.concurrent.TimeUnit
 
 /**
- * The hourly backup (backup-entwurf.md, step 4, A-9). All decisions are in
+ * The hourly backup (cloud-entscheidungen.md A-9). All decisions are in
  * [CloudBackup.backUpAutomatically]; the worker only calls it.
  *
  * It always ends as success: a failed backup is tried again at the next hour, not right away

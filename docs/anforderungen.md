@@ -1,8 +1,10 @@
 # Anforderungen – avlreminder
 
 > Arbeitsname. AVL = **A**udio / **V**isual / **L**ocation.
-> Stand: 2026-11-05 – umgesetzt bis V1.3b0.2 (gebaut, V1.3b0.1 auf dem Gerät; Übersicht in Kap. 10). Entscheidungen mit Datum in
-> Kap. 9, technisches Design nach Themen in [design.md](design.md). Wird iterativ verfeinert.
+> Was installiert und was offen ist: [stand.md](stand.md); Versionen in Kap. 10.1.
+> Entscheidungen mit Datum in Kap. 9 (bis 2026-10-31 in
+> [anforderungen-archiv.md](anforderungen-archiv.md)), technisches Design nach Themen in
+> [design.md](design.md). Wird iterativ verfeinert.
 
 ## 1. Vision
 
@@ -61,7 +63,7 @@ als eigenständige Verwaltungs-App.
 
 | Stufe | Inhalt | Technik |
 |---|---|---|
-| **V1** | Einzelnutzer, komplett lokal, Kernmechanismen | Kein Backend, Sideload-APK |
+| **V1** | Einzelnutzer, lokal, Kernmechanismen | Sideload-APK; Backend nur für das optionale Cloud-Backup (7.28, 8.4) |
 | V2 | Abgleich mit Zielen, lokale KI, Zahlenwerte, Backup, **Forschung Bewegungsdaten** (7.16), **Räume und Taster über Home Assistant** (7.19), ggf. GPS-Routen (7.17), **Schnittstelle für KI-Agenten** (7.26) | lokal bzw. im Heimnetz |
 | V3 | Mehrere Personen im Haushalt, gemeinsame Reminder (7.18), KI über Backend, ggf. NFC-Kontrollpunkte (7.15), ggf. **Haushaltsinventar und Einkaufsliste** (7.23) | Lokale Synchronisation zwischen den Handys – Backend nur, wenn nötig |
 
@@ -190,7 +192,7 @@ Die Einordnung ist vorläufig.
   - **Tagesgrenze** **[V1.1]**, einstellbar, Standard **23 Uhr**: Was bis dahin ohne
     Reaktion offen ist, gilt als **verpasst** (bisher: Ende des Fensters um 21 Uhr).
     Unabhängig von "Nicht stören".
-- **Mehrere Reminder gleichzeitig fällig** (2026-11-05, geplant mit V1.3b): Es gibt
+- **Mehrere Reminder gleichzeitig fällig** (2026-11-05, verschoben auf V1.3c): Es gibt
   immer nur **ein Vollbild** zur Zeit. Der nächste wartet mit dem Hinweis *+1 wartet*
   und erscheint, sobald das erste erledigt, verschoben oder ausgelassen ist. Seine
   Runden laufen derweil weiter, er verliert also keine Eskalation.
@@ -403,7 +405,7 @@ Pro Reminder einschaltbar. **[V1.3]**
   Sitzungen (z. B. "6 min schneller als im Schnitt"). Positive Verstärkung, kein Druck.
 - Technik: Foreground-Service mit laufender Benachrichtigung (wie der Alarm),
   Nachfragen als exakte Alarme – überlebt Bildschirm aus und App im Hintergrund.
-- D7 **Sitzung und andere Regeln** (2026-11-05, Review-Lauf 3; Technik in design.md E.3):
+- D7 **Sitzung und andere Regeln** (2026-11-05, Review-Lauf 3; Technik in design.md 3.1):
   - Eine laufende Sitzung wird **nicht verpasst**: weder zur Tagesgrenze noch beim
     nächsten Termin eines *mehrmals täglich*-Reminders noch am Fensterende einer Frist.
     Sie endet nur über die Nachfragen oder die maximale Dauer (D5). Über die
@@ -857,9 +859,9 @@ dazugekommen; Kevin sammelt jetzt erst einmal mit aktiver Nutzung.
   („Willst du wirklich …?“). Welche Stellen das sind und wie stark die Bremse sein
   soll, ergibt sich aus der Nutzung.
 - Ergebnisse fließen als Vorschläge (7.24) oder hier ein; danach Entwurf.
-- NT4 **Nutzung zählen erst vor V2**, zusammen mit der Testsession: nur Anzahlen aus der
-  Datenbank (welche Funktionen eingestellt sind, wie oft Später, Verschieben, Minimum),
-  keine Titel oder Inhalte. Bis dahin nutzt Kevin V1.2c weiter.
+- NT4 **Nutzung zählen erst vor V2**, zusammen mit einer Testsession (wird vor V2 neu
+  geschrieben): nur Anzahlen aus der Datenbank (welche Funktionen eingestellt sind, wie oft
+  Später, Verschieben, Minimum), keine Titel oder Inhalte.
 
 ### 7.28 Play-Store-Release und Backend
 Ziel ist, einmal den kompletten Weg zu gehen: eine offizielle App im Play Store mit
@@ -900,10 +902,10 @@ Vordergrund, nicht Reichweite.
   reichen; der Play-Store-Release ist ein Release-Build (nicht debuggable, kein
   `run-as`). Kein SQLCipher, solange kein konkreter Fall übrig bleibt.
 - Backend-Stand und was es für die App bedeutet: [backend.md](backend.md); Einbindung des
-  Cloud-Backups: [backup-entwurf.md](backup-entwurf.md) (bestätigt 2026-11-07).
+  Cloud-Backups: [cloud-entscheidungen.md](cloud-entscheidungen.md) (bestätigt 2026-11-07).
 
 ### 7.29 Ankunft im Zeitraum mit WLAN (2026-11-04, ohne GPS seit 2026-11-05)
-> Umgesetzt in V1.3b0.6 (2026-11-11); wie genau: design.md *Entwurf 7.29* Z.8.
+> Umgesetzt (2026-11-11); wie genau: design.md 6.
 
 **Anlass:** Am 2026-11-04 klingelte *Training* (19:30, Ankunft zuhause, sonst entfällt)
 um 07:12, weil der Geofence morgens eine Ankunft meldete. Eine früheste Uhrzeit gibt es
@@ -972,8 +974,6 @@ genaue Ortsprüfung per GPS ist nach **7.30** ausgelagert und kommt später.
     Ankunft (Prüfungen im Prüfabstand) und klingelt dann; ohne Ankunft ist er zur
     Tagesgrenze **verpasst**, nie *entfällt*. Damit klingelt *unklar* nicht mehr auf
     dem Heimweg.
-  - Umgesetzt in V1.3b0.2 für *klar weg* und *unklar* (Warten auf die Ankunft,
-    *verpasst* zur Tagesgrenze); die Prüfungen im Prüfabstand kommen mit 7.29.
 - OZ6 **Weitere Orte:** Orte sind allgemein (Zuhause, Arbeit, Fitnessstudio, später
   Geschäfte, 7.23 E2), jeder mit Mittelpunkt, Radius und WLANs. Ein Reminder wählt
   seinen Ort. Für den Anfang reicht die Oberfläche für Zuhause plus ein weiterer Ort.
@@ -1147,18 +1147,14 @@ vom Nutzer in den Systemeinstellungen erteilt werden.
 Akkumanagement und die Zuverlässigkeit des Geofence "Ankunft zuhause" – beides
 früh am S24 Ultra testen (Spike, siehe Abschnitt 10).
 
-### 8.3 Tech-Stack (Vorschlag)
-- Kotlin, Jetpack Compose, Room (lokale DB), AlarmManager + WorkManager, Glance (Widget)
-- minSdk/targetSdk 37 (Android 17); AGP-Version mit API-37-Unterstützung nötig
-- Build: Gradle (Wrapper), Entwicklung in Android Studio oder VS Code
-- Entwicklungsumgebung: siehe
-  [entwicklungsumgebung.md](entwicklungsumgebung.md)
+### 8.3 Tech-Stack
+Siehe design.md 1 (*Tech*) und [entwicklungsumgebung.md](entwicklungsumgebung.md).
 
 ### 8.4 Daten
 - Alle Daten inkl. Fotos und Audio liegen **lokal** auf dem Gerät. Sie verlassen es nur
   **Ende-zu-Ende verschlüsselt** im Cloud-Backup und nur, wenn es eingeschaltet ist
   (7.28 PS8, präzisiert 2026-11-07); Fotos und Audio gar nicht. Dafür braucht die App
-  die Berechtigung `INTERNET` ([backup-entwurf.md](backup-entwurf.md) A-3).
+  die Berechtigung `INTERNET` (cloud-entscheidungen.md A-3).
 - **Sensible Daten** (Fotos, Audio, Standorte, Bewegungsdaten) bleiben grundsätzlich
   **auf dem Gerät**. Gespeicherte Orte und WLANs verlassen es nur **Ende-zu-Ende
   verschlüsselt** im Backup B2b (2026-11-05); Fotos, Audio und Bewegungsdaten gar nicht.
@@ -1169,7 +1165,7 @@ früh am S24 Ultra testen (Spike, siehe Abschnitt 10).
 - Rohdaten der Bewegungssensoren (7.16) nach einer einstellbaren Frist löschen;
   das Ergebnis (Dauer, erkanntes Muster) bleibt.
 - **Nutzer-Backup** ist das Cloud-Backup des Backends (B2b, [backend.md](backend.md),
-  Einbindung [backup-entwurf.md](backup-entwurf.md)): Ende-zu-Ende verschlüsselt, ohne
+  Einbindung [cloud-entscheidungen.md](cloud-entscheidungen.md)): Ende-zu-Ende verschlüsselt, ohne
   Fotos und Audio, nur nach ausdrücklichem Einschalten (7.28 PS8). Ein Export als Datei
   ist später nachrüstbar (z. B. als ZIP). Die Kopie der Datenbank vor jeder Migration
   (design.md 13) ist nur eine Sicherung gegen Datenverlust beim Update, kein Backup.
@@ -1177,23 +1173,23 @@ früh am S24 Ultra testen (Spike, siehe Abschnitt 10).
 
 ## 9. Entscheidungen
 
-Neueste zuerst. Kap. 7 enthält immer den gültigen Stand; diese Tabelle ist die Historie. Überholte Einträge sind mit „→ ersetzt“ bzw. „→ präzisiert“ markiert.
+Neueste zuerst. Kap. 7 enthält immer den gültigen Stand; diese Tabelle ist die Historie. Überholte Einträge sind mit „→ ersetzt“ bzw. „→ präzisiert“ markiert. Einträge bis 2026-10-31: [anforderungen-archiv.md](anforderungen-archiv.md).
 
 | Datum | Entscheidung |
 |---|---|
 | 2026-11-12 | Antworten auf Review-Lauf 4 (`.review/runs/2026-11-12.md`): (1) Ein Vollbild zur Zeit, „+1 wartet“, *Rest später* (7.3, 7.4) auf V1.3c verschoben, nicht verworfen. (2) *Abgebrochen* aus Benachrichtigung oder Uhr ohne Rückfrage, aber 60 s zurücknehmbar wie *Erledigt* (7.31); danach läuft die Sitzung mit dem alten Start weiter; auf dem Bildschirm bleibt der Dialog. (3) F2 und WLAN-Meldung: die erste Prüfung des Zeitraums exakt auch im Doze; F2 gilt, wenn die *erste Prüfung dieses Zeitraums* einen schon da findet, egal wie spät sie kommt; eine WLAN-Meldung zählt nur als Ankunft, wenn vorher nicht dasselbe WLAN verbunden war. (4) Sitzungen zählen für Wochenziel, Minimum-Limit und Statistik in der Woche ihres Starts. (5) Doku: Cloud-Entwürfe zu `cloud-entscheidungen.md` zusammengelegt, `testsession.md` bis zur Überarbeitung vor V2 gelöscht, Kap.-9-Einträge bis 2026-10-31 nach `anforderungen-archiv.md`. Außerdem: *Teilschritt* bei aufgebrauchtem Minimum-Limit ausgeblendet, mit Hinweis; „Fassung wählen“ (R-4) in der App erst mit dem Wiederherstellen |
-| 2026-11-11 | Sitzung mit Timer (7.11, 7.20 V2) in V1.3b1 umgesetzt, nach design.md E.3. Bei der Umsetzung festgelegt (Einzelheiten in E.3): ohne Antwort am Ende *Minimum* mit erledigten Punkten, unter Notaus *abgebrochen*, sonst *verpasst*; unbeantwortete Nachfrage fragt nach höchstens 10 min erneut; *Teilschritt* nur mit Minimum; Schnitt aus den letzten 10 abgeschlossenen Sitzungen; während der Sitzung nur Texte änderbar; Vorlagen ohne Sitzung. Versionsname ab jetzt `1.3b<n>-backup<Schritt>` (erster: `1.3b1-backup5`, Code 17) |
-| 2026-11-11 | Entwurf 7.29 Z.7 bestätigt und in V1.3b0.6 umgesetzt (design.md *Entwurf 7.29*, Z.8). Bei der Umsetzung festgelegt: F2 gilt, wenn die erste Prüfung im Zeitraum (bis 5 min nach Beginn) einen schon da findet (→ präzisiert 2026-11-12: die für den Beginn geplante Prüfung, egal wie spät sie kommt); Prüfungen im Raster Beginn + k·Prüfabstand, die späteste Uhrzeit prüft der Alarm des Termins selbst; der Puffer gilt auch für verschobene Termine (`awaitsArrival`), nicht für *Wenn ich ankomme*; Vorlauf 0 = genau das alte Verhalten (kein Puffer, keine Prüfungen); WLAN-Namen und BSSIDs bleiben auf dem Handy (nicht im Diagnose-Log, nicht in der Claude-Schnittstelle, im Testdaten-Export ersetzt); die WLAN-Sonde ist entfernt. Einstellungen *Orte*: Zuhause und ein weiterer Ort, *Hier festlegen* übernimmt Standort und verbundenes WLAN |
-| 2026-11-09 | Nach Review-Lauf 10 (Backend-Repo `.review/runs/2026-11-09.md`, Fragen 1–3): (1) *Cloud-Daten löschen* sperrt **alle Geräte** des Kontos, nicht nur dieses (Ablauf in `protokoll`, R-3 in [wiederherstellen-entwurf.md](wiederherstellen-entwurf.md)). (2) Lehnt der Server die Sitzung ab (`AnmeldungAbgelehnt`), benachrichtigt die App sofort „Bitte neu anmelden“; der 3-Tage-Hinweis (A-13) hängt am gemerkten Konto statt an der Sitzung; ohne Sitzung heißt der Löschknopf „Nur dieses Handy zurücksetzen“, mit dem Hinweis, dass auf dem Server nichts gelöscht wird. (3) Nach einem lokalen Wiederherstellen (Tageskopie, *Rückgängig*) gilt W-7: automatisch wird erst nach einem Sichern von Hand wieder gesichert |
+| 2026-11-11 | Sitzung mit Timer (7.11, 7.20 V2) in V1.3b1 umgesetzt (design.md 3.1). Bei der Umsetzung festgelegt: ohne Antwort am Ende *Minimum* mit erledigten Punkten, unter Notaus *abgebrochen*, sonst *verpasst*; unbeantwortete Nachfrage fragt nach höchstens 10 min erneut; *Teilschritt* nur mit Minimum; Schnitt aus den letzten 10 abgeschlossenen Sitzungen; während der Sitzung nur Texte änderbar; Vorlagen ohne Sitzung. Versionsname ab jetzt `1.3b<n>-backup<Schritt>` (erster: `1.3b1-backup5`, Code 17) |
+| 2026-11-11 | Entwurf 7.29 Z.7 bestätigt und in V1.3b0.6 umgesetzt (design.md 6). Bei der Umsetzung festgelegt: F2 gilt, wenn die erste Prüfung im Zeitraum (bis 5 min nach Beginn) einen schon da findet (→ präzisiert 2026-11-12: die für den Beginn geplante Prüfung, egal wie spät sie kommt); Prüfungen im Raster Beginn + k·Prüfabstand, die späteste Uhrzeit prüft der Alarm des Termins selbst; der Puffer gilt auch für verschobene Termine (`awaitsArrival`), nicht für *Wenn ich ankomme*; Vorlauf 0 = genau das alte Verhalten (kein Puffer, keine Prüfungen); WLAN-Namen und BSSIDs bleiben auf dem Handy (nicht im Diagnose-Log, nicht in der Claude-Schnittstelle, im Testdaten-Export ersetzt); die WLAN-Sonde ist entfernt. Einstellungen *Orte*: Zuhause und ein weiterer Ort, *Hier festlegen* übernimmt Standort und verbundenes WLAN |
+| 2026-11-09 | Nach Review-Lauf 10 (Backend-Repo `.review/runs/2026-11-09.md`, Fragen 1–3): (1) *Cloud-Daten löschen* sperrt **alle Geräte** des Kontos, nicht nur dieses (Ablauf in `protokoll`, R-3 in cloud-entscheidungen.md). (2) Lehnt der Server die Sitzung ab (`AnmeldungAbgelehnt`), benachrichtigt die App sofort „Bitte neu anmelden“; der 3-Tage-Hinweis (A-13) hängt am gemerkten Konto statt an der Sitzung; ohne Sitzung heißt der Löschknopf „Nur dieses Handy zurücksetzen“, mit dem Hinweis, dass auf dem Server nichts gelöscht wird. (3) Nach einem lokalen Wiederherstellen (Tageskopie, *Rückgängig*) gilt W-7: automatisch wird erst nach einem Sichern von Hand wieder gesichert |
 | 2026-11-09 | Nach Review-Lauf 9 (Backend Kap. 11): Der Server prüft beim ersten Schlüssel-Backup zuerst die Version und schaltet ein angenommenes Gerät frei; die Einrichtung verwirft ein abgelehntes offenes Backup; die Testattrappe der App bildet die Regel nach. Dazu der Knopf „Mit Wiederherstellungsschlüssel freischalten“. Der Worker wertet eine unbeantwortete Rückfrage „übernehmen?“ wie „nein“ (A-10) |
 | 2026-11-09 | → ersetzt 2026-11-11 (ab 1.3b1: `1.3b<n>-backup<Schritt>`, stand.md): Versionsname je auf dem Handy installiertem Stand: `1.3b0.<n>-backup<Schritt>`, `versionCode` +1 bei jeder Installation (ab `1.3b0.5-backup5`, Code 15). So zeigen Einstellungen und Diagnose-Log, welcher Stand läuft |
 | 2026-11-09 | Gerätetests: Nach jeder Änderung ein kleines festes Set manueller Tests auf dem S24, größere Testschleifen mit dem Emulator. `geraetetest.md` wird dafür gesondert überarbeitet ([stand.md](stand.md)) |
 | 2026-11-09 | Einmalige Reminder und Fristen gelten nach einem Wechsel der Zeitzone (Reise, Sicherung in einer anderen Zone wiederhergestellt) nicht als verschoben: Sie bleiben bei ihrem Termin und kommen nur wieder, wenn ihr Zeitpunkt im Formular geändert wird. Das Verschieben legt den neuen Termin ausdrücklich beim Speichern an (`Changes.save`); `ScheduleRules` plant für *einmalig* nur den ersten Termin. Ein Termin, der schon geklingelt hat, endet beim Verschieben als „Zeitplan geändert“ (wie bei Fristen). Keine Migration: der alte Vergleich steckte nur in der Rechnung, nicht in den Daten |
-| 2026-11-09 | Cloud-Backup Schritt 5 ([wiederherstellen-entwurf.md](wiederherstellen-entwurf.md)) bestätigt: erst *Sicherung prüfen* in einer eigenen Prüfdatei, kein Umschalten zwischen Datenbanken; Wiederherstellen tauscht beim nächsten Start und behält die alten Daten 7 Tage zum Rückgängigmachen; nach dem Wiederherstellen von einem anderen Gerät sichert die App erst wieder nach *Jetzt sichern* mit Rückfrage. *Zurücksetzen* aufgeteilt in *Dieses Gerät abmelden* (löscht nichts auf dem Server) und *Cloud-Daten löschen* (nur mit eingetipptem „löschen“). Bremse: fehlen mehr als 10 oder mehr als die Hälfte der Reminder, sichert die App nicht automatisch. Lokale Kopien: 7 tägliche und 4 wöchentliche. Gerätetest des Wiederherstellens auf einem Emulator mit Google Play |
-| 2026-11-08 | Cloud-Backup Schritt 4: Trifft das automatische Sichern auf die Sicherung eines anderen Geräts, ruht es sofort (wie nach „Nein“) und meldet das per Benachrichtigung; die Rückfrage „Überschreiben?“ kommt erst mit *Jetzt sichern* in den Einstellungen (backup-entwurf.md, Ergänzung zu A-10). Der Hinweis nach 3 Tagen zählt ab der letzten Stunde, in der die Sicherung aktuell war |
+| 2026-11-09 | Cloud-Backup Schritt 5 (W-1…W-8, R-1…R-6 in cloud-entscheidungen.md) bestätigt: erst *Sicherung prüfen* in einer eigenen Prüfdatei, kein Umschalten zwischen Datenbanken; Wiederherstellen tauscht beim nächsten Start und behält die alten Daten 7 Tage zum Rückgängigmachen; nach dem Wiederherstellen von einem anderen Gerät sichert die App erst wieder nach *Jetzt sichern* mit Rückfrage. *Zurücksetzen* aufgeteilt in *Dieses Gerät abmelden* (löscht nichts auf dem Server) und *Cloud-Daten löschen* (nur mit eingetipptem „löschen“). Bremse: fehlen mehr als 10 oder mehr als die Hälfte der Reminder, sichert die App nicht automatisch. Lokale Kopien: 7 tägliche und 4 wöchentliche. Gerätetest des Wiederherstellens auf einem Emulator mit Google Play |
+| 2026-11-08 | Cloud-Backup Schritt 4: Trifft das automatische Sichern auf die Sicherung eines anderen Geräts, ruht es sofort (wie nach „Nein“) und meldet das per Benachrichtigung; die Rückfrage „Überschreiben?“ kommt erst mit *Jetzt sichern* in den Einstellungen (cloud-entscheidungen.md A-10). Der Hinweis nach 3 Tagen zählt ab der letzten Stunde, in der die Sicherung aktuell war |
 | 2026-11-08 | Android Lint in Build und CI (`:app:lintDebug`): Altfunde in `app/lint-baseline.xml`, jeder neue Fund (auch Warnung) macht den Build rot; Versions-Hinweise sind abgeschaltet. Go bleibt bei gofmt, go vet und golangci-lint im Backend; detekt erst, wenn Lint ruhig läuft, kein Qodana |
 | 2026-11-08 | Wiederherstellungsschlüssel: Die App bietet automatisch an, ihn im Passwortdienst zu sichern, und holt ihn von dort beim Wiederherstellen (7.33, Wunsch aus dem ersten Gerätetest von Backup Schritt 2). Papier bleibt der Weg ohne Passwortdienst |
-| 2026-11-07 | Cloud-Backup in der App: Entwurf [backup-entwurf.md](backup-entwurf.md) A-1 bis A-14 bestätigt. Keine eigene App-Variante, solange nur Kevin die App nutzt (Schalter aus PS8 im normalen Build); Composite Build mit festem Backend-Commit und Deploy-Key in der CI; neue Berechtigung `INTERNET` (8.4 präzisiert); Credential Manager, Geräteschlüssel und Keysets im Android Keystore; ZIP aus Datenbank und Einstellungen; stündlich per WorkManager nur bei Änderung; Wiederherstellen ersetzt die Datenbank nach lokaler Kopie; Diagnose ans Backend nur mit eigenem Logger ohne Inhalte. App und `core` bauen für Java 21 statt 17 |
+| 2026-11-07 | Cloud-Backup in der App: Entwurf A-1 bis A-14 (cloud-entscheidungen.md) bestätigt. Keine eigene App-Variante, solange nur Kevin die App nutzt (Schalter aus PS8 im normalen Build); Composite Build mit festem Backend-Commit und Deploy-Key in der CI; neue Berechtigung `INTERNET` (8.4 präzisiert); Credential Manager, Geräteschlüssel und Keysets im Android Keystore; ZIP aus Datenbank und Einstellungen; stündlich per WorkManager nur bei Änderung; Wiederherstellen ersetzt die Datenbank nach lokaler Kopie; Diagnose ans Backend nur mit eigenem Logger ohne Inhalte. App und `core` bauen für Java 21 statt 17 |
 | 2026-11-07 | Vorab verschieben und auslassen (7.32): Alarm-Bildschirm vorab mit *Verschieben* und *Auslassen*, „heute später“ +30 min/+1/+2 Std ab der geplanten Zeit, zählt aufs Verschieben-Konto, bei *streng* mit Rückfrage; Ort behält die neue Zeit, wartet sonst auf die Ankunft; Vorab-Reminder wandert mit; NT2 zählt Verschieben mit. Umgesetzt in V1.3b0.4 |
 | 2026-11-07 | Erledigung zurücknehmen (7.31): Rückgängig-Benachrichtigung 1 min, danach *Zurücknehmen* auf *Heute*; wieder offen, klingelt in 10 min ohne als *Später* zu zählen; nur der letzte Termin, bis der nächste klingelt bzw. bis zur Tagesgrenze; *Auslassen* auch, *verpasst*/*entfällt* nicht; Nachweis zählt wieder; neues Ereignis statt Löschen. Umgesetzt in V1.3b0.4 |
 | 2026-11-05 | 7.29 einfach anfangen: Ort **nur über WLAN** (Verbindung und Ergebnisse der WLAN-Suche, BSSIDs pro Ort), Prüfungen im Zeitraum lesen nur den WLAN-Zustand, sonst Rückfall wie bisher. Genaue Ortsprüfung per GPS nach **7.30** ausgelagert, später und erst nach einer Messung. Kevin hat die Anforderungen im Ganzen gelesen |
@@ -1214,7 +1210,7 @@ Neueste zuerst. Kap. 7 enthält immer den gültigen Stand; diese Tabelle ist die
 | 2026-11-02 | AG11 bestätigt und als V1.3a2 umgesetzt: ContentProvider mit `DUMP`, nur Debug-Build, Schalter mit Rückfrage; Claude darf Reminder-Inhalte über die freigegebene Schnittstelle lesen, sie bleiben aber aus Repo und Logs |
 | 2026-11-02 | Schnittstelle für Claude vorgezogen (vor V1.3b): Reminder lesen und schreiben über adb, ausdrücklich in der App freizugeben; Entwurf in 7.26 AG11 |
 | 2026-11-02 | V1.3a umgesetzt: höchstens 6 Uhrzeiten am Tag; Notaus mit 1 Stunde, bis morgen 06:00 oder bis zum Einschalten; Wochenend-Schalter gilt für Alarmzeiten und Übersicht zusammen |
-| 2026-11-02 | V1.3-Entwurf bestätigt (design.md E.5): Aufteilung a/b/c; mehrere Uhrzeiten – verpasst beim nächsten Termin, kein Wochenziel und keine Ankunft; NT2-Schwelle 3×2 (oder einmal 4×), Karte auf *Heute*, *Nein danke* 14 Tage; *Notaus* bricht keine Serie; für V1.3b: *abgebrochen* bricht die Serie, Nachfragen *locker*, max. 90 min. V1.3a gestartet |
+| 2026-11-02 | V1.3-Entwurf bestätigt (design.md, Git-Verlauf): Aufteilung a/b/c; mehrere Uhrzeiten – verpasst beim nächsten Termin, kein Wochenziel und keine Ankunft; NT2-Schwelle 3×2 (oder einmal 4×), Karte auf *Heute*, *Nein danke* 14 Tage; *Notaus* bricht keine Serie; für V1.3b: *abgebrochen* bricht die Serie, Nachfragen *locker*, max. 90 min. V1.3a gestartet |
 | 2026-11-02 | Ziel offizieller Play-Store-Release für eine sehr kleine Zielgruppe, mit Backend (Backup, Sync) und vollem EU-Datenschutz; Android 17 bleibt Minimum (7.28) |
 | 2026-11-02 | Verschlüsselung auf dem Gerät geklärt: Sandbox + Release-Build reichen, kein SQLCipher (7.28 PS9) |
 | 2026-11-02 | Play Store ohne Eile: erst „fertig“ (mindestens bis V2, ggf. Backend); dafür Transparenz, Notausschalter, Backend nur nach Einschalten; Verschlüsselung auf dem Gerät wird bewertet (7.28 PS5–PS9) |
@@ -1223,64 +1219,6 @@ Neueste zuerst. Kap. 7 enthält immer den gültigen Stand; diese Tabelle ist die
 | 2026-11-02 | V1.2c-Entwurf (design.md 12.4) bestätigt und umgesetzt: Fristen mit Ausführungsfenstern, Vorlagen, Vorab-Reminder, Blocker als Liste mit Vorbereitungsaufgaben, *Blocker gelöst* als Minimum, Nachfragen wenn es hakt |
 | 2026-11-02 | Testsession erst vor V2 statt vor V1.3 – die App läuft im Alltag gut |
 | 2026-11-01 | Schnittstelle für KI-Agenten in V2: nur lokal, für alle persönlichen Agenten, freiwillig mit Freigabe pro Agent; Agent erledigt nur als *delegierbar* markierte Reminder, nie Nachweis oder Alarm; App stößt den Agenten an; Datenschutz verantwortet der Nutzer, mit deutlichem Hinweis (7.26) |
-| 2026-10-31 | Mehrmals täglich: Serie hält mit mindestens einem eingehaltenen Termin pro Tag. Wochenend-Zeiten gelten auch für die Tagesgrenze (7.25) |
-| 2026-10-31 | V1.2b bestätigt wie Entwurf. UI-Feinschliff aus den ersten Vorschlägen noch vor der Testsession; mehrmals täglich und Wochenend-Zeiten nach V1.3 (7.25) |
-| 2026-10-29 | Reminder-Liste: abgeschlossene Einmal-Reminder automatisch eingeklappt, Archivieren von Hand, Gruppen und Sortierung (V1.2). Einmal-Reminder mit neuer Zeit wird wieder eingeplant und eingeschaltet (Bugfix, sofort) |
-| 2026-10-29 | V1.2 in drei Etappen: a Alltag (Vorschläge, Liste), b Ziele über die Zeit, c Fristen und Blocker; Vorab-Reminder (T6) in V1.2c |
-| 2026-10-28 | "Verbesserung vorschlagen" in der App: von überall erreichbar, Kontext automatisch, lokal gespeichert, als Text teilbar (V1.2) |
-| 2026-10-27 | Alarm verstummt, solange der Nachweis läuft (mit Frist, Standard 10 min); Text-Nachweis mit Mindestzeichen und Audio-Nachweis mit Mindestdauer, Nachweise kombinierbar – alles V1.1; Audio von der Uhr in V1.4 |
-| 2026-10-27 | Spike abgeschlossen: 13/13 Alarme pünktlich, Update + Neustart überstanden, kein Problem mit Samsungs Akkumanagement. Ankunft zuhause in V1.1 erst nach Verweildauer werten (Geofence grob) |
-| 2026-10-26 | Vollbild-Alarme ("normal", "streng") erscheinen nicht auf der Uhr → zusätzliche spiegelbare Benachrichtigung in V1.1 (G1b) |
-| 2026-10-26 | Feste Ruhezeit (außerhalb 7–21 Uhr still) entfällt ab V1.1; stattdessen gilt "Nicht stören" des Handys. Pro Reminder "auch bei Nicht stören" für besondere Ereignisse (ersetzt die Aufsteh-Wecker-Ausnahme). Laut weiterhin ab 18 Uhr; verpasst ab Tagesgrenze, Standard 23 Uhr |
-| 2026-10-26 | Verschiebe-Knöpfe pro Reminder (1–2, z. B. +10 oder +30/+60 min), V1.1; kurzes Verschieben ohne Limit, aber gezählt, nicht über die Tagesgrenze |
-| 2026-10-25 | Mehrere Personen (V3) möglichst ohne Backend über lokale Synchronisation im Haushalt |
-| 2026-10-25 | Sensible Daten grundsätzlich nur lokal auf dem Gerät |
-| 2026-10-25 | GPS-Routen erst V2/V3 – punktuelle Ortserkennung reicht vorerst |
-| 2026-10-25 | Bewegungsdaten von Handy und Uhr als Forschungsprojekt (messen, später auswerten), V2 |
-| 2026-10-25 | Startklar-Fragen (Ziel, Hindernisse, Startbereitschaft, erster Schritt) Pflicht bei Überwindung, änderbar mit Verlauf (V1.1); Blocker als Vorbereitungsaufgaben, Nachfragen bei wiederholtem Verschieben, "Blocker gelöst" als Minimum (V1.2) |
-| 2026-10-25 | Aufsteh-Wecker zweistufig (normal, dann nicht abschaltbar bis Nachweis), V2; einfachste Variante (Schritte) als PoC früher möglich, Home-Assistant-Varianten später |
-| 2026-10-25 | Haushaltsinventar (grob, "zuletzt gesehen", Import aus externer KI-Erfassung) und Einkaufsliste mit Geschäfts-Trigger, V3 – vielleicht nie; keine Anbindung an externe Listen-Apps; geteilte Liste ggf. über Home Assistant, Backend nur wenn wirklich nötig – Entscheidung in V3 |
-| 2026-10-25 | Reminder vorab erledigen (V1.1) und vorgezogen starten (V1.3); "vor dem Reminder erledigt" wird positiv ausgewiesen |
-| 2026-10-25 | Raumerkennung über Bluetooth-Empfänger mit der Uhr als Sender, ergänzt um aktive Methoden (Bewegung, Präsenzmelder, Taster) |
-| 2026-10-25 | Watch-App ist Fernbedienung und Anzeige, Logik bleibt auf dem Handy (Handy immer in der Nähe); laufende Reminder komplett über die Uhr bedienbar |
-| 2026-10-25 | Leitprinzip 10: nicht ans Handy gebunden |
-| 2026-10-25 | Eigene Watch-App in V1.4 – Bedienung laufender Reminder ohne Handy |
-| 2026-10-25 | NFC-Kontrollpunkte nach V3 – zu unflexibel; stattdessen Raumerkennung per Bluetooth und Taster über Home Assistant, V2 (ggf. V3) |
-| 2026-10-25 | ~~NFC-Kontrollpunkte als Nachweis im Haus, V1.3~~ → ersetzt: nach V3, Räume über Home Assistant (2026-10-25) |
-| 2026-10-25 | Watch: Benachrichtigungen samt Aktionen kommen bereits an – kein eigener Spike nötig |
-| 2026-10-25 | Training: nur Dauer und erledigte Schritte/Sätze; Wiederholungen/Gewicht bleiben V2 |
-| 2026-10-25 | Dauer wird getrackt und mit früheren Sitzungen verglichen (schnell fertig werden soll sich lohnen) |
-| 2026-10-25 | Maximale Dauer pro Sitzung; danach letzter Reminder so streng wie möglich, kurze Reaktionszeit, dann nicht erfüllt – mit erledigten Teilschritten zählt das Minimum |
-| 2026-10-25 | Nachfragen in Sitzungen zeitbasiert (Standard alle 10 min), Strenge der Nachfragen einstellbar |
-| 2026-10-25 | Restpunkte verschieben zählt nicht gegen das Limit, wenn am Tag mindestens ein Punkt erledigt wurde |
-| 2026-10-25 | Checkliste = Block: Intervall ab dem ersten erledigten Punkt, nächste Runde mit allen Punkten |
-| 2026-10-25 | Checklisten mit einzeln verschiebbaren Punkten |
-| 2026-10-25 | Durchführung mit Timer ("Ich starte jetzt") und Nachfrage-Muster; Abläufe für geregeltes Training, begrenzt aufs Wichtigste – keine Trainings-App |
-| 2026-10-25 | Galaxy Watch vorgezogen auf V1.3, zuerst über Benachrichtigungen |
-| 2026-10-25 | Alles bis einschließlich V1.3 kommt vor V2 |
-| 2026-10-24 | Strenge hochgestuft: *locker* = Banner + Vibration alle 10 min, *normal* = Vollbild wie Wecker ohne Ton |
-| 2026-10-18 | V1 in Etappen V1.0 / V1.1 / V1.2 → erweitert um V1.3 und V1.4 (2026-10-25), Stand in 10.1 |
-| 2026-10-18 | Wochen Mo–So; Rettungs-Erinnerung am Wochenende; Joker 1/Woche (täglich) bzw. 1/Monat (wöchentlich) |
-| 2026-10-18 | Besprechungen: Schnellknopf statt Kalenderabgleich |
-| 2026-10-18 | Widget für Ein-Klick-Erstellung; Strenge-Vorlagen in V1 (Startwerte siehe 7.9) |
-| 2026-10-18 | Dokumentation per Freitext + Audio; Zahlenwerte später |
-| 2026-10-18 | Auslassen zählt neutral; Serie hält bei Minimum; ein Aussetzer pro Woche/Monat erlaubt |
-| 2026-10-18 | Reminder kennen Ausführungsfenster; Fristen erinnern häufig, "auf morgen" möglich |
-| 2026-10-18 | Wiederkehrendes standardmäßig ab letzter Erledigung, kalendarisch optional |
-| 2026-10-18 | Training: Tagesangebot (Ankunft / 19 Uhr / sonst entfällt) + Wochenziel 3–4×, nie eine Woche ohne → Zeitraum ab 2026-11-04 (7.29) |
-| 2026-10-18 | Eskalation = Vollbild oder wiederholte Benachrichtigung bis Reaktion; **7–21 Uhr sichtbar** (Vollbild + Vibration), **18–21 Uhr laut** → ersetzt durch „Nicht stören“ und Tagesgrenze (2026-10-26) und *laut ab* (7.3) |
-| 2026-10-18 | ~~Daten nur lokal, kein Backup in V1~~ → ersetzt: Backup B2b mit Backend, Ende-zu-Ende verschlüsselt (2026-11-02, 7.28; 8.4) |
-| 2026-10-18 | Übersicht morgens und abends (einstellbar), inkl. Rückblick |
-| 2026-10-18 | Motivations-Audio nur auf Klick |
-| 2026-10-18 | Motivation über Statistik, Serien, Fortschritt (Woche/Monat/Jahr/gesamt); keine Belohnungssysteme |
-| 2026-10-18 | Nachweisart pro Reminder; fehlender Nachweis = "nicht erfolgreich" → präzisiert 2026-11-05 (7.5) |
-| 2026-10-18 | Minimum entscheidet der Nutzer; Limits für Minimum und Verschieben pro Reminder |
-| 2026-10-18 | Feste, flexible und ortsbasierte Reminder in V1 |
-| 2026-10-18 | KI später: teils lokal, teils über Backend |
-| 2026-10-18 | ~~Galaxy Watch nicht in V1~~ → ersetzt: V1.3 (2026-10-25) |
-| 2026-10-18 | Positive Verstärkung vor negativer; negative nur taktisch und begrenzt |
-| 2026-10-18 | Nur Android 17 (API 37), Zielgerät S24 Ultra, nur Privatgeräte |
-| 2026-10-18 | V1 lokal, nur ein Nutzer, Sideload |
 
 ## 10. Nächste Schritte
 
@@ -1306,53 +1244,34 @@ Neueste zuerst. Kap. 7 enthält immer den gültigen Stand; diese Tabelle ist die
 | V1.3b0.5 | 2026-11-11 | Cloud-Backup Schritte 1–5 in `develop`, Fixes aus Review-Lauf 10 |
 | V1.3b0.6 | 2026-11-11 | Ankunft im Zeitraum mit WLAN (7.29), weiterer Ort, Geofences nach `GEOFENCE_NOT_AVAILABLE` neu registriert |
 | V1.3b1 | 2026-11-11 | Sitzung mit Timer und Uhr (7.11, 7.20 V2) |
+| V1.3b2 | – | Antworten auf Review-Lauf 4: Sitzung zählt in der Woche ihres Starts, Abbruch zurücknehmbar, F2 über die geplante erste Prüfung, wiederholte WLAN-Meldung keine Ankunft; Tests (Kap. 9, 2026-11-12) |
 
 Details zum Verhalten: [design.md](design.md), Gerätetests: [geraetetest.md](geraetetest.md).
 
 ### 10.2 Plan
 
-1. ✅ **Technischer Spike auf dem S24 Ultra** (Plan: [spike.md](spike.md))
-2. **V1 in Etappen**, damit früh echte Nutzung möglich ist (umgesetzt bis V1.3b0.2, siehe 10.1):
-   - **V1.0 (benutzbar):** Zeit-Reminder, Eskalation, Aktionen, Quittieren/Foto,
-     Ziel/Minimum, einfache Liste der Erledigungen, Widget
-     – ✅ seit 2026-10-24 auf dem Gerät, inkl. Intervall ab letzter Erledigung
-   - **V1.1:** Ort (Ankunft zuhause), **Checklisten** (7.13), Audio-Nachweis,
-     Motivations-Audio, **vorab erledigen** (7.20), **Startklar-Fragen** (7.21, S1–S4),
-     **Vollbild-Alarme auf der Uhr** (7.14, G1b), **"Nicht stören" statt Ruhezeiten**
-     und Tagesgrenze (7.3), **Verschiebe-Knöpfe pro Reminder** (7.4),
-     **Alarm aus während des Nachweises**, **Text-Nachweis**, kombinierbare
-     Nachweise (7.5)
-   - **V1.2** in drei Etappen:
-     - **V1.2a:** **Verbesserung vorschlagen** (7.24), **Reminder-Liste aufräumen**
-       (7.9, L1–L5)
-     - **V1.2b:** Wochenziele, Serien/Joker, Statistik, Übersicht morgens/abends
-     - **V1.2c:** Fristen mit Ausführungsfenstern, **Vorab-Reminder** (T6), **Blocker
-       als Aufgaben** (7.21, S5–S8), Vorlagen
-   - **Jetzt (seit 2026-11-02): Nutzung beobachten und trimmen** (7.27): welche
-     Funktionen Kevin wirklich nutzt, Rückfragen bei Schlupflöchern, Hinweis bei
-     wiederholtem *Später*. Fehler aus dem Alltag als Fix auf `develop`.
-   - ✅ **Ankunft im Zeitraum** mit WLAN (7.29), umgesetzt in V1.3b0.6 (2026-11-11);
-     GPS (7.30) später.
-   - **V1.3:** **Durchführung mit Timer** und Nachfrage-Muster (7.11), ein Vollbild
-     zur Zeit (7.3), Knöpfe je Art (7.4), **Abläufe**
-     für Training (7.12), **Galaxy Watch** über Benachrichtigungen (7.14),
-     **vorgezogen starten** (7.20)
-   - **V1.4:** **eigene Watch-App** für laufende Reminder (7.14, G5–G9)
-   - **Kandidat zum Vorziehen:** Aufsteh-Wecker (7.22) als PoC mit Schritten –
-     sinnvoll ab V1.4 (Schritte auf der Uhr), eine Handy-only-Variante auch früher.
-   - **Möglicher Kandidat zum Vorziehen:** Einkaufsliste nur für einen selbst mit
-     Geschäfts-Trigger (7.23, E1–E3) – ohne Inventar, KI und Abgleich; Technik
-     ab V1.1 vorhanden. Nicht festgelegt.
-3. **V2** (Kap. 4), danach erst der **Play-Store-Release** mit Backend für Backup und
-   Sync, EU-Datenschutz (7.28 PS5, 2026-11-02).
-4. Weitere Anforderungen ergeben sich aus der Nutzung.
+Was schon umgesetzt ist, steht in 10.1.
+
+1. **Jetzt: Nutzung beobachten und trimmen** (7.27): welche Funktionen Kevin wirklich
+   nutzt, Rückfragen bei Schlupflöchern. Fehler aus dem Alltag als Fix auf `develop`.
+2. **V1.3c:** **Abläufe** für Training (7.12), dazu ein Vollbild zur Zeit mit *+1 wartet*
+   (7.3) und Knöpfe je Art mit *Rest später* (7.4). Entwurf nach einer Woche Training mit
+   der Sitzung (Skizze am Ende von design.md).
+3. **V1.4:** **eigene Watch-App** für laufende Reminder (7.14, G5–G9).
+   - Kandidat zum Vorziehen: Aufsteh-Wecker (7.22) als PoC mit Schritten – sinnvoll ab
+     V1.4 (Schritte auf der Uhr), eine Handy-only-Variante auch früher.
+   - Möglicher Kandidat: Einkaufsliste nur für einen selbst mit Geschäfts-Trigger (7.23,
+     E1–E3), ohne Inventar, KI und Abgleich. Nicht festgelegt.
+4. GPS für die Ortsprüfung (7.30), wenn WLAN im Alltag nicht reicht.
+5. **V2** (Kap. 4), vorher Testsession und Nutzung zählen (NT4); danach erst der
+   **Play-Store-Release** mit Backend für Backup und Sync, EU-Datenschutz (7.28 PS5).
+6. Weitere Anforderungen ergeben sich aus der Nutzung.
 
 ## 11. Offene Fragen
 
-Die Fragen aus Review-Lauf 3 (2026-11-05) sind entschieden (Kap. 9). Offen, aber
-klein (Stand 2026-11-05):
-- Vor V1.3 kurz prüfen, ob *Ich starte jetzt* und die Nachfrage-Antworten auf der Uhr
-  genauso ankommen wie *Erledigt* / *+10 min*.
+Offen, aber klein:
+- Zeigt die Uhr den Chronometer der gespiegelten Sitzungs-Benachrichtigung, oder nur die
+  Startzeit (Gerätetest K28)?
 - Sommerzeit: Was passiert mit einer Uhrzeit zwischen 02:00 und 03:00 am
   Umstellungstag, und mit einer Tagesgrenze nach Mitternacht?
 - Handy im Ankunftszeitraum aus und erst nach der spätesten Uhrzeit wieder an (7.29).
@@ -1376,16 +1295,6 @@ Für später:
   exakte Alarme, Standort im Hintergrund, Foreground-Service), und welche Testphase
   verlangt Google vor dem ersten Release? Vor dem Start an den aktuellen Richtlinien
   prüfen.
-- Backend (7.28): Wie passen Backup und Sync zu 8.4 (sensible Daten nur auf dem Gerät)?
-  Empfehlung: Backup Ende-zu-Ende verschlüsselt, sodass das Backend nur verschlüsselte
-  Daten sieht. **Geklärt:** Das Backend ist genau so gebaut ([backend.md](backend.md)).
-- ~~Verschlüsselung auf dem Gerät~~ – geklärt 2026-11-02 (7.28 PS9). Begründung: Android trennt App-Daten schon heute
-  (Sandbox, dateibasierte Verschlüsselung, `allowBackup=false`). Lesbar sind sie nur
-  über `run-as` in Debug-Builds und auf gerooteten Geräten. **Empfehlung:** Für den
-  Play Store ein Release-Build (nicht debuggable) – das schließt `run-as` aus.
-  Zusätzlich SQLCipher mit Schlüssel im Keystore nur, wenn ein konkreter Fall übrig
-  bleibt; es kostet Leistung, erschwert Diagnose und Migrationen. Fotos und Audio
-  lägen weiterhin als Dateien vor.
 - V2: Wie genau funktioniert die Freigabe für Agenten (Kopplung, Stufen, sensible
   Kategorien), und welche Agenten-Apps erreichen App Functions bzw. einen lokalen
   MCP-Server tatsächlich (7.26)?

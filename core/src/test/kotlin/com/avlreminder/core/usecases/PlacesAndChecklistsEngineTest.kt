@@ -73,7 +73,7 @@ class PlacesAndChecklistsEngineTest {
 
     @Test
     fun `without a window, arriving rings today's occurrence before its time`() = runTest {
-        // Lead 0: as before 7.29 (design.md Z.7 4.).
+        // Lead 0: as before 7.29 (design.md 6, Vorlauf 0).
         val r = training(homeId())
         val id = create(r.copy(arrival = r.arrival!!.copy(leadMinutes = 0)))
         clock.now = at(26, 17, 30)

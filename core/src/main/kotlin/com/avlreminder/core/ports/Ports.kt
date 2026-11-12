@@ -119,7 +119,7 @@ enum class PlaceSource {
 data class PlaceCheck(val result: PlaceResult, val source: PlaceSource?, val scanAge: Duration? = null)
 
 /**
- * The checks of a place in its arrival window (7.29 Z.3): one alarm per place, not per occurrence.
+ * The checks of a place in its arrival window (design.md 6): one alarm per place, not per occurrence.
  * It hands [at] back to [com.avlreminder.core.usecases.ReminderEngine.onPlaceCheck]; [exact]: also
  * in Doze on time (the check at the start of a window).
  */

@@ -89,7 +89,7 @@ class AndroidGeofences(private val context: Context, private val dwellMinutes: (
 
         /**
          * Android dropped the geofences (GEOFENCE_NOT_AVAILABLE, e.g. location switched off):
-         * the next sync registers them again (design.md 6., Anf. 7.29 Z.4).
+         * the next sync registers them again (design.md 6).
          */
         fun forget() {
             registered = null

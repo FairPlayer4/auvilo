@@ -104,7 +104,7 @@ object Stats {
 
     private fun outcome(resolution: Resolution?) = when (resolution) {
         Resolution.GOAL, Resolution.MINIMUM -> Outcome.COUNT
-        // An aborted session breaks the series like a miss (design.md E.5).
+        // An aborted session breaks the series like a miss (design.md 3.1).
         Resolution.MISSED, Resolution.ABORTED -> Outcome.MISS
         else -> Outcome.KEEP
     }

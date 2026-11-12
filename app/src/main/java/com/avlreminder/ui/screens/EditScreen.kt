@@ -601,7 +601,7 @@ private fun sessionSummary(form: ReminderForm): String {
     ).joinToString(" · ")
 }
 
-/** "Ich starte jetzt", timer and checks (Anf. 7.11, design.md E.3). */
+/** "Ich starte jetzt", timer and checks (Anf. 7.11, design.md 3.1). */
 @Composable
 private fun SessionSection(form: ReminderForm, onChange: (ReminderForm) -> Unit) {
     val c = Avl.colors

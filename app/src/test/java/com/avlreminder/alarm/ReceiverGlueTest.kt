@@ -329,7 +329,7 @@ class ReceiverGlueTest {
     }
 
     /**
-     * In the arrival window the engine sets the check alarm of the place (7.29 Z.3); when it
+     * In the arrival window the engine sets the check alarm of the place (design.md 6); when it
      * fires, the check runs and the log has its result without WLAN names or BSSIDs.
      */
     @Test

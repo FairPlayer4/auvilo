@@ -232,7 +232,7 @@ class AppViewModel(app: Application) : AndroidViewModel(app) {
         viewModelScope.launch { if (!graph.withEngine { it.setArchived(reminderId, archived) }) running() }
     }
 
-    /** Pausing or archiving a running session is rejected (design.md E.3); say so instead of doing nothing. */
+    /** Pausing or archiving a running session is rejected (design.md 3.1); say so instead of doing nothing. */
     private fun running() {
         Toast.makeText(getApplication(), "Läuft gerade – erst die Sitzung beenden", Toast.LENGTH_LONG).show()
     }

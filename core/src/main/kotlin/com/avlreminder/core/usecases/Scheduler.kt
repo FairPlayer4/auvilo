@@ -187,7 +187,7 @@ internal class Scheduler(private val c: EngineContext, private val views: AlarmV
     private fun local(at: Instant) = at.atZone(zone).toLocalTime().withNano(0)
 
     /**
-     * The next check of each place (7.29 Z.3): the earliest of all occurrences waiting there, so
+     * The next check of each place (design.md 6): the earliest of all occurrences waiting there, so
      * the shortest check interval wins. Runs at the end of every command. The check at the start
      * of a window is exact also in Doze: it decides F2.
      */

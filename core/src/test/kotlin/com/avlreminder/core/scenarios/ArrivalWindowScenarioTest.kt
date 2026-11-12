@@ -18,7 +18,7 @@ import org.junit.jupiter.api.Assertions.assertTrue
 import org.junit.jupiter.api.Test
 
 /**
- * Ankunft im Zeitraum mit WLAN (Anf. 7.29, design.md Z.6): ganze Tage mit [Simulation].
+ * Ankunft im Zeitraum mit WLAN (Anf. 7.29, design.md 6): ganze Tage mit [Simulation].
  * Training um 19:30 mit Vorlauf 90 min, also Zeitraum 18:00–19:30, Puffer 5 min, Prüfung alle 20 min.
  * 2026-10-26 ist ein Montag.
  */
@@ -235,7 +235,7 @@ class ArrivalWindowScenarioTest {
         assertEquals(emptyList<String>(), sim.rings)
     }
 
-    // Z.8: Bearbeiten leert arrivedAt – die Ankunft gehört zum alten Zeitraum, nicht zum neuen.
+    // design.md 6: Bearbeiten leert arrivedAt – die Ankunft gehört zum alten Zeitraum, nicht zum neuen.
     @Test
     fun `nach der Ankunft auf spaeter verlegt zaehlt die Ankunft nicht mehr`() = runTest {
         val id = training(home())

@@ -24,7 +24,7 @@ sealed interface SessionStep {
 }
 
 /**
- * The session with timer and checks (Anf. 7.11, design.md E.3): when its alarm comes, what it
+ * The session with timer and checks (Anf. 7.11, design.md 3.1): when its alarm comes, what it
  * does then and what the answers suggest. A session ends only through an answer or its maximum
  * duration; the end of the day does not apply to it (D7).
  */

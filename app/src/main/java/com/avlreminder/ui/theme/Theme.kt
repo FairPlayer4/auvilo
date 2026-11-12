@@ -11,7 +11,7 @@ import androidx.compose.runtime.staticCompositionLocalOf
 import androidx.compose.ui.graphics.Color
 import com.avlreminder.data.ThemeMode
 
-/** Design tokens (docs/design.md, section 7). Screens use only these, never fixed colors. */
+/** Design tokens (docs/design.md 11.4). Screens use only these, never fixed colors. */
 @Immutable
 data class AvlColors(
     val background: Color,

@@ -153,7 +153,7 @@ class AppGraph(private val context: Context) : ClaudeApi.Access {
     val location = AndroidLocation(context)
     val wifi = AndroidWifi(context)
 
-    /** Cloud backup (backup-entwurf.md); nothing touches the network until it is switched on. */
+    /** Cloud backup (design.md 16); nothing touches the network until it is switched on. */
     private val cloudStore = CloudStore(context)
     private val cloudLog = CloudLog(File(context.filesDir, "cloud-diag"), header = ::diagnosisHeader)
     private val restoreTarget = DatabaseRestore(context, db, settings, restoreFiles)

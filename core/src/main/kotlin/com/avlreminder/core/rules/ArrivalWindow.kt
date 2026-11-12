@@ -9,7 +9,7 @@ import java.time.Duration
 import java.time.Instant
 import java.time.ZoneId
 
-/** What an arrival means for one occurrence (Anf. 7.29, design.md Z.2). */
+/** What an arrival means for one occurrence (Anf. 7.29, design.md 6). */
 sealed interface ArrivalDecision {
     /** Nothing changes: no arrival trigger, not waiting, or the first arrival counted already. */
     data object Ignore : ArrivalDecision

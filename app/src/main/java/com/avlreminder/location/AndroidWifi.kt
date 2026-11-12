@@ -172,7 +172,7 @@ class WifiConnections(context: Context) {
 }
 
 /**
- * The checks of a place in its arrival window (design.md Z.3): one alarm per place, like the other
+ * The checks of a place in its arrival window (design.md 6): one alarm per place, like the other
  * alarms derived from the database on every sync. The check at the start of a window is exact also
  * in Doze (it decides F2), the others are inexact, `setWindow` with [WINDOW_MS]. The intent carries
  * the planned time.
