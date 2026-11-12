@@ -26,11 +26,14 @@ enum class ScheduleKind { ONCE, DAILY, WEEKDAYS, AFTER_DONE, ON_ARRIVAL, DEADLIN
 enum class PreNoticeKind { NONE, EVENING, BEFORE }
 
 /** One "Startklar" answer while editing. */
-data class PrepDraft(val text: String = "", val unknown: Boolean = false) {
+data class PrepDraft(val text: String = "", val unknown: Boolean = false) : java.io.Serializable {
     val answered: Boolean get() = unknown || text.isNotBlank()
 }
 
-/** Editable state of the "Reminder anlegen" screen. Keeps all schedule fields so switching kinds loses nothing. */
+/**
+ * Editable state of the "Reminder anlegen" screen. Keeps all schedule fields so switching kinds loses
+ * nothing. Serializable: the draft survives the activity being recreated (Review-Lauf 5).
+ */
 data class ReminderForm(
     val id: Long = 0,
     val createdAt: Instant? = null,
@@ -90,7 +93,7 @@ data class ReminderForm(
     val sessionMinimum: Int? = null,
     val sessionMax: Int = SessionSpec.DEFAULT_MAX,
     val sessionFinal: Int = SessionSpec.DEFAULT_FINAL,
-) {
+) : java.io.Serializable {
     /** Several times a day are possible for these kinds only (VS1). */
     val timesPossible: Boolean get() = kind == ScheduleKind.DAILY || kind == ScheduleKind.WEEKDAYS
 
@@ -133,6 +136,9 @@ data class ReminderForm(
             else -> null
         }
 
+    /** A minimum as text, or the minimum duration of a session (Review-Lauf 5, 6b). */
+    val hasMinimum: Boolean get() = minimum.isNotBlank() || (session && sessionMinimum != null)
+
     /** The reminder to save, or null if the schedule is incomplete. */
     fun toReminder(now: Instant): Reminder? {
         val schedule = schedule ?: return null
@@ -146,8 +152,8 @@ data class ReminderForm(
             schedule = schedule,
             goal = goal.trim().ifEmpty { null },
             minimum = minimum,
-            // Without a minimum a weekly limit means nothing.
-            minimumLimitPerWeek = if (minimum == null) null else minimumLimitPerWeek,
+            // Without a minimum a weekly limit means nothing; the minimum duration of a session counts too.
+            minimumLimitPerWeek = if (hasMinimum) minimumLimitPerWeek else null,
             proof = proof,
             postponeLimit = postponeLimit,
             active = active,
@@ -155,8 +161,8 @@ data class ReminderForm(
             ignoreDnd = ignoreDnd,
             snoozeMinutes = snoozeMinutes,
             motivationAudio = motivationAudio,
-            // Without a place the validation says what is missing.
-            arrival = arrival?.takeIf { placeId != null },
+            // Without a place the engine says what is missing instead of dropping it (Review-Lauf 5).
+            arrival = arrival,
             checklist = checklist.map { it.copy(title = it.title.trim()) }.filter { it.title.isNotEmpty() },
             weeklyGoal = if (weekly && weeklyPossible) WeeklyGoal(weekTarget, weekMax, weekMinimum) else null,
             preNotice = when (preNotice) {

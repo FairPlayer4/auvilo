@@ -38,6 +38,7 @@ import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.combine
+import kotlinx.coroutines.flow.filterNotNull
 import kotlinx.coroutines.flow.flow
 import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.flow.stateIn
@@ -63,8 +64,9 @@ class AppViewModel(app: Application) : AndroidViewModel(app) {
     private fun <T> state(initial: T, flow: Flow<T>): StateFlow<T> =
         flow.stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), initial)
 
-    val reminders: StateFlow<List<Reminder>> = state(
-        emptyList(),
+    /** null until loaded, like [places] and [prep]: the form waits for them (Review-Lauf 5). */
+    val reminders: StateFlow<List<Reminder>?> = state(
+        null,
         combine(dao.observeReminders(), dao.observeItems()) { l, items ->
             val byReminder = items.groupBy { it.reminderId }
             l.map { it.toModel(byReminder[it.id].orEmpty()) }
@@ -72,8 +74,8 @@ class AppViewModel(app: Application) : AndroidViewModel(app) {
     )
 
     /** The places with their WLANs; the first is "Zuhause" (Anf. 7.29 OZ6). */
-    val places: StateFlow<List<Place>> = state(
-        emptyList(),
+    val places: StateFlow<List<Place>?> = state(
+        null,
         combine(dao.observePlaces(), dao.observePlaceWifis()) { places, wifis ->
             val byPlace = wifis.groupBy { it.placeId }
             places.map { it.toModel(byPlace[it.id].orEmpty()) }
@@ -90,7 +92,7 @@ class AppViewModel(app: Application) : AndroidViewModel(app) {
 
     val today: StateFlow<Today?> = state(
         null,
-        combine(reminders, open, resolved, ticks) { r, o, d, now -> Overview.today(r, o + d, now, zone) },
+        combine(reminders.filterNotNull(), open, resolved, ticks) { r, o, d, now -> Overview.today(r, o + d, now, zone) },
     )
 
     /**
@@ -99,7 +101,7 @@ class AppViewModel(app: Application) : AndroidViewModel(app) {
      */
     val itemsDone: StateFlow<Map<Long, List<ItemDone>>> = state(
         emptyMap(),
-        combine(dao.observeItemsDone(), reminders, open, resolved) { l, r, o, d ->
+        combine(dao.observeItemsDone(), reminders.filterNotNull(), open, resolved) { l, r, o, d ->
             Checklists.doneByOccurrence(r, o, d, l.map { it.toModel() })
         },
     )
@@ -109,7 +111,7 @@ class AppViewModel(app: Application) : AndroidViewModel(app) {
 
     val history: StateFlow<List<HistoryDay>> = state(
         emptyList(),
-        combine(reminders, resolved) { r, d -> Overview.history(r, d, zone) },
+        combine(reminders.filterNotNull(), resolved) { r, d -> Overview.history(r, d, zone) },
     )
 
     /** Proofs per occurrence, for the history. */
@@ -119,8 +121,8 @@ class AppViewModel(app: Application) : AndroidViewModel(app) {
     )
 
     /** Current "Startklar" answers per reminder. */
-    val prep: StateFlow<Map<Long, Map<Int, PrepAnswer>>> = state(
-        emptyMap(),
+    val prep: StateFlow<Map<Long, Map<Int, PrepAnswer>>?> = state(
+        null,
         dao.observePrepAnswers().map { l -> l.map { it.toModel() }.groupBy { it.reminderId }.mapValues { Prep.latest(it.value) } },
     )
 
@@ -165,7 +167,9 @@ class AppViewModel(app: Application) : AndroidViewModel(app) {
 
     fun planTask(blockerId: Long, at: LocalDateTime) {
         viewModelScope.launch {
-            graph.withEngine { it.planTask(blockerId, at) }
+            val result = graph.withEngine { it.planTask(blockerId, at) }
+            // Rejected (e.g. the time is past): say why instead of doing nothing (Review-Lauf 5).
+            if (result is SaveResult.Invalid) rejected(result.problems)
         }
     }
 
@@ -225,18 +229,26 @@ class AppViewModel(app: Application) : AndroidViewModel(app) {
     }
 
     fun setActive(reminderId: Long, active: Boolean) {
-        viewModelScope.launch { if (!graph.withoutAlarm(if (active) null else open(reminderId)) { it.setActive(reminderId, active) }) running() }
+        viewModelScope.launch { if (!graph.withoutAlarm(if (active) null else open(reminderId)) { it.setActive(reminderId, active) }) notChanged(reminderId) }
     }
 
     fun setArchived(reminderId: Long, archived: Boolean) {
-        viewModelScope.launch { if (!graph.withoutAlarm(if (archived) open(reminderId) else null) { it.setArchived(reminderId, archived) }) running() }
+        viewModelScope.launch { if (!graph.withoutAlarm(if (archived) open(reminderId) else null) { it.setArchived(reminderId, archived) }) notChanged(reminderId) }
     }
 
     private suspend fun open(reminderId: Long): Long? = graph.repository.openOccurrence(reminderId)?.id
 
-    /** Pausing or archiving a running session is rejected (design.md 3.1); say so instead of doing nothing. */
-    private fun running() {
-        Toast.makeText(getApplication(), "Läuft gerade – erst die Sitzung beenden", Toast.LENGTH_LONG).show()
+    /**
+     * Pausing or archiving was rejected: a running session (design.md 3.1) or the reminder is gone
+     * meanwhile (Review-Lauf 5); say which instead of doing nothing.
+     */
+    private suspend fun notChanged(reminderId: Long) {
+        if (graph.repository.reminder(reminderId) == null) rejected(listOf("Reminder nicht gefunden"))
+        else Toast.makeText(getApplication(), "Läuft gerade – erst die Sitzung beenden", Toast.LENGTH_LONG).show()
+    }
+
+    private fun rejected(problems: List<String>) {
+        Toast.makeText(getApplication(), "Nicht möglich: ${problems.joinToString("; ")}", Toast.LENGTH_LONG).show()
     }
 
     val overview: StateFlow<OverviewTimes> = state(OverviewTimes(), graph.settings.overview)
@@ -251,9 +263,7 @@ class AppViewModel(app: Application) : AndroidViewModel(app) {
         viewModelScope.launch {
             val result = graph.withEngine { it.answerSnoozeHint(reminderId, choice) }
             // Rejected (e.g. "Überwindung" without the "Startklar" answers): say why (Review-Lauf 1).
-            if (result is SaveResult.Invalid) {
-                Toast.makeText(getApplication(), "Nicht möglich: ${result.problems.joinToString("; ")}", Toast.LENGTH_LONG).show()
-            }
+            if (result is SaveResult.Invalid) rejected(result.problems)
         }
     }
 
@@ -286,7 +296,7 @@ class AppViewModel(app: Application) : AndroidViewModel(app) {
     }
 
     fun addSuggestion(text: String, important: Boolean, screen: String, reminderId: Long?) {
-        val reminder = reminderId?.let { id -> reminders.value.firstOrNull { it.id == id } }
+        val reminder = reminderId?.let { id -> reminders.value.orEmpty().firstOrNull { it.id == id } }
         viewModelScope.launch { graph.addSuggestion(text, important, screen, reminder) }
     }
 

@@ -76,7 +76,7 @@ private fun Themed(content: @Composable () -> Unit) {
 
 @LightDark @Composable
 private fun TodayPreview() = Themed {
-    TodayScreen(Sample.today, Sample.date, Sample.zone, onOpenDue = {}, onEdit = {})
+    TodayScreen(Sample.today, Sample.date, Sample.zone, Sample.now, onOpenDue = {}, onEdit = {})
 }
 
 @LightDark @Composable

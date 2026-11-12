@@ -124,8 +124,9 @@ class MainActivity : ComponentActivity() {
                 androidx.compose.runtime.key(launch) {
                     AvlAppUi(
                         state = AppState(
-                            today, reminders, openByReminder, history, proofs, theme, permissions, prep, alert, dnd,
-                            places = places, arrivalHint = !arrivalHintSeen, dwellMinutes = dwell, itemsDone = itemsDone,
+                            today, reminders.orEmpty(), openByReminder, history, proofs, theme, permissions, prep.orEmpty(), alert, dnd,
+                            places = places.orEmpty(), formReady = reminders != null && prep != null && places != null,
+                            appVersion = graph.appVersion, arrivalHint = !arrivalHintSeen, dwellMinutes = dwell, itemsDone = itemsDone,
                             reminderSort = reminderSort, suggestions = suggestions, overview = overview,
                             blockers = blockers, templates = templates, snoozeHints = snoozeHints,
                             claudeAccess = claudeAccess, cloud = cloud, local = local,
@@ -264,8 +265,8 @@ class MainActivity : ComponentActivity() {
         val notifications = getSystemService(NotificationManager::class.java)
         val power = getSystemService(PowerManager::class.java)
         val blocked = Notifications.channelsBlockedByDnd(this)
-        val dndNeeded = vm.reminders.value.any { it.active && it.ignoreDnd }
-        val locationNeeded = vm.reminders.value.any { it.active && it.arrival != null }
+        val dndNeeded = vm.reminders.value.orEmpty().any { it.active && it.ignoreDnd }
+        val locationNeeded = vm.reminders.value.orEmpty().any { it.active && it.arrival != null }
         permissions = listOfNotNull(
             PermissionItem("Benachrichtigungen", "ohne sie gibt es keinen Alarm", granted(Manifest.permission.POST_NOTIFICATIONS)) {
                 requestPermission.launch(Manifest.permission.POST_NOTIFICATIONS)

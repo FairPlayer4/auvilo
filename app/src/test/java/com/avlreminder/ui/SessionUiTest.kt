@@ -210,7 +210,7 @@ class SessionUiTest {
             AvlTheme(dark = false) {
                 TodayScreen(
                     Today(emptyList(), emptyList(), emptyList(), emptyList(), running = listOf(running)),
-                    LocalDate.of(2026, 11, 11), zone, onOpenDue = { opened = it }, onEdit = {},
+                    LocalDate.of(2026, 11, 11), zone, start, onOpenDue = { opened = it }, onEdit = {},
                 )
             }
         }
@@ -218,6 +218,27 @@ class SessionUiTest {
         compose.onNodeWithText("Heute steht nichts mehr an", substring = true).assertDoesNotExist()
         compose.onNodeWithTag("running9").performClick()
         assertEquals(running, opened)
+    }
+
+    /** An aborted session goes on with its old start, only before its maximum (Review-Lauf 5). */
+    @Test
+    fun `Heute bietet Zurücknehmen einer abgebrochenen Sitzung nur vor dem Maximum an`() {
+        fun aborted(id: Long) = Occurrence(
+            id = id, reminderId = 1, dueAt = start, state = OccurrenceState.CLOSED, resolution = Resolution.ABORTED,
+            startedAt = start, resolvedAt = start.plus(Duration.ofMinutes(5)),
+        )
+        var now by mutableStateOf(start.plus(Duration.ofMinutes(30)))
+        compose.setContent {
+            AvlTheme(dark = false) {
+                TodayScreen(Today(emptyList(), emptyList(), listOf(Entry(training, aborted(9))), emptyList()), LocalDate.of(2026, 11, 11), zone, now, onOpenDue = {}, onEdit = {})
+            }
+        }
+        compose.onNodeWithTag("reopen9").performScrollTo().performClick()
+        compose.onNodeWithText("läuft mit ihrem Start um 18:42 weiter", substring = true).assertExists()
+        compose.onNodeWithText("Abbrechen").performClick()
+
+        now = start.plus(Duration.ofMinutes(spec.maxMinutes.toLong()))
+        compose.onNodeWithTag("reopen9").assertDoesNotExist()
     }
 
     @Test
@@ -228,7 +249,7 @@ class SessionUiTest {
         )
         compose.setContent {
             AvlTheme(dark = false) {
-                TodayScreen(Today(emptyList(), emptyList(), listOf(Entry(training, done)), emptyList()), LocalDate.of(2026, 11, 11), zone, onOpenDue = {}, onEdit = {})
+                TodayScreen(Today(emptyList(), emptyList(), listOf(Entry(training, done)), emptyList()), LocalDate.of(2026, 11, 11), zone, start, onOpenDue = {}, onEdit = {})
             }
         }
         compose.onNodeWithText("19:27 · 45 min").assertExists()

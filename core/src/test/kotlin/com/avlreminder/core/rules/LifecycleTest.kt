@@ -11,6 +11,7 @@ import com.avlreminder.core.model.OccurrenceState.PLANNED
 import com.avlreminder.core.model.ProofKind
 import com.avlreminder.core.model.ProofSpec
 import com.avlreminder.core.model.Resolution
+import com.avlreminder.core.model.SessionSpec
 import com.avlreminder.core.reminder
 import java.time.Duration
 import org.junit.jupiter.api.Assertions.assertEquals
@@ -160,6 +161,19 @@ class LifecycleTest {
         assertEquals(EventType.PROOF_STARTED, res.event.type)
         rejected(Lifecycle.transition(r, planned, Action.StartProof(at(26, 18, 15)), now))
         rejected(Lifecycle.transition(r, due, Action.StartProof(now), now))
+    }
+
+    @Test
+    fun `an aborted session can be taken back only before its maximum`() {
+        val session = r.copy(session = SessionSpec(maxMinutes = 60))
+        val started = now.minus(Duration.ofMinutes(30))
+        val aborted = planned.copy(state = CLOSED, resolution = Resolution.ABORTED, startedAt = started, resolvedAt = now)
+        assertTrue(Lifecycle.canReopen(session, aborted, now))
+        assertFalse(Lifecycle.canReopen(session, aborted, started.plus(Duration.ofMinutes(60))))
+        assertFalse(Lifecycle.canReopen(r, aborted, now))
+        // Anything else as before, without a maximum.
+        val done = planned.copy(state = DONE, resolution = Resolution.GOAL, resolvedAt = now)
+        assertTrue(Lifecycle.canReopen(r, done, now.plus(Duration.ofDays(1))))
     }
 
     @Test

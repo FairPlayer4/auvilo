@@ -75,6 +75,8 @@ fun SettingsScreen(
     onAlert: (AlertSettings) -> Unit,
     permissions: List<PermissionItem>,
     onBack: () -> Unit,
+    /** From the build, not written by hand (Review-Lauf 5). */
+    version: String = "",
     modifier: Modifier = Modifier,
     places: List<Place> = emptyList(),
     onSetPlace: (placeId: Long?, name: String, onResult: (PlaceSetResult) -> Unit) -> Unit = { _, _, _ -> },
@@ -267,7 +269,7 @@ fun SettingsScreen(
                     }
                 }
             }
-            Text("AVL-Reminder 1.3b0.1-Prototyp", Modifier.padding(vertical = 24.dp, horizontal = 4.dp), color = c.muted, fontSize = 12.sp)
+            Text("AVL-Reminder $version", Modifier.padding(vertical = 24.dp, horizontal = 4.dp), color = c.muted, fontSize = 12.sp)
         }
     }
 }

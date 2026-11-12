@@ -3,10 +3,16 @@ package com.avlreminder.ui
 import org.junit.Assert.assertFalse
 import org.junit.Assert.assertTrue
 import com.avlreminder.core.model.Arrival
+import com.avlreminder.core.model.Character
 import com.avlreminder.core.model.ChecklistItem
+import com.avlreminder.core.model.PreNotice
+import com.avlreminder.core.model.ProofKind
 import com.avlreminder.core.model.ProofSpec
+import com.avlreminder.core.model.Reminder
 import com.avlreminder.core.model.Schedule
+import com.avlreminder.core.model.SessionSpec
 import com.avlreminder.core.model.Strictness
+import com.avlreminder.core.model.WeeklyGoal
 import com.avlreminder.core.model.WhenAway
 import com.avlreminder.ui.screens.PrepDraft
 import com.avlreminder.ui.screens.ReminderForm
@@ -114,8 +120,21 @@ class ReminderFormTest {
         for (r in listOf(dropped, ringing, waiting)) {
             assertEquals(r, ReminderForm.of(r.copy(id = 5), LocalDate.of(2026, 10, 24)).toReminder(now)!!.copy(id = 0))
         }
-        // Without "Zuhause" the arrival is left out, so the validation can say what is missing.
-        assertNull(ReminderForm.new(now, zone).copy(kind = ScheduleKind.ON_ARRIVAL).toReminder(now)!!.arrival)
+        // Without "Zuhause" the arrival stays, without a place, so the engine says what is missing
+        // instead of saving without it (Review-Lauf 5).
+        val noPlace = ReminderForm.new(now, zone).copy(title = "Training")
+        assertEquals(0L, noPlace.copy(kind = ScheduleKind.ON_ARRIVAL).toReminder(now)!!.arrival!!.placeId)
+        assertEquals(Arrival(0, WhenAway.DROP), noPlace.copy(atHome = true).toReminder(now)!!.arrival)
+    }
+
+    /** The weekly limit also applies to the minimum duration of a session (Review-Lauf 5, 6b). */
+    @Test
+    fun theWeeklyLimitKeepsForTheMinimumDurationOfASession() {
+        val form = ReminderForm.new(now, zone).copy(title = "Training", minimum = "", minimumLimitPerWeek = 2, session = true, sessionMinimum = 10)
+        assertTrue(form.hasMinimum)
+        assertEquals(2, form.toReminder(now)!!.minimumLimitPerWeek)
+        assertNull(form.copy(sessionMinimum = null).toReminder(now)!!.minimumLimitPerWeek)
+        assertNull(form.copy(session = false).toReminder(now)!!.minimumLimitPerWeek)
     }
 
     // KRITISCH: Vorlauf, Puffer und Prüfabstand überstehen das Bearbeiten (Anf. 7.29); Feineinstellungen nur mit Zeitraum.
@@ -141,5 +160,34 @@ class ReminderFormTest {
         val r = form.toReminder(now)!!
         assertEquals(listOf(ChecklistItem(3, "Brunnen 1"), ChecklistItem(0, "Futter")), r.checklist)
         assertEquals(r.checklist, ReminderForm.of(r, LocalDate.of(2026, 10, 24)).checklist)
+    }
+
+    /**
+     * Every field set away from its default survives opening and saving the form; only what the
+     * form does not know (archive, quiet time of the card) is left to the engine (Review-Lauf 5, E22).
+     */
+    @Test
+    fun aReminderWithEveryFieldSurvivesTheForm() {
+        val full = Reminder(
+            id = 7, title = "Training", why = "Rücken", character = Character.DOCUMENT, strictness = Strictness.STRICT,
+            schedule = Schedule.Weekdays(LocalTime.of(7, 30), setOf(DayOfWeek.MONDAY, DayOfWeek.THURSDAY)),
+            goal = "45 min", minimum = "10 min", minimumLimitPerWeek = 2,
+            proof = ProofSpec(ProofKind.EVIDENCE, photo = true, textMinChars = 20, audioMinSeconds = 5, windowMinutes = 15),
+            postponeLimit = 2, active = false, createdAt = now.minusSeconds(86_400), ignoreDnd = true,
+            snoozeMinutes = listOf(5, 15), motivationAudio = "audio/7.m4a",
+            arrival = Arrival(3, WhenAway.RING, leadMinutes = 60, bufferMinutes = 10, checkMinutes = 15),
+            checklist = listOf(ChecklistItem(11, "Matte"), ChecklistItem(12, "Wasser")),
+            weeklyGoal = WeeklyGoal(2, 3, 1), preNotice = PreNotice.Before(45), prepFor = 4, solvedBlockerIsMinimum = true,
+            session = SessionSpec(15, Strictness.STRICT, goalMinutes = 45, minimumMinutes = 10, maxMinutes = 60, finalMinutes = 3),
+            archivedAt = now, hintQuietUntil = now,
+        )
+        val today = LocalDate.of(2026, 10, 24)
+        assertEquals(full.copy(archivedAt = null, hintQuietUntil = null), ReminderForm.of(full, today).toReminder(now))
+
+        val deadline = full.copy(
+            schedule = Schedule.Deadline(LocalDateTime.of(2026, 10, 30, 12, 0), setOf(DayOfWeek.FRIDAY), LocalTime.of(8, 0), LocalTime.of(10, 0), 30),
+            arrival = null, weeklyGoal = null, preNotice = PreNotice.Evening(LocalTime.of(20, 30)),
+        )
+        assertEquals(deadline.copy(archivedAt = null, hintQuietUntil = null), ReminderForm.of(deadline, today).toReminder(now))
     }
 }

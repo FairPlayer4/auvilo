@@ -117,6 +117,15 @@ object Lifecycle {
             (occurrence.state == CLOSED && occurrence.resolution == Resolution.SKIPPED && occurrence.note !in SkipReasons.SYSTEM) ||
             (occurrence.state == CLOSED && occurrence.resolution == Resolution.ABORTED && occurrence.startedAt != null)
 
+    /** As [canReopen], and an aborted session only before its maximum duration, as [transition] decides (Review-Lauf 5). */
+    fun canReopen(reminder: Reminder, occurrence: Occurrence, now: Instant): Boolean {
+        if (!canReopen(occurrence)) return false
+        if (occurrence.resolution != Resolution.ABORTED) return true
+        val spec = reminder.session ?: return false
+        val started = occurrence.startedAt ?: return false
+        return now < Sessions.maxAt(spec, started)
+    }
+
     fun canPostpone(reminder: Reminder, occurrence: Occurrence): Boolean =
         reminder.postponeLimit == null || occurrence.postponeCount < reminder.postponeLimit
 

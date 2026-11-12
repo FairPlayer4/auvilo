@@ -48,11 +48,11 @@ object Validation {
         if (proof.needsEvidence && !proof.photo && proof.textMinChars == null && proof.audioMinSeconds == null) {
             add("Nachweis: Foto, Text oder Audio wählen")
         }
-        proof.textMinChars?.let { if (it !in 1..2000) add("Mindestzeichen 1 bis 2000") }
-        proof.audioMinSeconds?.let { if (it !in 1..600) add("Mindestdauer 1 bis 600 s") }
-        if (proof.windowMinutes !in 1..60) add("Frist für den Nachweis 1 bis 60 min")
+        proof.textMinChars?.let { if (it !in 1..ProofSpec.MAX_TEXT_CHARS) add("Mindestzeichen 1 bis ${ProofSpec.MAX_TEXT_CHARS}") }
+        proof.audioMinSeconds?.let { if (it !in 1..ProofSpec.MAX_AUDIO_SECONDS) add("Mindestdauer 1 bis ${ProofSpec.MAX_AUDIO_SECONDS} s") }
+        if (proof.windowMinutes !in 1..ProofSpec.MAX_WINDOW_MINUTES) add("Frist für den Nachweis 1 bis ${ProofSpec.MAX_WINDOW_MINUTES} min")
         if (reminder.snoozeMinutes.size !in 1..2) add("Ein oder zwei Verschiebe-Knöpfe")
-        if (reminder.snoozeMinutes.any { it !in 1..240 }) add("Verschiebe-Knöpfe 1 bis 240 min")
+        if (reminder.snoozeMinutes.any { it !in 1..Reminder.MAX_SNOOZE_MINUTES }) add("Verschiebe-Knöpfe 1 bis ${Reminder.MAX_SNOOZE_MINUTES} min")
         if (reminder.snoozeMinutes.toSet().size != reminder.snoozeMinutes.size) add("Verschiebe-Knöpfe doppelt")
         reminder.postponeLimit?.let { if (it < 0) add("Verschiebe-Limit darf nicht negativ sein") }
         reminder.minimumLimitPerWeek?.let { if (it < 0) add("Minimum-Limit darf nicht negativ sein") }
@@ -67,12 +67,16 @@ object Validation {
         if (reminder.schedule == Schedule.OnArrival && reminder.arrival == null) add("„Wenn ich zuhause bin“ braucht einen Ort")
         (reminder.schedule as? Schedule.Deadline)?.let { d ->
             if (d.until <= d.from) add("Fenster: Ende nach dem Beginn")
-            if (d.intervalMinutes !in 5..480) add("Abstand 5 bis 480 min")
+            if (d.intervalMinutes !in Schedule.Deadline.MIN_INTERVAL..Schedule.Deadline.MAX_INTERVAL) {
+                add("Abstand ${Schedule.Deadline.MIN_INTERVAL} bis ${Schedule.Deadline.MAX_INTERVAL} min")
+            }
             if (reminder.arrival != null) add("Frist ohne Ankunft")
         }
         reminder.preNotice?.let { n ->
             if (reminder.schedule == Schedule.OnArrival) add("Vorab-Reminder braucht eine Uhrzeit")
-            if (n is PreNotice.Before && n.minutes !in 5..1440) add("Vorab 5 bis 1440 min vorher")
+            if (n is PreNotice.Before && n.minutes !in PreNotice.Before.MIN_MINUTES..PreNotice.Before.MAX_MINUTES) {
+                add("Vorab ${PreNotice.Before.MIN_MINUTES} bis ${PreNotice.Before.MAX_MINUTES} min vorher")
+            }
         }
         (reminder.schedule as? AtTimes)?.let { s ->
             if (s.times.size > MAX_TIMES) add("Höchstens $MAX_TIMES Uhrzeiten am Tag")

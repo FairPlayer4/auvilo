@@ -116,6 +116,10 @@ data class AppState(
     /** Cloud backup (A-14): null = not shown. */
     val cloud: CloudStatus? = null,
     val local: com.avlreminder.restore.LocalStatus? = null,
+    /** Reminders, "Startklar" answers and places are loaded; the form is built only then (Review-Lauf 5). */
+    val formReady: Boolean = true,
+    /** versionName of the build, for "Einstellungen". */
+    val appVersion: String = "",
 )
 
 interface AppActions {
@@ -188,9 +192,10 @@ fun AvlAppUi(
 ) {
     val c = Avl.colors
     var route by rememberSaveable { mutableStateOf(startRoute) }
-    var problems by remember { mutableStateOf(emptyList<String>()) }
+    // Saveable like the form draft: they survive the activity being recreated (Review-Lauf 5).
+    var problems by rememberSaveable { mutableStateOf(emptyList<String>()) }
     /** Screen name and reminder for the open suggestion dialog. */
-    var suggestFrom by remember { mutableStateOf<Pair<String, Long?>?>(null) }
+    var suggestFrom by rememberSaveable { mutableStateOf<Pair<String, Long?>?>(null) }
     val date = now.atZone(zone).toLocalDate()
     val tab = route in listOf(Routes.TODAY, Routes.HISTORY, Routes.REMINDERS)
     fun go(to: String) {
@@ -239,7 +244,7 @@ fun AvlAppUi(
                     if (state.permissions.any { it.required && !it.granted }) PermissionBanner { go(Routes.SETTINGS) }
                     state.today?.let { today ->
                         TodayScreen(
-                            today = today, date = date, zone = zone,
+                            today = today, date = date, zone = zone, now = now,
                             onOpenDue = { actions.openAlarm(it.occurrence.id) },
                             onEdit = { go(Routes.edit(it.id)) },
                             onCompleteEarly = { actions.completeEarly(it.occurrence.id) },
@@ -280,7 +285,7 @@ fun AvlAppUi(
             route == Routes.SETTINGS -> Box(m) {
                 SettingsScreen(
                     theme = state.theme, onTheme = actions::setTheme, alert = state.alert, onAlert = actions::setAlert,
-                    onPause = actions::setAlarmsPaused, now = now, zone = zone,
+                    onPause = actions::setAlarmsPaused, now = now, zone = zone, version = state.appVersion,
                     claudeAccess = state.claudeAccess, onClaudeAccess = actions::setClaudeAccess,
                     cloud = state.cloud, cloudActions = actions.cloud,
                     local = state.local, localActions = actions.local,
@@ -334,56 +339,60 @@ fun AvlAppUi(
                     modifier = m,
                 )
             }
-            route.startsWith("edit:") || route.startsWith("template:") -> {
-                val fromTemplate = route.startsWith("template:")
-                val id = if (fromTemplate) 0L else route.removePrefix("edit:").toLong()
-                val existing = state.reminders.firstOrNull { it.id == id }
-                val initial = remember(route, existing != null) {
-                    val template = if (fromTemplate) state.templates?.firstOrNull { it.id == route.removePrefix("template:").toLong() } else null
-                    existing?.let { ReminderForm.of(it, date, state.prep[it.id].orEmpty(), state.places.firstOrNull()?.id) }
-                        ?: ReminderForm.new(now, zone, state.places.firstOrNull()?.id).let { f -> template?.let { f.withTemplate(it) } ?: f }
-                }
-                val blockers = existing?.let { state.blockers[it.id] }.orEmpty()
-                EditScreen(
-                    initial = initial,
-                    problems = problems,
-                    places = state.places,
-                    onSave = { form ->
-                        val reminder = form.toReminder(now)
-                        if (reminder == null) {
-                            problems = listOf("Mindestens einen Wochentag wählen")
-                        } else {
-                            actions.save(reminder, form.prepAnswers(now)) { result ->
-                                when (result) {
-                                    is SaveResult.Saved -> go(Routes.TODAY)
-                                    is SaveResult.Invalid -> problems = result.problems
+            route.startsWith("edit:") || route.startsWith("template:") -> if (!state.formReady || (route.startsWith("template:") && state.templates == null)) {
+                // Built once reminders, "Startklar" answers, places (and templates) are loaded: a cold
+                // start on this route would otherwise build it from what was there first (Review-Lauf 5).
+                Box(m)
+            } else {
+                    val fromTemplate = route.startsWith("template:")
+                    val id = if (fromTemplate) 0L else route.removePrefix("edit:").toLong()
+                    val existing = state.reminders.firstOrNull { it.id == id }
+                    val initial = remember(route, existing != null) {
+                        val template = if (fromTemplate) state.templates?.firstOrNull { it.id == route.removePrefix("template:").toLong() } else null
+                        existing?.let { ReminderForm.of(it, date, state.prep[it.id].orEmpty(), state.places.firstOrNull()?.id) }
+                            ?: ReminderForm.new(now, zone, state.places.firstOrNull()?.id).let { f -> template?.let { f.withTemplate(it) } ?: f }
+                    }
+                    val blockers = existing?.let { state.blockers[it.id] }.orEmpty()
+                    EditScreen(
+                        initial = initial,
+                        problems = problems,
+                        places = state.places,
+                        onSave = { form ->
+                            val reminder = form.toReminder(now)
+                            if (reminder == null) {
+                                problems = listOf("Mindestens einen Wochentag wählen")
+                            } else {
+                                actions.save(reminder, form.prepAnswers(now)) { result ->
+                                    when (result) {
+                                        is SaveResult.Saved -> go(Routes.TODAY)
+                                        is SaveResult.Invalid -> problems = result.problems
+                                    }
                                 }
                             }
-                        }
-                    },
-                    onCancel = { go(Routes.TODAY) },
-                    onDelete = existing?.let { r -> { actions.delete(r.id); go(Routes.TODAY) } },
-                    modifier = m,
-                    recorder = recorder,
-                    play = actions::play,
-                    onSuggest = { suggestFrom = (if (id == 0L) "Neuer Reminder" else "Bearbeiten") to existing?.id },
-                    onArchive = existing?.let { r -> { archived -> actions.setArchived(r.id, archived); go(Routes.REMINDERS) } },
-                    archived = existing?.archivedAt != null,
-                    onStats = existing?.let { r -> { go(Routes.stats(r.id)) } },
-                    onCheckItems = existing?.takeIf { it.checklist.isNotEmpty() && it.active }
-                        ?.let { state.openByReminder[it.id] }?.let { o -> { actions.completeEarly(o.id) } },
-                    onSaveTemplate = { name, form -> actions.saveTemplate(form.toTemplate(name, now)) },
-                    blockers = blockers,
-                    blockerActions = existing?.let { r ->
-                        BlockerActions(
-                            add = { actions.addBlocker(r.id, it) },
-                            solve = actions::solveBlocker,
-                            plan = actions::planTask,
-                            suggestedTime = Blockers.suggestTaskTime(state.openByReminder[r.id]?.currentAt, now, zone),
-                            taskAt = { taskId -> state.openByReminder[taskId]?.currentAt },
-                        )
-                    },
-                )
+                        },
+                        onCancel = { go(Routes.TODAY) },
+                        onDelete = existing?.let { r -> { actions.delete(r.id); go(Routes.TODAY) } },
+                        modifier = m,
+                        recorder = recorder,
+                        play = actions::play,
+                        onSuggest = { suggestFrom = (if (id == 0L) "Neuer Reminder" else "Bearbeiten") to existing?.id },
+                        onArchive = existing?.let { r -> { archived -> actions.setArchived(r.id, archived); go(Routes.REMINDERS) } },
+                        archived = existing?.archivedAt != null,
+                        onStats = existing?.let { r -> { go(Routes.stats(r.id)) } },
+                        onCheckItems = existing?.takeIf { it.checklist.isNotEmpty() && it.active }
+                            ?.let { state.openByReminder[it.id] }?.let { o -> { actions.completeEarly(o.id) } },
+                        onSaveTemplate = { name, form -> actions.saveTemplate(form.toTemplate(name, now)) },
+                        blockers = blockers,
+                        blockerActions = existing?.let { r ->
+                            BlockerActions(
+                                add = { actions.addBlocker(r.id, it) },
+                                solve = actions::solveBlocker,
+                                plan = actions::planTask,
+                                suggestedTime = Blockers.suggestTaskTime(state.openByReminder[r.id]?.currentAt, now, zone),
+                                taskAt = { taskId -> state.openByReminder[taskId]?.currentAt },
+                            )
+                        },
+                    )
             }
         }
     }

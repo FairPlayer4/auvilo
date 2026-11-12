@@ -30,10 +30,14 @@ data class ProofSpec(
     val audioMinSeconds: Int? = null,
     /** How long the alarm stays quiet while the proof is being made. */
     val windowMinutes: Int = 10,
-) {
+) : java.io.Serializable {
     val needsEvidence: Boolean get() = kind == ProofKind.EVIDENCE
 
     companion object {
+        /** Limits the validation checks and the form offers (Review-Lauf 5). */
+        const val MAX_TEXT_CHARS = 2000
+        const val MAX_AUDIO_SECONDS = 600
+        const val MAX_WINDOW_MINUTES = 60
         val NONE = ProofSpec(ProofKind.NONE)
         val CONFIRM = ProofSpec(ProofKind.CONFIRM)
         val PHOTO = ProofSpec(ProofKind.EVIDENCE, photo = true)
@@ -123,6 +127,11 @@ sealed interface Schedule {
             require(days.isNotEmpty()) { "at least one weekday" }
             require(intervalMinutes >= 1) { "interval must be at least one minute" }
         }
+
+        companion object {
+            const val MIN_INTERVAL = 5
+            const val MAX_INTERVAL = 480
+        }
     }
 }
 
@@ -147,7 +156,12 @@ val Schedule.severalADay: Boolean get() = (this as? AtTimes)?.severalADay == tru
 sealed interface PreNotice {
     /** The evening before the due day, at [time]. */
     data class Evening(val time: LocalTime) : PreNotice
-    data class Before(val minutes: Int) : PreNotice
+    data class Before(val minutes: Int) : PreNotice {
+        companion object {
+            const val MIN_MINUTES = 5
+            const val MAX_MINUTES = 1440
+        }
+    }
 }
 
 enum class BlockerOrigin {
@@ -266,7 +280,8 @@ data class SessionSpec(
 }
 
 /** One point of a checklist; the list order is the order of the points. */
-data class ChecklistItem(val id: Long = 0, val title: String)
+/** Serializable for the form draft (Review-Lauf 5). */
+data class ChecklistItem(val id: Long = 0, val title: String) : java.io.Serializable
 
 data class Reminder(
     val id: Long = 0,
@@ -308,7 +323,12 @@ data class Reminder(
     val hintQuietUntil: Instant? = null,
     /** "Ich starte jetzt" with timer and checks (7.11); null = done in one go as before. */
     val session: SessionSpec? = null,
-)
+) {
+    companion object {
+        /** Longest snooze button. */
+        const val MAX_SNOOZE_MINUTES = 240
+    }
+}
 
 /** One concrete time a reminder is due. */
 data class Occurrence(

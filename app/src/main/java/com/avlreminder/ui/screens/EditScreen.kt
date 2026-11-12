@@ -36,6 +36,7 @@ import androidx.compose.runtime.getValue
 import androidx.compose.runtime.key
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
@@ -47,7 +48,11 @@ import androidx.compose.ui.unit.sp
 import com.avlreminder.core.model.Blocker
 import com.avlreminder.core.model.Character
 import com.avlreminder.core.model.ChecklistItem
+import com.avlreminder.core.model.PreNotice
 import com.avlreminder.core.model.ProofKind
+import com.avlreminder.core.model.ProofSpec
+import com.avlreminder.core.model.Reminder
+import com.avlreminder.core.model.Schedule
 import com.avlreminder.core.model.Strictness
 import com.avlreminder.core.model.WhenAway
 import com.avlreminder.core.rules.Prep
@@ -110,7 +115,8 @@ fun EditScreen(
     onCheckItems: (() -> Unit)? = null,
 ) {
     val c = Avl.colors
-    var form by remember(initial) { mutableStateOf(initial) }
+    // The draft survives dark mode, font size and process death (Review-Lauf 5, 6a).
+    var form by rememberSaveable(initial) { mutableStateOf(initial) }
     var confirmDelete by remember { mutableStateOf(false) }
     var namingTemplate by remember { mutableStateOf(false) }
     var templateSaved by remember { mutableStateOf(false) }
@@ -125,8 +131,13 @@ fun EditScreen(
             onSuggest?.let { SuggestButton(it) }
             Button(onClick = { onSave(form) }, Modifier.padding(end = 8.dp)) { Text("Speichern") }
         }
+        // Under the fixed header: in sight also when the form is scrolled down (Review-Lauf 5).
+        if (problems.isNotEmpty()) {
+            Column(Modifier.padding(horizontal = 16.dp).padding(bottom = 4.dp)) {
+                problems.forEach { Text(it, color = c.strict, fontWeight = FontWeight.SemiBold, modifier = Modifier.padding(top = 4.dp)) }
+            }
+        }
         Column(Modifier.verticalScroll(rememberScrollState()).padding(horizontal = 16.dp)) {
-            problems.forEach { Text(it, color = c.strict, fontWeight = FontWeight.SemiBold, modifier = Modifier.padding(top = 4.dp)) }
             onStats?.let { TextButton(onClick = it, Modifier.testTag("stats")) { Text("Statistik und Serie ›", color = c.accent) } }
             onCheckItems?.let { TextButton(onClick = it, Modifier.testTag("checkItems")) { Text("Punkte abhaken ›", color = c.accent) } }
 
@@ -172,7 +183,7 @@ fun EditScreen(
                 GrowingField(form.goal, { form = form.copy(goal = it) }, Modifier.fillMaxWidth(), "z. B. 45 min")
                 Text("Minimum", Modifier.padding(top = 8.dp), color = c.text, fontSize = 14.sp)
                 GrowingField(form.minimum, { form = form.copy(minimum = it) }, Modifier.fillMaxWidth(), "leer = kein Minimum")
-                if (form.minimum.isNotBlank()) {
+                if (form.hasMinimum) {
                     Text("Minimum max. pro Woche", Modifier.padding(top = 12.dp), color = c.text, fontSize = 14.sp)
                     NumberChoice(listOf(1, 2, 3), form.minimumLimitPerWeek, 1..7, "Minimum max. pro Woche", unit = "×", unlimited = "unbegrenzt") {
                         form = form.copy(minimumLimitPerWeek = it)
@@ -197,7 +208,7 @@ fun EditScreen(
             val overcome = form.character == Character.OVERCOME
             key(overcome) {
                 Fold(if (overcome) "Startklar (Pflicht)" else "Startklar (optional)", prepSummary(form), "foldPrep", initiallyOpen = overcome && prepAnswered(form) < Prep.QUESTIONS.count()) {
-                    PrepSection(form) { form = it }
+                    PrepSection(form, initial.prep) { form = it }
                 }
             }
             Fold("Feineinstellungen", fineSummary(form), "foldFine") {
@@ -304,18 +315,18 @@ private fun ProofSection(form: ReminderForm, onChange: (ReminderForm) -> Unit) {
         }
         p.textMinChars?.let { min ->
             Text("Text: mindestens Zeichen (ohne Leerzeichen)", Modifier.padding(top = 10.dp), color = c.text, fontSize = 14.sp)
-            NumberChoice(listOf(20, 50, 100), min, 1..2000, "Text: mindestens Zeichen", unit = "") {
+            NumberChoice(listOf(20, 50, 100), min, 1..ProofSpec.MAX_TEXT_CHARS, "Text: mindestens Zeichen", unit = "") {
                 onChange(form.copy(proof = p.copy(textMinChars = it)))
             }
         }
         p.audioMinSeconds?.let { min ->
             Text("Audio: mindestens", Modifier.padding(top = 10.dp), color = c.text, fontSize = 14.sp)
-            NumberChoice(listOf(5, 10, 30), min, 1..600, "Audio: mindestens", unit = "s") {
+            NumberChoice(listOf(5, 10, 30), min, 1..ProofSpec.MAX_AUDIO_SECONDS, "Audio: mindestens", unit = "s") {
                 onChange(form.copy(proof = p.copy(audioMinSeconds = it)))
             }
         }
         Text("Alarm pausiert während des Nachweises", Modifier.padding(top = 10.dp), color = c.text, fontSize = 14.sp)
-        NumberChoice(listOf(5, 10, 15, 30), p.windowMinutes, 1..60, "Alarm pausiert während des Nachweises", unit = "min") {
+        NumberChoice(listOf(5, 10, 15, 30), p.windowMinutes, 1..ProofSpec.MAX_WINDOW_MINUTES, "Alarm pausiert während des Nachweises", unit = "min") {
             onChange(form.copy(proof = p.copy(windowMinutes = it)))
         }
     }
@@ -344,7 +355,7 @@ private fun MotivationAudio(
 
 /** The four "Startklar" questions; "weiß ich noch nicht" is a valid answer. */
 @Composable
-private fun PrepSection(form: ReminderForm, onChange: (ReminderForm) -> Unit) {
+private fun PrepSection(form: ReminderForm, stored: Map<Int, PrepDraft>, onChange: (ReminderForm) -> Unit) {
     val c = Avl.colors
     Prep.QUESTIONS.forEach { q ->
         val draft = form.prep[q] ?: PrepDraft()
@@ -354,6 +365,12 @@ private fun PrepSection(form: ReminderForm, onChange: (ReminderForm) -> Unit) {
             draft.text, { set(draft.copy(text = it, unknown = false)) },
             Modifier.fillMaxWidth().padding(top = 4.dp).testTag("prep$q"),
             enabled = !draft.unknown, keyboardOptions = TextKeyboard,
+            // An answer can be overwritten, not emptied: an empty field keeps it (Review-Lauf 5, 6c).
+            supportingText = if (!draft.answered && stored[q]?.answered == true) {
+                { Text("Leer bleibt die bisherige Antwort", Modifier.testTag("prepKept$q")) }
+            } else {
+                null
+            },
         )
         FlowRow(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
             if (q == Prep.READY) {
@@ -537,14 +554,14 @@ private fun SnoozeChoice(selected: List<Int>, onPick: (List<Int>) -> Unit) {
     if (other) {
         var text by remember { mutableStateOf(selected.joinToString(", ")) }
         val minutes = text.split(',', ' ', '/').mapNotNull { it.trim().toIntOrNull() }
-        val valid = minutes.size in 1..2 && minutes.all { it in 1..240 } && minutes.toSet().size == minutes.size
+        val valid = minutes.size in 1..2 && minutes.all { it in 1..Reminder.MAX_SNOOZE_MINUTES } && minutes.toSet().size == minutes.size
         AlertDialog(
             onDismissRequest = { other = false },
             title = { Text("Später-Knöpfe", fontSize = 18.sp) },
             text = {
                 Column {
                     OutlinedTextField(text, { text = it }, Modifier.testTag("snoozeOwn"), singleLine = true, placeholder = { Text("z. B. 20, 45") })
-                    Text("ein oder zwei Minutenwerte, 1 bis 240", Modifier.padding(top = 4.dp), color = c.muted, fontSize = 13.sp)
+                    Text("ein oder zwei Minutenwerte, 1 bis ${Reminder.MAX_SNOOZE_MINUTES}", Modifier.padding(top = 4.dp), color = c.muted, fontSize = 13.sp)
                 }
             },
             confirmButton = {
@@ -688,7 +705,7 @@ private fun ScheduleDetail(form: ReminderForm, onChange: (ReminderForm) -> Unit)
                     OutlinedButton(onClick = { pickUntil = true }, Modifier.testTag("windowUntil")) { Text("bis ${Format.time(form.windowUntil)}") }
                 }
                 Text("Erinnert im Fenster alle", Modifier.padding(top = 8.dp), color = c.text, fontSize = 14.sp)
-                NumberChoice(listOf(30, 60, 120), form.remindEvery, 5..480, "Erinnert im Fenster alle", unit = "min") {
+                NumberChoice(listOf(30, 60, 120), form.remindEvery, Schedule.Deadline.MIN_INTERVAL..Schedule.Deadline.MAX_INTERVAL, "Erinnert im Fenster alle", unit = "min") {
                     onChange(form.copy(remindEvery = it))
                 }
                 Text(
@@ -781,7 +798,7 @@ private fun PreNoticeSection(form: ReminderForm, onChange: (ReminderForm) -> Uni
                 Text("um ${Format.time(form.preNoticeEvening)}")
             }
         PreNoticeKind.BEFORE ->
-            NumberChoice(listOf(15, 30, 60, 120), form.preNoticeBefore, 5..1440, "Vorab-Reminder", unit = "min") {
+            NumberChoice(listOf(15, 30, 60, 120), form.preNoticeBefore, PreNotice.Before.MIN_MINUTES..PreNotice.Before.MAX_MINUTES, "Vorab-Reminder", unit = "min") {
                 onChange(form.copy(preNoticeBefore = it))
             }
     }
