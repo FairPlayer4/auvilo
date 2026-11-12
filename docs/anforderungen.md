@@ -1250,6 +1250,7 @@ Neueste zuerst. Kap. 7 enthält immer den gültigen Stand; diese Tabelle ist die
 | V1.3b0.6 | 2026-11-11 | Ankunft im Zeitraum mit WLAN (7.29), weiterer Ort, Geofences nach `GEOFENCE_NOT_AVAILABLE` neu registriert |
 | V1.3b1 | 2026-11-11 | Sitzung mit Timer und Uhr (7.11, 7.20 V2) |
 | V1.3b2 | 2026-11-12 | Antworten auf Review-Lauf 4: Sitzung zählt in der Woche ihres Starts, Abbruch zurücknehmbar, F2 über die geplante erste Prüfung, wiederholte WLAN-Meldung keine Ankunft; Tests (Kap. 9, 2026-11-12) |
+| V1.3b3 | 2026-11-12 | Antworten auf Review-Lauf 5, Etappe A: Formular (Entwurf übersteht Neuaufbau, Probleme sichtbar, Limit für Sitzungs-Minimum, Startklar nicht leerbar, Ankunft ohne Ort nicht still weg), F2 auch für eine vorher geplante Prüfung, geänderte Ankunftsregel entscheidet neu, Zurücknehmen einer Sitzung nur vor dem Maximum; Tests der UI-Verdrahtung (Kap. 9, 2026-11-12) |
 
 Details zum Verhalten: [design.md](design.md), Gerätetests: [geraetetest.md](geraetetest.md).
 

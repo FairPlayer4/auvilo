@@ -75,9 +75,9 @@ fun SettingsScreen(
     onAlert: (AlertSettings) -> Unit,
     permissions: List<PermissionItem>,
     onBack: () -> Unit,
+    modifier: Modifier = Modifier,
     /** From the build, not written by hand (Review-Lauf 5). */
     version: String = "",
-    modifier: Modifier = Modifier,
     places: List<Place> = emptyList(),
     onSetPlace: (placeId: Long?, name: String, onResult: (PlaceSetResult) -> Unit) -> Unit = { _, _, _ -> },
     dwellMinutes: Int = Settings.DEFAULT_DWELL,

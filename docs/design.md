@@ -192,7 +192,9 @@ PLANNED ──(Zeit/Ankunft)──► DUE ──(keine Reaktion)──► ESCALA
   in der Benachrichtigung, ebenso nach *Abbruch* einer Sitzung aus Benachrichtigung oder
   Uhr, eine stille Benachrichtigung mit *Rückgängig*, eigene Id,
   `setTimeoutAfter(60 s)`; das Ergebnis kommt als zweite stille Benachrichtigung. Auf
-  *Heute* unter *Erledigt* *Zurücknehmen* mit Rückfrage, Ergebnis als Toast.
+  *Heute* unter *Erledigt* *Zurücknehmen* mit Rückfrage, Ergebnis als Toast; eine
+  abgebrochene Sitzung nur vor ihrer maximalen Dauer (`Lifecycle.canReopen(reminder,
+  occurrence, now)`), die Rückfrage sagt dann, dass sie mit ihrem Start weiterläuft.
 
 ### 3.1 Sitzung mit Timer (Anf. 7.11, 7.20 V2)
 
@@ -325,7 +327,10 @@ PLANNED/DUE/ESCALATING ─Ich starte jetzt─► RUNNING ─Fertig────�
   Ereignis `ARRIVED`) setzt `arrivedAt` und legt `currentAt` auf Ankunft + Puffer (0–30,
   Standard 5 min); liegt das schon hinter jetzt, klingelt es sofort. Kurz wieder weg ändert
   daran nichts. *Später*, *Verschieben*, *Rest auf morgen*, Fenster schließen,
-  Zurücknehmen, Klingeln und Bearbeiten leeren `arrivedAt`.
+  Zurücknehmen und Klingeln leeren `arrivedAt`. Bearbeiten leert es, wenn sich die
+  Fälligkeit oder die Ankunftsregel ändert (Ort, Puffer, Vorlauf, Prüfabstand, *wenn weg*,
+  Regel weg): Der Termin geht auf seine Uhrzeit zurück, die nächste Prüfung entscheidet neu.
+  Reine Textänderungen lassen es (Review-Lauf 5).
 
   | Wann | da | klar weg | unklar |
   |---|---|---|---|
@@ -337,8 +342,10 @@ PLANNED/DUE/ESCALATING ─Ich starte jetzt─► RUNNING ─Fertig────�
 
 - **F2:** Findet die Prüfung, die für den Beginn des Zeitraums geplant war, einen schon da
   (Homeoffice), klingelt es zur spätesten Uhrzeit, auch wenn Android sie verspätet zustellt:
-  Der Prüf-Alarm trägt seine geplante Zeit (`plannedAt`). Eine Verbindung oder ein
-  Geofence ist dagegen eine echte Ankunft (Puffer).
+  Der Prüf-Alarm trägt seine geplante Zeit (`plannedAt`). Als Prüfung zum Beginn zählt
+  auch eine, die davor geplant war und erst im Zeitraum kommt (zwei Reminder an einem Ort,
+  eine Prüfung pro Ort, Doze; Review-Lauf 5). Eine Verbindung oder ein Geofence ist dagegen
+  eine echte Ankunft (Puffer).
 - **Prüfungen** im Raster Beginn + k·Prüfabstand (15–30, Standard 20 min), jeweils vor der
   spätesten Uhrzeit; die späteste Uhrzeit prüft der Alarm des Termins selbst. Wartende
   verschobene Termine prüfen ab `currentAt` bis zur Tagesgrenze. Mehrere Reminder am Ort:
@@ -505,7 +512,15 @@ https://claude.ai/artifact/PXA9YgWi8XoHupYnN7Z3cS
 - **Formular:** Was, Charakter, Wann, Wie streng; der Rest klappbar mit Zusammenfassung
   in der Kopfzeile (Wochenziel, Ziel und Minimum, Vorab-Reminder, Blocker, Checkliste,
   Nachweis, Warum und Botschaft, Startklar, Feineinstellungen). Zahlen als Chips plus
-  *andere…*.
+  *andere…*, ihre Grenzen aus den Konstanten in `:core` (`ProofSpec`, `Arrival`,
+  `SessionSpec`, …), die auch die Prüfung nutzt. Was die Engine beim Speichern ablehnt,
+  steht unter dem festen Kopf, also auch weit unten im Formular sichtbar. Der Entwurf
+  übersteht Design-, Schriftgrößenwechsel und Prozesstod (`rememberSaveable`,
+  `ReminderForm` ist `Serializable`); gebaut wird das Formular erst, wenn Reminder,
+  Startklar-Antworten und Orte geladen sind (`AppState.formReady`). Das Wochenlimit des
+  Minimums gilt auch für die Minimum-Dauer einer Sitzung. Eine Startklar-Antwort lässt sich
+  überschreiben, nicht leeren: Ein geleertes Feld sagt, dass die bisherige bleibt. Eine
+  Ankunft ohne Ort fällt nicht still weg, die Engine nennt, was fehlt (Review-Lauf 5).
 - **Alarm (Vollbild, immer dunkel):** Titel, Warum, Botschaft, Startklar, Blocker,
   Woche, Ziel/Minimum, Checkliste; Ich starte jetzt, Erledigt, Minimum, Blocker gelöst,
   Rest auf morgen, Auf morgen, Später, Verschieben, Auslassen; Nachweis als eigener
@@ -618,7 +633,7 @@ umgesetzt / verworfen. Liste in den Einstellungen, *Teilen* als Markdown.
 | `:app` data | Robolectric + Room, `MigrationTest` gegen die Schemas; `RoomRepositoryCasesTest` | jede Migration, Backup |
 | `:app` echte Daten | `RealDataTest` mit `testdata/real-*.json`: Migration, Alarm-Ansicht, eine Woche mit allen Remindern | bei jeder neuen Version neu ziehen |
 | `:app` Verbindung | `ReceiverGlueTest`, `AlarmGlueTest`, `SessionGlueTest`: Broadcast (Alarm, Knopf, Ankunft, WLAN, Geofence, Neustart) → Engine mit echter Room-DB → Benachrichtigung, Dienst, Alarm; feste Uhrzeit über `TestClock` | jeder Receiver und Knopf |
-| `:app` ui | Compose-UI-Tests mit Robolectric für Kernabläufe; Previews hell und dunkel | keine Zahl |
+| `:app` ui | Compose-UI-Tests mit Robolectric für Kernabläufe, auch Ablehnungen der Engine (`SaveResult.Invalid`) und Neuaufbau (`StateRestorationTester`); `AppViewModelTest` prüft die Verdrahtung zur Engine (z. B. Benachrichtigung weg nach Löschen); Previews hell und dunkel | keine Zahl |
 | Gerät | [geraetetest.md](geraetetest.md), Diagnose-Log | vor jeder Freigabe |
 
 - **Szenario-Tests:** `Simulation` stellt die Uhr vor und löst jeden Alarm
@@ -637,8 +652,8 @@ umgesetzt / verworfen. Liste in den Einstellungen, *Teilen* als Markdown.
   `testdata/` ([README](../testdata/README.md)), erzeugt mit
   `tools/testdata/export_testdata.py` über adb, ohne Import/Export in der App.
   `RealDataTest` lädt sie in das Schema ihrer Version, migriert, baut die Alarm-Ansicht
-  jedes offenen Termins und spielt eine Woche sowie zwei Tage mit ausgeschaltetem Handy
-  durch. `Fakes` und `Simulation` liegen dafür in den Testhilfen von `core`
+  jedes offenen Termins, öffnet und speichert jeden Reminder im Formular (Round-Trip) und
+  spielt eine Woche sowie zwei Tage mit ausgeschaltetem Handy durch. `Fakes` und `Simulation` liegen dafür in den Testhilfen von `core`
   (`src/testFixtures`, `java-test-fixtures`), die `:app` in den Tests mitbenutzt.
 
 - Tests entstehen mit dem Code; Regeln haben sprechende Testnamen.

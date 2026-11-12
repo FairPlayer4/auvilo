@@ -75,6 +75,8 @@ löscht oder ein zweites Gerät braucht, läuft im **Emulator** mit einem eigene
 | K30 | Vorab starten (7.20 V2) | vor der Uhrzeit *Vorab* → *Ich starte jetzt*, nach 1 min *Fertig* | Verlauf „Sitzung …–… · 1 min“; zur Uhrzeit kein Alarm |
 | K31 | Abbruch zurücknehmen | Sitzung starten, in der Benachrichtigung *Abbruch*, dann *Rückgängig* | „‹Titel› abgebrochen“ mit *Rückgängig*; danach läuft die Sitzung mit dem alten Start, Benachrichtigung „Die Sitzung läuft weiter …“ |
 | K32 | Teilschritt nach Limit | Reminder mit Minimum 1×/Woche und Sitzung; Minimum einmal nutzen, dann Sitzung starten | laufende Benachrichtigung ohne *Teilschritt*; Sitzungsbildschirm sagt, dass das Minimum diese Woche aufgebraucht ist |
+| K33 | Notaus beim Klingeln (Review-Lauf 5) | Test-Reminder klingeln lassen, in der App *Alle Alarme pausieren* 1 h | Klingeln hört sofort auf; eine **stille** Benachrichtigung des Termins bleibt stehen, Antippen öffnet den Alarm |
+| K34 | Formular-Entwurf (Review-Lauf 5) | Reminder bearbeiten, Titel ändern, ohne Speichern Dunkelmodus (Schnelleinstellungen) umschalten | Formular zeigt weiter den geänderten Titel; nach *Speichern* steht er in der Liste |
 
 ## E. Nach dem Test
 - Claude liest `adb logcat -d -s AvlDiag` und `files/diag/diag.log` (per `run-as`) und

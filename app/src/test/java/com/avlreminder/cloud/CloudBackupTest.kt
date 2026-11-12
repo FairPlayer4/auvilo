@@ -329,7 +329,8 @@ class CloudBackupTest {
     private val logged = java.util.Collections.synchronizedList(mutableListOf<String>())
     private var brokenKeys: Throwable? = null
 
-    private fun <T> blocking(block: suspend () -> T): T = runBlocking { withTimeout(10_000) { block() } }
+    // Generous: under the load of the full build 10 s were too short once (Review-Lauf 5); a real hang still fails.
+    private fun <T> blocking(block: suspend () -> T): T = runBlocking { withTimeout(30_000) { block() } }
 
     private fun CloudBackup.await(predicate: (CloudStatus) -> Boolean): CloudStatus = blocking { status.first(predicate) }
 

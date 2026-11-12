@@ -21,6 +21,12 @@ Kevins echte Daten; vor dem ersten weiteren Nutzer kommt die Sicherheitsphase (B
 einer Fassung.
 
 ## Offen
+0. **V1.3b3** (`versionCode` 19, Etappe A aus Review-Lauf 5) gebaut, **noch nicht
+   installiert**; danach K33 und K34. Als Nächstes **Etappe B = V1.3c0** auf
+   `feature/v1.3c0` (Kap. 9, 2026-11-12): Doku und Zeit-Regel (E21), `Database.kt` teilen
+   (E23), Ende eines Alarms als Engine-Effekt (E17, Frage 3), Sitzungsantworten aus einer
+   Quelle (E18), `AppGraph` entschlacken (E19), `Scheduler` intern teilen (E20), dann
+   review-loop und PR nach `main`.
 1. **Gerätetests** aus [geraetetest.md](geraetetest.md): K15, K23–K26 (vorher *Zuhause* in
    *Orte* mit WLAN neu festlegen), K27–K30 (Sitzung, dabei: zeigt die Uhr den
    Chronometer?), K31, K32. In den nächsten Tagen im `diag.log` prüfen, dass keine Ankunft mehr direkt nach
