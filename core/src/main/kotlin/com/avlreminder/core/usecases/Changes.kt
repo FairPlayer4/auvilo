@@ -53,8 +53,14 @@ internal class Changes(private val c: EngineContext, private val views: AlarmVie
         // KRITISCH: a running session keeps its settings and its time; only the texts may change (7.11 D7).
         if (stored != null && running(stored.id) && !onlyTexts(stored, edited)) return SaveResult.Invalid(listOf(RUNNING))
         val moved = (schedule is Schedule.Once || schedule is Schedule.Deadline) && stored != null && stored.schedule != schedule
-        // The form does not know the archive; moving a one-off brings it back.
-        val reminder = if (moved) edited.copy(active = true, archivedAt = null) else edited.copy(archivedAt = stored?.archivedAt)
+        // The form does not know the archive; moving a one-off brings it back. Nor the quiet time of
+        // the card (NT2): it stays unless the answer to the card sets it (Review-Lauf 5).
+        val quiet = edited.hintQuietUntil ?: stored?.hintQuietUntil
+        val reminder = if (moved) {
+            edited.copy(active = true, archivedAt = null, hintQuietUntil = quiet)
+        } else {
+            edited.copy(archivedAt = stored?.archivedAt, hintQuietUntil = quiet)
+        }
         if (schedule is Schedule.Once) {
             val past = when {
                 reminder.id == 0L -> schedule.at.atZone(zone).toInstant() <= now()
