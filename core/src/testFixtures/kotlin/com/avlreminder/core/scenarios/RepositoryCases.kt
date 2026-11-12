@@ -6,11 +6,14 @@ import com.avlreminder.core.model.OccurrenceState
 import com.avlreminder.core.model.ProofKind
 import com.avlreminder.core.model.ProofSpec
 import com.avlreminder.core.model.Resolution
+import com.avlreminder.core.model.Schedule
+import com.avlreminder.core.model.SessionSpec
 import com.avlreminder.core.ports.ReminderRepository
 import com.avlreminder.core.reminder
 import com.avlreminder.core.rules.Action
 import com.avlreminder.core.rules.Evidence
 import com.avlreminder.core.usecases.SaveResult
+import java.time.LocalDateTime
 
 /**
  * Engine cases whose outcome depends on how the repository stores (Review-Lauf 4, E14). They run
@@ -23,6 +26,7 @@ object RepositoryCases {
         "undone after completion, only the completing item is open again" to ::undoKeepsTheItems,
         "deleted with an open occurrence, nothing is left" to ::deleteWithOpenOccurrence,
         "saving an unknown id creates nothing, foreign item ids are new" to ::unknownIdsAreNotTakenOver,
+        "a session counts in the week of its start" to ::sessionCountsInItsStartWeek,
     )
 
     private fun list() = reminder().copy(
@@ -99,5 +103,26 @@ object RepositoryCases {
         val items = sim.repo.reminder(id)!!.checklist
         check(items.size == 4 && items.last().id != foreign.id) { "foreign item id taken over: $items" }
         check(sim.repo.reminder(other)!!.checklist.first() == foreign) { "the other list changed" }
+    }
+
+    /**
+     * Review-Lauf 4, Frage 4: started Sunday 23:20, answered Monday 0:10. The repository counts
+     * it in the week of the start (`countedAt`), which the weekly limit and goal read.
+     */
+    suspend fun sessionCountsInItsStartWeek(sim: Simulation<out ReminderRepository>) {
+        val id = sim.create(
+            reminder(Schedule.Once(LocalDateTime.of(2026, 11, 1, 23, 0))).copy(session = SessionSpec(minimumMinutes = 20)),
+        )
+        val o = sim.open(id)
+        sim.clock.now = o.dueAt
+        checkNotNull(sim.engine.onAlarm(o.id)) { "does not ring" }
+        sim.clock.now = at(1, 23, 20, month = 11)
+        check(sim.engine.start(o.id) is com.avlreminder.core.rules.TransitionResult.Ok) { "start rejected" }
+        sim.clock.now = at(2, 0, 10, month = 11)
+        check(sim.engine.act(o.id, Action.Complete(minimumOnly = false)) is com.avlreminder.core.rules.TransitionResult.Ok) { "answer rejected" }
+
+        val startWeek = sim.repo.countResolved(id, Resolution.GOAL, at(26, 0), at(2, 0, month = 11))
+        val nextWeek = sim.repo.countResolved(id, Resolution.GOAL, at(2, 0, month = 11), at(9, 0, month = 11))
+        check(startWeek == 1 && nextWeek == 0) { "counted $startWeek in the start week, $nextWeek in the next" }
     }
 }
