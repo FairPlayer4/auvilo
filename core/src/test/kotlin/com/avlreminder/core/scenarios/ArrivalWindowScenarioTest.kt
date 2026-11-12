@@ -10,6 +10,7 @@ import com.avlreminder.core.model.WhenAway
 import com.avlreminder.core.reminder
 import com.avlreminder.core.rules.Action
 import java.time.DayOfWeek
+import java.time.Duration
 import java.time.LocalTime
 import kotlinx.coroutines.test.runTest
 import org.junit.jupiter.api.Assertions.assertEquals
@@ -69,6 +70,40 @@ class ArrivalWindowScenarioTest {
         assertEquals(listOf("Mo 19:30 Training FULLSCREEN"), sim.rings)
         // Nach der ersten Prüfung steht fest, dass man da ist: keine weiteren Prüfungen.
         assertEquals(listOf(at(26, 18)), sim.placeChecks)
+    }
+
+    // KRITISCH: F2 im Doze (Review-Lauf 4): die Prüfung zu Beginn ist exakt, die übrigen nicht.
+    @Test
+    fun `im Doze kommt die erste Pruefung puenktlich und entscheidet F2`() = runTest {
+        training(home())
+        sim.doze = Duration.ofMinutes(15)
+        sim.wifi(HOME_24, at(26, 8))
+        sim.runUntil(at(26, 17, 59))
+        assertTrue(sim.placeAlarms.exact.isNotEmpty(), "die Prüfung zu Beginn ist exakt")
+        sim.runUntil(at(26, 19, 31))
+        assertEquals(listOf(at(26, 18)), sim.placeChecks)
+        assertEquals(listOf("Mo 19:30 Training FULLSCREEN"), sim.rings)
+    }
+
+    @Test
+    fun `kommt die erste Pruefung trotzdem spaet, gilt F2 weiter`() = runTest {
+        training(home())
+        sim.exactLate = Duration.ofMinutes(12)
+        sim.wifi(HOME_24, at(26, 8))
+        sim.runUntil(at(26, 19, 31))
+        assertEquals(listOf(at(26, 18, 12)), sim.placeChecks)
+        assertEquals(listOf("Mo 19:30 Training FULLSCREEN"), sim.rings)
+    }
+
+    @Test
+    fun `eine spaete Pruefung nach der ersten ist eine Ankunft, nicht F2`() = runTest {
+        training(home())
+        sim.doze = Duration.ofMinutes(15)
+        sim.wifi(HOME_24, at(26, 18, 10), reported = false)
+        sim.runUntil(at(26, 18, 41))
+        // 18:00 exakt und weg, 18:20 im Doze erst 18:35: da, Alarm nach dem Puffer.
+        assertEquals(listOf(at(26, 18), at(26, 18, 35)), sim.placeChecks)
+        assertEquals(listOf("Mo 18:40 Training FULLSCREEN"), sim.rings)
     }
 
     // KRITISCH: F1 – eine frische WLAN-Suche ohne das WLAN von Zuhause heißt klar weg: entfällt.

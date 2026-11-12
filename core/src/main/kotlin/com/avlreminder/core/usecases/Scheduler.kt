@@ -125,21 +125,24 @@ internal class Scheduler(private val c: EngineContext, private val views: AlarmV
 
     /** Arrived at [placeId], reported by the geofence or the WLAN connection. */
     suspend fun onArrival(placeId: Long): List<Ring> =
-        waitingAt(placeId).mapNotNull { (r, o) -> arrived(r, o, byCheck = false) }
+        waitingAt(placeId).mapNotNull { (r, o) -> arrived(r, o, byCheck = false, plannedCheck = null) }
 
     /**
      * The check alarm of [placeId] (7.29 OZ2): one check for all occurrences in their window or
      * waiting for the arrival there, from the WLAN alone. Only "there" changes anything.
+     * [plannedAt]: the time the check was planned for, null if unknown; the check planned for the
+     * start of a window decides F2 even when Doze delivers it late.
      */
-    suspend fun onPlaceCheck(placeId: Long): List<Ring> {
+    suspend fun onPlaceCheck(placeId: Long, plannedAt: Instant?): List<Ring> {
         val place = repo.places().firstOrNull { it.id == placeId } ?: return emptyList()
         val now = now()
         val waiting = waitingAt(placeId).filter { (r, o) -> ArrivalWindow.waits(r, o, now, views.missedAt(r, o)) }
         if (waiting.isEmpty()) return emptyList()
         val check = c.check(place, fallback = false)
-        c.log("place check place=$placeId ${ArrivalWindow.describe(check)} for ${waiting.joinToString { "r${it.first.id}" }}")
+        val late = plannedAt?.let { Duration.between(it, now).toMinutes() }?.takeIf { it > 0 }?.let { " late=${it}min" }.orEmpty()
+        c.log("place check place=$placeId ${ArrivalWindow.describe(check)}$late for ${waiting.joinToString { "r${it.first.id}" }}")
         if (check.result != PlaceResult.AT) return emptyList()
-        return waiting.mapNotNull { (r, o) -> arrived(r, o, byCheck = true) }
+        return waiting.mapNotNull { (r, o) -> arrived(r, o, byCheck = true, plannedCheck = plannedAt) }
     }
 
     suspend fun checkPlaces(): List<Ring> {
@@ -149,7 +152,7 @@ internal class Scheduler(private val c: EngineContext, private val views: AlarmV
             val o = repo.openOccurrence(r.id)
                 ?.takeIf { it.state == OccurrenceState.PLANNED && (r.schedule == Schedule.OnArrival || it.awaitsArrival) }
                 ?: return@mapNotNull null
-            if (c.check(place, fallback = true).result == PlaceResult.AT) arrived(r, o, byCheck = true) else null
+            if (c.check(place, fallback = true).result == PlaceResult.AT) arrived(r, o, byCheck = true, plannedCheck = null) else null
         }
     }
 
@@ -159,9 +162,9 @@ internal class Scheduler(private val c: EngineContext, private val views: AlarmV
             .mapNotNull { r -> repo.openOccurrence(r.id)?.let { r to it } }
 
     /** What the arrival means (see [ArrivalWindow.decide]); rings what is due right away. */
-    private suspend fun arrived(reminder: Reminder, occurrence: Occurrence, byCheck: Boolean): Ring? {
+    private suspend fun arrived(reminder: Reminder, occurrence: Occurrence, byCheck: Boolean, plannedCheck: Instant?): Ring? {
         val now = now()
-        return when (val d = ArrivalWindow.decide(reminder, occurrence, now, zone, byCheck)) {
+        return when (val d = ArrivalWindow.decide(reminder, occurrence, now, zone, plannedCheck)) {
             ArrivalDecision.Ignore -> null
             is ArrivalDecision.TooEarly -> {
                 c.log("arrival r${reminder.id}: too early, window from ${local(d.windowStart)}")
@@ -185,21 +188,24 @@ internal class Scheduler(private val c: EngineContext, private val views: AlarmV
 
     /**
      * The next check of each place (7.29 Z.3): the earliest of all occurrences waiting there, so
-     * the shortest check interval wins. Runs at the end of every command.
+     * the shortest check interval wins. Runs at the end of every command. The check at the start
+     * of a window is exact also in Doze: it decides F2.
      */
     suspend fun planChecks() {
         val now = now()
         val next = mutableMapOf<Long, Instant>()
+        val starts = mutableMapOf<Long, MutableSet<Instant>>()
         for (r in repo.reminders()) {
             val placeId = r.arrival?.placeId ?: continue
             if (!r.active) continue
             val o = repo.openOccurrence(r.id) ?: continue
             val at = ArrivalWindow.nextCheck(r, o, now, views.missedAt(r, o)) ?: continue
             next.merge(placeId, at, ::minOf)
+            ArrivalWindow.windowStart(r, o)?.let { starts.getOrPut(placeId) { mutableSetOf() } += it }
         }
         for (place in repo.places()) {
             val at = next[place.id]
-            if (at != null) c.placeAlarms.set(place.id, at) else c.placeAlarms.cancel(place.id)
+            if (at != null) c.placeAlarms.set(place.id, at, exact = starts[place.id].orEmpty().contains(at)) else c.placeAlarms.cancel(place.id)
         }
     }
 

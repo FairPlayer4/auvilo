@@ -52,7 +52,7 @@ internal class EngineContext(
     }
 
     val placeAlarms: PlaceAlarmPort = object : PlaceAlarmPort {
-        override fun set(placeId: Long, at: Instant) = effect { placeAlarms.set(placeId, at) }
+        override fun set(placeId: Long, at: Instant, exact: Boolean) = effect { placeAlarms.set(placeId, at, exact) }
         override fun cancel(placeId: Long) = effect { placeAlarms.cancel(placeId) }
     }
 

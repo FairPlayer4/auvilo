@@ -102,11 +102,15 @@ class FakeWifi(var connected: String? = null, var scan: WifiScan? = null) : Wifi
 
 class FakePlaceAlarms : PlaceAlarmPort {
     val set = mutableMapOf<Long, Instant>()
-    override fun set(placeId: Long, at: Instant) {
+    /** The places whose current check is exact (also in Doze). */
+    val exact = mutableSetOf<Long>()
+    override fun set(placeId: Long, at: Instant, exact: Boolean) {
         set[placeId] = at
+        if (exact) this.exact += placeId else this.exact -= placeId
     }
     override fun cancel(placeId: Long) {
         set.remove(placeId)
+        exact -= placeId
     }
 }
 

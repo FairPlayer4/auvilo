@@ -776,9 +776,9 @@ späteste Uhrzeit.
   selben Ort teilen sich die Prüfung; es gilt der kürzeste Prüfabstand.
 
 ### Z.3 Ports
-- **Prüf-Alarme pro Ort:** `PlaceAlarmPort.set(placeId, at)` / `cancel(placeId)`. Der
-  `AlarmPort` kennt nur einen Alarm pro Fälligkeit, Prüfungen gehören aber zum Ort. Exakt
-  genug ist `setWindow` mit 2 min. `ReminderEngine.onPlaceCheck(placeId)` sammelt alle
+- **Prüf-Alarme pro Ort:** `PlaceAlarmPort.set(placeId, at, exact)` / `cancel(placeId)`. Der
+  `AlarmPort` kennt nur einen Alarm pro Fälligkeit, Prüfungen gehören aber zum Ort.
+  `ReminderEngine.onPlaceCheck(placeId, plannedAt)` sammelt alle
   Fälligkeiten, die an dem Ort warten, prüft einmal und plant den nächsten Prüf-Alarm.
 - **Ortsergebnis als Fakt:** `LocationPort.check(place): PlaceCheck(placeId, source, result,
   scanAge, at)` mit `source` = `WIFI_CONNECTED` / `WIFI_SCAN` / `GEOFENCE` / `FALLBACK` und
@@ -836,15 +836,19 @@ späteste Uhrzeit.
   `currentAt` auf Ankunft + Puffer; liegt das schon hinter jetzt, klingelt es sofort.
   *Später*, *Verschieben*, *Rest auf morgen*, Fenster schließen, Wiederöffnen, Klingeln
   und Bearbeiten leeren `arrivedAt`.
-- **F2:** Findet die erste Prüfung im Zeitraum (bis `START_TOLERANCE` = 5 min nach Beginn)
-  einen schon da, klingelt es zur spätesten Uhrzeit. Eine Verbindung oder ein Geofence ist
-  dagegen eine echte Ankunft (Puffer). Ankunft vor dem Zeitraum: ignoriert, Diag „too early“.
+- **F2:** Findet die Prüfung, die für den Beginn des Zeitraums geplant war, einen schon da,
+  klingelt es zur spätesten Uhrzeit, auch wenn Android sie verspätet zustellt (der
+  Prüf-Alarm trägt seine geplante Zeit, `plannedAt`; seit Review-Lauf 4, vorher
+  „bis 5 min nach Beginn“). Eine Verbindung oder ein Geofence ist dagegen eine echte
+  Ankunft (Puffer). Ankunft vor dem Zeitraum: ignoriert, Diag „too early“.
 - **Prüfungen** im Raster Beginn + k·Prüfabstand, jeweils vor der spätesten Uhrzeit; die
   späteste Uhrzeit prüft der Alarm des Termins selbst (mit Rückfall auf die grobe
   Ortsabfrage, `check(fallback = true)`). Wartende verschobene Termine (`awaitsArrival`)
   prüfen ab `currentAt` bis zur Tagesgrenze. Mehrere Reminder am Ort: die früheste fällige
   Prüfung gilt. `planChecks()` läuft am Ende jedes Befehls in der Transaktion und setzt je
-  Ort einen Prüf-Alarm (`PlaceAlarmPort`, `setWindow` 2 min) oder löscht ihn.
+  Ort einen Prüf-Alarm (`PlaceAlarmPort`) oder löscht ihn: die Prüfung zu Beginn eines
+  Zeitraums exakt auch im Doze (`setExactAndAllowWhileIdle`, sie entscheidet F2), die
+  übrigen `setWindow` 2 min. Das Diagnose-Log nennt eine Verspätung (`late=…min`).
 - **Ortsergebnis:** `WifiLocation` (core) aus `WifiPort`: verbunden mit einer BSSID des
   Orts → `AT`; Ort ohne WLAN oder keine Suche → `UNKNOWN`; sonst WLAN des Orts nicht in
   einer Suche ≤ 10 min → `AWAY`, älter → `UNKNOWN`. Nur mit `fallback` fällt `UNKNOWN` auf
@@ -852,8 +856,11 @@ späteste Uhrzeit.
 - **Vorlauf 0** = genau das alte Verhalten: kein Puffer, keine Prüfungen. *Wenn ich
   ankomme* (`OnArrival`) klingelt bei Ankunft sofort, ohne Puffer.
 - **Android:** `AndroidWifi.watch` registriert bei jedem Prozessstart einen
-  `NetworkCallback` mit PendingIntent auf `WifiReceiver` (ruft `onWifi`);
-  `PlaceCheckReceiver` ruft `onPlaceCheck`. Die WLAN-Sonde aus V1.3b0.3 ist entfernt.
+  `NetworkCallback` mit PendingIntent auf `WifiReceiver` (ruft `onWifi`). Android meldet
+  dabei eine schon bestehende Verbindung erneut; `WifiConnections` merkt sich das Handle
+  der zuletzt gemeldeten Verbindung (`Network.networkHandle`, SharedPreferences `wifi`),
+  und nur eine neue Verbindung ruft `onWifi` (Review-Lauf 4). `PlaceCheckReceiver` ruft
+  `onPlaceCheck`. Die WLAN-Sonde aus V1.3b0.3 ist entfernt.
 - **Oberfläche:** Formular *Bei Ankunft* mit Ortswahl (ab zwei Orten), *Ankunft zählt ab*
   30/60/90/120 min/*andere…* und *entfällt*/*trotzdem klingeln*; Puffer und Prüfabstand
   unter *Feineinstellungen*. Einstellungen *Orte*: Zuhause und ein weiterer Ort mit Namen,

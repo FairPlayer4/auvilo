@@ -35,8 +35,8 @@ class ArrivalWindowTest {
 
     @ParameterizedTest(name = "{0}")
     @MethodSource("ankuenfte")
-    fun `was eine Ankunft bedeutet`(name: String, occurrence: Occurrence, now: Instant, byCheck: Boolean, decision: ArrivalDecision) {
-        assertEquals(decision, ArrivalWindow.decide(TRAINING, occurrence, now, ZONE, byCheck), name)
+    fun `was eine Ankunft bedeutet`(name: String, occurrence: Occurrence, now: Instant, plannedCheck: Instant?, decision: ArrivalDecision) {
+        assertEquals(decision, ArrivalWindow.decide(TRAINING, occurrence, now, ZONE, plannedCheck), name)
     }
 
     companion object {
@@ -73,14 +73,16 @@ class ArrivalWindowTest {
 
         @JvmStatic
         fun ankuenfte() = listOf(
-            arguments("vor dem Zeitraum: zu früh", PLANNED, at(26, 17, 59), false, ArrivalDecision.TooEarly(at(26, 18))),
-            arguments("im Zeitraum gemeldet: nach dem Puffer", PLANNED, at(26, 18, 2), false, ArrivalDecision.At(at(26, 18, 7))),
-            arguments("Prüfung zu Beginn findet einen da: späteste Uhrzeit (F2)", PLANNED, at(26, 18, 5), true, ArrivalDecision.At(at(26, 19, 30))),
-            arguments("Prüfung später im Zeitraum: nach dem Puffer", PLANNED, at(26, 18, 6), true, ArrivalDecision.At(at(26, 18, 11))),
-            arguments("schon angekommen: die erste zählt", PLANNED.copy(arrivedAt = at(26, 18, 2), currentAt = at(26, 18, 7)), at(26, 18, 4), false, ArrivalDecision.Ignore),
-            arguments("zur spätesten Uhrzeit: entscheidet der eigene Alarm", PLANNED, at(26, 19, 30), false, ArrivalDecision.Ignore),
-            arguments("verschoben vor der neuen Zeit: behält sie", PLANNED.copy(postponeCount = 1, currentAt = at(26, 20)), at(26, 18, 30), false, ArrivalDecision.Ignore),
-            arguments("wartet auf die Ankunft: nach dem Puffer", PLANNED.copy(firedAt = at(26, 19, 30), currentAt = at(26, 20), awaitsArrival = true), at(26, 20, 34), false, ArrivalDecision.At(at(26, 20, 39))),
+            arguments("vor dem Zeitraum: zu früh", PLANNED, at(26, 17, 59), null, ArrivalDecision.TooEarly(at(26, 18))),
+            arguments("im Zeitraum gemeldet: nach dem Puffer", PLANNED, at(26, 18, 2), null, ArrivalDecision.At(at(26, 18, 7))),
+            arguments("zu Beginn gemeldet, nicht geprüft: nach dem Puffer", PLANNED, at(26, 18), null, ArrivalDecision.At(at(26, 18, 5))),
+            arguments("Prüfung zu Beginn findet einen da: späteste Uhrzeit (F2)", PLANNED, at(26, 18), at(26, 18), ArrivalDecision.At(at(26, 19, 30))),
+            arguments("Prüfung zu Beginn kommt im Doze 12 min zu spät: trotzdem F2", PLANNED, at(26, 18, 12), at(26, 18), ArrivalDecision.At(at(26, 19, 30))),
+            arguments("spätere Prüfung, pünktlich: nach dem Puffer", PLANNED, at(26, 18, 20), at(26, 18, 20), ArrivalDecision.At(at(26, 18, 25))),
+            arguments("schon angekommen: die erste zählt", PLANNED.copy(arrivedAt = at(26, 18, 2), currentAt = at(26, 18, 7)), at(26, 18, 4), null, ArrivalDecision.Ignore),
+            arguments("zur spätesten Uhrzeit: entscheidet der eigene Alarm", PLANNED, at(26, 19, 30), null, ArrivalDecision.Ignore),
+            arguments("verschoben vor der neuen Zeit: behält sie", PLANNED.copy(postponeCount = 1, currentAt = at(26, 20)), at(26, 18, 30), null, ArrivalDecision.Ignore),
+            arguments("wartet auf die Ankunft: nach dem Puffer", PLANNED.copy(firedAt = at(26, 19, 30), currentAt = at(26, 20), awaitsArrival = true), at(26, 20, 34), null, ArrivalDecision.At(at(26, 20, 39))),
         )
     }
 }

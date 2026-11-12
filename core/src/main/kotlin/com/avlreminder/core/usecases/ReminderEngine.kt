@@ -133,8 +133,11 @@ class ReminderEngine(
         repo.places().filter { it.hasWifi(bssid) }.flatMap { scheduler.onArrival(it.id) }
     }
 
-    /** The check alarm of [placeId] fired: one check for all occurrences that wait there (OZ2). */
-    suspend fun onPlaceCheck(placeId: Long): List<Ring> = command { scheduler.onPlaceCheck(placeId) }
+    /**
+     * The check alarm of [placeId] fired: one check for all occurrences that wait there (OZ2).
+     * [plannedAt]: the time it was set for (null: unknown).
+     */
+    suspend fun onPlaceCheck(placeId: Long, plannedAt: Instant?): List<Ring> = command { scheduler.onPlaceCheck(placeId, plannedAt) }
 
     /**
      * Checks the position for reminders that only wait for an arrival: after a reboot or a new

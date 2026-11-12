@@ -23,6 +23,7 @@ import com.avlreminder.core.ports.WifiScan
 import com.avlreminder.core.rules.WifiLocation
 import com.avlreminder.core.usecases.ReminderEngine
 import com.avlreminder.core.usecases.SaveResult
+import java.time.Duration
 import java.time.Instant
 import java.time.LocalDateTime
 import java.time.LocalTime
@@ -73,15 +74,16 @@ class Simulation<R : ReminderRepository>(start: Instant, val repo: R, var settin
         require(until >= clock.now) { "time only moves forward" }
         repeat(MAX_ALARMS) {
             val occurrence = alarms.set.entries.minByOrNull { it.value.first }?.let { it.key to it.value.first }
-            val place = placeAlarms.set.entries.minByOrNull { it.value }?.let { it.key to it.value }
+            val place = placeAlarms.set.entries.map { (id, at) -> id to at.plus(delay(id)) }.minByOrNull { it.second }
             val placeFirst = place != null && (occurrence == null || place.second < occurrence.second)
             val (id, next) = (if (placeFirst) place else occurrence) ?: return finish(until)
             if (next > until) return finish(until)
             clock.now = maxOf(clock.now, next)
             if (placeFirst) {
+                val planned = placeAlarms.set.getValue(id)
                 placeChecks += next
-                engine.onPlaceCheck(id)
-                check(placeAlarms.set[id] != next) { "check of place $id at $next is set again to the same time" }
+                engine.onPlaceCheck(id, planned)
+                check(placeAlarms.set[id] != planned) { "check of place $id at $planned is set again to the same time" }
             } else {
                 engine.onAlarm(id)
                 check(alarms.set[id]?.first != next) { "alarm of occurrence $id fired at $next and is set again to the same time" }
@@ -91,8 +93,14 @@ class Simulation<R : ReminderRepository>(start: Instant, val repo: R, var settin
         error("more than $MAX_ALARMS alarms before $until")
     }
 
-    /** When the places were checked. */
+    /** When the places were checked (as delivered, after [doze]). */
     val placeChecks = mutableListOf<Instant>()
+
+    /** Doze: how late Android delivers an inexact check; [exactLate]: an exact one (phone briefly off). */
+    var doze: Duration = Duration.ZERO
+    var exactLate: Duration = Duration.ZERO
+
+    private fun delay(placeId: Long): Duration = if (placeId in placeAlarms.exact) exactLate else doze
 
     /**
      * Connects to the WLAN [bssid] at [at] (null: disconnects); Android reports a connection, so

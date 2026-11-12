@@ -20,7 +20,12 @@ import com.avlreminder.core.model.WhenAway
 import com.avlreminder.core.usecases.SaveResult
 import com.avlreminder.AvlApp
 import com.avlreminder.graph
+import android.net.ConnectivityManager
+import com.avlreminder.location.AndroidPlaceAlarms
+import com.avlreminder.location.AndroidWifi
 import com.avlreminder.location.GeofenceReceiver
+import com.avlreminder.location.WifiReceiver
+import org.robolectric.shadows.ShadowNetwork
 import com.avlreminder.location.PlaceCheckReceiver
 import com.avlreminder.system.SystemReceiver
 import kotlinx.coroutines.runBlocking
@@ -237,6 +242,9 @@ class ReceiverGlueTest {
         assertTrue(saved.toString(), saved is SaveResult.Saved)
         val check = shadowOf(alarmManager).scheduledAlarms.single { it.operation?.let { op -> shadowOf(op).savedIntent }?.component?.className == PlaceCheckReceiver::class.java.name }
         assertTrue(Instant.ofEpochMilli(check.triggerAtTime) <= Instant.now().plus(Duration.ofMinutes(20)))
+        // A check inside the window may come a little late; only the one at its start is exact.
+        assertTrue("inexact", !check.isAllowWhileIdle)
+        assertEquals(check.triggerAtTime, shadowOf(check.operation).savedIntent.getLongExtra(AndroidPlaceAlarms.EXTRA_AT, -1))
 
         broadcast(shadowOf(check.operation).savedIntent)
 
@@ -244,6 +252,48 @@ class ReceiverGlueTest {
         waitFor("check logged") { log.readText().contains("place check place=$home UNKNOWN") }
         val text = log.readText()
         assertTrue(text, !text.contains(bssid) && !text.contains("Heimnetz"))
+    }
+
+    /**
+     * F2 (Homeoffice) hangs on the check at the start of the window: it is exact also in Doze and
+     * carries its planned time, so the engine knows it was the first one however late it comes.
+     */
+    @Test
+    fun theCheckAtTheStartOfTheWindowIsExactAndCarriesItsPlannedTime() = runBlocking {
+        val home = graph.withEngine {
+            it.savePlace(Place(name = "Zuhause", lat = 48.1, lon = 11.5, wifis = listOf(PlaceWifi("aa:bb:cc:00:00:01"))))
+        }
+        // Due in three hours: the window (90 min before) starts in 90 min.
+        val latest = LocalTime.now().plusHours(3).withSecond(0).withNano(0)
+        graph.withEngine { it.save(reminder("Training").copy(schedule = Schedule.Daily(latest), arrival = Arrival(home))) }
+
+        val check = shadowOf(alarmManager).scheduledAlarms.single { it.operation?.let { op -> shadowOf(op).savedIntent }?.component?.className == PlaceCheckReceiver::class.java.name }
+        assertTrue("exact while idle", check.isAllowWhileIdle)
+        val start = Instant.ofEpochMilli(check.triggerAtTime)
+        assertEquals(0, start.atZone(java.time.ZoneId.systemDefault()).toLocalTime().withNano(0).compareTo(latest.minusMinutes(90)))
+        assertEquals(check.triggerAtTime, shadowOf(check.operation).savedIntent.getLongExtra(AndroidPlaceAlarms.EXTRA_AT, -1))
+    }
+
+    /**
+     * Android reports a WLAN connection that already exists again whenever the app registers for
+     * reports, so at every process start: the same connection is no arrival (Review-Lauf 4).
+     */
+    @Test
+    fun theSameWlanConnectionReportedAgainIsNoArrival() {
+        val log = File(context.filesDir, "diag/diag.log")
+        fun report(netId: Int) = broadcast(
+            Intent(AndroidWifi.ACTION_CONNECT).setClass(context, WifiReceiver::class.java)
+                .putExtra(ConnectivityManager.EXTRA_NETWORK, ShadowNetwork.newInstance(netId)),
+        )
+        fun repeats() = if (log.exists()) log.readText().split("same connection as before").size - 1 else 0
+
+        report(7)
+        waitFor("first report handled") { log.exists() && log.readText().contains("wifi connected: no bssid") }
+        assertEquals(0, repeats())
+        report(7)
+        assertEquals(1, repeats())
+        report(8)
+        assertEquals(1, repeats())
     }
 
     // --- Boot and time change -------------------------------------------------------------------

@@ -16,6 +16,7 @@ import android.net.wifi.ScanResult
 import android.net.wifi.WifiInfo
 import android.net.wifi.WifiManager
 import android.os.SystemClock
+import androidx.core.content.edit
 import com.avlreminder.core.model.PlaceWifi
 import com.avlreminder.core.ports.PlaceAlarmPort
 import com.avlreminder.core.ports.WifiPort
@@ -120,10 +121,19 @@ class AndroidWifi(private val context: Context) : WifiPort {
     }
 }
 
-/** Connected to a WLAN: an arrival at the places it belongs to. The log has no names, no BSSIDs. */
+/**
+ * Connected to a WLAN: an arrival at the places it belongs to. The log has no names, no BSSIDs.
+ * Android also reports a connection that already exists whenever [AndroidWifi.watch] registers
+ * again, so at every process start: only a new connection counts (2026-11-12, Review-Lauf 4).
+ */
 class WifiReceiver : BroadcastReceiver() {
     override fun onReceive(context: Context, intent: Intent) {
         if (intent.action != AndroidWifi.ACTION_CONNECT) return
+        val network = intent.getParcelableExtra(ConnectivityManager.EXTRA_NETWORK, Network::class.java)
+        if (!WifiConnections(context).isNew(network?.networkHandle)) {
+            Diag.log("wifi connected: same connection as before, no arrival")
+            return
+        }
         val result = goAsync()
         val graph = context.graph
         graph.scope.launch {
@@ -141,28 +151,61 @@ class WifiReceiver : BroadcastReceiver() {
 }
 
 /**
- * The checks of a place in its arrival window (design.md Z.3): one inexact alarm per place,
- * `setWindow` with [WINDOW_MS], like the other alarms derived from the database on every sync.
+ * Which WLAN connection was reported last: Android's handle of the network, which a new
+ * connection changes and a repeated report of the same one keeps. On the phone only.
+ */
+class WifiConnections(context: Context) {
+    private val prefs = context.getSharedPreferences("wifi", Context.MODE_PRIVATE)
+
+    /** Whether [handle] is a connection not reported before; it is remembered. Null: unknown, counts. */
+    fun isNew(handle: Long?): Boolean {
+        if (handle == null) return true
+        if (prefs.getLong(KEY, NONE) == handle) return false
+        prefs.edit { putLong(KEY, handle) }
+        return true
+    }
+
+    private companion object {
+        const val KEY = "lastNetwork"
+        const val NONE = Long.MIN_VALUE
+    }
+}
+
+/**
+ * The checks of a place in its arrival window (design.md Z.3): one alarm per place, like the other
+ * alarms derived from the database on every sync. The check at the start of a window is exact also
+ * in Doze (it decides F2), the others are inexact, `setWindow` with [WINDOW_MS]. The intent carries
+ * the planned time.
  */
 class AndroidPlaceAlarms(private val context: Context) : PlaceAlarmPort {
     private val alarms get() = context.getSystemService(AlarmManager::class.java)
 
-    override fun set(placeId: Long, at: Instant) {
-        alarms.setWindow(AlarmManager.RTC_WAKEUP, at.toEpochMilli(), WINDOW_MS, pending(placeId))
+    // USE_EXACT_ALARM is granted at install time (manifest); lint only knows SCHEDULE_EXACT_ALARM.
+    @SuppressLint("MissingPermission")
+    override fun set(placeId: Long, at: Instant, exact: Boolean) {
+        val pending = pending(placeId, at)
+        if (exact) {
+            alarms.setExactAndAllowWhileIdle(AlarmManager.RTC_WAKEUP, at.toEpochMilli(), pending)
+        } else {
+            alarms.setWindow(AlarmManager.RTC_WAKEUP, at.toEpochMilli(), WINDOW_MS, pending)
+        }
     }
 
     override fun cancel(placeId: Long) {
-        alarms.cancel(pending(placeId))
+        alarms.cancel(pending(placeId, null))
     }
 
-    private fun pending(placeId: Long): PendingIntent = PendingIntent.getBroadcast(
+    private fun pending(placeId: Long, at: Instant?): PendingIntent = PendingIntent.getBroadcast(
         context, placeId.toInt(),
-        Intent(context, PlaceCheckReceiver::class.java).putExtra(EXTRA_PLACE, placeId),
+        Intent(context, PlaceCheckReceiver::class.java).putExtra(EXTRA_PLACE, placeId)
+            .apply { at?.let { putExtra(EXTRA_AT, it.toEpochMilli()) } },
         PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE,
     )
 
     companion object {
         const val EXTRA_PLACE = "place"
+        /** The planned time of the check, for F2 and to log how late it came. */
+        const val EXTRA_AT = "at"
         const val WINDOW_MS = 2 * 60_000L
     }
 }
@@ -172,11 +215,12 @@ class PlaceCheckReceiver : BroadcastReceiver() {
     override fun onReceive(context: Context, intent: Intent) {
         val placeId = intent.getLongExtra(AndroidPlaceAlarms.EXTRA_PLACE, -1)
         if (placeId < 0) return
+        val planned = intent.getLongExtra(AndroidPlaceAlarms.EXTRA_AT, -1).takeIf { it >= 0 }?.let(Instant::ofEpochMilli)
         val result = goAsync()
         val graph = context.graph
         graph.scope.launch {
             try {
-                graph.withEngine { it.onPlaceCheck(placeId) }
+                graph.withEngine { it.onPlaceCheck(placeId, planned) }
             } finally {
                 result.finish()
             }

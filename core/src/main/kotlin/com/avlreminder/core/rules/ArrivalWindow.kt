@@ -27,12 +27,6 @@ sealed interface ArrivalDecision {
  * the arrival from then on until the end of the day (OZ5).
  */
 object ArrivalWindow {
-    /**
-     * A check this soon after the start of the window that finds one there means "already there"
-     * (F2, Homeoffice): it rings at the latest time. Later it counts as an arrival.
-     */
-    val START_TOLERANCE: Duration = Duration.ofMinutes(5)
-
     /** From when to when the place is checked for the occurrence; null: not at all. */
     fun checking(reminder: Reminder, occurrence: Occurrence, missedAt: Instant): Pair<Instant, Instant>? {
         val arrival = reminder.arrival ?: return null
@@ -60,12 +54,20 @@ object ArrivalWindow {
     fun waits(reminder: Reminder, occurrence: Occurrence, now: Instant, missedAt: Instant): Boolean =
         checking(reminder, occurrence, missedAt)?.let { (start, end) -> now >= start && now < end } == true
 
+    /** The start of the window of a planned occurrence that neither rang nor moved; null: none. */
+    fun windowStart(reminder: Reminder, occurrence: Occurrence): Instant? {
+        val arrival = reminder.arrival ?: return null
+        if (!arrival.hasWindow || reminder.schedule == Schedule.OnArrival || occurrence.rangOrMoved || occurrence.awaitsArrival) return null
+        return occurrence.currentAt.minus(Duration.ofMinutes(arrival.leadMinutes.toLong()))
+    }
+
     /**
-     * Arrived at [now]; [byCheck]: found there by a check, not reported by the WLAN connection or
-     * the geofence. The first arrival in the window counts; a snoozed or postponed occurrence keeps
-     * its new time unless it waits for the arrival.
+     * Arrived at [now]. [plannedCheck]: found there by the check planned for that time; null:
+     * reported by the WLAN connection or the geofence, or a check outside the window grid. The
+     * first arrival in the window counts; a snoozed or postponed occurrence keeps its new time
+     * unless it waits for the arrival.
      */
-    fun decide(reminder: Reminder, occurrence: Occurrence, now: Instant, zone: ZoneId, byCheck: Boolean): ArrivalDecision {
+    fun decide(reminder: Reminder, occurrence: Occurrence, now: Instant, zone: ZoneId, plannedCheck: Instant?): ArrivalDecision {
         val arrival = reminder.arrival ?: return ArrivalDecision.Ignore
         if (occurrence.state != OccurrenceState.PLANNED) return ArrivalDecision.Ignore
         if (reminder.schedule == Schedule.OnArrival) return ArrivalDecision.Now
@@ -83,7 +85,8 @@ object ArrivalWindow {
         return when {
             now < start -> ArrivalDecision.TooEarly(start)
             // KRITISCH: Already there when the window starts (Homeoffice): the latest time, not now (F2).
-            byCheck && now <= start.plus(START_TOLERANCE) -> ArrivalDecision.At(occurrence.currentAt)
+            // The check planned for the start decides, however late Doze delivers it (2026-11-12).
+            plannedCheck == start -> ArrivalDecision.At(occurrence.currentAt)
             else -> ArrivalDecision.At(afterBuffer)
         }
     }
