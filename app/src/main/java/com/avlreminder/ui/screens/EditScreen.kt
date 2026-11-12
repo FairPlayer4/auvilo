@@ -315,7 +315,7 @@ private fun ProofSection(form: ReminderForm, onChange: (ReminderForm) -> Unit) {
             }
         }
         Text("Alarm pausiert während des Nachweises", Modifier.padding(top = 10.dp), color = c.text, fontSize = 14.sp)
-        NumberChoice(listOf(5, 10, 15, 30), p.windowMinutes, 1..120, "Alarm pausiert während des Nachweises", unit = "min") {
+        NumberChoice(listOf(5, 10, 15, 30), p.windowMinutes, 1..60, "Alarm pausiert während des Nachweises", unit = "min") {
             onChange(form.copy(proof = p.copy(windowMinutes = it)))
         }
     }
