@@ -19,7 +19,11 @@ interface ReminderRepository {
 
     suspend fun reminders(): List<Reminder>
     suspend fun reminder(id: Long): Reminder?
-    /** Inserts when id is 0, otherwise updates; also stores the checklist (items get ids). Returns the id. */
+    /**
+     * Inserts when id is 0, otherwise updates; an unknown id changes nothing. Also stores the
+     * checklist: items of this reminder keep their id, others get a new one, a removed item takes
+     * its progress along. Returns the id.
+     */
     suspend fun saveReminder(reminder: Reminder): Long
     /** Deletes the reminder with its occurrences, events, proofs, prep answers and blockers. */
     suspend fun deleteReminder(id: Long)

@@ -144,10 +144,10 @@ class SessionEngineTest {
 
     @Test
     fun `maximale Dauer mit erledigtem Punkt – Minimum (D5)`() = runTest {
-        val id = training { it.copy(checklist = listOf(ChecklistItem(1, "Aufwärmen"), ChecklistItem(2, "Laufen"))) }
+        val id = training { it.copy(checklist = listOf(ChecklistItem(title = "Aufwärmen"), ChecklistItem(title = "Laufen"))) }
         val o = started(id, at(26, 18))
         clock.now = at(26, 18, 20)
-        engine.act(o, Action.CheckItem(1))
+        engine.act(o, Action.CheckItem(repo.reminder(id)!!.checklist.first().id))
         assertEquals(OccurrenceState.RUNNING, repo.occurrence(o)!!.state)
         clock.now = at(26, 19, 30)
         engine.onAlarm(o)

@@ -39,6 +39,7 @@ class RoomReminderRepository(private val db: AvlDatabase) : ReminderRepository {
 
     override suspend fun reminder(id: Long) = dao.reminder(id)?.toModel(dao.items(id))
 
+    /** An unknown id changes nothing, as in the fake (Review-Lauf 4, E14). */
     override suspend fun saveReminder(reminder: Reminder): Long {
         var oldAudio: String? = null
         val id = db.withTransaction {
@@ -46,7 +47,8 @@ class RoomReminderRepository(private val db: AvlDatabase) : ReminderRepository {
             val id = if (reminder.id == 0L) {
                 dao.insert(entity)
             } else {
-                oldAudio = dao.reminder(reminder.id)?.motivationAudio
+                val old = dao.reminder(reminder.id) ?: return@withTransaction reminder.id
+                oldAudio = old.motivationAudio
                 dao.update(entity)
                 reminder.id
             }

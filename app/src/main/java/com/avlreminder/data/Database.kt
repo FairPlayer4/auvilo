@@ -307,7 +307,8 @@ interface AvlDao {
     @Query("SELECT * FROM occurrence WHERE state IN $OPEN")
     fun observeOpenOccurrences(): Flow<List<OccurrenceEntity>>
 
-    @Query("SELECT * FROM occurrence WHERE reminderId = :reminderId AND state IN $OPEN LIMIT 1")
+    // The oldest, like the fake; there should only ever be one (Review-Lauf 4).
+    @Query("SELECT * FROM occurrence WHERE reminderId = :reminderId AND state IN $OPEN ORDER BY id LIMIT 1")
     suspend fun openOccurrence(reminderId: Long): OccurrenceEntity?
 
     @Query("SELECT * FROM occurrence WHERE reminderId = :reminderId AND state IN ('DONE','CLOSED') ORDER BY resolvedAt DESC, id DESC LIMIT 1")
@@ -316,7 +317,7 @@ interface AvlDao {
     @Query("SELECT * FROM occurrence WHERE reminderId = :reminderId AND state = 'DONE' ORDER BY resolvedAt DESC, id DESC LIMIT 1")
     suspend fun lastDone(reminderId: Long): OccurrenceEntity?
 
-    @Query("SELECT * FROM occurrence WHERE reminderId = :reminderId AND state IN ('DONE','CLOSED') ORDER BY resolvedAt DESC LIMIT :limit")
+    @Query("SELECT * FROM occurrence WHERE reminderId = :reminderId AND state IN ('DONE','CLOSED') ORDER BY resolvedAt DESC, id DESC LIMIT :limit")
     suspend fun recentResolved(reminderId: Long, limit: Int): List<OccurrenceEntity>
 
     @Query(
