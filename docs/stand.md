@@ -4,14 +4,13 @@ Stand: 2026-11-12. Bei jedem größeren Schritt aktualisieren. Erledigtes steht 
 anforderungen.md Kap. 10.1 und in den Review-Berichten (`.review/runs/`), nicht hier.
 
 ## Auf dem Gerät (S24)
-- **V1.3b1** (`versionCode` 17), installiert am 2026-11-11: Sitzung mit Timer und Uhr
-  (7.11), davor 1.3b0.6 (Ankunft im Zeitraum mit WLAN, 7.29) und 1.3b0.5 (Cloud-Backup
+- **V1.3b2** (`versionCode` 18), installiert am 2026-11-12: Antworten auf Review-Lauf 4
+  (Sitzung zählt in der Woche ihres Starts, *Abbruch* 60 s zurücknehmbar, *Teilschritt*
+  nach aufgebrauchtem Limit ausgeblendet, F2 über die geplante erste Prüfung, wiederholte
+  WLAN-Meldung keine Ankunft) und Tests. Start ohne Fehler, Alarme neu geplant.
+- Davor V1.3b1 (2026-11-11): Sitzung mit Timer und Uhr (7.11), davor 1.3b0.6 (Ankunft im Zeitraum mit WLAN, 7.29) und 1.3b0.5 (Cloud-Backup
   Schritte 1–5). Nach dem Start jeweils: Berechtigungen ok, Alarme neu geplant, keine
   Fehler im Diagnose-Log.
-- **V1.3b2** gebaut, wartet auf Kevins Go: Antworten auf Review-Lauf 4 (Sitzung zählt in
-  der Woche ihres Starts, *Abbruch* 60 s zurücknehmbar, *Teilschritt* nach aufgebrauchtem
-  Limit ausgeblendet, F2 über die geplante erste Prüfung, wiederholte WLAN-Meldung keine
-  Ankunft) und Tests.
 
 ## Cloud-Backup
 Schritte 1–5 installiert (2026-11-07 bis 11-09), seit 2026-11-11 in `develop`.
@@ -24,24 +23,22 @@ einer Fassung.
 ## Offen
 1. **Gerätetests** aus [geraetetest.md](geraetetest.md): K15, K23–K26 (vorher *Zuhause* in
    *Orte* mit WLAN neu festlegen), K27–K30 (Sitzung, dabei: zeigt die Uhr den
-   Chronometer?). Nach V1.3b2 im `diag.log` prüfen, dass keine Ankunft mehr direkt nach
+   Chronometer?), K31, K32. In den nächsten Tagen im `diag.log` prüfen, dass keine Ankunft mehr direkt nach
    „app start“ kommt und die erste Prüfung eines Zeitraums pünktlich ist (`late=`).
 2. **Eine Woche Training mit der Sitzung**, dann Entwurf **V1.3c**: Abläufe (7.12), ein
    Vollbild zur Zeit mit *+1 wartet* (7.3), Knöpfe je Art mit *Rest später* (7.4);
    Vorlagen mit Sitzung.
-3. **Testdaten neu ziehen** (`tools/testdata/export_testdata.py`, Review-Lauf 4 E16), sobald
-   das Handy verbunden ist.
-4. **Nutzung beobachten und trimmen** (7.27): Reminder werden manchmal zu streng angelegt
+3. **Nutzung beobachten und trimmen** (7.27): Reminder werden manchmal zu streng angelegt
    und mehrfach um 10 min geschoben; Cheats bekommen später Rückfragen. Zählen erst vor V2
    mit einer neuen Testsession (NT4).
-5. **Vorschläge in der App:** 1, 4, 5, 6, 7 und 9 sind umgesetzt (Kevin markiert sie);
+4. **Vorschläge in der App:** 1, 4, 5, 6, 7 und 9 sind umgesetzt (Kevin markiert sie);
    offen VS3 (7.25).
-6. **Später, stört aktuell nicht:** Kevin beschreibt die Szenarien zu Checklisten mit
+5. **Später, stört aktuell nicht:** Kevin beschreibt die Szenarien zu Checklisten mit
    mehreren Uhrzeiten (vermuteter Fehler; Code und Tests am 2026-11-11 ohne Befund, die
    Engine-Fälle laufen seit 2026-11-12 auch gegen Room, ohne Befund), Training-Alarm am
    Morgen; aus Review-Lauf 2 optional Paket `alarm` aufteilen.
-7. **Versionsname** je installiertem Stand `1.3b<n>-backup<Schritt>`, `versionCode` +1.
-8. **Play-Store-Release** ohne Eile, frühestens mit V2 (7.28 PS5–PS9). Branch-Regel für
+6. **Versionsname** je installiertem Stand `1.3b<n>-backup<Schritt>`, `versionCode` +1.
+7. **Play-Store-Release** ohne Eile, frühestens mit V2 (7.28 PS5–PS9). Branch-Regel für
    `main` setzt Kevin.
 
 ## Beobachtungen aus der echten Nutzung

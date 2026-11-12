@@ -29,7 +29,7 @@ Das Cloud-Backup (`app/…/cloud`, `restore`) prüft der review-loop des Backend
 | app-Claude | app/…/claude, app/src/debug | anforderungen.md 7.26 AG11, design.md 15 | ClaudeApiTest | 2026-11-03 | AG5-Frage offen; Freigabe-Prüfung ungetestet |
 | app-Ort/Widget | app/…/location, widget | design.md 6, 11.2 | ReceiverGlueTest (PlaceCheck über echten PendingIntent) | 2026-11-12 (Ankunft, WLAN) | wiederholte WLAN-Meldung keine Ankunft (3f49b58); Geofence-Test in 5f2c6a2; Widget ohne Test |
 | Doku | CLAUDE.md, README, docs/*.md | – | – | 2026-11-12 (Lauf 4, alle Dokumente) | nach Lauf 4 umgebaut: design.md nach Themen (3.1 Sitzung, 6 Ankunft), Cloud-Entwürfe → cloud-entscheidungen.md, Kap.-9-Archiv, testsession.md gelöscht |
-| Tests gesamt | core/src/test, testFixtures, app/src/test | design.md 14 | – | 2026-11-12 (Lauf 4) | core sehr gut; E13–E15 umgesetzt (5f2c6a2, 247b44b), E16 Testdaten offen |
+| Tests gesamt | core/src/test, testFixtures, app/src/test | design.md 14 | – | 2026-11-12 (Lauf 4) | core sehr gut; E13–E16 umgesetzt (5f2c6a2, 247b44b, Testdaten Schema 10 am 2026-11-12); Mutationslauf: 21/21 entdeckt nach cc337b4 |
 
 ## Bekannte Schulden und beobachtete Drift
 - 2026-11-03: Regel-Logik in `:app`: `AlarmActivity.canDeferRest`, das Anbieten des nächsten Punkts in `ActionReceiver`. Beginnende Drift. **Trend (Lauf 2):** Die Alarm-Ansicht gibt es viermal (`Ring`, `AlarmUi`, `AlarmInfo`, `ActionReceiver`); `ActionReceiver` nutzt `Checklists.round` nicht. Empfehlung E1.
@@ -51,7 +51,7 @@ Das Cloud-Backup (`app/…/cloud`, `restore`) prüft der review-loop des Backend
 - 2026-11-12, **Trend (Lauf 1 → 2 → 4): Android-Schicht dünn getestet.** Neu belegt mit 7 von 8 unentdeckten App-Mutanten (A2–A6, M4, M5); Tests bauen Intents nach, statt die erzeugten PendingIntents auszulösen. Empfehlung E13.
 - 2026-11-12: Fake weicht von Room ab (Checklisten-Punkte, unbekannte Id). E14. **Behoben 247b44b** (gemeinsame `RepositoryCases`).
 - 2026-11-12: Glue-Tests nutzen die echte Uhr und werden 22:30–0:30 übersprungen. E15. **Behoben 5f2c6a2** (`TestClock`).
-- 2026-11-12: `testdata/` auf Schema 7. E16.
+- 2026-11-12: `testdata/` auf Schema 7. E16. **Behoben** (`real-2026-11-12.json`, Schema 10).
 
 ## Offene Fragen an den Entwickler
 Keine aus Lauf 4 (alle am 2026-11-12 beantwortet).
