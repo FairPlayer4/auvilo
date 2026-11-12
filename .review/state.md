@@ -50,7 +50,7 @@ Das Cloud-Backup (`app/…/cloud`, `restore`) prüft der review-loop des Backend
 - 2026-11-12, **Trend (Lauf 3 → 4): Doku-Drift wächst mit jeder Etappe.** Umgesetzte Entwürfe (E.3, Z.8) werden nicht in design.md eingearbeitet, Statuszeilen in sechs Dokumenten veralten. Empfehlung E11 (Version nur in stand.md, Einarbeiten als Teil von „fertig“).
 - 2026-11-12, **Trend (Lauf 1 → 2 → 4): Android-Schicht dünn getestet.** Neu belegt mit 7 von 8 unentdeckten App-Mutanten (A2–A6, M4, M5); Tests bauen Intents nach, statt die erzeugten PendingIntents auszulösen. Empfehlung E13.
 - 2026-11-12: Fake weicht von Room ab (Checklisten-Punkte, unbekannte Id). E14. **Behoben 247b44b** (gemeinsame `RepositoryCases`).
-- 2026-11-12: Glue-Tests nutzen die echte Uhr und werden 22:30–0:30 übersprungen. E15. **Behoben 5f2c6a2** (`TestClock`).
+- 2026-11-12: Glue-Tests nutzen die echte Uhr und werden 22:30–0:30 übersprungen. E15. **Behoben 5f2c6a2** (`TestClock`). Nachzügler am selben Tag: `AlarmPause.update` und die Übersicht rechneten noch mit `Instant.now()`, der Pausentest war ab 14 Uhr rot; jetzt `SystemZoneClock`.
 - 2026-11-12: `testdata/` auf Schema 7. E16. **Behoben** (`real-2026-11-12.json`, Schema 10).
 
 ## Offene Fragen an den Entwickler
@@ -72,4 +72,5 @@ Kleine offene Unklarheiten (Sommerzeit, Handy aus im Zeitraum, *Auslassen* bei m
 - 2026-11-05 (Lauf 3, Fragen 1–7, nach Vorschlag): siehe anforderungen.md Kap. 9 (2026-11-05). Frage 6 beruhte auf einer falschen Prämisse (Fristen werden ohne und mit Notaus *verpasst* und bleiben *überfällig*); nur Klarstellung.
 - 2026-11-05 (Lauf 3, E7–E10): angenommen und in der Doku umgesetzt (Entwurf 7.29, Tabelle `RUNNING` in E.3, Statuszeilen, Kap. 9 neueste zuerst).
 - 2026-11-12 (Lauf 4): Kevin wollte Doku und Tests im Fokus; das Architektur-Review ist deshalb auf Lauf 5 verschoben (Hauptagent).
+- 2026-11-12: Aus Lauf 1 gefixt (Kevin: „jetzt fixen“): abgelehnte Antwort auf die Hinweis-Karte sagt warum; Löschen/Pausieren/Archivieren/Verwerfen nehmen Klingeln und Benachrichtigung weg; anderer Alarm beendet einen offenen Nachweis; Notaus lässt eine stille Benachrichtigung. Offen aus Lauf 1 und mit V1.3c: abgelehnte Aktion in `ActionReceiver` entfernt trotzdem, mehrere Vollbild-Alarme/„Nachweis läuft“ (Gerätetest); nicht nachgeprüft: `Stats.streak` mehrmals täglich, `ClaudeApi.save` bei Ankunft.
 - 2026-11-12 (Lauf 4, Fragen 1–8, alle nach Vorschlag): Vollbild/*+1 wartet*/*Rest später* → V1.3c; *Abgebrochen* 60 s zurücknehmbar; F2 über die geplante erste Prüfung, wiederholte WLAN-Meldung keine Ankunft; Sitzung zählt in der Woche ihres Starts; Doku zusammengelegt und gekürzt; *Teilschritt* nach aufgebrauchtem Limit ausgeblendet. Umgesetzt in V1.3b2 (anforderungen.md Kap. 9, 2026-11-12).
