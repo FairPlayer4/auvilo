@@ -1,6 +1,6 @@
 # Review-Gedächtnis
-Letzter Lauf: 2026-11-05 @ e31aa9f (Lauf 3: Doku-Review Anforderungen/Design, review/2026-11-05)   Laufzähler: 3
-Letztes Architektur-Review: Lauf 2 (2026-11-03)
+Letzter Lauf: 2026-11-12 @ 8a57338 (Lauf 4: Doku, Tests, Sitzung/Ankunft; review/2026-11-12, Fixes bis 7f16054)   Laufzähler: 4
+Letztes Architektur-Review: Lauf 2 (2026-11-03); in Lauf 4 auf Kevins Fokus (Doku/Tests) verschoben, **in Lauf 5 fällig**
 
 ## Beabsichtigte Architektur
 - **Schichten:** `:core` ist reines Kotlin (model, rules, ports, usecases) und kennt kein Android. `:app` ist Android (ui, alarm, data, location, system, widget, claude) und hängt von `:core` ab, nie umgekehrt. Regeln gehören nach `:core`, `:app` setzt sie nur um.
@@ -20,15 +20,16 @@ Das Cloud-Backup (`app/…/cloud`, `restore`) prüft der review-loop des Backend
 ## Bereiche
 | Bereich | Pfade | Anforderungen/Doku | Tests | Zuletzt reviewt | Zustand |
 |---|---|---|---|---|---|
-| core-Regeln | core/…/rules | design.md 2–10 | core/src/test/…/rules (Kover ≥ 90 %) | 2026-11-03 (nur V1.3a-Teile) | gut; Lücke Mehrfachzeit nach Neustart |
-| core-Engine | core/…/usecases | design.md 1, 3, 4 | core/src/test/…/usecases, scenarios | 2026-11-03 (Architektur, Lauf 2); Lauf 3 Stichproben | Rundenplanung bei sync (offen); B1/B2 gefixt fd955e4 (Lauf 3, E5/E6; offen) |
+| core-Regeln | core/…/rules | design.md 2–10, E.3, Z | core/src/test/…/rules (Kover ≥ 90 %, 98,7 %) | 2026-11-12 (Sessions, ArrivalWindow, PlaceChecks) | gut, Mutanten entdeckt; Wochengrenze nach `resolvedAt` (Frage) |
+| core-Engine | core/…/usecases | design.md 1, 3, 4 | core/src/test/…/usecases, scenarios | 2026-11-12 (Sitzung/Ankunft) | Runden bei sync behoben aabd19f; `arrivedAt` beim Bearbeiten gefixt 7248e01; F2/Doze offen (Frage) |
 | core-Modell/Ports | core/…/model, ports | design.md 2 | indirekt | – | – |
-| app-Alarm | app/…/alarm, system | design.md 4, 5, 11.2, 12 | AlarmGlueTest (dünn) | 2026-11-03 | mehrere offene Minor-Funde, Service ungetestet |
+| app-Alarm | app/…/alarm, system | design.md 4, 5, 11.2, 12, E.3 | AlarmGlueTest, ReceiverGlueTest, SessionGlueTest, AlarmServiceTest | 2026-11-12 (Tests, Sitzung) | Verdrahtung dünn: A2–A5 unentdeckt (E13); Schlussruf-Benachrichtigung nach TimeOut bleibt |
 | app-Daten | app/…/data | design.md 13 | MigrationTest, RoomReminderRepositoryTest | 2026-11-03 (nur Migration 6→7) | gut |
 | app-UI | app/…/ui | design.md 11 | ui-Tests (Robolectric) | – | – |
 | app-Claude | app/…/claude, app/src/debug | anforderungen.md 7.26 AG11, design.md 15 | ClaudeApiTest | 2026-11-03 | AG5-Frage offen; Freigabe-Prüfung ungetestet |
-| app-Ort/Widget | app/…/location, widget | design.md 6, 11.2 | ReceiverGlueTest | – | Geofence-Cache (Lauf 3, minor) |
-| Doku | docs/anforderungen.md, docs/design.md | – | – | 2026-11-05 (Lauf 3) | nachgezogen am 2026-11-05: Fragen beantwortet, Statuszeilen aktuell, Kap. 9 neu sortiert |
+| app-Ort/Widget | app/…/location, widget | design.md 6, 11.2, Z | ReceiverGlueTest (PlaceCheck über echten PendingIntent) | 2026-11-12 (Ankunft, WLAN) | `setWindow`/WLAN-Meldung beim Start (F2, Frage); A6, M5 unentdeckt; Widget ohne Test |
+| Doku | CLAUDE.md, README, docs/*.md | – | – | 2026-11-12 (Lauf 4, alle Dokumente) | design.md auf V1.3b0.2 (E11), Kürzen ≈ 30–60 KB (E12); eindeutige Fehler gefixt 7f16054 |
+| Tests gesamt | core/src/test, testFixtures, app/src/test | design.md 14 | – | 2026-11-12 (Lauf 4) | core sehr gut; app-Verdrahtung, Fake vs. Room, Uhr in Glue-Tests (E13–E16) |
 
 ## Bekannte Schulden und beobachtete Drift
 - 2026-11-03: Regel-Logik in `:app`: `AlarmActivity.canDeferRest`, das Anbieten des nächsten Punkts in `ActionReceiver`. Beginnende Drift. **Trend (Lauf 2):** Die Alarm-Ansicht gibt es viermal (`Ring`, `AlarmUi`, `AlarmInfo`, `ActionReceiver`); `ActionReceiver` nutzt `Checklists.round` nicht. Empfehlung E1.
@@ -45,8 +46,17 @@ Das Cloud-Backup (`app/…/cloud`, `restore`) prüft der review-loop des Backend
 - 2026-11-05 (**behoben fd955e4**, E6): Langsame Port-I/O (Ortsabfrage bis 8 s) in Transaktion und Mutex. Empfehlung E6.
 - 2026-11-05 (**nachgezogen am selben Tag**, E9/E10): Doku-Drift: Kopfzeilen, 7.10, E.5, Kover-Wert; gültige Regeln stehen teils nur in Kap. 9. Empfehlung E9, E10.
 
+## Bekannte Schulden und beobachtete Drift (Lauf 4)
+- 2026-11-12, **Trend (Lauf 3 → 4): Doku-Drift wächst mit jeder Etappe.** Umgesetzte Entwürfe (E.3, Z.8) werden nicht in design.md eingearbeitet, Statuszeilen in sechs Dokumenten veralten. Empfehlung E11 (Version nur in stand.md, Einarbeiten als Teil von „fertig“).
+- 2026-11-12, **Trend (Lauf 1 → 2 → 4): Android-Schicht dünn getestet.** Neu belegt mit 7 von 8 unentdeckten App-Mutanten (A2–A6, M4, M5); Tests bauen Intents nach, statt die erzeugten PendingIntents auszulösen. Empfehlung E13.
+- 2026-11-12: Fake weicht von Room ab (Checklisten-Punkte, unbekannte Id). E14.
+- 2026-11-12: Glue-Tests nutzen die echte Uhr und werden 22:30–0:30 übersprungen. E15.
+- 2026-11-12: `testdata/` auf Schema 7. E16.
+
 ## Offene Fragen an den Entwickler
-Keine. Kleine offene Unklarheiten (Sommerzeit, Handy aus im Zeitraum, *Auslassen* bei mehrmals täglich, Begriff „Pause“) stehen in anforderungen.md Kap. 11.
+Aus Lauf 4 (Bericht `runs/2026-11-12.md`): 1. Ein Vollbild zur Zeit / *Rest später* verschoben oder verworfen? 2. Sitzungs-Abbruch aus Benachrichtigung/Uhr ohne Rückgängig gewollt? 3. F2/Doze und WLAN-Meldung beim Prozessstart im diag.log prüfen und fixen? 4. Sitzung über die Wochengrenze nach Start zählen? 5. Doku kürzen: Cloud-Entwürfe zusammenlegen, testsession.md löschen, Kap.-9-Archiv?
+
+Kleine offene Unklarheiten (Sommerzeit, Handy aus im Zeitraum, *Auslassen* bei mehrmals täglich, Begriff „Pause“) stehen in anforderungen.md Kap. 11.
 
 ## Getroffene Entscheidungen
 - 2026-11-03: `.review/` liegt im Repository.
@@ -61,3 +71,4 @@ Keine. Kleine offene Unklarheiten (Sommerzeit, Handy aus im Zeitraum, *Auslassen
 - 2026-11-05 (Lauf 3, B1, B2, E5, E6, umgesetzt in V1.3b0.2, fd955e4): Termin mit `firedAt`/`awaitsArrival`; Speichern verschiebt nur nie geklungene Termine; verschobener Ankunfts-Termin wartet auf die Ankunft und ist zur Tagesgrenze *verpasst*; Ortsprüfung außerhalb der Transaktion.
 - 2026-11-05 (Lauf 3, Fragen 1–7, nach Vorschlag): siehe anforderungen.md Kap. 9 (2026-11-05). Frage 6 beruhte auf einer falschen Prämisse (Fristen werden ohne und mit Notaus *verpasst* und bleiben *überfällig*); nur Klarstellung.
 - 2026-11-05 (Lauf 3, E7–E10): angenommen und in der Doku umgesetzt (Entwurf 7.29, Tabelle `RUNNING` in E.3, Statuszeilen, Kap. 9 neueste zuerst).
+- 2026-11-12 (Lauf 4): Kevin wollte Doku und Tests im Fokus; das Architektur-Review ist deshalb auf Lauf 5 verschoben (Hauptagent).
