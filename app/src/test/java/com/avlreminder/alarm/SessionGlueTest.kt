@@ -1,5 +1,7 @@
 package com.avlreminder.alarm
 
+import com.avlreminder.TestClock
+import com.avlreminder.settle
 import android.app.Application
 import android.app.Notification
 import android.app.NotificationManager
@@ -22,7 +24,7 @@ import com.avlreminder.graph
 import kotlinx.coroutines.runBlocking
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertTrue
-import org.junit.Assume.assumeTrue
+import org.junit.After
 import org.junit.Before
 import org.junit.Test
 import org.junit.runner.RunWith
@@ -47,12 +49,13 @@ class SessionGlueTest {
 
     @Before
     fun setUp() {
-        // The engine runs on the real clock; near midnight a due occurrence would count as missed.
-        val now = LocalTime.now()
-        assumeTrue("not shortly before or after midnight", now > LocalTime.of(0, 30) && now < LocalTime.of(22, 30))
+        TestClock.at()
         runBlocking { (context as AvlApp).started.join() }
         ShadowLooper.idleMainLooper()
     }
+
+    @After
+    fun tearDown() = TestClock.reset()
 
     // --- Knöpfe ---------------------------------------------------------------------------------
 
@@ -130,7 +133,7 @@ class SessionGlueTest {
 
     private suspend fun training(minimum: Boolean): Long = repo.saveReminder(
         Reminder(
-            title = "Training", schedule = Schedule.Daily(LocalTime.of(18, 0)), createdAt = Instant.now(), character = Character.DOCUMENT,
+            title = "Training", schedule = Schedule.Daily(LocalTime.of(18, 0)), createdAt = TestClock.now(), character = Character.DOCUMENT,
             session = SessionSpec(goalMinutes = 45, minimumMinutes = if (minimum) 10 else null),
         ),
     )
@@ -163,17 +166,17 @@ class SessionGlueTest {
         )
         for (a in antworten) {
             val id = training(a.minimum)
-            val o = repo.saveOccurrence(Occurrence(reminderId = id, dueAt = Instant.now().minusSeconds(60), state = OccurrenceState.DUE))
+            val o = repo.saveOccurrence(Occurrence(reminderId = id, dueAt = TestClock.now().minusSeconds(60), state = OccurrenceState.DUE))
             press(ActionReceiver.ACTION_START, o)
             waitFor("${a.name}: started") { repo.occurrence(o)?.state == OccurrenceState.RUNNING }
             val firstCheck = repo.occurrence(o)!!.nextCheckAt!!
-            Thread.sleep(5)
+            TestClock.advance(Duration.ofSeconds(5))
             press(a.action, o)
             waitFor("${a.name}: answered") {
                 val now = repo.occurrence(o)!!
                 now.state == a.state && now.resolution == a.resolution && (a.action == ActionReceiver.ACTION_MINIMUM || a.state != OccurrenceState.RUNNING || now.nextCheckAt != firstCheck)
             }
-            Thread.sleep(100)
+            graph.settle()
             val after = repo.occurrence(o)!!
             assertEquals(a.name, a.state, after.state)
             assertEquals(a.name, a.resolution, after.resolution)
@@ -210,7 +213,7 @@ class SessionGlueTest {
 
     /** A running session started [minutesAgo] ago, with the given state of its last reminder. */
     private suspend fun running(reminderId: Long, minutesAgo: Long, finalCallAgo: Long? = null): Long {
-        val now = Instant.now()
+        val now = TestClock.now()
         return repo.saveOccurrence(
             Occurrence(
                 reminderId = reminderId, dueAt = now.minus(Duration.ofMinutes(minutesAgo)), state = OccurrenceState.RUNNING,
@@ -256,11 +259,11 @@ class SessionGlueTest {
     fun `aufgebrauchtes Minimum – kein Teilschritt in der laufenden Benachrichtigung`() = runBlocking {
         val id = repo.saveReminder(
             Reminder(
-                title = "Training", schedule = Schedule.Daily(LocalTime.of(18, 0)), createdAt = Instant.now().minus(Duration.ofDays(1)),
+                title = "Training", schedule = Schedule.Daily(LocalTime.of(18, 0)), createdAt = TestClock.now().minus(Duration.ofDays(1)),
                 character = Character.DOCUMENT, session = SessionSpec(minimumMinutes = 10), minimumLimitPerWeek = 1,
             ),
         )
-        val now = Instant.now()
+        val now = TestClock.now()
         repo.saveOccurrence(
             Occurrence(reminderId = id, dueAt = now.minus(Duration.ofHours(2)), state = OccurrenceState.DONE, resolution = Resolution.MINIMUM, resolvedAt = now.minus(Duration.ofHours(1))),
         )

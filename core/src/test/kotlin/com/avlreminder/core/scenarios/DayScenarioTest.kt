@@ -9,7 +9,10 @@ import com.avlreminder.core.model.Resolution
 import com.avlreminder.core.model.Schedule
 import com.avlreminder.core.model.WhenAway
 import com.avlreminder.core.reminder
+import com.avlreminder.core.model.Strictness
 import com.avlreminder.core.rules.Action
+import com.avlreminder.core.rules.AlertSettings
+import com.avlreminder.core.rules.DayTimes
 import java.time.DayOfWeek
 import java.time.Duration
 import java.time.LocalTime
@@ -184,6 +187,26 @@ class DayScenarioTest {
         assertEquals(30, rings.size)
         assertEquals(Resolution.MISSED, sim.repo.occurrences.values.single { it.dueAt == at(26, 18) }.resolution)
         assertEquals(at(27, 18), sim.open(id).dueAt)
+    }
+
+    /**
+     * A strict reminder ignored on Friday and Saturday: loud only from the loud time of its day,
+     * on the weekend its own (VS2). The simulation checks every ring against that, not only the
+     * last one (Review-Lauf 4, E15).
+     */
+    @Test
+    fun `a strict reminder gets loud at the loud time of its day, on the weekend its own`() = runTest {
+        val weekend = Simulation(at(30, 6), AlertSettings(weekend = DayTimes(LocalTime.of(17, 0), LocalTime.of(22, 0))))
+        weekend.create(reminder(Schedule.Daily(LocalTime.of(16, 30))).copy(title = "Steuer", strictness = Strictness.STRICT))
+        weekend.runUntil(at(31, 23))
+
+        fun firstLoud(day: String) = weekend.rings.first { it.startsWith(day) && it.endsWith("FULLSCREEN_LOUD") }
+        assertEquals("Fr 16:30 Steuer FULLSCREEN", weekend.rings.first())
+        assertEquals("Fr 18:00 Steuer FULLSCREEN_LOUD", firstLoud("Fr"))
+        assertEquals("Sa 16:50 Steuer FULLSCREEN", weekend.rings.last { it.startsWith("Sa") && !it.endsWith("LOUD") })
+        assertEquals("Sa 17:00 Steuer FULLSCREEN_LOUD", firstLoud("Sa"))
+        // The weekend's day ends at 22:00.
+        assertEquals("Sa 21:50 Steuer FULLSCREEN_LOUD", weekend.rings.last())
     }
 
     @Test

@@ -465,4 +465,35 @@ class MigrationTest {
         assertNull(AvlDatabase.backupBeforeMigration(file, dir))
         assertNull(AvlDatabase.backupBeforeMigration(File(dir, "missing.db"), dir))
     }
+
+    /** A failed copy must not keep the app from starting, nor cost the data (Review-Lauf 4). */
+    @Test
+    fun aFailedBackupLetsTheAppStartAndKeepsTheData() {
+        createV1()
+        // The backup folder cannot be made: a file stands where it should be.
+        val blocked = File(context.filesDir, "backup-blocked").apply { deleteRecursively(); writeText("x") }
+
+        assertNull(AvlDatabase.backupBeforeMigration(file, blocked))
+
+        // Room still migrates the untouched database.
+        val db = open()
+        try {
+            assertEquals(2, kotlinx.coroutines.runBlocking { db.dao().observeReminders().first() }.size)
+        } finally {
+            db.close()
+        }
+    }
+
+    @Test
+    fun aDamagedDatabaseIsNeitherCopiedNorDeleted() {
+        file.parentFile!!.mkdirs()
+        val garbage = ByteArray(8192) { (it * 31).toByte() }
+        file.writeBytes(garbage)
+        val dir = File(context.filesDir, "backup-damaged").apply { deleteRecursively() }
+
+        assertNull(AvlDatabase.backupBeforeMigration(file, dir))
+
+        assertTrue(file.readBytes().contentEquals(garbage))
+        assertTrue(dir.listFiles().isNullOrEmpty())
+    }
 }

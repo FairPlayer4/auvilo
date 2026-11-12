@@ -9,6 +9,7 @@ import android.content.Intent
 import android.content.pm.PackageManager
 import android.location.Location
 import android.util.Log
+import androidx.annotation.VisibleForTesting
 import com.avlreminder.core.model.Place
 import com.avlreminder.core.ports.GeofencePort
 import com.avlreminder.AppGraph
@@ -41,8 +42,7 @@ fun Context.hasBackgroundLocation() =
 class AndroidGeofences(private val context: Context, private val dwellMinutes: () -> Int) : GeofencePort {
     @SuppressLint("MissingPermission") // checked right before
     override fun watch(places: List<Place>) {
-        // Only the circles count; a new WLAN of a place needs no new geofence.
-        val wanted = places.map { it.copy(wifis = emptyList()) }.sortedBy { it.id } to dwellMinutes()
+        val wanted = wanted(places, dwellMinutes())
         if (wanted == registered) return
         val client = LocationServices.getGeofencingClient(context)
         client.removeGeofences(pending(context))
@@ -80,7 +80,12 @@ class AndroidGeofences(private val context: Context, private val dwellMinutes: (
          * What is registered in this process; geofences are gone after a reboot, and so is this.
          * Process-wide, so the receiver can [forget] it.
          */
-        @Volatile private var registered: Pair<List<Place>, Int>? = null
+        @VisibleForTesting(otherwise = VisibleForTesting.PRIVATE)
+        @Volatile internal var registered: Pair<List<Place>, Int>? = null
+
+        /** What [watch] registers: only the circles count; a new WLAN of a place needs no new geofence. */
+        internal fun wanted(places: List<Place>, dwellMinutes: Int): Pair<List<Place>, Int> =
+            places.map { it.copy(wifis = emptyList()) }.sortedBy { it.id } to dwellMinutes
 
         /**
          * Android dropped the geofences (GEOFENCE_NOT_AVAILABLE, e.g. location switched off):
@@ -141,39 +146,56 @@ class AndroidLocation(private val context: Context) {
 class GeofenceReceiver : BroadcastReceiver() {
     override fun onReceive(context: Context, intent: Intent) {
         val event = GeofencingEvent.fromIntent(intent) ?: return
-        if (event.hasError()) {
-            Log.w(TAG, "Geofence-Fehler ${event.errorCode}")
-            Diag.log("geofence error ${event.errorCode}")
-            if (event.errorCode == GeofenceStatusCodes.GEOFENCE_NOT_AVAILABLE) {
-                AndroidGeofences.forget()
-                // Registers again right away; fails as long as the location stays off, then the next sync tries.
-                val result = goAsync()
-                val graph = context.graph
-                graph.scope.launch {
-                    try {
-                        graph.syncAndRing()
-                    } finally {
-                        result.finish()
-                    }
-                }
-            }
-            return
+        val error = event.errorCode.takeIf { event.hasError() }
+        if (error != null) {
+            Log.w(TAG, "Geofence-Fehler $error")
+            Diag.log("geofence error $error")
+        } else {
+            Diag.log("geofence transition=${event.geofenceTransition}")
         }
-        Diag.log("geofence transition=${event.geofenceTransition}")
-        if (event.geofenceTransition != Geofence.GEOFENCE_TRANSITION_DWELL) return
-        val ids = event.triggeringGeofences.orEmpty().mapNotNull { it.requestId.toLongOrNull() }
+        val meaning = meaning(error, event.geofenceTransition, event.triggeringGeofences.orEmpty().mapNotNull { it.requestId.toLongOrNull() })
+        if (meaning == GeofenceMeaning.Ignore) return
         val result = goAsync()
         val graph = context.graph
         graph.scope.launch {
             try {
-                arrived(graph, ids)
+                when (meaning) {
+                    GeofenceMeaning.Lost -> lost(graph)
+                    is GeofenceMeaning.Arrived -> arrived(graph, meaning.placeIds)
+                    GeofenceMeaning.Ignore -> Unit
+                }
             } finally {
                 result.finish()
             }
         }
     }
 
+    /** What a geofence event asks for. */
+    sealed interface GeofenceMeaning {
+        data class Arrived(val placeIds: List<Long>) : GeofenceMeaning
+        /** Android dropped the geofences, e.g. location switched off: register them again. */
+        data object Lost : GeofenceMeaning
+        data object Ignore : GeofenceMeaning
+    }
+
     companion object {
+        /** The decision on an event, apart from Android so it is tested (Review-Lauf 4, A6). */
+        fun meaning(error: Int?, transition: Int, placeIds: List<Long>): GeofenceMeaning = when {
+            error == GeofenceStatusCodes.GEOFENCE_NOT_AVAILABLE -> GeofenceMeaning.Lost
+            error != null -> GeofenceMeaning.Ignore
+            transition == Geofence.GEOFENCE_TRANSITION_DWELL && placeIds.isNotEmpty() -> GeofenceMeaning.Arrived(placeIds)
+            else -> GeofenceMeaning.Ignore
+        }
+
+        /**
+         * The geofences are gone: forget what was registered, so the sync registers them again
+         * right away; that fails as long as the location stays off, then the next sync tries.
+         */
+        suspend fun lost(graph: AppGraph) {
+            AndroidGeofences.forget()
+            graph.syncAndRing()
+        }
+
         /**
          * Stayed long enough at [placeIds]: their reminders ring now. The log says which ones and
          * for which time, so an arrival that rang too early can be traced back.

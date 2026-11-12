@@ -12,7 +12,6 @@ import com.avlreminder.core.model.Place
 import com.avlreminder.core.model.PrepAnswer
 import com.avlreminder.core.model.Proof
 import com.avlreminder.core.model.Reminder
-import com.avlreminder.core.model.severalADay
 import com.avlreminder.core.rules.Action
 import com.avlreminder.core.rules.AlertSettings
 import com.avlreminder.core.rules.Checklists
@@ -101,15 +100,7 @@ class AppViewModel(app: Application) : AndroidViewModel(app) {
     val itemsDone: StateFlow<Map<Long, List<ItemDone>>> = state(
         emptyMap(),
         combine(dao.observeItemsDone(), reminders, open, resolved) { l, r, o, d ->
-            val done = l.map { it.toModel() }
-            val byOccurrence = done.groupBy { it.occurrenceId }
-            val reminderOf = (o + d).associate { it.id to it.reminderId }
-            val rounds = o.mapNotNull { open ->
-                val reminder = r.firstOrNull { it.id == open.reminderId }?.takeIf { it.checklist.isNotEmpty() && it.schedule.severalADay }
-                    ?: return@mapNotNull null
-                open.id to Checklists.round(reminder.checklist, done.filter { reminderOf[it.occurrenceId] == reminder.id })
-            }
-            byOccurrence + rounds
+            Checklists.doneByOccurrence(r, o, d, l.map { it.toModel() })
         },
     )
 

@@ -26,7 +26,6 @@ import com.avlreminder.core.usecases.SaveResult
 import java.time.Duration
 import java.time.Instant
 import java.time.LocalDateTime
-import java.time.LocalTime
 import java.time.format.DateTimeFormatter
 
 /**
@@ -47,13 +46,19 @@ class Simulation<R : ReminderRepository>(start: Instant, val repo: R, var settin
     val wifi = FakeWifi()
     val placeAlarms = FakePlaceAlarms()
     val rings = mutableListOf<String>()
+    /** Each ring with its time, for the loudness rule; [checkInvariants] looks at the new ones. */
+    private val ringTimes = mutableListOf<Pair<Instant, AlarmLevel>>()
+    private var ringsChecked = 0
     /** What the engine wrote to the diagnostic log. */
     val diag = mutableListOf<String>()
     val preNotices = FakePreNotices()
     val engine = ReminderEngine(
         repo, alarms, clock, settings = { settings }, geofences = geofences,
         location = WifiLocation(wifi, clock) { location.checks++; location.here },
-        preNotices = preNotices, ringer = { rings += line(clock.now, it.reminder.title, it.level) },
+        preNotices = preNotices, ringer = {
+            rings += line(clock.now, it.reminder.title, it.level)
+            ringTimes += clock.now to it.level
+        },
         placeAlarms = placeAlarms, diag = { diag += it },
     )
 
@@ -159,7 +164,8 @@ class Simulation<R : ReminderRepository>(start: Instant, val repo: R, var settin
      * - each active reminder has exactly one open occurrence, a paused one none with an alarm;
      * - an open occurrence has an alarm, except one that only waits for an arrival;
      * - closed occurrences have no alarm and no notice before;
-     * - nothing rings loud before [AlertSettings.loudFrom].
+     * - nothing rings loud before [AlertSettings.loudFrom] of its day (weekend times included),
+     *   checked for every ring since the last step, not only the last one (Review-Lauf 4, E15).
      */
     suspend fun checkInvariants() {
         val open = repo.openOccurrences().groupBy { it.reminderId }
@@ -177,11 +183,13 @@ class Simulation<R : ReminderRepository>(start: Instant, val repo: R, var settin
         }
         for (id in alarms.set.keys) check(repo.occurrence(id)?.isOpen == true) { "occurrence $id is closed or gone but has an alarm" }
         for (id in preNotices.set.keys) check(repo.occurrence(id)?.isOpen == true) { "occurrence $id is closed or gone but has a notice before" }
-        rings.lastOrNull()?.let { last ->
-            val loud = last.endsWith(AlarmLevel.FULLSCREEN_LOUD.name)
-            val time = LocalTime.parse(last.substring(3, 8))
-            check(!loud || settings.weekend != null || time >= settings.loudFrom) { "loud before ${settings.loudFrom}: $last" }
+        for (i in ringsChecked until ringTimes.size) {
+            val (at, level) = ringTimes[i]
+            val local = at.atZone(ZONE)
+            val day = settings.on(local.toLocalDate())
+            check(level != AlarmLevel.FULLSCREEN_LOUD || day.isLoud(local.toLocalTime())) { "loud before ${day.loudFrom}: ${rings[i]}" }
         }
+        ringsChecked = ringTimes.size
     }
 
     companion object {

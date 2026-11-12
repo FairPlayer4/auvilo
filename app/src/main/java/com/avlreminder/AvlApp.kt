@@ -2,6 +2,7 @@ package com.avlreminder
 
 import com.avlreminder.alarm.SessionService
 import com.avlreminder.alarm.SessionNote
+import androidx.annotation.VisibleForTesting
 import android.app.Application
 import android.app.NotificationManager
 import android.content.Context
@@ -71,6 +72,7 @@ import kotlinx.coroutines.launch
 import kotlinx.coroutines.sync.Mutex
 import kotlinx.coroutines.sync.withLock
 import java.time.Clock
+import java.time.Duration
 import java.time.Instant
 import java.time.ZoneId
 
@@ -114,9 +116,15 @@ val Context.graph: AppGraph get() = (applicationContext as AvlApp).graph
 
 /** Clock that always follows the current system time zone. */
 object SystemZoneClock : Clock() {
+    /**
+     * Moves the engine's time: the glue tests run on the real time and set a fixed time of day
+     * (Review-Lauf 4, E15). Always zero in the app.
+     */
+    @VisibleForTesting @Volatile var shift: Duration = Duration.ZERO
+
     override fun getZone(): ZoneId = ZoneId.systemDefault()
     override fun withZone(zone: ZoneId): Clock = system(zone)
-    override fun instant(): Instant = Instant.now()
+    override fun instant(): Instant = Instant.now().plus(shift)
 }
 
 /** "Do not disturb" in any form; an unknown filter counts as off. */
@@ -266,7 +274,7 @@ class AppGraph(private val context: Context) : ClaudeApi.Access {
     override suspend fun reminders(): List<Reminder> = repository.reminders()
     override suspend fun openOccurrences(): List<Occurrence> = db.dao().openOccurrences().map { it.toModel() }
     override suspend fun resolvedOccurrences(): List<Occurrence> = db.dao().observeResolved().first().map { it.toModel() }
-    override fun now(): Instant = Instant.now()
+    override fun now(): Instant = SystemZoneClock.instant()
     override val zone: ZoneId get() = ZoneId.systemDefault()
 
     /**

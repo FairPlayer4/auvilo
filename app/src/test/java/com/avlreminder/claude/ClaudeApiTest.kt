@@ -194,6 +194,10 @@ class ClaudeApiTest {
         // Planned but already past (the alarm is late): the same.
         repo.saveOccurrence(open.copy(currentAt = now))
         assertFalse(call("setActive", """{"id": $id, "active": false}""").getBoolean("ok"))
+        // It rang and now waits for the arrival, planned again for later (AG5, Review-Lauf 4 M4).
+        repo.saveOccurrence(open.copy(currentAt = now.plusSeconds(3600), awaitsArrival = true))
+        assertEquals("läuft gerade – nur in der App", call("archive", """{"id": $id}""").getString("error"))
+        assertTrue(repo.reminder(id)!!.archivedAt == null)
         // A blocker is fine.
         assertTrue(call("addBlocker", """{"reminderId": $id, "text": "x"}""").getBoolean("ok"))
     }
