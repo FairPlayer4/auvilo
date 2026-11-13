@@ -324,6 +324,9 @@ data class Reminder(
     /** "Ich starte jetzt" with timer and checks (7.11); null = done in one go as before. */
     val session: SessionSpec? = null,
 ) {
+    /** A minimum as text or as a duration of the session (7.11 D4); its weekly limit is a rule apart. */
+    val hasMinimum: Boolean get() = minimum != null || session?.minimumMinutes != null
+
     companion object {
         /** Longest snooze button. */
         const val MAX_SNOOZE_MINUTES = 240

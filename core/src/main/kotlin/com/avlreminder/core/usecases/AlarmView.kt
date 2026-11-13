@@ -7,6 +7,7 @@ import com.avlreminder.core.model.PrepAnswer
 import com.avlreminder.core.model.Reminder
 import com.avlreminder.core.rules.AlarmLevel
 import com.avlreminder.core.rules.SessionAnswer
+import com.avlreminder.core.rules.Sessions
 import java.time.Duration
 import com.avlreminder.core.rules.WeekStatus
 import java.time.Instant
@@ -60,6 +61,19 @@ data class AlarmView(
 ) {
     /** The first open checklist item. */
     val nextItem: ChecklistItem? get() = reminder.checklist.firstOrNull { it.id !in done }
+
+    /**
+     * Done without the alarm screen (notification, watch): photo, text or audio cannot be given
+     * there, so "done" would always count as without proof.
+     */
+    val quickDone: Boolean get() = !reminder.proof.needsEvidence
+
+    /**
+     * The answers of the running session ([Sessions.answers]); "Teilschritt" with a minimum even
+     * when its weekly limit is used up – the screen shows it, [minimumAllowed] says whether it works.
+     */
+    val sessionAnswers: List<SessionAnswer>
+        get() = session?.let { Sessions.answers(it.final, it.suggestion, reminder.hasMinimum) }.orEmpty()
 }
 
 /** A running session as the check, the session screen and its notification show it (7.11). */

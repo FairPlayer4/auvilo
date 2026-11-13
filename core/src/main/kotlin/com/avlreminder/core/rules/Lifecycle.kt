@@ -134,7 +134,7 @@ object Lifecycle {
 
     /** A minimum as text, or as a duration of the session (7.11 D4). */
     fun canUseMinimum(reminder: Reminder, limits: Limits): Boolean =
-        (reminder.minimum != null || reminder.session?.minimumMinutes != null) && minimumLeft(reminder, limits)
+        reminder.hasMinimum && minimumLeft(reminder, limits)
 
     /** A solved blocker as the minimum (S7); the weekly limit for the minimum applies. */
     fun canUseSolvedBlocker(reminder: Reminder, limits: Limits): Boolean =

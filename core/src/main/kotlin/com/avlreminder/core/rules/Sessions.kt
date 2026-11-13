@@ -35,6 +35,18 @@ object Sessions {
     fun canStart(reminder: Reminder, occurrence: Occurrence): Boolean =
         reminder.session != null && occurrence.state in STARTABLE
 
+    /**
+     * The answers a running session offers, in this order (Review-Lauf 5, E18): the suggested one
+     * first (D4), "Noch dran" not at the last reminder (D5), "Teilschritt" only with [minimum].
+     * "Abbruch" is always there and not part of it. Screen, notification and watch show these.
+     */
+    fun answers(final: Boolean, suggestion: SessionAnswer, minimum: Boolean): List<SessionAnswer> =
+        (listOf(suggestion) + ORDER).distinct().filter {
+            it != SessionAnswer.ABORT && (it != SessionAnswer.STILL_ON || !final) && (it != SessionAnswer.MINIMUM || minimum)
+        }
+
+    private val ORDER = listOf(SessionAnswer.STILL_ON, SessionAnswer.DONE, SessionAnswer.MINIMUM)
+
     /** When the maximum duration is reached (D5). */
     fun maxAt(spec: SessionSpec, startedAt: Instant): Instant = startedAt.plus(minutes(spec.maxMinutes))
 

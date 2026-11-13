@@ -84,6 +84,13 @@ class SessionsTest {
         assertEquals(2, Stats.counts(aborted).aborted)
     }
 
+    /** Screen, notification and watch offer the same answers in the same order (Review-Lauf 5, E18). */
+    @ParameterizedTest(name = "{0}")
+    @MethodSource("antworten")
+    fun `the answers of a session`(@Suppress("unused") name: String, final: Boolean, suggestion: SessionAnswer, minimum: Boolean, expected: List<SessionAnswer>) {
+        assertEquals(expected, Sessions.answers(final, suggestion, minimum))
+    }
+
     companion object {
         private val START = at(26, 18)
         private fun min(m: Long) = START.plus(Duration.ofMinutes(m))
@@ -198,6 +205,15 @@ class SessionsTest {
         private fun done(minutes: Long, resolution: Resolution = Resolution.GOAL) = Occurrence(
             reminderId = 1, dueAt = START, startedAt = START, resolvedAt = min(minutes), resolution = resolution,
             state = if (resolution == Resolution.GOAL || resolution == Resolution.MINIMUM) OccurrenceState.DONE else OccurrenceState.CLOSED,
+        )
+
+        @JvmStatic
+        fun antworten() = listOf(
+            arguments("Noch dran vorgeschlagen", false, SessionAnswer.STILL_ON, true, listOf(SessionAnswer.STILL_ON, SessionAnswer.DONE, SessionAnswer.MINIMUM)),
+            arguments("Ziel erreicht: Fertig zuerst", false, SessionAnswer.DONE, true, listOf(SessionAnswer.DONE, SessionAnswer.STILL_ON, SessionAnswer.MINIMUM)),
+            arguments("Minimum erreicht: Teilschritt zuerst", false, SessionAnswer.MINIMUM, true, listOf(SessionAnswer.MINIMUM, SessionAnswer.STILL_ON, SessionAnswer.DONE)),
+            arguments("letzter Reminder: nur beenden", true, SessionAnswer.STILL_ON, true, listOf(SessionAnswer.DONE, SessionAnswer.MINIMUM)),
+            arguments("ohne Minimum kein Teilschritt", false, SessionAnswer.MINIMUM, false, listOf(SessionAnswer.STILL_ON, SessionAnswer.DONE)),
         )
 
         @JvmStatic

@@ -242,6 +242,11 @@ PLANNED/DUE/ESCALATING ─Ich starte jetzt─► RUNNING ─Fertig────�
   sonst *Noch dran*. Nur ein Vorschlag, nichts ist gesperrt.
 - **Teilschritt** nur mit Minimum (Text oder Dauer) und solange das Minimum-Limit der
   Woche nicht aufgebraucht ist; sonst fehlt der Knopf und ein Hinweis sagt warum.
+- **Eine Quelle für die Antworten (E18):** Welche Antworten in welcher Reihenfolge,
+  liefert `Sessions.answers` (Vorschlag zuerst, kein *Noch dran* beim letzten Reminder,
+  *Teilschritt* nur mit Minimum); `AlarmView.sessionAnswers` und `quickDone` wenden es an.
+  Bildschirm, Nachfrage, Uhr und die laufende Benachrichtigung (`SessionNote.of(AlarmView)`)
+  rechnen nichts selbst nach.
 - **Ende ohne Antwort** (`EndSession`, nach der Reaktionszeit): *Minimum*, wenn
   Checklistenpunkte erledigt sind; unter Notaus *abgebrochen* (ohne letzten Alarm); sonst
   *verpasst*. Der Alarm räumt die Benachrichtigung der Sitzung ab.

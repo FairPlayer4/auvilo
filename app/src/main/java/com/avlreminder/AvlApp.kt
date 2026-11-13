@@ -47,7 +47,6 @@ import com.avlreminder.core.model.Occurrence
 import com.avlreminder.core.model.Reminder
 import com.avlreminder.core.ports.DeviceStatePort
 import com.avlreminder.core.rules.AlertSettings
-import com.avlreminder.core.rules.Lifecycle
 import com.avlreminder.core.usecases.ReminderEngine
 import com.avlreminder.core.usecases.Ring
 import com.avlreminder.core.usecases.RingPort
@@ -262,24 +261,14 @@ class AppGraph(private val context: Context) : ClaudeApi.Access {
     /** After each command (not after reading): widget and the notification of running sessions (E17). */
     private fun refresh() {
         scope.launch { runCatching { AvlWidget().updateAll(context) } }
-        scope.launch { runCatching { SessionService.show(context, sessions()) } }
+        scope.launch { runCatching { SessionService.show(context, withEngine { sessions(it) }) } }
     }
 
-    /** The running sessions for their notification (Anf. 7.11). */
-    private suspend fun sessions(): List<SessionNote> {
-        val running = openOccurrences().filter { it.isRunning }
-        if (running.isEmpty()) return emptyList()
-        return running.mapNotNull { o ->
-            val r = repository.reminder(o.reminderId) ?: return@mapNotNull null
-            val hasMinimum = r.minimum != null || r.session?.minimumMinutes != null
-            val minimum = hasMinimum && Lifecycle.canUseMinimum(r, engine.limits(r, o))
-            SessionNote(
-                occurrenceId = o.id, title = r.title, startedAt = o.startedAt ?: return@mapNotNull null,
-                quickDone = !r.proof.needsEvidence,
-                minimum = minimum, minimumUsedUp = hasMinimum && !minimum,
-            )
-        }.sortedBy { it.startedAt }
-    }
+    /** The running sessions for their notification (Anf. 7.11), from the alarm view of the engine (E18). */
+    private suspend fun sessions(engine: ReminderEngine): List<SessionNote> =
+        openOccurrences().filter { it.isRunning }
+            .mapNotNull { o -> engine.alarmView(o.id)?.let(SessionNote::of) }
+            .sortedBy { it.startedAt }
 
     // --- Interface for Claude (Anf. 7.26 AG11) ----------------------------------------------
 
