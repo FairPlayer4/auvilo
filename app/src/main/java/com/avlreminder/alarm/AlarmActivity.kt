@@ -113,7 +113,7 @@ class AlarmActivity : ComponentActivity() {
         // Close as soon as the occurrence is resolved or snoozed elsewhere (notification, other device action).
         LaunchedEffect(id) {
             var last: OccurrenceState? = null
-            graph.db.dao().observeOpenOccurrences().collect { open ->
+            graph.repository.observeOpenOccurrences().collect { open ->
                 val o = open.firstOrNull { it.id == id }
                 if (o == null || (o.state == OccurrenceState.PLANNED && !early)) {
                     finish()
