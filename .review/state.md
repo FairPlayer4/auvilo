@@ -62,7 +62,7 @@ Das Cloud-Backup (`app/…/cloud`, `restore`) prüft der review-loop des Backend
 - 2026-11-12, **Trend (Lauf 4 → 5): Zeit in `:app` uneinheitlich** (`Instant.now()` in *Heute*-Ticks, Widget, AlarmActivity, WLAN-Scan); zweimal Testfehler. E21, Frage 2.
 - 2026-11-12: design.md 1 „einzige Wahrheit“ widerspricht dem bestätigten Bild (Room + DataStore); Gerätezustand ohne Kategorie. E21.
 - 2026-11-12, **Trend (Lauf 1 → 2 → 4 → 5): Android-Schicht dünn getestet**, jetzt die UI: kein Test mit `SaveResult.Invalid`, Round-Trip nur mit Remindern aus dem Formular, Mutant A (`withoutAlarm` in der UI) unentdeckt. E22.
-- 2026-11-12: `Database.kt` (693 Z., Schema 10) weiter ungeteilt (Lauf 2: „mit Migration 8“). E23.
+- 2026-11-12: `Database.kt` (693 Z., Schema 10) weiter ungeteilt (Lauf 2: „mit Migration 8“). E23. → 2026-11-13 geteilt (Entities, Dao, Converters, Migrations, Database).
 
 ## Offene Fragen an den Entwickler
 Keine aus Lauf 5 (alle am 2026-11-12 nach Vorschlag beantwortet).
