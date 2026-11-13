@@ -48,8 +48,9 @@ import com.avlreminder.core.model.Reminder
 import com.avlreminder.core.ports.DeviceStatePort
 import com.avlreminder.core.rules.AlertSettings
 import com.avlreminder.core.rules.Lifecycle
-import com.avlreminder.core.rules.TransitionResult
 import com.avlreminder.core.usecases.ReminderEngine
+import com.avlreminder.core.usecases.Ring
+import com.avlreminder.core.usecases.RingPort
 import com.avlreminder.core.usecases.Today
 import com.avlreminder.core.usecases.Overview
 import com.avlreminder.data.AvlDatabase
@@ -215,15 +216,20 @@ class AppGraph(private val context: Context) : ClaudeApi.Access {
         "schema" to AvlDatabase.VERSION,
     )
     private val engine = ReminderEngine(
-        repository, AndroidAlarmPort(context), SystemZoneClock, AndroidDeviceState(context),
+        repository, AndroidAlarmPort(context), clock, AndroidDeviceState(context),
         settings = { alert },
         geofences = AndroidGeofences(context) { dwell },
         // The WLAN first; only at the latest time a coarse position when it is unclear (7.29 OZ2).
-        location = WifiLocation(wifi, SystemZoneClock) { location.isAt(it) },
+        location = WifiLocation(wifi, clock) { location.isAt(it) },
         preNotices = PreNotices.Port(context),
-        ringer = { Ringer.ring(context, it) },
+        // Ringing and its end are effects of the engine (E17); nobody else dismisses an alarm.
+        ringer = object : RingPort {
+            override fun ring(ring: Ring) = Ringer.ring(context, ring)
+            override fun end(occurrenceId: Long) = Ringer.dismiss(context, occurrenceId)
+        },
         placeAlarms = AndroidPlaceAlarms(context),
         diag = Diag::log,
+        changed = { refresh() },
     )
     private val mutex = Mutex()
 
@@ -245,28 +251,18 @@ class AppGraph(private val context: Context) : ClaudeApi.Access {
         )
     }
 
-    /**
-     * Deleting, pausing, archiving or discarding takes the alarm of [occurrenceId] away; its
-     * ringing and notification go with it (Review-Lauf 1). A rejected change (`false`, Rejected)
-     * leaves them.
-     */
-    suspend fun <T> withoutAlarm(occurrenceId: Long?, block: suspend (ReminderEngine) -> T): T {
-        val result = withEngine(block)
-        if (occurrenceId != null && result != false && result !is TransitionResult.Rejected) Ringer.dismiss(context, occurrenceId)
-        return result
+    /** Runs use cases one at a time; the engine says after each command what to refresh. */
+    override suspend fun <T> withEngine(block: suspend (ReminderEngine) -> T): T = mutex.withLock {
+        // Read fresh each time: an alarm may start the process before anything else loaded the settings.
+        alert = settings.alert.first()
+        dwell = settings.dwellMinutes.first()
+        block(engine)
     }
 
-    /** Runs use cases one at a time and refreshes the widget afterwards. */
-    override suspend fun <T> withEngine(block: suspend (ReminderEngine) -> T): T {
-        val result = mutex.withLock {
-            // Read fresh each time: an alarm may start the process before anything else loaded the settings.
-            alert = settings.alert.first()
-            dwell = settings.dwellMinutes.first()
-            block(engine)
-        }
+    /** After each command (not after reading): widget and the notification of running sessions (E17). */
+    private fun refresh() {
         scope.launch { runCatching { AvlWidget().updateAll(context) } }
         scope.launch { runCatching { SessionService.show(context, sessions()) } }
-        return result
     }
 
     /** The running sessions for their notification (Anf. 7.11). */

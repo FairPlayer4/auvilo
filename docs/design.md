@@ -44,8 +44,16 @@
   Reminder, Aktionen, Blocker, Hinweise).
 - **Ein Befehl, eine Transaktion.** Jeder öffentliche Befehl läuft ganz oder gar nicht
   (`ReminderRepository.transaction`, in Room `withTransaction`); ein Befehl in einem
-  anderen schließt sich ihm an. Was dabei fällig wird, klingelt erst danach über den
-  `RingPort` – die Aufrufer klingeln nicht selbst.
+  anderen schließt sich ihm an. Die Wirkungen nach außen – **planen, klingeln und
+  beenden** – laufen erst danach: Alarme über den `AlarmPort`, Klingeln über
+  `RingPort.ring`, das Ende über `RingPort.end` (Klang aus, Benachrichtigung weg). Die
+  Engine beendet jeden Termin, der nicht mehr klingeln soll: nach einer Aktion (außer
+  „Nachweis verlassen“), wenn das System ihn schließt (verpasst, Tagesende, Ende einer
+  Sitzung, Notaus-Skip; Frage 3), beim Löschen und Pausieren, und bei einem Knopf auf
+  einem geschlossenen oder unbekannten Termin. Eine abgelehnte Aktion auf einem offenen
+  Termin lässt ihn klingeln; was im selben Befehl wieder klingelt, wird nicht beendet. Die
+  Aufrufer klingeln und beenden nicht selbst. Nach jedem Befehl (nicht nach dem Lesen)
+  meldet `changed` der App, Widget und Sitzungs-Benachrichtigung neu aufzubauen (E17).
 - **Die Alarm-Ansicht kommt aus `core`** (`AlarmView`): Alarm-Bildschirm, Benachrichtigung
   und der Knopf „✓ Punkt“ zeigen dieselben erlaubten Aktionen; `Ring` trägt sie mit der
   Lautstärke.
@@ -597,7 +605,7 @@ umgesetzt / verworfen. Liste in den Einstellungen, *Teilen* als Markdown.
 | Alarm | `setAlarmClock()` für normal/streng, `setExactAndAllowWhileIdle()` für locker; Übersicht und Vorab-Reminder mit `setWindow()`; Prüf-Alarme der Orte exakt bzw. `setWindow()` (6.) |
 | Dauer-Alarm, Sitzung | Foreground-Services Typ `systemExempted` (`AlarmService`, `SessionService`) |
 | Vollbild | Full-Screen-Intent + Activity mit `showWhenLocked`/`turnScreenOn` |
-| Was vom Alarm bleibt | Löschen, Pausieren, Archivieren und Verwerfen aus der App nehmen Klingeln und Benachrichtigung des offenen Termins weg (`AppGraph.withoutAlarm`), eine abgelehnte Änderung nicht. *Notaus* stoppt das Klingeln und lässt eine stille Benachrichtigung, wie nach einer Runde. Ein anderer Alarm, während ein Nachweis offen ist, beendet diesen Nachweis (N0) |
+| Was vom Alarm bleibt | Löschen, Pausieren, Archivieren und Verwerfen aus der App nehmen Klingeln und Benachrichtigung des offenen Termins weg, ebenso verpasst, Tagesende und Notaus-Skip; das macht die Engine (`RingPort.end`, Abschnitt 1), eine abgelehnte Änderung nicht. *Notaus* stoppt das Klingeln und lässt eine stille Benachrichtigung, wie nach einer Runde. Ein anderer Alarm, während ein Nachweis offen ist, beendet diesen Nachweis (N0) |
 | Neuaufbau | `sync` bei Änderung, Alarm, App-Start, `BOOT_COMPLETED`, `MY_PACKAGE_REPLACED`, Zeit-/Zonenänderung |
 | Ort | WLAN (`NetworkCallback` mit PendingIntent, letzte Suchergebnisse), Play-Services Geofencing (Dwell), Fused Location für die aktive Prüfung |
 | Berechtigungen | Seite in den Einstellungen, Warnung auf *Heute*: Benachrichtigungen, Vollbild, Akku, Kamera, Mikrofon; Standort „Immer“ und DND-Ausnahme nur, wenn ein Reminder sie braucht |

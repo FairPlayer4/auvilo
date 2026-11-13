@@ -89,7 +89,17 @@ data class Ring(val view: AlarmView, val level: AlarmLevel) {
     val tomorrow: Instant? get() = view.tomorrow
 }
 
-/** Rings what the engine found due; called once the command that found it is stored. */
+/**
+ * What the user notices of an alarm: the engine rings and ends it, once the command is stored
+ * (design.md 1, Review-Lauf 5, E17). Nobody else stops a ringing alarm or removes its notification.
+ */
 fun interface RingPort {
     fun ring(ring: Ring)
+
+    /**
+     * [occurrenceId] rings no more: stop the sound and take its notification away. After an
+     * action on it, when it is closed (also by the system: missed, the end of the day, the end of
+     * a session), deleted or paused. Not for one that rings again in the same command.
+     */
+    fun end(occurrenceId: Long) {}
 }

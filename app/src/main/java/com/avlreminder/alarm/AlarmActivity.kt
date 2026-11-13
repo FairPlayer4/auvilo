@@ -184,7 +184,8 @@ class AlarmActivity : ComponentActivity() {
             val result = graph.withEngine { it.startProof(id) }
             val o = (result as? TransitionResult.Ok)?.occurrence ?: return@launch
             val r = graph.repository.reminder(o.reminderId) ?: return@launch
-            Ringer.pause(this@AlarmActivity, AlarmInfo(o.id, r.title, r.why ?: r.goal, quickDone = false), o.pausedUntil!!)
+            // The engine ended the ringing; one silent notification leads back (E17).
+            Notifications.showProofRunning(this@AlarmActivity, AlarmInfo(o.id, r.title, r.why ?: r.goal, quickDone = false), o.pausedUntil!!)
         }
     }
 
@@ -204,7 +205,6 @@ class AlarmActivity : ComponentActivity() {
                 Toast.makeText(this@AlarmActivity, "Nicht möglich: ${(result as TransitionResult.Rejected).reason}", Toast.LENGTH_LONG).show()
                 return@launch
             }
-            Ringer.dismiss(this@AlarmActivity, id)
             if (stay && result.occurrence.state != OccurrenceState.DONE) {
                 early = false
                 version++

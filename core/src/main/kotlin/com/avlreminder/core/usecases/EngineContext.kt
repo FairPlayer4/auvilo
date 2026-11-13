@@ -26,12 +26,21 @@ internal class EngineContext(
     preNotices: PreNoticePort,
     placeAlarms: PlaceAlarmPort,
     private val diag: DiagPort,
+    private val ringer: RingPort,
 ) {
     val zone: ZoneId get() = clock.zone
     fun now(): Instant = clock.instant()
 
     /** Rings found by the running command; they ring once it is stored. */
     val pending = mutableListOf<Ring>()
+
+    /** Occurrences the running command ended (E17); they stop ringing once it is stored. */
+    private val ended = linkedSetOf<Long>()
+
+    /** [occurrenceId] rings no more once the command is stored ([RingPort.end]). */
+    fun end(occurrenceId: Long) {
+        if (buffering) ended += occurrenceId else ringer.end(occurrenceId)
+    }
 
     /** Alarm and notice changes of the running command; applied once it is stored, dropped on a rollback. */
     private val effects = mutableListOf<() -> Unit>()
@@ -74,20 +83,28 @@ internal class EngineContext(
         buffering = true
         effects.clear()
         pending.clear()
+        ended.clear()
     }
 
-    /** The command was stored: its alarm changes take effect, its rings are handed out. */
+    /**
+     * The command was stored: its alarm changes take effect, what it ended stops (unless it rings
+     * again right away), its rings are handed out.
+     */
     fun commit(): List<Ring> {
         buffering = false
         effects.forEach { it() }
         effects.clear()
-        return pending.toList().also { pending.clear() }
+        val rings = pending.toList().also { pending.clear() }
+        ended.filter { id -> rings.none { it.occurrence.id == id } }.forEach(ringer::end)
+        ended.clear()
+        return rings
     }
 
     fun rollback() {
         buffering = false
         effects.clear()
         pending.clear()
+        ended.clear()
     }
 }
 

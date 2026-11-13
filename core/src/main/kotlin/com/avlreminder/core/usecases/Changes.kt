@@ -155,7 +155,10 @@ internal class Changes(private val c: EngineContext, private val views: AlarmVie
         reminder?.prepFor?.let { main ->
             repo.blockers(main).filter { it.taskReminderId == reminderId }.forEach { repo.saveBlocker(it.copy(taskReminderId = null)) }
         }
-        repo.openOccurrence(reminderId)?.let { scheduler.cancel(it) }
+        repo.openOccurrence(reminderId)?.let {
+            scheduler.cancel(it)
+            c.end(it.id)
+        }
         repo.deleteReminder(reminderId)
         scheduler.watchPlaces()
     }
@@ -167,7 +170,10 @@ internal class Changes(private val c: EngineContext, private val views: AlarmVie
         repo.saveReminder(reminder.copy(active = active, archivedAt = if (active) null else reminder.archivedAt))
         val open = repo.openOccurrence(reminderId)
         if (!active) {
-            open?.let { scheduler.cancel(it) }
+            open?.let {
+                scheduler.cancel(it)
+                c.end(it.id)
+            }
             scheduler.watchPlaces()
             return true
         }
@@ -200,15 +206,20 @@ internal class Changes(private val c: EngineContext, private val views: AlarmVie
 
     // --- Occurrences -----------------------------------------------------------------------
 
+    /**
+     * After it the occurrence rings no more (E17), except after leaving the proof screen: then the
+     * escalation goes on after a grace. An action on one that is closed or gone ends what is left
+     * of it (an old notification); a rejected action on an open one leaves it ringing.
+     */
     suspend fun act(occurrenceId: Long, action: Action): TransitionResult {
-        val occurrence = repo.occurrence(occurrenceId) ?: return TransitionResult.Rejected("unknown occurrence")
-        val reminder = repo.reminder(occurrence.reminderId) ?: return TransitionResult.Rejected("unknown reminder")
+        val occurrence = repo.occurrence(occurrenceId) ?: return gone(occurrenceId, "unknown occurrence")
+        val reminder = repo.reminder(occurrence.reminderId) ?: return gone(occurrenceId, "unknown reminder")
         if (action is Action.Snooze && now().plus(action.duration) >= views.missedAt(reminder, occurrence)) {
             return TransitionResult.Rejected("snooze would pass the end of the day")
         }
         val limits = views.limits(reminder, occurrence)
         val result = Lifecycle.transition(reminder, occurrence, action, now(), limits)
-        if (result !is TransitionResult.Ok) return result
+        if (result !is TransitionResult.Ok) return result.also { if (!occurrence.isOpen) c.end(occurrenceId) }
         repo.saveOccurrence(result.occurrence)
         repo.addEvent(result.event)
         when (action) {
@@ -234,8 +245,14 @@ internal class Changes(private val c: EngineContext, private val views: AlarmVie
                 .forEach { repo.saveBlocker(it.copy(solvedAt = now())) }
         }
         scheduler.cancel(occurrence)
+        if (action !is Action.AbortProof) c.end(occurrence.id)
         scheduler.syncReminder(reminder)
         return result
+    }
+
+    private fun gone(occurrenceId: Long, reason: String): TransitionResult {
+        c.end(occurrenceId)
+        return TransitionResult.Rejected(reason)
     }
 
     /**

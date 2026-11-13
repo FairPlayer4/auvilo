@@ -22,6 +22,8 @@ import com.avlreminder.core.ports.ReminderRepository
 import com.avlreminder.core.ports.WifiScan
 import com.avlreminder.core.rules.WifiLocation
 import com.avlreminder.core.usecases.ReminderEngine
+import com.avlreminder.core.usecases.Ring
+import com.avlreminder.core.usecases.RingPort
 import com.avlreminder.core.usecases.SaveResult
 import java.time.Duration
 import java.time.Instant
@@ -49,15 +51,24 @@ class Simulation<R : ReminderRepository>(start: Instant, val repo: R, var settin
     /** Each ring with its time, for the loudness rule; [checkInvariants] looks at the new ones. */
     private val ringTimes = mutableListOf<Pair<Instant, AlarmLevel>>()
     private var ringsChecked = 0
+    /** Occurrences whose alarm or notification is in sight: rung and not ended since (E17). */
+    val showing = mutableSetOf<Long>()
     /** What the engine wrote to the diagnostic log. */
     val diag = mutableListOf<String>()
     val preNotices = FakePreNotices()
     val engine = ReminderEngine(
         repo, alarms, clock, settings = { settings }, geofences = geofences,
         location = WifiLocation(wifi, clock) { location.checks++; location.here },
-        preNotices = preNotices, ringer = {
-            rings += line(clock.now, it.reminder.title, it.level)
-            ringTimes += clock.now to it.level
+        preNotices = preNotices, ringer = object : RingPort {
+            override fun ring(ring: Ring) {
+                rings += line(clock.now, ring.reminder.title, ring.level)
+                ringTimes += clock.now to ring.level
+                showing += ring.occurrence.id
+            }
+
+            override fun end(occurrenceId: Long) {
+                showing -= occurrenceId
+            }
         },
         placeAlarms = placeAlarms, diag = { diag += it },
     )
@@ -183,6 +194,8 @@ class Simulation<R : ReminderRepository>(start: Instant, val repo: R, var settin
         }
         for (id in alarms.set.keys) check(repo.occurrence(id)?.isOpen == true) { "occurrence $id is closed or gone but has an alarm" }
         for (id in preNotices.set.keys) check(repo.occurrence(id)?.isOpen == true) { "occurrence $id is closed or gone but has a notice before" }
+        // Closed, also by the system (missed, end of the day, end of a session): nothing of it stays in sight (Frage 3).
+        for (id in showing) check(repo.occurrence(id)?.isOpen == true) { "occurrence $id is closed or gone but still in sight" }
         for (i in ringsChecked until ringTimes.size) {
             val (at, level) = ringTimes[i]
             val local = at.atZone(ZONE)

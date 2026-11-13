@@ -55,8 +55,13 @@ class ReminderEngine(
     private val ringer: RingPort = RingPort {},
     placeAlarms: PlaceAlarmPort = PlaceAlarmPort.NONE,
     diag: DiagPort = DiagPort {},
+    /**
+     * After each command (not after reading): what the app derives from the data besides the
+     * alarms, e.g. widget and the notification of a session (E17).
+     */
+    private val changed: () -> Unit = {},
 ) {
-    private val c = EngineContext(repo, alarms, clock, device, settings, geofences, preNotices, placeAlarms, diag)
+    private val c = EngineContext(repo, alarms, clock, device, settings, geofences, preNotices, placeAlarms, diag, ringer)
     private val views = AlarmViews(c)
     private val scheduler = Scheduler(c, views)
     private val changes = Changes(c, views, scheduler)
@@ -89,6 +94,7 @@ class ReminderEngine(
             }
             depth--
             c.commit().forEach(ringer::ring)
+            changed()
             return result
         }
     }

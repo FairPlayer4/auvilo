@@ -32,8 +32,8 @@ import java.time.LocalTime
 
 /**
  * What the view model does around the engine: says why something was rejected (Review-Lauf 1) and
- * takes the alarm away when a change from the app ends it (Review-Lauf 5, E22: the wiring itself,
- * not only [com.avlreminder.AppGraph.withoutAlarm]).
+ * takes the alarm away when a change from the app ends it (Review-Lauf 5, E22: the wiring itself;
+ * since E17 the engine ends it, [com.avlreminder.core.usecases.RingPort.end]).
  */
 @RunWith(AndroidJUnit4::class)
 class AppViewModelTest {

@@ -122,7 +122,9 @@ class AlarmGlueTest {
     @Test
     fun pauseForTheProofReplacesTheAlarmWithAQuietNote() {
         Ringer.ring(context, ring(AlarmLevel.BANNER))
-        Ringer.pause(context, AlarmInfo(42, "Katzenbrunnen", null, quickDone = false), at.plusSeconds(600))
+        // Starting the proof ends the ringing (the engine, E17), then the screen leaves a quiet note.
+        Ringer.dismiss(context, 42)
+        Notifications.showProofRunning(context, AlarmInfo(42, "Katzenbrunnen", null, quickDone = false), at.plusSeconds(600))
         val n = shadowOf(notifications).getNotification(Notifications.id(42))
         assertNotNull(n)
         assertEquals(true, n.extras.getCharSequence(android.app.Notification.EXTRA_TEXT).toString().startsWith("Nachweis läuft"))

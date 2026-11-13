@@ -306,6 +306,8 @@ internal class Scheduler(private val c: EngineContext, private val views: AlarmV
      * back the next day with the rest (C3, does not count as postponing); anything else is missed.
      */
     private suspend fun endDay(reminder: Reminder, occurrence: Occurrence) {
+        // Today it rings no more: missed, or quiet until its next window or tomorrow (Review-Lauf 5, Frage 3).
+        c.end(occurrence.id)
         val schedule = reminder.schedule
         val missedAt = views.missedAt(reminder, occurrence)
         if (schedule is Schedule.Deadline) {
@@ -461,9 +463,11 @@ internal class Scheduler(private val c: EngineContext, private val views: AlarmV
         return result.occurrence
     }
 
+    /** Closed, also by the system (missed, dropped, the end of a session): nothing of it rings any more (E17). */
     suspend fun close(reminder: Reminder, occurrence: Occurrence, action: Action) {
         apply(reminder, occurrence, action)
         cancel(occurrence)
+        c.end(occurrence.id)
     }
 }
 

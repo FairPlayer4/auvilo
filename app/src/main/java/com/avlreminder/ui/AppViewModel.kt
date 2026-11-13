@@ -140,7 +140,7 @@ class AppViewModel(app: Application) : AndroidViewModel(app) {
 
     /** "Verwerfen" for an overdue deadline. */
     fun discard(occurrenceId: Long) {
-        viewModelScope.launch { graph.withoutAlarm(occurrenceId) { it.act(occurrenceId, Action.Skip(SkipReasons.DISCARDED)) } }
+        viewModelScope.launch { graph.withEngine { it.act(occurrenceId, Action.Skip(SkipReasons.DISCARDED)) } }
     }
 
     /** "Zurücknehmen" (Anf. 7.31); [onResult] says what happened. */
@@ -220,18 +220,16 @@ class AppViewModel(app: Application) : AndroidViewModel(app) {
     }
 
     fun delete(reminderId: Long) {
-        viewModelScope.launch { graph.withoutAlarm(open(reminderId)) { it.delete(reminderId) } }
+        viewModelScope.launch { graph.withEngine { it.delete(reminderId) } }
     }
 
     fun setActive(reminderId: Long, active: Boolean) {
-        viewModelScope.launch { if (!graph.withoutAlarm(if (active) null else open(reminderId)) { it.setActive(reminderId, active) }) notChanged(reminderId) }
+        viewModelScope.launch { if (!graph.withEngine { it.setActive(reminderId, active) }) notChanged(reminderId) }
     }
 
     fun setArchived(reminderId: Long, archived: Boolean) {
-        viewModelScope.launch { if (!graph.withoutAlarm(if (archived) open(reminderId) else null) { it.setArchived(reminderId, archived) }) notChanged(reminderId) }
+        viewModelScope.launch { if (!graph.withEngine { it.setArchived(reminderId, archived) }) notChanged(reminderId) }
     }
-
-    private suspend fun open(reminderId: Long): Long? = graph.repository.openOccurrence(reminderId)?.id
 
     /**
      * Pausing or archiving was rejected: a running session (design.md 3.1) or the reminder is gone
