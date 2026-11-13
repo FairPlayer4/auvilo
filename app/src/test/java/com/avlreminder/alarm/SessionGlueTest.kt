@@ -20,6 +20,7 @@ import com.avlreminder.core.model.Resolution
 import com.avlreminder.core.model.Schedule
 import com.avlreminder.core.model.SessionSpec
 import com.avlreminder.core.rules.SessionAnswer
+import com.avlreminder.core.rules.TransitionResult
 import com.avlreminder.graph
 import kotlinx.coroutines.runBlocking
 import org.junit.Assert.assertEquals
@@ -239,6 +240,19 @@ class SessionGlueTest {
         ShadowLooper.idleMainLooper()
         waitFor("running again") { repo.occurrence(o)?.state == OccurrenceState.RUNNING }
         assertEquals(started, repo.occurrence(o)!!.startedAt)
+    }
+
+    // Nach dem Maximum gibt es nichts zurückzunehmen; abgelehnt sagt die Benachrichtigung warum (Review-Lauf 6).
+    @Test
+    fun `nach dem Maximum bietet der Abbruch kein Rueckgaengig an`() = runBlocking {
+        val id = training(minimum = false)
+        val o = running(id, minutesAgo = 100, finalCallAgo = 5)
+        press(ActionReceiver.ACTION_ABORT, o)
+        waitFor("aborted") { repo.occurrence(o)?.resolution == Resolution.ABORTED }
+        graph.settle()
+        ShadowLooper.idleMainLooper()
+        assertEquals(null, shadowOf(notifications).getNotification(Undo.id(o)))
+        assertTrue(Undo.message(TransitionResult.Rejected("maximum duration reached")).contains("maximale Dauer"))
     }
 
     // K29: nach dem letzten Reminder ohne Antwort endet die Sitzung, und nichts von ihr bleibt stehen.
