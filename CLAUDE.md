@@ -29,6 +29,8 @@ Strenge und invasive Mechanismen sind gewollt. Kommunikation auf **Deutsch, mit 
 ```bash
 ./gradlew -q :core:check :core:koverLog :app:testDebugUnitTest :app:lintDebug :app:assembleDebug
 ```
+- Vor einem PR nach `main` zusätzlich `-PbackendStreng=true` (wie die CI): bricht ab,
+  wenn der Backend-Stand nicht zu `gradle/backend-commit.txt` passt.
 - `JAVA_HOME` und `ANDROID_HOME` sind auf dem Rechner gesetzt, nichts exportieren
   (Pfade in entwicklungsumgebung.md).
 - Gradle, adb und `git push` brauchen in Claude Code Netz/Geräte außerhalb der Sandbox.
@@ -76,6 +78,10 @@ Strenge und invasive Mechanismen sind gewollt. Kommunikation auf **Deutsch, mit 
 - `main` nur per Pull Request, nie direkt pushen. Nach einer abgeschlossenen Etappe
   einen PR anbieten (`gh pr create`, Basis `main`; ohne `gh` die Compare-URL
   `https://github.com/FairPlayer4/avlreminder/compare/main...<branch>` nennen).
-- PRs nach `main` baut und testet GitHub Actions (`.github/workflows/build.yml`, gleicher
-  Befehl wie lokal; Debug-APK als Artefakt am Lauf).
+- GitHub Actions baut und testet nur nach dem Merge auf `main` (`.github/workflows/build.yml`,
+  gleicher Befehl wie lokal; Debug-APK als Artefakt am Lauf), nicht bei PRs und nicht auf
+  `develop` (GitHub-Minuten, Kap. 9, 2026-11-13). Vor einem PR nach `main` deshalb lokal
+  mit `-PbackendStreng=true` bauen, alles grün, und nach dem Merge den Lauf ansehen.
+  Andere Branches nur bei Bedarf von Hand (`gh workflow run build.yml --ref <branch>`).
+  Wird das Repo öffentlich, wieder bei PRs bauen.
 - Commit-Nachrichten auf Deutsch, Präfix mit Version (z. B. `V1.2b: …`).
