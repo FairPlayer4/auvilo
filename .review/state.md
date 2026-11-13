@@ -71,9 +71,7 @@ Das Cloud-Backup (`app/…/cloud`, `restore`) prüft der review-loop des Backend
 - 2026-11-13: Schutzcode ohne Fall: Filter „was wieder klingelt“ in `EngineContext.commit` (M2). E24.
 
 ## Offene Fragen an den Entwickler
-Aus Lauf 6 (`runs/2026-11-13.md`):
-1. Ankunftsregel geändert nach Ankunft eines *verschobenen* Termins: wieder auf Ankunft warten (am neuen Ort)? Vorschlag ja.
-2. „Teilschritt“ ohne Bildschirm bei Nachweis-Pflicht ausblenden wie „Fertig“? Vorschlag ja (mit E25).
+Keine aus Lauf 6 (beide am 2026-11-13 nach Vorschlag beantwortet).
 
 Kleine offene Unklarheiten (Sommerzeit, Handy aus im Zeitraum, *Auslassen* bei mehrmals täglich, Begriff „Pause“) stehen in anforderungen.md Kap. 11.
 
@@ -94,3 +92,4 @@ Kleine offene Unklarheiten (Sommerzeit, Handy aus im Zeitraum, *Auslassen* bei m
 - 2026-11-12: Aus Lauf 1 gefixt (Kevin: „jetzt fixen“): abgelehnte Antwort auf die Hinweis-Karte sagt warum; Löschen/Pausieren/Archivieren/Verwerfen nehmen Klingeln und Benachrichtigung weg; anderer Alarm beendet einen offenen Nachweis; Notaus lässt eine stille Benachrichtigung. Offen aus Lauf 1 und mit V1.3c: abgelehnte Aktion in `ActionReceiver` entfernt trotzdem, mehrere Vollbild-Alarme/„Nachweis läuft“ (Gerätetest); nicht nachgeprüft: `Stats.streak` mehrmals täglich, `ClaudeApi.save` bei Ankunft.
 - 2026-11-12 (Lauf 4, Fragen 1–8, alle nach Vorschlag): Vollbild/*+1 wartet*/*Rest später* → V1.3c; *Abgebrochen* 60 s zurücknehmbar; F2 über die geplante erste Prüfung, wiederholte WLAN-Meldung keine Ankunft; Sitzung zählt in der Woche ihres Starts; Doku zusammengelegt und gekürzt; *Teilschritt* nach aufgebrauchtem Limit ausgeblendet. Umgesetzt in V1.3b2 (anforderungen.md Kap. 9, 2026-11-12).
 - 2026-11-12 (Lauf 5, Fragen 1–6, alle nach Vorschlag): Umbau-Etappe V1.3c0 (E17–E21, E23) vor V1.3c; Architekturbild: Room + DataStore, Gerätezustand eigene Kategorie, Zeitregel in `:app`, Effekte inkl. beenden; vom System geschlossene Termine räumen auf; F2 `plannedCheck <= start`; `arrivedAt` bei jeder Änderung der Ankunftsregel leeren; Formular-Entwurf retten, Limit für Sitzungs-Minimum, Startklar nicht leerbar (anforderungen.md Kap. 9). Offene Funde und E22 in V1.3b3.
+- 2026-11-13 (Lauf 6, Fragen 1–2, nach Vorschlag): verschobener, angekommener Termin wartet nach geänderter Ankunftsregel wieder auf die Ankunft; *Teilschritt* ohne Bildschirm nur ohne Nachweis-Pflicht, wie *Erledigt* (anforderungen.md Kap. 9, 2026-11-13).

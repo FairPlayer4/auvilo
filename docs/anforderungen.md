@@ -295,7 +295,9 @@ Erster Satz, wird mit der Nutzung angepasst: **[V1]**
 - Z1c **Ziel über Zeitraum**: z. B. Wochenziel 3–4×, Minimum 1× pro Woche **[V1]**
 - Z2 **Gutes Rescheduling**: Verschieben ist eine bewusste Entscheidung mit neuem
   konkretem Zeitpunkt – kein endloses Snooze. **[V1]**
-- Z2b **Limit für Verschieben** pro Reminder einstellbar **[V1]**
+- Z2b **Limit für Verschieben** pro Reminder einstellbar **[V1]**; bisher pro Termin (jeder
+  neue Termin fängt bei 0 an). Wunsch 2026-11-13: wahlweise auch pro Woche oder pro Monat
+  (Details in Klärung)
 
 ### 7.7 Verstärkung (Psychologie)
 **Positiv (Schwerpunkt):**
@@ -1180,6 +1182,7 @@ Neueste zuerst. Kap. 7 enthält immer den gültigen Stand; diese Tabelle ist die
 
 | Datum | Entscheidung |
 |---|---|
+| 2026-11-13 | Antworten auf Review-Lauf 6 (`.review/runs/2026-11-13.md`), beide nach Vorschlag: (1) Ändert sich die Ankunftsregel, nachdem ein *verschobener* Termin schon angekommen ist, wartet er wieder auf die Ankunft, jetzt nach der neuen Regel (`awaitsArrival`, zur Tagesgrenze *verpasst*); ergänzt Frage 5 vom 2026-11-12. (2) Ohne Bildschirm (Benachrichtigung, Uhr) gibt es *Teilschritt* wie *Erledigt* nicht, wenn ein Nachweis mit Foto, Text oder Audio nötig ist. Außerdem Wunsch: Das Verschiebe-Limit soll sich auch wöchentlich oder monatlich erneuern können (Z2b, Details in Klärung) |
 | 2026-11-13 | **CI nur nach dem Merge auf `main`** (GitHub-Minuten, privates Repo): kein Build bei PRs und auf `develop`, reine Doku-Merges ohne Lauf; vor dem PR lokal mit `-PbackendStreng=true` bauen. Actions auf Commit-SHA festgelegt, Dependabot meldet monatlich neue Versionen. Mit der Veröffentlichung als Open Source wieder bei PRs bauen |
 | 2026-11-12 | Antworten auf Review-Lauf 5 (`.review/runs/2026-11-12-2.md`), alle nach Vorschlag: (1) Umbau-Etappe **V1.3c0** vor V1.3c (Review-Empfehlungen E17–E21, E23): Ende eines Alarms als Effekt der Engine, Sitzungsantworten aus einer Quelle, `AppGraph` entschlackt, `Scheduler` intern geteilt, `Database.kt` geteilt. (2) Architektur: Wahrheit sind Room und DataStore; Gerätezustand außerhalb des Backups ist eine eigene Kategorie; Zeit, nach der die App entscheidet, kommt auch in `:app` über die Uhr der Engine; Effekte sind planen, klingeln und beenden. (3) Schließt das System einen Termin (*verpasst*, Notaus-Skip), verschwinden auch Klingeln und Benachrichtigung. (4) F2: Eine Ortsprüfung, die vor dem Start des Ankunftszeitraums geplant war und erst danach kommt, zählt als Prüfung zum Start (7.29). (5) Jede Änderung an der Ankunftsregel (Ort, Puffer, Vorlauf, Regel weg) leert `arrivedAt`; reine Textänderungen nicht. (6) Formular: halbe Eingaben überstehen Design-, Schriftgrößenwechsel und Prozesstod; das Wochenlimit gilt im Formular auch für die Minimum-Dauer einer Sitzung; eine Startklar-Antwort lässt sich überschreiben, aber nicht leeren (Hinweis im Feld) |
 | 2026-11-12 | Nach der Sicherheits- und Datenschutzprüfung des Backends (Backend `anforderungen.md` Kap. 11): **Papier ist der Standard** für den Wiederherstellungsschlüssel; den Passwortdienst bietet die App nur auf Knopfdruck nach dem Hinweis an (7.33 WS1, WS4; A-15). Vor der Sicherheitsphase kommen in die App außerdem *Konto löschen* und die Bestätigung mit der Displaysperre für *Cloud-Daten löschen*, *Konto löschen* und *Gerät sperren* (Backend B1, SE5) |
