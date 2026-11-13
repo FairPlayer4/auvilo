@@ -280,7 +280,7 @@ class AppViewModel(app: Application) : AndroidViewModel(app) {
     fun setOverview(times: OverviewTimes) {
         viewModelScope.launch {
             graph.settings.setOverview(times)
-            graph.rebuild("overview times")
+            graph.rebuild("overview times", overview = true)
         }
     }
 

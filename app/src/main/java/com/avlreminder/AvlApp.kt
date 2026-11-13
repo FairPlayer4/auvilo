@@ -82,7 +82,7 @@ class AvlApp : Application() {
         started = graph.scope.launch {
             // A restore swapped data in at this start: take its settings before anything plans alarms.
             graph.finishRestore()
-            graph.rebuild("start")
+            graph.rebuild("start", overview = true)
             graph.cloud.load().join()
             graph.local.load().join()
             // R-1: the daily copy; the worker takes it on days the app does not start.
@@ -258,12 +258,14 @@ class AppGraph(private val context: Context) : ClaudeApi.Access {
      * the pause and the times of the overview; widget and session follow the command. One recipe
      * for every trigger: start, reboot/update/time change, geofences lost, settings, app in front.
      * [checkPlaces]: also look whether one is already at a place it waits for (after a reboot).
+     * [overview]: plan the overview again – only at start, after system events and with new times;
+     * planned at any other moment it would move a pending one of today to tomorrow (Review-Lauf 6).
      */
-    suspend fun rebuild(reason: String, checkPlaces: Boolean = false) {
+    suspend fun rebuild(reason: String, checkPlaces: Boolean = false, overview: Boolean = false) {
         val rings = withEngine { it.sync() + if (checkPlaces) it.checkPlaces() else emptyList() }
         if (rings.isNotEmpty()) Diag.log("rebuild ($reason): ${rings.size} alarm(s) ring now")
         AlarmPause.update(context, settings.alert.first().alarmsPausedUntil)
-        OverviewNotifications.schedule(context, settings.overview.first())
+        if (overview) OverviewNotifications.schedule(context, settings.overview.first())
     }
 
     /**
