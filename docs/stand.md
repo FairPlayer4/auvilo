@@ -33,10 +33,10 @@ einer Fassung.
    Knopf in der Benachrichtigung lässt sie stehen; die Morgenübersicht kommt, auch wenn die
    App kurz nach ihrer Zeit geöffnet wird; einen Punkt aus der Benachrichtigung eines
    klingelnden Vollbild-Alarms abhaken und im Vollbild den Nachweis starten: der nächste
-   Punkt bzw. „Nachweis läuft“ bleibt stehen (Lauf 6, E26); K33 und K34. Aus Lauf 6
-   beantwortet, noch umzusetzen (Kap. 9, 2026-11-13): verschobener Termin wartet nach
+   Punkt bzw. „Nachweis läuft“ bleibt stehen (Lauf 6, E26); K33 und K34. Die Antworten auf
+   Lauf 6 (Kap. 9, 2026-11-13) sind umgesetzt: Ein verschobener Termin wartet nach
    geänderter Ankunftsregel wieder auf die Ankunft; *Teilschritt* ohne Bildschirm nur ohne
-   Nachweis-Pflicht. Wunsch: Verschiebe-Limit pro Woche oder Monat (Details in Klärung).
+   Nachweis-Pflicht. Das Verschiebe-Limit pro Woche oder Monat folgt als V1.3c1.
 1. **Gerätetests** aus [geraetetest.md](geraetetest.md): K15, K23–K26 (vorher *Zuhause* in
    *Orte* mit WLAN neu festlegen), K27–K30 (Sitzung, dabei: zeigt die Uhr den
    Chronometer?), K31, K32. In den nächsten Tagen im `diag.log` prüfen, dass keine Ankunft mehr direkt nach

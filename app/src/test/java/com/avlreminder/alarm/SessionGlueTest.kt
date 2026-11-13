@@ -85,6 +85,11 @@ class SessionGlueTest {
             "Nachweis nötig: kein Fertig aus der Benachrichtigung", check(minimum = false, quickDone = false),
             listOf(Button.StillOn, Button.Abort), listOf(Button.StillOn, Button.Abort),
         ),
+        // Wie Fertig: Foto, Text oder Audio gehen nur im Alarm (Review-Lauf 6, Antwort 2).
+        Fall(
+            "Nachweis nötig: auch kein Teilschritt aus der Benachrichtigung", check(SessionAnswer.MINIMUM, quickDone = false),
+            listOf(Button.StillOn, Button.Abort), listOf(Button.StillOn, Button.Abort),
+        ),
         Fall(
             "Alarm mit Sitzung: Ich starte jetzt zuerst", AlarmInfo(1, "Training", null, quickDone = true, snooze = listOf(10, 30), canStart = true),
             listOf(Button.Start, Button.Done, Button.Snooze(10)), listOf(Button.Start, Button.Done, Button.Snooze(10), Button.Snooze(30)),
@@ -208,6 +213,25 @@ class SessionGlueTest {
         SessionService.show(context, emptyList())
         service.onStartCommand(shadowOf(context).nextStartedService, 0, 2)
         assertTrue(shadowOf(service).isStoppedBySelf)
+    }
+
+    // Die laufende Benachrichtigung bietet mit Nachweis weder Fertig noch Teilschritt (Review-Lauf 6, Antwort 2).
+    @Test
+    fun `mit Nachweis bietet die laufende Benachrichtigung keinen Teilschritt`() {
+        val reminder = Reminder(
+            id = 7, title = "Training", schedule = Schedule.Once(java.time.LocalDateTime.of(2026, 10, 26, 19, 30)),
+            createdAt = start, minimum = "10 Minuten", proof = com.avlreminder.core.model.ProofSpec(kind = com.avlreminder.core.model.ProofKind.EVIDENCE, photo = true),
+        )
+        val view = com.avlreminder.core.usecases.AlarmView(
+            reminder, Occurrence(id = 3, reminderId = 7, dueAt = start, state = OccurrenceState.RUNNING, startedAt = start),
+            minimumAllowed = true, minimumsLeft = null, canPostpone = true, postponesLeft = null,
+            session = com.avlreminder.core.usecases.SessionView(start, start.plusSeconds(7200), false, SessionAnswer.MINIMUM, null, 15),
+        )
+        val note = SessionNote.of(view)!!
+        assertEquals(listOf("Abbruch"), SessionService.notification(context, note).actions.map { it.title.toString() })
+        // Ohne Nachweis wie bisher.
+        val plain = SessionNote.of(view.copy(reminder = reminder.copy(proof = com.avlreminder.core.model.ProofSpec())))!!
+        assertEquals(listOf("Fertig", "Teilschritt", "Abbruch"), SessionService.notification(context, plain).actions.map { it.title.toString() })
     }
 
     // --- Review-Lauf 4 ---------------------------------------------------------------------------

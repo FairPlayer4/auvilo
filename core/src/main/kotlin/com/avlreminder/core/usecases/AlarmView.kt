@@ -68,6 +68,12 @@ data class AlarmView(
      */
     val quickDone: Boolean get() = !reminder.proof.needsEvidence
 
+    /** "Teilschritt" without the alarm screen: allowed and, as [quickDone], no proof to give (Review-Lauf 6). */
+    val quickMinimum: Boolean get() = minimumAllowed && quickDone
+
+    /** The reminder has a minimum, but its weekly limit is used up. */
+    val minimumUsedUp: Boolean get() = reminder.hasMinimum && !minimumAllowed
+
     /**
      * The answers of the running session ([Sessions.answers]); "Teilschritt" with a minimum even
      * when its weekly limit is used up – the screen shows it, [minimumAllowed] says whether it works.

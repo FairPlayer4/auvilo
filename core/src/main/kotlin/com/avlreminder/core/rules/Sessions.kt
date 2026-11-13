@@ -45,6 +45,13 @@ object Sessions {
             it != SessionAnswer.ABORT && (it != SessionAnswer.STILL_ON || !final) && (it != SessionAnswer.MINIMUM || minimum)
         }
 
+    /**
+     * [answers] without the alarm screen (notification, watch): photo, text or audio cannot be given
+     * there, so without [quick] neither "Fertig" nor "Teilschritt" (Review-Lauf 6, Antwort 2).
+     */
+    fun quickAnswers(final: Boolean, suggestion: SessionAnswer, minimum: Boolean, quick: Boolean): List<SessionAnswer> =
+        answers(final, suggestion, minimum).filter { quick || it == SessionAnswer.STILL_ON }
+
     private val ORDER = listOf(SessionAnswer.STILL_ON, SessionAnswer.DONE, SessionAnswer.MINIMUM)
 
     /** When the maximum duration is reached (D5). */

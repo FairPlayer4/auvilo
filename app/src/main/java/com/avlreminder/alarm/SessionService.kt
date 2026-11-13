@@ -22,7 +22,7 @@ data class SessionNote(
     val startedAt: Instant,
     /** "Fertig" from the notification; not with a proof that needs photo, text or audio. */
     val quickDone: Boolean,
-    /** "Teilschritt" is allowed: the reminder has a minimum and its weekly limit is not used up. */
+    /** "Teilschritt" from the notification: allowed this week and no proof that needs photo, text or audio. */
     val minimum: Boolean,
     /** The reminder has a minimum, but its weekly limit is used up: the notification says so. */
     val minimumUsedUp: Boolean = false,
@@ -33,8 +33,7 @@ data class SessionNote(
             val session = view.session ?: return null
             return SessionNote(
                 occurrenceId = view.occurrence.id, title = view.reminder.title, startedAt = session.startedAt,
-                quickDone = view.quickDone, minimum = view.minimumAllowed,
-                minimumUsedUp = view.reminder.hasMinimum && !view.minimumAllowed,
+                quickDone = view.quickDone, minimum = view.quickMinimum, minimumUsedUp = view.minimumUsedUp,
             )
         }
     }

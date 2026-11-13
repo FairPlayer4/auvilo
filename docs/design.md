@@ -249,10 +249,13 @@ PLANNED/DUE/ESCALATING ─Ich starte jetzt─► RUNNING ─Fertig────�
   Ziel-Dauer erreicht → *Fertig*; ohne Ziel und Minimum-Dauer erreicht → *Teilschritt*;
   sonst *Noch dran*. Nur ein Vorschlag, nichts ist gesperrt.
 - **Teilschritt** nur mit Minimum (Text oder Dauer) und solange das Minimum-Limit der
-  Woche nicht aufgebraucht ist; sonst fehlt der Knopf und ein Hinweis sagt warum.
+  Woche nicht aufgebraucht ist; sonst fehlt der Knopf und ein Hinweis sagt warum. Ohne
+  Bildschirm (Nachfrage, Uhr, laufende Benachrichtigung) wie *Fertig* nur ohne Nachweis mit
+  Foto, Text oder Audio (Review-Lauf 6, Antwort 2).
 - **Eine Quelle für die Antworten (E18):** Welche Antworten in welcher Reihenfolge,
   liefert `Sessions.answers` (Vorschlag zuerst, kein *Noch dran* beim letzten Reminder,
-  *Teilschritt* nur mit Minimum); `AlarmView.sessionAnswers` und `quickDone` wenden es an.
+  *Teilschritt* nur mit Minimum), ohne Bildschirm `Sessions.quickAnswers`;
+  `AlarmView.sessionAnswers`, `quickDone`, `quickMinimum` und `minimumUsedUp` wenden es an.
   Bildschirm, Nachfrage, Uhr und die laufende Benachrichtigung (`SessionNote.of(AlarmView)`)
   rechnen nichts selbst nach.
 - **Ende ohne Antwort** (`EndSession`, nach der Reaktionszeit): *Minimum*, wenn

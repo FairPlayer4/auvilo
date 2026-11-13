@@ -85,6 +85,17 @@ class SessionsTest {
     }
 
     /** Screen, notification and watch offer the same answers in the same order (Review-Lauf 5, E18). */
+    // Ohne Bildschirm (Benachrichtigung, Uhr) kein Fertig und kein Teilschritt mit Nachweis (Review-Lauf 6, Antwort 2).
+    @Test
+    fun `without the screen a proof leaves only Noch dran`() {
+        assertEquals(
+            listOf(SessionAnswer.MINIMUM, SessionAnswer.STILL_ON, SessionAnswer.DONE),
+            Sessions.quickAnswers(final = false, suggestion = SessionAnswer.MINIMUM, minimum = true, quick = true),
+        )
+        assertEquals(listOf(SessionAnswer.STILL_ON), Sessions.quickAnswers(final = false, suggestion = SessionAnswer.MINIMUM, minimum = true, quick = false))
+        assertEquals(emptyList<SessionAnswer>(), Sessions.quickAnswers(final = true, suggestion = SessionAnswer.DONE, minimum = true, quick = false))
+    }
+
     @ParameterizedTest(name = "{0}")
     @MethodSource("antworten")
     fun `the answers of a session`(@Suppress("unused") name: String, final: Boolean, suggestion: SessionAnswer, minimum: Boolean, expected: List<SessionAnswer>) {

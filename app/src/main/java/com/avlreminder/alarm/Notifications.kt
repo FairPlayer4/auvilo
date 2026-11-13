@@ -248,9 +248,8 @@ object Notifications {
     fun buttons(info: AlarmInfo): Buttons {
         val session = info.session
         if (session != null) {
-            // The answers and their order come from core (E18); without the screen no "Fertig" with a proof.
-            val answers = Sessions.answers(session.final, session.suggestion, session.minimum)
-                .filter { it != SessionAnswer.DONE || info.quickDone }
+            // The answers and their order come from core (E18); without the screen none with a proof.
+            val answers = Sessions.quickAnswers(session.final, session.suggestion, session.minimum, info.quickDone)
             val stillOn = Button.StillOn.takeIf { SessionAnswer.STILL_ON in answers }
             val ends = answers.mapNotNull {
                 when (it) {
