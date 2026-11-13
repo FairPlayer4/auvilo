@@ -1251,6 +1251,7 @@ Neueste zuerst. Kap. 7 enthält immer den gültigen Stand; diese Tabelle ist die
 | V1.3b1 | 2026-11-11 | Sitzung mit Timer und Uhr (7.11, 7.20 V2) |
 | V1.3b2 | 2026-11-12 | Antworten auf Review-Lauf 4: Sitzung zählt in der Woche ihres Starts, Abbruch zurücknehmbar, F2 über die geplante erste Prüfung, wiederholte WLAN-Meldung keine Ankunft; Tests (Kap. 9, 2026-11-12) |
 | V1.3b3 | 2026-11-12 | Antworten auf Review-Lauf 5, Etappe A: Formular (Entwurf übersteht Neuaufbau, Probleme sichtbar, Limit für Sitzungs-Minimum, Startklar nicht leerbar, Ankunft ohne Ort nicht still weg), F2 auch für eine vorher geplante Prüfung, geänderte Ankunftsregel entscheidet neu, Zurücknehmen einer Sitzung nur vor dem Maximum; Tests der UI-Verdrahtung (Kap. 9, 2026-11-12) |
+| V1.3c0 | 2026-11-13 | Umbau-Etappe B aus Review-Lauf 5: Zeit über die Uhr der Engine und Lesen über das Repository (E21), `Database.kt` geteilt (E23), Ende eines Alarms als Effekt der Engine, auch wenn das System den Termin schließt (E17, Frage 3), Sitzungsantworten aus dem Core (E18), `AppGraph.rebuild`, „Hier festlegen“ und Blocker mit Aufgabe in der Engine, `CloudWiring` (E19), `Scheduler` intern geteilt (E20) |
 
 Details zum Verhalten: [design.md](design.md), Gerätetests: [geraetetest.md](geraetetest.md).
 

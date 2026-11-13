@@ -55,12 +55,12 @@ Das Cloud-Backup (`app/…/cloud`, `restore`) prüft der review-loop des Backend
 - 2026-11-12: `testdata/` auf Schema 7. E16. **Behoben** (`real-2026-11-12.json`, Schema 10).
 
 ## Bekannte Schulden und beobachtete Drift (Lauf 5)
-- 2026-11-12: Das Ende eines Alarms (stoppen, leise, Benachrichtigung weg) ist kein Engine-Effekt; sechs Aufrufer mit eigenen Bedingungen. E17. Knüpft an die Lauf-1-Funde und 7e95a4a an.
-- 2026-11-12, **Trend (Lauf 2 → 5): Regeln der Alarm-/Sitzungsansicht entstehen in `:app` neu**, jetzt bei der Sitzung (`AppGraph.sessions`, `Notifications.buttons`, `SessionService`, `SessionContent`). E18.
-- 2026-11-12: `AppGraph` wird Sammelbecken (186 → 373 Zeilen seit Lauf 2, 18 Commits); Neuaufbau je Auslöser eigens zusammengesetzt. E19.
-- 2026-11-12: `Scheduler` trägt Termine, Sitzungen und Orte (471 Z.); V1.3c bringt Schritte und Signale. E20.
-- 2026-11-12, **Trend (Lauf 4 → 5): Zeit in `:app` uneinheitlich** (`Instant.now()` in *Heute*-Ticks, Widget, AlarmActivity, WLAN-Scan); zweimal Testfehler. E21, Frage 2.
-- 2026-11-12: design.md 1 „einzige Wahrheit“ widerspricht dem bestätigten Bild (Room + DataStore); Gerätezustand ohne Kategorie. E21.
+- 2026-11-12: Das Ende eines Alarms (stoppen, leise, Benachrichtigung weg) ist kein Engine-Effekt; sechs Aufrufer mit eigenen Bedingungen. E17. Knüpft an die Lauf-1-Funde und 7e95a4a an. → 2026-11-13 `RingPort.end` (8208e96).
+- 2026-11-12, **Trend (Lauf 2 → 5): Regeln der Alarm-/Sitzungsansicht entstehen in `:app` neu**, jetzt bei der Sitzung (`AppGraph.sessions`, `Notifications.buttons`, `SessionService`, `SessionContent`). E18. → 2026-11-13 `Sessions.answers`, `SessionNote.of` (9d7ea5b).
+- 2026-11-12: `AppGraph` wird Sammelbecken (186 → 373 Zeilen seit Lauf 2, 18 Commits); Neuaufbau je Auslöser eigens zusammengesetzt. E19. → 2026-11-13 `rebuild`, `setPlaceHere`, `answerAsk(planTask)`, `CloudWiring`; 308 Z. (31d75be).
+- 2026-11-12: `Scheduler` trägt Termine, Sitzungen und Orte (471 Z.); V1.3c bringt Schritte und Signale. E20. → 2026-11-13 `Arrivals`, `SessionTimer`; 339 Z. (52f8bfc).
+- 2026-11-12, **Trend (Lauf 4 → 5): Zeit in `:app` uneinheitlich** (`Instant.now()` in *Heute*-Ticks, Widget, AlarmActivity, WLAN-Scan); zweimal Testfehler. E21, Frage 2. → 2026-11-13 `AppGraph.clock`, `ClockRuleTest` (7b10771).
+- 2026-11-12: design.md 1 „einzige Wahrheit“ widerspricht dem bestätigten Bild (Room + DataStore); Gerätezustand ohne Kategorie. E21. → 2026-11-13 design.md 1 (7b10771).
 - 2026-11-12, **Trend (Lauf 1 → 2 → 4 → 5): Android-Schicht dünn getestet**, jetzt die UI: kein Test mit `SaveResult.Invalid`, Round-Trip nur mit Remindern aus dem Formular, Mutant A (`withoutAlarm` in der UI) unentdeckt. E22.
 - 2026-11-12: `Database.kt` (693 Z., Schema 10) weiter ungeteilt (Lauf 2: „mit Migration 8“). E23. → 2026-11-13 geteilt (Entities, Dao, Converters, Migrations, Database).
 

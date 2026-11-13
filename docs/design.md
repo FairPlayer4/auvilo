@@ -29,7 +29,7 @@
 │             ArrivalWindow, PlaceChecks, Checklists, Snoozing            │
 │  ports/     ReminderRepository, AlarmPort, PlaceAlarmPort, GeofencePort,│
 │             LocationPort, WifiPort, DeviceStatePort, PreNoticePort      │
-│  usecases/  ReminderEngine (Fassade) mit Scheduler (+ Arrivals,        │
+│  usecases/  ReminderEngine (Fassade) mit Scheduler (+ Arrivals,         │
 │             SessionTimer), AlarmViews, Changes, EngineContext;          │
 │             AlarmView, RingPort; Overview, Digest                       │
 └─────────────────────────────────────────────────────────────────────────┘

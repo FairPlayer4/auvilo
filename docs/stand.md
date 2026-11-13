@@ -1,14 +1,14 @@
 # Stand und nächste Schritte
 
-Stand: 2026-11-12. Bei jedem größeren Schritt aktualisieren. Erledigtes steht in git, in
+Stand: 2026-11-13. Bei jedem größeren Schritt aktualisieren. Erledigtes steht in git, in
 anforderungen.md Kap. 10.1 und in den Review-Berichten (`.review/runs/`), nicht hier.
 
 ## Auf dem Gerät (S24)
-- **V1.3b2** (`versionCode` 18), installiert am 2026-11-12: Antworten auf Review-Lauf 4
-  (Sitzung zählt in der Woche ihres Starts, *Abbruch* 60 s zurücknehmbar, *Teilschritt*
-  nach aufgebrauchtem Limit ausgeblendet, F2 über die geplante erste Prüfung, wiederholte
-  WLAN-Meldung keine Ankunft) und Tests. Start ohne Fehler, Alarme neu geplant.
-- Davor V1.3b1 (2026-11-11): Sitzung mit Timer und Uhr (7.11), davor 1.3b0.6 (Ankunft im Zeitraum mit WLAN, 7.29) und 1.3b0.5 (Cloud-Backup
+- **V1.3b3** (`versionCode` 19), installiert am 2026-11-13: Etappe A aus Review-Lauf 5
+  (Formular-Entwurf übersteht Neuaufbau, F2 auch für eine vorher geplante Prüfung,
+  geänderte Ankunftsregel entscheidet neu, Tests der UI-Verdrahtung). Start ohne Fehler,
+  Alarme neu geplant.
+- Davor V1.3b2 (2026-11-12, Antworten auf Review-Lauf 4), V1.3b1 (2026-11-11): Sitzung mit Timer und Uhr (7.11), davor 1.3b0.6 (Ankunft im Zeitraum mit WLAN, 7.29) und 1.3b0.5 (Cloud-Backup
   Schritte 1–5). Nach dem Start jeweils: Berechtigungen ok, Alarme neu geplant, keine
   Fehler im Diagnose-Log.
 
@@ -21,12 +21,14 @@ Kevins echte Daten; vor dem ersten weiteren Nutzer kommt die Sicherheitsphase (B
 einer Fassung.
 
 ## Offen
-0. **V1.3b3** (`versionCode` 19, Etappe A aus Review-Lauf 5) gebaut, **noch nicht
-   installiert**; danach K33 und K34. Als Nächstes **Etappe B = V1.3c0** auf
-   `feature/v1.3c0` (Kap. 9, 2026-11-12): Doku und Zeit-Regel (E21), `Database.kt` teilen
-   (E23), Ende eines Alarms als Engine-Effekt (E17, Frage 3), Sitzungsantworten aus einer
-   Quelle (E18), `AppGraph` entschlacken (E19), `Scheduler` intern teilen (E20), dann
-   review-loop und PR nach `main`.
+0. **V1.3c0** (`versionCode` 20, Etappe B aus Review-Lauf 5) auf `feature/v1.3c0`
+   umgesetzt, **noch nicht installiert**: Zeit-Regel und Lesen über das Repository (E21),
+   `Database.kt` geteilt (E23), die Engine beendet Alarme auch, wenn das System einen
+   Termin schließt (E17, Frage 3), Sitzungsantworten aus dem Core (E18), `AppGraph.rebuild`
+   und `CloudWiring` (E19), `Scheduler` mit `Arrivals` und `SessionTimer` (E20). Danach
+   review-loop und PR nach `main`. Am Gerät nach der Installation: ein verpasster Termin
+   und ein Notaus-Skip nehmen die Benachrichtigung mit; ein abgelehnter Knopf in der
+   Benachrichtigung lässt sie stehen; K33 und K34.
 1. **Gerätetests** aus [geraetetest.md](geraetetest.md): K15, K23–K26 (vorher *Zuhause* in
    *Orte* mit WLAN neu festlegen), K27–K30 (Sitzung, dabei: zeigt die Uhr den
    Chronometer?), K31, K32. In den nächsten Tagen im `diag.log` prüfen, dass keine Ankunft mehr direkt nach
