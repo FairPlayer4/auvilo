@@ -95,6 +95,8 @@ data class AlarmInfo(
             val ask = when {
                 s.final -> "Maximale Dauer erreicht"
                 s.suggestion == SessionAnswer.DONE -> "Ziel erreicht – Fertig?"
+                // Without the button it says why, as the running session's notification (Review-Lauf 6).
+                s.suggestion == SessionAnswer.MINIMUM && !s.minimum -> "Minimum erreicht – Teilschritt diese Woche aufgebraucht"
                 s.suggestion == SessionAnswer.MINIMUM -> "Minimum erreicht – Teilschritt?"
                 else -> "Noch dran?"
             }

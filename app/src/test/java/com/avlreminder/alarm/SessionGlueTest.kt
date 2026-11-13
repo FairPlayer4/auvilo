@@ -254,6 +254,15 @@ class SessionGlueTest {
         waitFor("notification gone") { shadowOf(notifications).getNotification(Notifications.id(o)) == null }
     }
 
+    // Die Nachfrage schlägt keinen Teilschritt vor, den es nicht mehr gibt (Review-Lauf 6).
+    @Test
+    fun `die Nachfrage sagt, wenn das Minimum diese Woche aufgebraucht ist`() {
+        val zone = java.time.ZoneId.of("Europe/Berlin")
+        val check = SessionCheck(start, final = false, minimum = true, suggestion = SessionAnswer.MINIMUM)
+        assertTrue(AlarmInfo.sessionText(check, zone).startsWith("Minimum erreicht – Teilschritt?"))
+        assertTrue(AlarmInfo.sessionText(check.copy(minimum = false), zone).startsWith("Minimum erreicht – Teilschritt diese Woche aufgebraucht"))
+    }
+
     // Teilschritt nur, solange das Wochenlimit reicht; sonst sagt die Benachrichtigung es.
     @Test
     fun `aufgebrauchtes Minimum – kein Teilschritt in der laufenden Benachrichtigung`() = runBlocking {
