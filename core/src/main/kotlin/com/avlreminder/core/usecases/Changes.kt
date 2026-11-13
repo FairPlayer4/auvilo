@@ -234,7 +234,8 @@ internal class Changes(private val c: EngineContext, private val views: AlarmVie
     suspend fun act(occurrenceId: Long, action: Action): TransitionResult {
         val occurrence = repo.occurrence(occurrenceId) ?: return gone(occurrenceId, "unknown occurrence")
         val reminder = repo.reminder(occurrence.reminderId) ?: return gone(occurrenceId, "unknown reminder")
-        if (action is Action.Snooze && now().plus(action.duration) >= views.missedAt(reminder, occurrence)) {
+        // Only for an open one: a closed one of yesterday goes on to be ended below (Review-Lauf 6).
+        if (action is Action.Snooze && occurrence.isOpen && now().plus(action.duration) >= views.missedAt(reminder, occurrence)) {
             return TransitionResult.Rejected("snooze would pass the end of the day")
         }
         val limits = views.limits(reminder, occurrence)

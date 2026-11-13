@@ -4,7 +4,10 @@ import com.avlreminder.core.FakeAlarms
 import com.avlreminder.core.FakeRepository
 import com.avlreminder.core.MutableClock
 import com.avlreminder.core.at
+import com.avlreminder.core.model.ChecklistItem
+import com.avlreminder.core.model.OccurrenceState
 import com.avlreminder.core.model.Resolution
+import com.avlreminder.core.model.Schedule
 import com.avlreminder.core.model.SessionSpec
 import com.avlreminder.core.ports.ReminderRepository
 import com.avlreminder.core.reminder
@@ -17,7 +20,10 @@ import org.junit.jupiter.api.Assertions.assertEquals
 import org.junit.jupiter.api.Assertions.assertFalse
 import org.junit.jupiter.api.Assertions.assertTrue
 import org.junit.jupiter.api.Test
+import java.time.DayOfWeek
 import java.time.Duration
+import java.time.LocalDateTime
+import java.time.LocalTime
 
 /**
  * The end of an alarm is an effect of the engine like its ring (Review-Lauf 5, E17): after the
@@ -104,6 +110,33 @@ class AlarmEndTest {
     }
 
     @Test
+    fun `quiet until tomorrow or the next window it ends too, though still open (Review-Lauf 6)`() = runTest {
+        // A checklist with progress today: the rest is carried over to tomorrow.
+        val items = listOf(ChecklistItem(title = "Brunnen 1"), ChecklistItem(title = "Brunnen 2"))
+        val o = ringing(reminder().copy(checklist = items))
+        val first = repo.reminder(repo.occurrence(o)!!.reminderId)!!.checklist.first().id
+        engine.act(o, Action.CheckItem(first))
+        ended.clear()
+        clock.now = at(26, 23)
+        engine.sync()
+        assertEquals(OccurrenceState.PLANNED, repo.occurrence(o)!!.state)
+        assertEquals(listOf(o), ended)
+
+        // A deadline whose window of today ended: quiet until tomorrow's window.
+        ended.clear()
+        clock.now = at(26, 9)
+        val deadline = Schedule.Deadline(
+            due = LocalDateTime.of(2026, 10, 30, 12, 0), days = DayOfWeek.entries.take(5).toSet(),
+            from = LocalTime.of(9, 0), until = LocalTime.of(17, 0),
+        )
+        val d = ringing(reminder(deadline).copy(title = "Steuer"))
+        clock.now = at(26, 18)
+        engine.sync()
+        assertTrue(repo.occurrence(d)!!.isOpen)
+        assertTrue(d in ended)
+    }
+
+    @Test
     fun `deleting or pausing ends it`() = runTest {
         val o = ringing()
         val id = repo.occurrence(o)!!.reminderId
@@ -130,6 +163,17 @@ class AlarmEndTest {
         val open = ringing(reminder().copy(title = "Lesen"))
         assertTrue(engine.act(open, Action.Complete(minimumOnly = true)) is TransitionResult.Rejected)
         assertEquals(emptyList<Long>(), ended)
+    }
+
+    @Test
+    fun `a snooze button on yesterday's missed occurrence takes it away (Review-Lauf 6)`() = runTest {
+        val o = ringing()
+        clock.now = at(27, 8)
+        engine.sync()
+        assertEquals(Resolution.MISSED, repo.occurrence(o)!!.resolution)
+        ended.clear()
+        assertTrue(engine.act(o, Action.Snooze(Duration.ofMinutes(10))) is TransitionResult.Rejected)
+        assertEquals(listOf(o), ended)
     }
 
     @Test
