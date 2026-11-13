@@ -147,6 +147,29 @@ class ArrivalWindowScenarioTest {
         assertEquals("Mo 19:15 Training FULLSCREEN", sim.rings.first())
     }
 
+    // Review-Lauf 6, Frage 1: Verschoben und schon angekommen, dann ein anderer Ort: Seine Zeit ist
+    // weg, er wartet wieder auf die Ankunft, jetzt am neuen Ort.
+    @Test
+    fun `verschoben angekommen und dann ein anderer Ort wartet auf die Ankunft dort`() = runTest {
+        val id = training(home())
+        val studio = sim.place(Place(name = "Studio", lat = 48.2, lon = 11.6, wifis = listOf(PlaceWifi(OTHER))))
+        sim.runUntil(at(26, 19, 31))
+        sim.act(id, at(26, 19, 32)) { Action.Postpone(at(26, 20, 30)) }
+        sim.runUntil(at(26, 20, 31))
+        sim.wifi(HOME_5, at(26, 20, 34))
+        assertEquals(at(26, 20, 39), sim.open(id).currentAt)
+
+        sim.runUntil(at(26, 20, 35))
+        sim.engine.save(sim.repo.reminder(id)!!.copy(arrival = Arrival(studio)))
+        assertTrue(sim.open(id).awaitsArrival)
+        assertEquals(null, sim.open(id).arrivedAt)
+        sim.runUntil(at(26, 20, 50))
+        assertEquals(listOf("Mo 19:30 Training FULLSCREEN"), sim.rings)
+        sim.wifi(OTHER, at(26, 20, 50))
+        sim.runUntil(at(26, 21))
+        assertEquals(listOf("Mo 19:30 Training FULLSCREEN", "Mo 20:55 Training FULLSCREEN"), sim.rings)
+    }
+
     // KRITISCH: F1 – eine frische WLAN-Suche ohne das WLAN von Zuhause heißt klar weg: entfällt.
     @Test
     fun `zur spaetesten Uhrzeit klar weg entfaellt ohne Ton`() = runTest {

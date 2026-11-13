@@ -16,6 +16,7 @@ import com.avlreminder.core.model.ProofType
 import com.avlreminder.core.model.Reminder
 import com.avlreminder.core.model.Resolution
 import com.avlreminder.core.model.Schedule
+import com.avlreminder.core.model.WhenAway
 import com.avlreminder.core.model.Strictness
 import com.avlreminder.core.rules.Action
 import com.avlreminder.core.rules.Blockers
@@ -114,9 +115,15 @@ internal class Changes(private val c: EngineContext, private val views: AlarmVie
         }
         // A changed arrival rule (place, buffer, lead, rule gone) decides the arrival anew: the
         // occurrence goes back to its time; a mere text change keeps it (Review-Lauf 5, Frage 5).
+        // Snoozed or postponed its own time is gone: it waits for the arrival under the new rule,
+        // as when it was not there at its new time (Review-Lauf 6, Frage 1; 7.29 OZ5).
         if (stored != null && stored.arrival != saved.arrival) {
-            repo.openOccurrence(id)?.takeIf { it.state == OccurrenceState.PLANNED && it.arrivedAt != null && !it.rangOrMoved }
-                ?.let { repo.saveOccurrence(it.copy(currentAt = it.dueAt, arrivedAt = null)) }
+            repo.openOccurrence(id)?.takeIf { it.state == OccurrenceState.PLANNED && it.arrivedAt != null }?.let {
+                repo.saveOccurrence(
+                    if (!it.rangOrMoved) it.copy(currentAt = it.dueAt, arrivedAt = null)
+                    else it.copy(arrivedAt = null, awaitsArrival = saved.arrival?.whenAway == WhenAway.DROP),
+                )
+            }
         }
         val ring = scheduler.syncReminder(saved) ?: scheduler.arriveIfThere(saved)
         scheduler.watchPlaces()

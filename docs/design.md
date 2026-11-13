@@ -365,7 +365,9 @@ PLANNED/DUE/ESCALATING ─Ich starte jetzt─► RUNNING ─Fertig────�
   Zurücknehmen und Klingeln leeren `arrivedAt`. Bearbeiten leert es, wenn sich die
   Fälligkeit oder die Ankunftsregel ändert (Ort, Puffer, Vorlauf, Prüfabstand, *wenn weg*,
   Regel weg): Der Termin geht auf seine Uhrzeit zurück, die nächste Prüfung entscheidet neu.
-  Reine Textänderungen lassen es (Review-Lauf 5).
+  War er schon verschoben oder geschlummert, gibt es diese Uhrzeit nicht mehr: Er wartet
+  wieder auf die Ankunft, jetzt nach der neuen Regel (OZ5, Review-Lauf 6); ohne *entfällt*
+  oder ohne Regel klingelt er zu seiner Zeit. Reine Textänderungen lassen es (Review-Lauf 5).
 
   | Wann | da | klar weg | unklar |
   |---|---|---|---|
