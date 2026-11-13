@@ -29,8 +29,9 @@
 │             ArrivalWindow, PlaceChecks, Checklists, Snoozing            │
 │  ports/     ReminderRepository, AlarmPort, PlaceAlarmPort, GeofencePort,│
 │             LocationPort, WifiPort, DeviceStatePort, PreNoticePort      │
-│  usecases/  ReminderEngine (Fassade) mit Scheduler, AlarmViews, Changes,│
-│             EngineContext; AlarmView, RingPort; Overview, Digest        │
+│  usecases/  ReminderEngine (Fassade) mit Scheduler (+ Arrivals,        │
+│             SessionTimer), AlarmViews, Changes, EngineContext;          │
+│             AlarmView, RingPort; Overview, Digest                       │
 └─────────────────────────────────────────────────────────────────────────┘
 ```
 
@@ -39,7 +40,8 @@
 - **`ReminderEngine`** ist der einzige Weg, Reminder und Fälligkeiten zu ändern:
   Oberfläche, Benachrichtigungen, Receiver und später Agenten (Anf. 7.26) nutzen dieselben
   Befehle. Sie ist eine Fassade über drei interne Teile: `Scheduler` (Zeit:
-  nächste Fälligkeit, Alarm planen, auslösen, eskalieren, Tagesgrenze), `AlarmViews` (was
+  nächste Fälligkeit, Alarm planen, auslösen, eskalieren, Tagesgrenze; darin eigene Teile
+  für Orte und Ankunft, `Arrivals`, und den Timer einer Sitzung, `SessionTimer`, E20), `AlarmViews` (was
   jetzt gilt: Limits, Woche, Strenge, Alarm-Ansicht) und `Changes` (was der Nutzer ändert:
   Reminder, Aktionen, Blocker, Hinweise).
 - **Ein Befehl, eine Transaktion.** Jeder öffentliche Befehl läuft ganz oder gar nicht
