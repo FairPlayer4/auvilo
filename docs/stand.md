@@ -25,10 +25,17 @@ einer Fassung.
    umgesetzt, **noch nicht installiert**: Zeit-Regel und Lesen über das Repository (E21),
    `Database.kt` geteilt (E23), die Engine beendet Alarme auch, wenn das System einen
    Termin schließt (E17, Frage 3), Sitzungsantworten aus dem Core (E18), `AppGraph.rebuild`
-   und `CloudWiring` (E19), `Scheduler` mit `Arrivals` und `SessionTimer` (E20). Danach
-   review-loop und PR nach `main`. Am Gerät nach der Installation: ein verpasster Termin
-   und ein Notaus-Skip nehmen die Benachrichtigung mit; ein abgelehnter Knopf in der
-   Benachrichtigung lässt sie stehen; K33 und K34.
+   und `CloudWiring` (E19), `Scheduler` mit `Arrivals` und `SessionTimer` (E20). Review-Lauf 6
+   (`.review/runs/2026-11-13.md`) mit 7 Fixes, u. a. Entwurf nach Start aus Widget oder
+   Benachrichtigung, Übersicht beim Öffnen der App nicht mehr auf morgen, „+x min“ auf
+   einer alten Benachrichtigung räumt sie ab. Am Gerät nach der Installation: ein
+   verpasster Termin und ein Notaus-Skip nehmen die Benachrichtigung mit; ein abgelehnter
+   Knopf in der Benachrichtigung lässt sie stehen; die Morgenübersicht kommt, auch wenn die
+   App kurz nach ihrer Zeit geöffnet wird; einen Punkt aus der Benachrichtigung eines
+   klingelnden Vollbild-Alarms abhaken und im Vollbild den Nachweis starten: der nächste
+   Punkt bzw. „Nachweis läuft“ bleibt stehen (Lauf 6, E26); K33 und K34. Offen aus Lauf 6:
+   zwei Fragen (verschobener Termin bei geänderter Ankunftsregel, „Teilschritt“ ohne
+   Bildschirm bei Nachweis-Pflicht).
 1. **Gerätetests** aus [geraetetest.md](geraetetest.md): K15, K23–K26 (vorher *Zuhause* in
    *Orte* mit WLAN neu festlegen), K27–K30 (Sitzung, dabei: zeigt die Uhr den
    Chronometer?), K31, K32. In den nächsten Tagen im `diag.log` prüfen, dass keine Ankunft mehr direkt nach
