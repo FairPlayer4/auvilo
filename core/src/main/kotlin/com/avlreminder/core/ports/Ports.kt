@@ -39,6 +39,11 @@ interface ReminderRepository {
     suspend fun recentResolved(reminderId: Long, limit: Int): List<Occurrence>
     /** Resolved with [resolution] and counted ([Occurrence.countedAt]) in [from, until). */
     suspend fun countResolved(reminderId: Long, resolution: Resolution, from: Instant, until: Instant): Int
+    /**
+     * Postponements of [reminderId]'s occurrences made in [from, until): *Verschieben* and a
+     * *Rest auf morgen* that counted ([com.avlreminder.core.rules.Lifecycle.COUNTED]), Z2b.
+     */
+    suspend fun countPostponed(reminderId: Long, from: Instant, until: Instant): Int
     suspend fun saveOccurrence(occurrence: Occurrence): Long
     /** Deletes the occurrence with its events, proofs and checklist progress. */
     suspend fun deleteOccurrence(id: Long)

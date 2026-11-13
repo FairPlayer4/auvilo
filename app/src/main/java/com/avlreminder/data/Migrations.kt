@@ -139,6 +139,15 @@ val MIGRATION_9_10 = object : Migration(9, 10) {
     }
 }
 
+/** V1.3c1 (Z2b): the postpone limit per occurrence, week or month; existing ones stay per occurrence. */
+val MIGRATION_10_11 = object : Migration(10, 11) {
+    override fun migrate(db: SupportSQLiteDatabase) {
+        for (table in listOf("reminder", "template")) {
+            db.execSQL("ALTER TABLE $table ADD COLUMN postponePeriod TEXT NOT NULL DEFAULT 'OCCURRENCE'")
+        }
+    }
+}
+
 /** The new tables of version 6, as Room generates them (see schemas/…/6.json). */
 private val CREATE_6 = listOf(
     "CREATE TABLE IF NOT EXISTS `blocker` (`id` INTEGER PRIMARY KEY AUTOINCREMENT NOT NULL, `reminderId` INTEGER NOT NULL, " +

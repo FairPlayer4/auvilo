@@ -295,9 +295,16 @@ Erster Satz, wird mit der Nutzung angepasst: **[V1]**
 - Z1c **Ziel über Zeitraum**: z. B. Wochenziel 3–4×, Minimum 1× pro Woche **[V1]**
 - Z2 **Gutes Rescheduling**: Verschieben ist eine bewusste Entscheidung mit neuem
   konkretem Zeitpunkt – kein endloses Snooze. **[V1]**
-- Z2b **Limit für Verschieben** pro Reminder einstellbar **[V1]**; bisher pro Termin (jeder
-  neue Termin fängt bei 0 an). Wunsch 2026-11-13: wahlweise auch pro Woche oder pro Monat
-  (Details in Klärung)
+- Z2b **Limit für Verschieben** pro Reminder einstellbar **[V1]**, wahlweise **pro Termin**
+  (jeder neue Termin fängt bei 0 an), **pro Woche** oder **pro Monat** (2026-11-13, V1.3c1):
+  - Woche und Monat sind Kalenderwoche (Mo–So) und Kalendermonat; es zählen alle
+    Verschiebungen des Reminders in diesem Zeitraum, zum Zeitpunkt des Verschiebens. Mit der
+    neuen Woche bzw. dem neuen Monat geht es wieder, auch für einen schon verschobenen Termin.
+  - Es zählen *Verschieben* (auch vorab, 7.32 VB3) und *Rest auf morgen*, wenn es bisher
+    zählte (ohne erledigten Punkt am selben Tag); *Später* bleibt ohne Limit.
+  - Bestehende Reminder, Vorlagen und die Startwerte der Strenge zählen pro Termin.
+  - Der Alarm zeigt, was bleibt („noch 1× diese Woche“), aufgebraucht ausgegraut mit
+    „wieder ab Mo 02.11.“.
 
 ### 7.7 Verstärkung (Psychologie)
 **Positiv (Schwerpunkt):**
@@ -1182,6 +1189,7 @@ Neueste zuerst. Kap. 7 enthält immer den gültigen Stand; diese Tabelle ist die
 
 | Datum | Entscheidung |
 |---|---|
+| 2026-11-13 | Verschiebe-Limit wahlweise pro Termin, Woche oder Monat (Z2b, nach Vorschlag): Kalenderwoche Mo–So bzw. Kalendermonat, gezählt zum Zeitpunkt des Verschiebens über alle Termine des Reminders; zählt *Verschieben* (auch vorab) und ein zählendes *Rest auf morgen*, *Später* bleibt frei; Bestand, Vorlagen und Strenge-Startwerte pro Termin; der Alarm zeigt, was bleibt und ab wann es wieder geht. Umgesetzt in V1.3c1 |
 | 2026-11-13 | Antworten auf Review-Lauf 6 (`.review/runs/2026-11-13.md`), beide nach Vorschlag: (1) Ändert sich die Ankunftsregel, nachdem ein *verschobener* Termin schon angekommen ist, wartet er wieder auf die Ankunft, jetzt nach der neuen Regel (`awaitsArrival`, zur Tagesgrenze *verpasst*); ergänzt Frage 5 vom 2026-11-12. (2) Ohne Bildschirm (Benachrichtigung, Uhr) gibt es *Teilschritt* wie *Erledigt* nicht, wenn ein Nachweis mit Foto, Text oder Audio nötig ist. Außerdem Wunsch: Das Verschiebe-Limit soll sich auch wöchentlich oder monatlich erneuern können (Z2b, Details in Klärung) |
 | 2026-11-13 | **CI nur nach dem Merge auf `main`** (GitHub-Minuten, privates Repo): kein Build bei PRs und auf `develop`, reine Doku-Merges ohne Lauf; vor dem PR lokal mit `-PbackendStreng=true` bauen. Actions auf Commit-SHA festgelegt, Dependabot meldet monatlich neue Versionen. Mit der Veröffentlichung als Open Source wieder bei PRs bauen |
 | 2026-11-12 | Antworten auf Review-Lauf 5 (`.review/runs/2026-11-12-2.md`), alle nach Vorschlag: (1) Umbau-Etappe **V1.3c0** vor V1.3c (Review-Empfehlungen E17–E21, E23): Ende eines Alarms als Effekt der Engine, Sitzungsantworten aus einer Quelle, `AppGraph` entschlackt, `Scheduler` intern geteilt, `Database.kt` geteilt. (2) Architektur: Wahrheit sind Room und DataStore; Gerätezustand außerhalb des Backups ist eine eigene Kategorie; Zeit, nach der die App entscheidet, kommt auch in `:app` über die Uhr der Engine; Effekte sind planen, klingeln und beenden. (3) Schließt das System einen Termin (*verpasst*, Notaus-Skip), verschwinden auch Klingeln und Benachrichtigung. (4) F2: Eine Ortsprüfung, die vor dem Start des Ankunftszeitraums geplant war und erst danach kommt, zählt als Prüfung zum Start (7.29). (5) Jede Änderung an der Ankunftsregel (Ort, Puffer, Vorlauf, Regel weg) leert `arrivedAt`; reine Textänderungen nicht. (6) Formular: halbe Eingaben überstehen Design-, Schriftgrößenwechsel und Prozesstod; das Wochenlimit gilt im Formular auch für die Minimum-Dauer einer Sitzung; eine Startklar-Antwort lässt sich überschreiben, aber nicht leeren (Hinweis im Feld) |
@@ -1256,6 +1264,7 @@ Neueste zuerst. Kap. 7 enthält immer den gültigen Stand; diese Tabelle ist die
 | V1.3b2 | 2026-11-12 | Antworten auf Review-Lauf 4: Sitzung zählt in der Woche ihres Starts, Abbruch zurücknehmbar, F2 über die geplante erste Prüfung, wiederholte WLAN-Meldung keine Ankunft; Tests (Kap. 9, 2026-11-12) |
 | V1.3b3 | 2026-11-12 | Antworten auf Review-Lauf 5, Etappe A: Formular (Entwurf übersteht Neuaufbau, Probleme sichtbar, Limit für Sitzungs-Minimum, Startklar nicht leerbar, Ankunft ohne Ort nicht still weg), F2 auch für eine vorher geplante Prüfung, geänderte Ankunftsregel entscheidet neu, Zurücknehmen einer Sitzung nur vor dem Maximum; Tests der UI-Verdrahtung (Kap. 9, 2026-11-12) |
 | V1.3c0 | 2026-11-13 | Umbau-Etappe B aus Review-Lauf 5: Zeit über die Uhr der Engine und Lesen über das Repository (E21), `Database.kt` geteilt (E23), Ende eines Alarms als Effekt der Engine, auch wenn das System den Termin schließt (E17, Frage 3), Sitzungsantworten aus dem Core (E18), `AppGraph.rebuild`, „Hier festlegen“ und Blocker mit Aufgabe in der Engine, `CloudWiring` (E19), `Scheduler` intern geteilt (E20); Fixes aus Review-Lauf 6 (Entwurf beim Neuaufbau nach Start aus Benachrichtigung, Übersicht nicht bei jedem Öffnen neu geplant, Snooze auf altem Termin, Rückgängig nur vor dem Maximum, Nachfrage-Text); Antworten auf Lauf 6: verschobener Termin wartet nach neuer Ankunftsregel wieder, ohne Bildschirm kein *Teilschritt* mit Nachweis |
+| V1.3c1 | 2026-11-13 | Verschiebe-Limit pro Termin, Woche oder Monat (Z2b): Formular, Alarm mit „noch 1× diese Woche“ und „wieder ab …“, Vorlagen, Schnittstelle für Claude; Schema 11 |
 
 Details zum Verhalten: [design.md](design.md), Gerätetests: [geraetetest.md](geraetetest.md).
 

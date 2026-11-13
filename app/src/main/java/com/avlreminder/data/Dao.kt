@@ -64,6 +64,14 @@ interface AvlDao {
     )
     suspend fun countResolved(reminderId: Long, resolution: String, from: Instant, until: Instant): Int
 
+    /** [com.avlreminder.core.ports.ReminderRepository.countPostponed]; [counted] marks a "Rest auf morgen" that counted. */
+    @Query(
+        "SELECT COUNT(*) FROM event JOIN occurrence ON event.occurrenceId = occurrence.id " +
+            "WHERE occurrence.reminderId = :reminderId AND event.at >= :from AND event.at < :until " +
+            "AND (event.type = 'POSTPONED' OR (event.type = 'DEFERRED' AND event.detail LIKE '%' || :counted))",
+    )
+    suspend fun countPostponed(reminderId: Long, from: Instant, until: Instant, counted: String): Int
+
     @Query("SELECT * FROM occurrence WHERE state IN ('DONE','CLOSED') ORDER BY resolvedAt DESC")
     fun observeResolved(): Flow<List<OccurrenceEntity>>
 

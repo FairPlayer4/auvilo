@@ -20,6 +20,13 @@ enum class ProofKind {
     EVIDENCE,
 }
 
+/**
+ * What the postpone limit counts over (Z2b, 2026-11-13): each occurrence anew, or the
+ * postponements of all its occurrences in the calendar week (Mo–So) or month, counted when
+ * they were made.
+ */
+enum class PostponePeriod { OCCURRENCE, WEEK, MONTH }
+
 /** What a reminder asks for as proof. Photo, text and audio can be combined. */
 data class ProofSpec(
     val kind: ProofKind = ProofKind.CONFIRM,
@@ -296,8 +303,10 @@ data class Reminder(
     /** null = unlimited. */
     val minimumLimitPerWeek: Int? = null,
     val proof: ProofSpec = ProofSpec.CONFIRM,
-    /** Max. postponements per occurrence; null = unlimited. */
+    /** Max. postponements per [postponePeriod]; null = unlimited. */
     val postponeLimit: Int? = null,
+    /** What [postponeLimit] counts over (Z2b, 2026-11-13). */
+    val postponePeriod: PostponePeriod = PostponePeriod.OCCURRENCE,
     val active: Boolean = true,
     val createdAt: Instant,
     /** Rings as set even while the phone is on "do not disturb". */

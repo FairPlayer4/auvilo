@@ -7,6 +7,7 @@ import com.avlreminder.core.model.ChecklistItem
 import com.avlreminder.core.model.PrepAnswer
 import com.avlreminder.core.model.PreNotice
 import com.avlreminder.core.model.ProofSpec
+import com.avlreminder.core.model.PostponePeriod
 import com.avlreminder.core.model.Reminder
 import com.avlreminder.core.model.Schedule
 import com.avlreminder.core.model.Strictness
@@ -54,6 +55,8 @@ data class ReminderForm(
     val minimum: String = "",
     val proof: ProofSpec = Presets.of(Presets.DEFAULT_STRICTNESS).proof,
     val postponeLimit: Int? = Presets.of(Presets.DEFAULT_STRICTNESS).postponeLimit,
+    /** The presets count per occurrence (Z2b). */
+    val postponePeriod: PostponePeriod = PostponePeriod.OCCURRENCE,
     val minimumLimitPerWeek: Int? = Presets.of(Presets.DEFAULT_STRICTNESS).minimumLimitPerWeek,
     val ignoreDnd: Boolean = false,
     val snoozeMinutes: List<Int> = listOf(10),
@@ -109,7 +112,10 @@ data class ReminderForm(
     /** Picking a strictness resets proof and limits to the preset; each can be changed afterwards. */
     fun withStrictness(s: Strictness): ReminderForm {
         val p = Presets.of(s)
-        return copy(strictness = s, proof = p.proof, postponeLimit = p.postponeLimit, minimumLimitPerWeek = p.minimumLimitPerWeek)
+        return copy(
+            strictness = s, proof = p.proof, postponeLimit = p.postponeLimit, postponePeriod = PostponePeriod.OCCURRENCE,
+            minimumLimitPerWeek = p.minimumLimitPerWeek,
+        )
     }
 
     val schedule: Schedule?
@@ -157,6 +163,7 @@ data class ReminderForm(
             minimumLimitPerWeek = if (hasMinimum) minimumLimitPerWeek else null,
             proof = proof,
             postponeLimit = postponeLimit,
+            postponePeriod = postponePeriod,
             active = active,
             createdAt = createdAt ?: now,
             ignoreDnd = ignoreDnd,
@@ -200,7 +207,7 @@ data class ReminderForm(
                 id = r.id, createdAt = r.createdAt, active = r.active, title = r.title, why = r.why.orEmpty(),
                 character = r.character, strictness = r.strictness, date = today, time = LocalTime.of(18, 0),
                 goal = r.goal.orEmpty(), minimum = r.minimum.orEmpty(), proof = r.proof,
-                postponeLimit = r.postponeLimit, minimumLimitPerWeek = r.minimumLimitPerWeek,
+                postponeLimit = r.postponeLimit, postponePeriod = r.postponePeriod, minimumLimitPerWeek = r.minimumLimitPerWeek,
                 ignoreDnd = r.ignoreDnd, snoozeMinutes = r.snoozeMinutes, motivationAudio = r.motivationAudio,
                 prep = prep.mapValues { (_, a) -> PrepDraft(a.text.orEmpty(), a.unknown) },
                 atHome = r.arrival != null && r.schedule != Schedule.OnArrival,

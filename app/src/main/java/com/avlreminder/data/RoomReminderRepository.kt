@@ -17,6 +17,7 @@ import com.avlreminder.core.model.PrepAnswer
 import com.avlreminder.core.model.Proof
 import com.avlreminder.core.model.ProofSpec
 import com.avlreminder.core.model.Reminder
+import com.avlreminder.core.rules.Lifecycle
 import com.avlreminder.core.model.Resolution
 import com.avlreminder.core.model.Schedule
 import com.avlreminder.core.model.WeeklyGoal
@@ -123,6 +124,9 @@ class RoomReminderRepository(private val db: AvlDatabase) : ReminderRepository {
     override suspend fun countResolved(reminderId: Long, resolution: Resolution, from: Instant, until: Instant) =
         dao.countResolved(reminderId, resolution.name, from, until)
 
+    override suspend fun countPostponed(reminderId: Long, from: Instant, until: Instant) =
+        dao.countPostponed(reminderId, from, until, Lifecycle.COUNTED)
+
     override suspend fun saveOccurrence(occurrence: Occurrence): Long {
         val entity = occurrence.toEntity()
         if (occurrence.id == 0L) return dao.insert(entity)
@@ -217,6 +221,7 @@ fun ReminderEntity.toModel(items: List<ChecklistItemEntity> = emptyList()): Remi
     minimumLimitPerWeek = minimumLimitPerWeek,
     proof = ProofSpec(proofKind, proofPhoto, proofTextMinChars, proofAudioMinSeconds, proofWindowMinutes),
     postponeLimit = postponeLimit,
+    postponePeriod = postponePeriod,
     active = active,
     createdAt = createdAt,
     ignoreDnd = ignoreDnd,
@@ -290,6 +295,7 @@ fun Reminder.toEntity(): ReminderEntity {
         minimumLimitPerWeek = minimumLimitPerWeek,
         proofKind = proof.kind,
         postponeLimit = postponeLimit,
+        postponePeriod = postponePeriod,
         active = active,
         createdAt = createdAt,
         proofPhoto = proof.photo,

@@ -105,7 +105,7 @@ Paket `com.avlreminder`.
 | Ziel | `goal`, `minimum`, `minimumLimitPerWeek`, `weeklyGoal` (Ziel, höchstens, mindestens) |
 | Sitzung | `session: SessionSpec?` (Nachfrage-Intervall und -Strenge, Ziel- und Minimum-Dauer, maximale Dauer, Reaktionszeit; 3.1) |
 | Nachweis | `proof: ProofSpec` (5.) |
-| Alarm | `postponeLimit`, `snoozeMinutes` (1–2 Werte), `ignoreDnd` |
+| Alarm | `postponeLimit` mit `postponePeriod` (`OCCURRENCE` / `WEEK` / `MONTH`, 4.), `snoozeMinutes` (1–2 Werte), `ignoreDnd` |
 | Inhalt | `checklist`, `motivationAudio` |
 | Vorab und Blocker | `preNotice` (`Evening(time)` / `Before(minutes)`), `prepFor` (Vorbereitungsaufgabe für Reminder x), `solvedBlockerIsMinimum` |
 
@@ -332,6 +332,12 @@ PLANNED/DUE/ESCALATING ─Ich starte jetzt─► RUNNING ─Fertig────�
   ausgeblendet; ohne Limit, jedes ist ein `SNOOZED`.
 - **Verschieben** auf einen Zeitpunkt: zählt gegen `postponeLimit`. Ist es erreicht,
   bleiben Erledigt, Minimum und Auslassen.
+- **Zeitraum des Limits** (`postponePeriod`, Z2b): pro Termin zählt `postponeCount`; pro
+  Woche (Mo–So) oder Monat zählt `repo.countPostponed` die Ereignisse `POSTPONED` und die
+  `DEFERRED` mit Markierung `Lifecycle.COUNTED` aller Termine des Reminders im Zeitraum um
+  *jetzt* (`PostponePeriods.range`, `Limits.postponesInPeriod`). Aufgebraucht nennt
+  `AlarmView.postponeAgainAt` den Beginn des nächsten Zeitraums („wieder ab Mo 02.11.“).
+  Verschieben ist nicht zurücknehmbar, deshalb reichen die Ereignisse als Zählung.
 - **Minimum:** ausgegraut, wenn das Wochenlimit erreicht ist (mehrere Uhrzeiten: Tage mit Minimum).
 - **Startwerte der Strenge** (`Presets`, pro Reminder änderbar): locker – Quittieren,
   Verschieben unbegrenzt; normal – Quittieren, 3× Verschieben; streng – Foto, 1×
@@ -460,7 +466,8 @@ um …*, Fenstertage, *von / bis*, Intervall (Standard Mo–Fr 9–17, 60 min).
 - **Über mehrere Tage:** Wurde an einem Tag ein Punkt erledigt, kommt der Rest am
   nächsten Tag zur selben Uhrzeit wieder (zählt nicht als Verschieben); sonst verpasst.
   *Rest auf morgen* im Alarm ist nach einem Punkt am selben Tag frei, sonst eine
-  Verschiebung.
+  Verschiebung (dann trägt das `DEFERRED`-Ereignis die Markierung für das Limit pro Woche
+  oder Monat, 4.).
 - **Mehrere Uhrzeiten am Tag:** Die Liste läuft über die Termine. Ein
   abgehakter Punkt schließt den Termin (`GOAL` bzw. `NO_PROOF` nach dem Nachweis dieses
   Punkts), der nächste Termin zeigt nur die offenen Punkte. Erledigt ist, was seit dem
@@ -592,7 +599,7 @@ https://claude.ai/artifact/PXA9YgWi8XoHupYnN7Z3cS
 
 ### 11.3 Vorlagen
 Übernehmen Charakter, Strenge, Nachweis, Minimum mit Limit, Später-Knöpfe,
-Verschiebe-Limit, *Nicht stören*-Ausnahme und die Art des Takts mit Zeiten (auch
+Verschiebe-Limit mit Zeitraum, *Nicht stören*-Ausnahme und die Art des Takts mit Zeiten (auch
 mehrere Uhrzeiten). Nicht: Titel,
 Warum, Startklar, Botschaft, Datum. *+* und Widget zeigen die Auswahl (zuletzt benutzte
 oben, dazu *Leer*), sofern es Vorlagen gibt. Umbenennen und Löschen in den Einstellungen.
@@ -632,7 +639,7 @@ umgesetzt / verworfen. Liste in den Einstellungen, *Teilen* als Markdown.
 
 ## 13. Daten, Migration, Diagnose
 
-- **Room** mit exportierten Schemas (`app/schemas/`), aktuell Version 10. Jede Version hat
+- **Room** mit exportierten Schemas (`app/schemas/`), aktuell Version 11. Jede Version hat
   eine explizite Migration (`AvlDatabase.MIGRATIONS`), kein destruktiver Fallback;
   Migrationen möglichst nur mit `ADD COLUMN` und neuen Tabellen.
 - **Fremdschlüssel mit `ON DELETE CASCADE`:** `occurrence`, `blocker`, `checklist_item`,
@@ -648,7 +655,9 @@ umgesetzt / verworfen. Liste in den Einstellungen, *Teilen* als Markdown.
   `arrivalCheck` mit den Standardwerten (bestehende Ankunfts-Reminder bekommen den
   Zeitraum, *Heute* zeigt einmal einen Hinweis), `occurrence.arrivedAt`, Tabelle
   `place_wifi`. Migration 9→10: `reminder.session…` (leer = keine Sitzung),
-  `occurrence.startedAt`/`nextCheckAt`/`finalCallAt`. Ereignistypen und Auflösungen stehen
+  `occurrence.startedAt`/`nextCheckAt`/`finalCallAt`. Migration 10→11:
+  `reminder.postponePeriod` und `template.postponePeriod` (Standard `OCCURRENCE`, Z2b).
+  Ereignistypen und Auflösungen stehen
   als Name in der Datenbank; neue brauchen keine Migration.
 - **Einstellungen** (DataStore): Wochenend-Zeiten als eigene Schlüssel (fehlen = wie
   Mo–Fr), `alarmsPausedUntil` und `alarmsPausedFrom` in Millisekunden (fehlt = keine

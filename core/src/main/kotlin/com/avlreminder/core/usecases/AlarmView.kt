@@ -58,6 +58,8 @@ data class AlarmView(
     val canStart: Boolean = false,
     /** The running session; the alarm is then a check or the last reminder. */
     val session: SessionView? = null,
+    /** A limit per week or month is used up: from then on postponing works again (Z2b). */
+    val postponeAgainAt: Instant? = null,
 ) {
     /** The first open checklist item. */
     val nextItem: ChecklistItem? get() = reminder.checklist.firstOrNull { it.id !in done }

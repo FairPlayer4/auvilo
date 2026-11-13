@@ -62,6 +62,7 @@ fun ReminderForm.toTemplate(name: String, now: Instant) = TemplateEntity(
     proofAudioMinSeconds = proof.audioMinSeconds,
     proofWindowMinutes = proof.windowMinutes,
     postponeLimit = postponeLimit,
+    postponePeriod = postponePeriod,
     ignoreDnd = ignoreDnd,
     snoozeMinutes = snoozeMinutes.joinToString(","),
     moreTimes = if (timesPossible) moreTimes.takeIf { it.isNotEmpty() }?.joinToString(",") { it.toMinutes().toString() } else null,
@@ -86,6 +87,7 @@ fun ReminderForm.withTemplate(t: TemplateEntity): ReminderForm {
         minimumLimitPerWeek = t.minimumLimitPerWeek,
         proof = ProofSpec(t.proofKind, t.proofPhoto, t.proofTextMinChars, t.proofAudioMinSeconds, t.proofWindowMinutes),
         postponeLimit = t.postponeLimit,
+        postponePeriod = t.postponePeriod,
         ignoreDnd = t.ignoreDnd,
         snoozeMinutes = t.snoozeMinutes.split(',').mapNotNull { it.trim().toIntOrNull() }.ifEmpty { listOf(10) },
     )

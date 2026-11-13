@@ -77,6 +77,7 @@ löscht oder ein zweites Gerät braucht, läuft im **Emulator** mit einem eigene
 | K32 | Teilschritt nach Limit | Reminder mit Minimum 1×/Woche und Sitzung; Minimum einmal nutzen, dann Sitzung starten | laufende Benachrichtigung ohne *Teilschritt*; Sitzungsbildschirm sagt, dass das Minimum diese Woche aufgebraucht ist |
 | K33 | Notaus beim Klingeln (Review-Lauf 5) | Test-Reminder klingeln lassen, in der App *Alle Alarme pausieren* 1 h | Klingeln hört sofort auf; eine **stille** Benachrichtigung des Termins bleibt stehen, Antippen öffnet den Alarm |
 | K34 | Formular-Entwurf (Review-Lauf 5) | Reminder bearbeiten, Titel ändern, ohne Speichern Dunkelmodus (Schnelleinstellungen) umschalten | Formular zeigt weiter den geänderten Titel; nach *Speichern* steht er in der Liste |
+| K35 | Verschieben pro Woche (Z2b, V1.3c1) | Test-Reminder täglich, *Feineinstellungen*: Verschieben 1× *pro Woche*; heute vorab verschieben, morgen den Alarm öffnen | Zusammenfassung „Verschieben 1× pro Woche“; morgen ist *Verschieben* ausgegraut mit „wieder ab Mo …“ (nächster Montag) |
 
 ## E. Nach dem Test
 - Claude liest `adb logcat -d -s AvlDiag` und `files/diag/diag.log` (per `run-as`) und

@@ -10,6 +10,7 @@ import com.avlreminder.core.model.Character
 import com.avlreminder.core.model.EventType
 import com.avlreminder.core.model.OccurrenceState
 import com.avlreminder.core.model.ProofKind
+import com.avlreminder.core.model.PostponePeriod
 import com.avlreminder.core.model.ProofType
 import com.avlreminder.core.model.Resolution
 import com.avlreminder.core.model.Strictness
@@ -85,6 +86,8 @@ data class ReminderEntity(
     val sessionMinimum: Int? = null,
     val sessionMax: Int? = null,
     val sessionFinal: Int? = null,
+    /** What [postponeLimit] counts over (Z2b); existing reminders per occurrence. */
+    @ColumnInfo(defaultValue = "OCCURRENCE") val postponePeriod: PostponePeriod = PostponePeriod.OCCURRENCE,
 )
 
 @Entity(
@@ -131,6 +134,7 @@ data class TemplateEntity(
     val ignoreDnd: Boolean,
     val snoozeMinutes: String,
     val moreTimes: String? = null,
+    @ColumnInfo(defaultValue = "OCCURRENCE") val postponePeriod: PostponePeriod = PostponePeriod.OCCURRENCE,
 )
 
 @Entity(tableName = "place")

@@ -10,6 +10,7 @@ import com.avlreminder.core.model.PrepAnswer
 import com.avlreminder.core.model.PreNotice
 import com.avlreminder.core.model.ProofKind
 import com.avlreminder.core.model.ProofSpec
+import com.avlreminder.core.model.PostponePeriod
 import com.avlreminder.core.model.Reminder
 import com.avlreminder.core.model.Schedule
 import com.avlreminder.core.model.Strictness
@@ -49,6 +50,7 @@ internal class ClaudeJson(private val zone: ZoneId) {
         .put("minimumLimitPerWeek", r.minimumLimitPerWeek ?: JSONObject.NULL)
         .put("proof", proof(r.proof))
         .put("postponeLimit", r.postponeLimit ?: JSONObject.NULL)
+        .put("postponePeriod", r.postponePeriod.name)
         .put("active", r.active)
         .put("archived", r.archivedAt != null)
         .put("createdAt", instant(r.createdAt))
@@ -160,6 +162,7 @@ internal class ClaudeJson(private val zone: ZoneId) {
         if (o.has("minimumLimitPerWeek")) r = r.copy(minimumLimitPerWeek = o.optIntOrNull("minimumLimitPerWeek"))
         if (o.has("proof")) r = r.copy(proof = proof(o.getJSONObject("proof"), r.proof))
         if (o.has("postponeLimit")) r = r.copy(postponeLimit = o.optIntOrNull("postponeLimit"))
+        if (o.has("postponePeriod")) r = r.copy(postponePeriod = PostponePeriod.valueOf(o.getString("postponePeriod")))
         if (o.has("ignoreDnd")) r = r.copy(ignoreDnd = o.getBoolean("ignoreDnd"))
         if (o.has("snoozeMinutes")) r = r.copy(snoozeMinutes = o.getJSONArray("snoozeMinutes").ints())
         if (o.has("arrival")) {

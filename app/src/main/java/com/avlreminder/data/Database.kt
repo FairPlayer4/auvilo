@@ -27,8 +27,8 @@ abstract class AvlDatabase : RoomDatabase() {
     companion object {
         const val NAME = "avlreminder.db"
 
-        val MIGRATIONS = arrayOf(MIGRATION_1_2, MIGRATION_2_3, MIGRATION_3_4, MIGRATION_4_5, MIGRATION_5_6, MIGRATION_6_7, MIGRATION_7_8, MIGRATION_8_9, MIGRATION_9_10)
-        const val VERSION = 10
+        val MIGRATIONS = arrayOf(MIGRATION_1_2, MIGRATION_2_3, MIGRATION_3_4, MIGRATION_4_5, MIGRATION_5_6, MIGRATION_6_7, MIGRATION_7_8, MIGRATION_8_9, MIGRATION_9_10, MIGRATION_10_11)
+        const val VERSION = 11
 
         fun create(context: Context): AvlDatabase {
             val backups = File(context.filesDir, "backup")

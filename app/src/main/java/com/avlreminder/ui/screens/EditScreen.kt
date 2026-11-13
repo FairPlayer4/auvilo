@@ -1,9 +1,11 @@
 package com.avlreminder.ui.screens
 
+import com.avlreminder.core.model.PostponePeriod
 import com.avlreminder.core.model.SessionSpec
 import com.avlreminder.core.model.Arrival
 import com.avlreminder.core.model.Place
 import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.ExperimentalLayoutApi
 import androidx.compose.foundation.layout.FlowRow
@@ -217,9 +219,15 @@ fun EditScreen(
                     "für besondere Ereignisse; braucht die Ausnahme in den Einstellungen",
                     form.ignoreDnd,
                 ) { form = form.copy(ignoreDnd = it) }
-                Text("Verschieben max. pro Fälligkeit", Modifier.padding(top = 12.dp), color = c.text, fontSize = 14.sp)
-                NumberChoice(listOf(0, 1, 2, 3, 5), form.postponeLimit, 0..20, "Verschieben max. pro Fälligkeit", unit = "×", unlimited = "unbegrenzt") {
+                Text("Verschieben höchstens", Modifier.padding(top = 12.dp), color = c.text, fontSize = 14.sp)
+                NumberChoice(listOf(0, 1, 2, 3, 5), form.postponeLimit, 0..20, "Verschieben höchstens", unit = "×", unlimited = "unbegrenzt") {
                     form = form.copy(postponeLimit = it)
+                }
+                // Each occurrence anew, or over all of them in the calendar week or month (Z2b).
+                if (form.postponeLimit != null) {
+                    Box(Modifier.padding(top = 4.dp).testTag("postponePeriod")) {
+                        Choice(PERIODS.map { it to periodLabel(it) }, form.postponePeriod) { form = form.copy(postponePeriod = it) }
+                    }
                 }
                 Text("Später-Knöpfe im Alarm", Modifier.padding(top = 12.dp), color = c.text, fontSize = 14.sp)
                 SnoozeChoice(form.snoozeMinutes) { form = form.copy(snoozeMinutes = it) }
@@ -660,8 +668,19 @@ private fun SessionSection(form: ReminderForm, onChange: (ReminderForm) -> Unit)
     )
 }
 
+private val PERIODS = PostponePeriod.entries
+
+private fun periodLabel(p: PostponePeriod) = when (p) {
+    PostponePeriod.OCCURRENCE -> "pro Termin"
+    PostponePeriod.WEEK -> "pro Woche"
+    PostponePeriod.MONTH -> "pro Monat"
+}
+
 private fun fineSummary(form: ReminderForm) = listOfNotNull(
-    "Verschieben " + (form.postponeLimit?.let { "$it×" } ?: "unbegrenzt"),
+    "Verschieben " + (
+        form.postponeLimit?.let { "$it×" + if (form.postponePeriod == PostponePeriod.OCCURRENCE) "" else " " + periodLabel(form.postponePeriod) }
+            ?: "unbegrenzt"
+        ),
     "Später " + form.snoozeMinutes.joinToString(" / ") { "+$it" },
     "auch bei Nicht stören".takeIf { form.ignoreDnd },
     "Ankunft +${form.buffer} min, prüfen alle ${form.check} min".takeIf { form.hasWindow },

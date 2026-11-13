@@ -36,7 +36,10 @@ einer Fassung.
    Punkt bzw. „Nachweis läuft“ bleibt stehen (Lauf 6, E26); K33 und K34. Die Antworten auf
    Lauf 6 (Kap. 9, 2026-11-13) sind umgesetzt: Ein verschobener Termin wartet nach
    geänderter Ankunftsregel wieder auf die Ankunft; *Teilschritt* ohne Bildschirm nur ohne
-   Nachweis-Pflicht. Das Verschiebe-Limit pro Woche oder Monat folgt als V1.3c1.
+   Nachweis-Pflicht. Darauf aufbauend **V1.3c1** (`versionCode` 21, `feature/v1.3c1`, noch
+   nicht installiert): Verschiebe-Limit pro Termin, Woche oder Monat (Z2b), Schema 11. Am
+   Gerät: einen Reminder auf „1× pro Woche“ stellen, verschieben; der nächste Termin zeigt
+   „wieder ab Mo …“ ausgegraut (K35).
 1. **Gerätetests** aus [geraetetest.md](geraetetest.md): K15, K23–K26 (vorher *Zuhause* in
    *Orte* mit WLAN neu festlegen), K27–K30 (Sitzung, dabei: zeigt die Uhr den
    Chronometer?), K31, K32. In den nächsten Tagen im `diag.log` prüfen, dass keine Ankunft mehr direkt nach

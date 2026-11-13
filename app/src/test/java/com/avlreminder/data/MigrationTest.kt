@@ -1,6 +1,7 @@
 package com.avlreminder.data
 
 import com.avlreminder.core.model.OccurrenceState
+import com.avlreminder.core.model.PostponePeriod
 import com.avlreminder.core.model.Strictness
 import com.avlreminder.core.model.SessionSpec
 import android.content.Context
@@ -164,6 +165,44 @@ class MigrationTest {
             "INSERT INTO occurrence (id, reminderId, dueAt, currentAt, state, postponeCount, resolvedAt, resolution, note, awaitsArrival) " +
                 "VALUES (5, 1, 1000, 1000, 'DUE', 0, NULL, NULL, NULL, 0)",
         )
+    }
+
+    private fun createV10() = create(10) { db ->
+        db.execSQL(
+            "INSERT INTO reminder (id, title, character, strictness, scheduleType, timeMinutes, weekdays, proof, postponeLimit, active, createdAt, " +
+                "proofPhoto, ignoreDnd, snoozeMinutes, solvedBlockerIsMinimum, arrivalLead, arrivalBuffer, arrivalCheck) " +
+                "VALUES (1, 'Training', 'OVERCOME', 'NORMAL', 'DAILY', 1080, 0, 'CONFIRM', 3, 1, 0, 0, 0, '10', 0, 90, 5, 20)",
+        )
+        db.execSQL(
+            "INSERT INTO template (id, name, usedAt, character, strictness, scheduleType, timeMinutes, weekdays, proofKind, " +
+                "proofPhoto, proofWindowMinutes, postponeLimit, ignoreDnd, snoozeMinutes) " +
+                "VALUES (2, 'Abends', 0, 'OVERCOME', 'NORMAL', 'DAILY', 1080, 0, 'CONFIRM', 0, 10, 1, 0, '10')",
+        )
+    }
+
+    // KRITISCH: Bestehende Reminder und Vorlagen zählen das Verschiebe-Limit weiter pro Termin (Z2b, 2026-11-13).
+    @Test
+    fun version10KeepsDataAndCountsPostponingPerOccurrence() = runTest {
+        createV10()
+        val db = open()
+        try {
+            val repo = RoomReminderRepository(db)
+            val training = repo.reminder(1)!!
+            assertEquals(3, training.postponeLimit)
+            assertEquals(PostponePeriod.OCCURRENCE, training.postponePeriod)
+            assertEquals(PostponePeriod.OCCURRENCE, db.dao().template(2)!!.postponePeriod)
+            repo.saveReminder(training.copy(postponePeriod = PostponePeriod.MONTH))
+            assertEquals(PostponePeriod.MONTH, repo.reminder(1)!!.postponePeriod)
+        } finally {
+            db.close()
+        }
+    }
+
+    @Test
+    fun backupIsTakenBeforeTheUpgradeFromVersion10() {
+        createV10()
+        val dir = File(context.filesDir, "backup-test-10").apply { deleteRecursively() }
+        assertTrue(AvlDatabase.backupBeforeMigration(file, dir)!!.name.startsWith("avlreminder-v10-"))
     }
 
     // KRITISCH: Bestehende Reminder bleiben ohne Sitzung (Anf. 7.11); eine laufende Sitzung zählt als offen.

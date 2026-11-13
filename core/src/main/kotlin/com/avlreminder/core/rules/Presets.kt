@@ -5,6 +5,7 @@ import com.avlreminder.core.model.AtTimes
 import com.avlreminder.core.model.Character
 import com.avlreminder.core.model.PreNotice
 import com.avlreminder.core.model.ProofKind
+import com.avlreminder.core.model.PostponePeriod
 import com.avlreminder.core.model.ProofSpec
 import com.avlreminder.core.model.Reminder
 import com.avlreminder.core.model.Schedule
@@ -111,6 +112,17 @@ object Validation {
 }
 
 /** Weeks run Monday to Sunday. */
+/** The span a postpone limit per week or month counts in (Z2b). */
+object PostponePeriods {
+    /** [from, to) of [period] containing [now]; null per occurrence. */
+    fun range(period: PostponePeriod, now: Instant, zone: ZoneId): Pair<Instant, Instant>? = when (period) {
+        PostponePeriod.OCCURRENCE -> null
+        PostponePeriod.WEEK -> Weeks.range(now, zone)
+        PostponePeriod.MONTH -> now.atZone(zone).toLocalDate().withDayOfMonth(1)
+            .let { it.atStartOfDay(zone).toInstant() to it.plusMonths(1).atStartOfDay(zone).toInstant() }
+    }
+}
+
 object Weeks {
     fun start(date: LocalDate): LocalDate = date.with(TemporalAdjusters.previousOrSame(DayOfWeek.MONDAY))
 
