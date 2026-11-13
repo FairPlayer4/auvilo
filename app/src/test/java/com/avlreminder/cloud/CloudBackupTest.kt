@@ -9,6 +9,7 @@ import androidx.credentials.exceptions.GetCredentialUnknownException
 import androidx.credentials.exceptions.NoCredentialException
 import androidx.test.core.app.ApplicationProvider
 import androidx.test.ext.junit.runners.AndroidJUnit4
+import com.avlreminder.AvlApp
 import com.avlreminder.data.AvlDatabase
 import com.avlreminder.protokoll.BackupAblage
 import com.avlreminder.restore.BackupTable
@@ -47,11 +48,16 @@ import com.connectrpc.Code
 import com.connectrpc.ConnectException
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.Job
 import kotlinx.coroutines.SupervisorJob
+import kotlinx.coroutines.TimeoutCancellationException
+import kotlinx.coroutines.async
 import kotlinx.coroutines.cancel
+import kotlinx.coroutines.coroutineScope
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.runBlocking
+import kotlinx.coroutines.selects.select
 import kotlinx.coroutines.withTimeout
 import org.junit.After
 import org.junit.Assert.assertEquals
@@ -321,20 +327,41 @@ class CloudBackupTest {
     private fun ready(cloud: CloudBackup): CloudPhase.Ready {
         blocking { cloud.setEnabled(true).join() }
         val job = cloud.signIn(activity)
-        cloud.awaitPhase(CloudPhase.ShowKey::class.java)
+        cloud.awaitPhase(CloudPhase.ShowKey::class.java, job)
         cloud.confirmKey(true)
         blocking { job.join() }
         return cloud.status.value.phase as CloudPhase.Ready
     }
-    private val logged = java.util.Collections.synchronizedList(mutableListOf<String>())
+    // Copy-on-write: tests read it with any/none while the steps still log; a synchronized list
+    // threw ConcurrentModificationException there once.
+    private val logged = java.util.concurrent.CopyOnWriteArrayList<String>()
     private var brokenKeys: Throwable? = null
 
     // Generous: under the load of the full build 10 s were too short once (Review-Lauf 5); a real hang still fails.
     private fun <T> blocking(block: suspend () -> T): T = runBlocking { withTimeout(30_000) { block() } }
 
-    private fun CloudBackup.await(predicate: (CloudStatus) -> Boolean): CloudStatus = blocking { status.first(predicate) }
+    // Thrown here, outside the coroutine: the stack then shows the waiting test line, and the message the status.
+    private fun CloudBackup.await(predicate: (CloudStatus) -> Boolean): CloudStatus = try {
+        blocking { status.first(predicate) }
+    } catch (e: TimeoutCancellationException) {
+        throw AssertionError("The awaited status did not come; now: ${status.value}", e)
+    }
 
     private fun CloudBackup.awaitPhase(phase: Class<out CloudPhase>): CloudStatus = await { phase.isInstance(it.phase) }
+
+    /**
+     * Waits for [phase] while [step] runs. If the step ends without reaching it (an error of the step), this
+     * fails at once with the status instead of waiting for the time limit.
+     */
+    private fun CloudBackup.awaitPhase(phase: Class<out CloudPhase>, step: Job): CloudStatus = blocking {
+        coroutineScope {
+            val reached = async { status.first { phase.isInstance(it.phase) } }
+            select<CloudStatus?> {
+                reached.onAwait { it }
+                step.onJoin { null }
+            }.also { reached.cancel() }
+        } ?: throw AssertionError("The step ended without ${phase.simpleName}: ${status.value}")
+    }
 
     /** An existing account: keys and their backup under [key]. */
     private fun existingAccount(key: Wiederherstellungsschluessel = Wiederherstellungsschluessel.erzeugen()): Schluesselbund {
@@ -344,8 +371,14 @@ class CloudBackupTest {
     }
     private var existingKey: Wiederherstellungsschluessel? = null
 
+    // The app starts anew for every test and reads the same DataStore in the background. On Windows an
+    // open reader makes DataStore's rename on writing fail ("Unable to rename …"); the step then ends as
+    // a network error and ShowKey never comes. So wait for the start first, like the other tests do.
     @Before
-    fun clean() = blocking { store.clear() }
+    fun clean() = blocking {
+        (ApplicationProvider.getApplicationContext<Context>() as AvlApp).started.join()
+        store.clear()
+    }
 
     @After
     fun stop() = scope.cancel()
