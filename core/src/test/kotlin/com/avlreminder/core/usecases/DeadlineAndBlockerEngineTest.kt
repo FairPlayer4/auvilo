@@ -268,6 +268,22 @@ class DeadlineAndBlockerEngineTest {
         assertNull(engine.answerAsk(9999, "x"))
     }
 
+    /** The answer and its task are one command (Review-Lauf 5, E19): both or neither. */
+    @Test
+    fun `answering with a task plans it in the same command`() = runTest {
+        val id = create(reminder(character = Character.OVERCOME), allAnswers())
+        clock.now = at(26, 18)
+        val o = open(id)
+        val at = engine.suggestTaskTime(id)
+        val blocker = engine.answerAsk(o.id, "Zu müde", planTask = true)!!
+        val task = repo.reminders().single { it.prepFor == id }
+        assertEquals("Zu müde", task.title)
+        assertEquals(Schedule.Once(at), task.schedule)
+        assertEquals(BlockerOrigin.ASKED, repo.blocker(blocker)!!.origin)
+        assertNull(engine.answerAsk(o.id, " ", planTask = true))
+        assertEquals(1, repo.reminders().count { it.prepFor == id })
+    }
+
     @Test
     fun `documenting reminders and tasks are never asked`() = runTest {
         val id = create(reminder())

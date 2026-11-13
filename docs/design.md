@@ -82,6 +82,12 @@
   WLAN-Scans. Frei sind nur Log-Stempel und Dateinamen; `ClockRuleTest` hält die Liste.
   Keine DI-Bibliothek: ein kleiner Container (`AppGraph`). Engine-Aufrufe laufen
   nacheinander (`withEngine`).
+- **Ein Rezept für den Neuaufbau:** `AppGraph.rebuild(reason)` macht `sync`, Pause-Hinweis
+  und Übersichtszeiten, bei Neustart/Update/Zeitänderung auch die Prüfung der Orte. Jeder
+  Auslöser (Start, `SystemReceiver`, Geofences verloren, Einstellungen, App im
+  Vordergrund) ruft nur dieses Rezept. Regeln, was beim Speichern bleibt (*Hier
+  festlegen*), und Befehle, die zusammengehören (Blocker samt Aufgabe), liegen in der
+  Engine; die Cloud-Verdrahtung baut `cloud/CloudWiring` (E19).
 
 **Tech:** AGP 9.4.1, Kotlin 2.4.21, Gradle 9.8.1, Compose BOM 2026.09, Room 2.8 + KSP,
 DataStore, Glance, CameraX, Play-Services-Location, Kover. minSdk = targetSdk = 37.
@@ -413,7 +419,9 @@ PLANNED/DUE/ESCALATING ─Ich starte jetzt─► RUNNING ─Fertig────�
 - **Oberfläche:** Formular *Bei Ankunft* mit Ortswahl (ab zwei Orten), *Ankunft zählt ab*
   30/60/90/120 min/*andere…* und *entfällt*/*trotzdem klingeln*; Puffer und Prüfabstand
   unter *Feineinstellungen*. Einstellungen *Orte*: *Hier festlegen* übernimmt Standort und
-  das verbundene WLAN mit allen Zugangspunkten derselben SSID aus der letzten Suche.
+  das verbundene WLAN mit allen Zugangspunkten derselben SSID aus der letzten Suche; was
+  gerade fehlt, bleibt wie es war, ein neuer Ort braucht den Standort
+  (`ReminderEngine.setPlaceHere`).
   *Heute*: „ab 18:00 bei Ankunft zuhause, sonst 19:30“ bzw. „angekommen – klingelt 18:35“.
 - **Privat:** WLAN-Namen und BSSIDs bleiben auf dem Handy. Das Diagnose-Log nennt je
   Prüfung Ort-Id, Quelle, Ergebnis und Alter der Suche, keine Koordinaten und keine WLANs;

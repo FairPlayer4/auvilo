@@ -16,33 +16,14 @@ import com.avlreminder.alarm.Notifications
 import com.avlreminder.alarm.OverviewNotifications
 import com.avlreminder.alarm.PreNotices
 import com.avlreminder.alarm.Ringer
-import com.avlreminder.core.model.Place
 import com.avlreminder.claude.ClaudeApi
 import com.avlreminder.cloud.AndroidCloudNotices
-import com.avlreminder.cloud.AppBackupSource
-import com.avlreminder.cloud.BackupStateFile
-import com.avlreminder.cloud.CloudBackup
-import com.avlreminder.cloud.CloudLog
-import com.avlreminder.cloud.CloudConfig
-import com.avlreminder.cloud.CloudStore
-import com.avlreminder.cloud.ConnectCloudServer
-import com.avlreminder.cloud.CredentialManagerSafe
-import com.avlreminder.cloud.CredentialManagerSignIn
-import com.avlreminder.cloud.KeyFile
-import com.avlreminder.cloud.KeystoreDeviceKey
-import com.avlreminder.cloud.KeystoreSealer
-import com.avlreminder.cloud.WorkManagerSchedule
-import com.avlreminder.cloud.deleteBackendKeystoreEntries
-import com.avlreminder.restore.DatabaseRestore
+import com.avlreminder.cloud.CloudWiring
 import com.avlreminder.restore.DatabaseSwap
-import com.avlreminder.restore.LocalRestore
 import com.avlreminder.restore.RestoreFiles
 import com.avlreminder.restore.RestoreFinish
 import com.avlreminder.restore.SnapshotWorker
-import com.avlreminder.restore.Snapshots
 import com.avlreminder.restore.SwapOutcome
-import com.avlreminder.verbindung.Verbindung
-import java.io.File
 import com.avlreminder.core.model.Occurrence
 import com.avlreminder.core.model.Reminder
 import com.avlreminder.core.ports.DeviceStatePort
@@ -101,8 +82,7 @@ class AvlApp : Application() {
         started = graph.scope.launch {
             // A restore swapped data in at this start: take its settings before anything plans alarms.
             graph.finishRestore()
-            graph.syncAndRing()
-            graph.scheduleOverview()
+            graph.rebuild("start")
             graph.cloud.load().join()
             graph.local.load().join()
             // R-1: the daily copy; the worker takes it on days the app does not start.
@@ -159,35 +139,13 @@ class AppGraph(private val context: Context) : ClaudeApi.Access {
     val location = AndroidLocation(context)
     val wifi = AndroidWifi(context, clock)
 
+    private val cloudWiring = CloudWiring(context, db, settings, scope, restoreFiles, ::diagnosisHeader)
+
     /** Cloud backup (design.md 16); nothing touches the network until it is switched on. */
-    private val cloudStore = CloudStore(context)
-    private val cloudLog = CloudLog(File(context.filesDir, "cloud-diag"), header = ::diagnosisHeader)
-    private val restoreTarget = DatabaseRestore(context, db, settings, restoreFiles)
-    private val snapshots = Snapshots(File(context.filesDir, "backup"), Snapshots.vacuumInto(db))
-    private val connection by lazy { Verbindung(CloudConfig.SERVER_URL) }
-    val cloud = CloudBackup(
-        cloudStore,
-        server = { ConnectCloudServer(connection, KeystoreDeviceKey(), cloudStore) },
-        keys = { account -> KeyFile(File(context.filesDir, "backend"), KeystoreSealer(), account) },
-        google = CredentialManagerSignIn(),
-        passwords = CredentialManagerSafe(),
-        wipe = {
-            File(context.filesDir, "backend").deleteRecursively()
-            deleteBackendKeystoreEntries()
-        },
-        scope = scope,
-        backupState = { account -> BackupStateFile(File(context.filesDir, "backend"), account) },
-        source = AppBackupSource(db, settings, context.cacheDir),
-        events = cloudLog,
-        schedule = WorkManagerSchedule(context, Diag::log),
-        notices = AndroidCloudNotices(context),
-        restore = restoreTarget,
-        reminders = { db.dao().reminderCount() },
-        log = Diag::log,
-    )
+    val cloud get() = cloudWiring.cloud
 
     /** Restoring from a daily copy and undoing a restore (R-1, W-6); no network. */
-    val local = LocalRestore(restoreTarget, restoreFiles, snapshots, settings::backup, scope, cloudLog, Diag::log)
+    val local get() = cloudWiring.local
 
     /**
      * Ends a restore swapped in at this start (W-5, step 5): takes its settings (without the pause
@@ -294,11 +252,18 @@ class AppGraph(private val context: Context) : ClaudeApi.Access {
         Diag.log("claude access ${if (on) "on" else "off"}")
     }
 
-    /** Rebuilds all alarms; the engine rings what was missed. */
-    suspend fun syncAndRing() {
-        val rings = withEngine { it.sync() }
-        if (rings.isNotEmpty()) Diag.log("sync: ${rings.size} missed alarm(s) ring now")
+    /**
+     * Builds everything derived from the data again (design.md 1, E19): alarms, geofences, checks
+     * of the places and pre-notices (`sync`, the engine rings what was missed), the notification of
+     * the pause and the times of the overview; widget and session follow the command. One recipe
+     * for every trigger: start, reboot/update/time change, geofences lost, settings, app in front.
+     * [checkPlaces]: also look whether one is already at a place it waits for (after a reboot).
+     */
+    suspend fun rebuild(reason: String, checkPlaces: Boolean = false) {
+        val rings = withEngine { it.sync() + if (checkPlaces) it.checkPlaces() else emptyList() }
+        if (rings.isNotEmpty()) Diag.log("rebuild ($reason): ${rings.size} alarm(s) ring now")
         AlarmPause.update(context, settings.alert.first().alarmsPausedUntil)
+        OverviewNotifications.schedule(context, settings.overview.first())
     }
 
     /**
@@ -316,16 +281,8 @@ class AppGraph(private val context: Context) : ClaudeApi.Access {
             withEngine { it.resume() }
             AlarmPause.update(context, null)
         } else {
-            syncAndRing()
+            rebuild(if (until == null) "alarms on" else "alarms paused")
         }
-    }
-
-    /** Sets the morning and evening overview from the settings. */
-    suspend fun scheduleOverview() = OverviewNotifications.schedule(context, settings.overview.first())
-
-    /** Rings reminders that wait for an arrival when already there (geofences report only entering). */
-    suspend fun checkPlacesAndRing() {
-        withEngine { it.checkPlaces() }
     }
 
     /**
@@ -336,21 +293,9 @@ class AppGraph(private val context: Context) : ClaudeApi.Access {
     suspend fun setPlaceHere(placeId: Long?, name: String): PlaceSetResult {
         val here = location.current()
         val network = wifi.currentNetwork()
-        val saved = withEngine { e ->
-            val old = e.places().firstOrNull { it.id == placeId }
-            val lat = here?.latitude ?: old?.lat
-            val lon = here?.longitude ?: old?.lon
-            if (lat == null || lon == null || (here == null && network == null)) return@withEngine false
-            e.savePlace(
-                Place(
-                    id = old?.id ?: 0, name = name.trim().ifEmpty { old?.name ?: "Ort" }, lat = lat, lon = lon,
-                    radiusMeters = old?.radiusMeters ?: 150, wifis = network ?: old?.wifis.orEmpty(),
-                ),
-            )
-            true
-        }
-        if (!saved) return PlaceSetResult.NoPosition
-        checkPlacesAndRing()
+        // What stays as it was decides the engine (E19); then what waits there rings if already there.
+        withEngine { it.setPlaceHere(placeId, name, here?.latitude, here?.longitude, network) } ?: return PlaceSetResult.NoPosition
+        withEngine { it.checkPlaces() }
         return PlaceSetResult.Saved(position = here != null, ssid = network?.firstNotNullOfOrNull { it.ssid }, wifi = network != null)
     }
 }

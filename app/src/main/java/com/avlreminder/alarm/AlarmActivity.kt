@@ -168,11 +168,8 @@ class AlarmActivity : ComponentActivity() {
     /** Saves the answer as a blocker; [plan] makes it a task for the suggested time. Stays on the alarm. */
     private fun answerAsk(id: Long, text: String?, plan: Boolean) {
         lifecycleScope.launch {
-            graph.withEngine { engine ->
-                val blockerId = engine.answerAsk(id, text)
-                val reminderId = graph.repository.occurrence(id)?.reminderId
-                if (plan && blockerId != null && reminderId != null) engine.planTask(blockerId, engine.suggestTaskTime(reminderId))
-            }
+            // Blocker and task in one command (E19).
+            graph.withEngine { it.answerAsk(id, text, planTask = plan) }
             Diag.log("alarm screen occ=$id asked → ${if (text.isNullOrBlank()) "skipped" else if (plan) "blocker + task" else "blocker"}")
             version++
         }

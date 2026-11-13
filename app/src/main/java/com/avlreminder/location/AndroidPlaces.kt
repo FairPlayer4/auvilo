@@ -193,7 +193,7 @@ class GeofenceReceiver : BroadcastReceiver() {
          */
         suspend fun lost(graph: AppGraph) {
             AndroidGeofences.forget()
-            graph.syncAndRing()
+            graph.rebuild("geofences lost")
         }
 
         /**

@@ -192,7 +192,7 @@ class AppViewModel(app: Application) : AndroidViewModel(app) {
     fun setAlert(settings: AlertSettings) {
         viewModelScope.launch {
             graph.settings.setAlert(settings)
-            graph.syncAndRing()
+            graph.rebuild("alert settings")
         }
     }
 
@@ -215,7 +215,7 @@ class AppViewModel(app: Application) : AndroidViewModel(app) {
     fun setDwellMinutes(minutes: Int) {
         viewModelScope.launch {
             graph.settings.setDwellMinutes(minutes)
-            graph.syncAndRing()
+            graph.rebuild("dwell time")
         }
     }
 
@@ -280,7 +280,7 @@ class AppViewModel(app: Application) : AndroidViewModel(app) {
     fun setOverview(times: OverviewTimes) {
         viewModelScope.launch {
             graph.settings.setOverview(times)
-            graph.scheduleOverview()
+            graph.rebuild("overview times")
         }
     }
 
@@ -307,6 +307,6 @@ class AppViewModel(app: Application) : AndroidViewModel(app) {
 
     /** Also catches up on alarms that never fired while the app was not running. */
     fun sync() {
-        viewModelScope.launch { graph.syncAndRing() }
+        viewModelScope.launch { graph.rebuild("app in front") }
     }
 }

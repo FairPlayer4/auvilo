@@ -9,6 +9,7 @@ import com.avlreminder.core.model.ItemDone
 import com.avlreminder.core.model.Occurrence
 import com.avlreminder.core.model.OccurrenceState
 import com.avlreminder.core.model.Place
+import com.avlreminder.core.model.PlaceWifi
 import com.avlreminder.core.model.PrepAnswer
 import com.avlreminder.core.model.Proof
 import com.avlreminder.core.model.ProofType
@@ -202,6 +203,25 @@ internal class Changes(private val c: EngineContext, private val views: AlarmVie
         val id = repo.savePlace(place)
         scheduler.watchPlaces()
         return id
+    }
+
+    /**
+     * "Hier festlegen" (Anf. 7.29 OZ3, OZ6, Review-Lauf 5 E19): [placeId] (null or unknown = a new
+     * place) takes the position and the WLAN found here; what was not found stays as it was. A new
+     * place needs a position; with neither nothing changes. Returns the place's id, null if not saved.
+     */
+    suspend fun setPlaceHere(placeId: Long?, name: String, lat: Double?, lon: Double?, wifis: List<PlaceWifi>?): Long? {
+        val position = if (lat != null && lon != null) lat to lon else null
+        if (position == null && wifis == null) return null
+        val old = placeId?.let { id -> repo.places().firstOrNull { it.id == id } }
+        val base = old ?: position?.let { Place(name = "Ort", lat = it.first, lon = it.second) } ?: return null
+        return savePlace(
+            base.copy(
+                name = name.trim().ifEmpty { base.name },
+                lat = position?.first ?: base.lat, lon = position?.second ?: base.lon,
+                wifis = wifis ?: base.wifis,
+            ),
+        )
     }
 
     // --- Occurrences -----------------------------------------------------------------------

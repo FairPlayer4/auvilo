@@ -5,6 +5,7 @@ import com.avlreminder.core.model.BlockerOrigin
 import com.avlreminder.core.model.ItemDone
 import com.avlreminder.core.model.Occurrence
 import com.avlreminder.core.model.Place
+import com.avlreminder.core.model.PlaceWifi
 import com.avlreminder.core.model.PrepAnswer
 import com.avlreminder.core.model.Reminder
 import com.avlreminder.core.ports.AlarmPort
@@ -128,6 +129,14 @@ class ReminderEngine(
     suspend fun savePlace(place: Place): Long = command { changes.savePlace(place) }
 
     /**
+     * "Hier festlegen" with what the phone found here: a position ([lat], [lon]) and/or the
+     * connected WLAN ([wifis]); what was not found stays as it was (Changes.setPlaceHere).
+     * Null if nothing was saved (a new place without a position).
+     */
+    suspend fun setPlaceHere(placeId: Long?, name: String, lat: Double?, lon: Double?, wifis: List<PlaceWifi>?): Long? =
+        command { changes.setPlaceHere(placeId, name, lat, lon, wifis) }
+
+    /**
      * Arrived at [placeId] (geofence after the dwell time): an occurrence in its window rings after
      * the buffer, one waiting for the arrival too (7.29); before the window it does not count.
      * Without a window today's occurrences ring now. Snoozed or postponed ones keep their time.
@@ -239,8 +248,16 @@ class ReminderEngine(
     /** "Als Aufgabe planen": a relaxed one-off at [at]; doing it solves the blocker. */
     suspend fun planTask(blockerId: Long, at: LocalDateTime): SaveResult = command { changes.planTask(blockerId, at) }
 
-    /** The answer to "Was hält dich gerade ab?" (S8); null or blank = skipped. Returns the blocker's id. */
-    suspend fun answerAsk(occurrenceId: Long, text: String?): Long? = command { changes.answerAsk(occurrenceId, text) }
+    /**
+     * The answer to "Was hält dich gerade ab?" (S8); null or blank = skipped. Returns the blocker's
+     * id. [planTask]: "Als Aufgabe planen" at [suggestTaskTime], in the same command (E19).
+     */
+    suspend fun answerAsk(occurrenceId: Long, text: String?, planTask: Boolean = false): Long? = command {
+        changes.answerAsk(occurrenceId, text)?.also { blockerId ->
+            val reminderId = repo.occurrence(occurrenceId)?.reminderId
+            if (planTask && reminderId != null) changes.planTask(blockerId, changes.suggestTaskTime(reminderId))
+        }
+    }
 
     /** What the silent notice before the occurrence shows; null if it is no longer planned. */
     suspend fun preNotice(occurrenceId: Long): Digest? = changes.preNotice(occurrenceId)
