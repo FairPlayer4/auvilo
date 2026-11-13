@@ -58,6 +58,9 @@ class MainActivity : ComponentActivity() {
             Intent(context, MainActivity::class.java).putExtra(EXTRA_NEW, true)
                 .addFlags(Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_CLEAR_TOP)
 
+        private const val STATE_LAUNCH = "launch"
+        private const val STATE_ROUTE = "startRoute"
+
         /** Opens the settings (tap on a notification of the cloud backup). */
         fun openSettings(context: Context): Intent =
             Intent(context, MainActivity::class.java).putExtra(EXTRA_SETTINGS, true)
@@ -85,7 +88,14 @@ class MainActivity : ComponentActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         enableEdgeToEdge()
-        handle(intent)
+        // Rebuilt (design, font size, process death): the same screen with its draft, not the
+        // intent again – it was handled already, its extras are gone (Review-Lauf 6).
+        if (savedInstanceState == null) {
+            handle(intent)
+        } else {
+            launch = savedInstanceState.getInt(STATE_LAUNCH)
+            startRoute = savedInstanceState.getString(STATE_ROUTE) ?: Routes.TODAY
+        }
         setContent {
             val theme by vm.theme.collectAsStateWithLifecycle()
             val today by vm.today.collectAsStateWithLifecycle()
@@ -140,6 +150,12 @@ class MainActivity : ComponentActivity() {
                 }
             }
         }
+    }
+
+    override fun onSaveInstanceState(outState: Bundle) {
+        super.onSaveInstanceState(outState)
+        outState.putInt(STATE_LAUNCH, launch)
+        outState.putString(STATE_ROUTE, startRoute)
     }
 
     override fun onNewIntent(intent: Intent) {
