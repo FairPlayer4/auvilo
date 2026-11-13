@@ -29,6 +29,7 @@ import com.avlreminder.ui.Format
 import com.avlreminder.ui.theme.Avl
 import kotlinx.coroutines.delay
 import java.time.Duration
+import com.avlreminder.SystemZoneClock
 import java.time.Instant
 import java.time.ZoneId
 
@@ -114,9 +115,10 @@ fun SessionMain(
 /** The current time, every second, for the timer. */
 @Composable
 private fun ticking(): Instant {
-    val now by produceState(Instant.now()) {
+    // The engine's clock, as everywhere the app decides by time (design.md 1).
+    val now by produceState(SystemZoneClock.instant()) {
         while (true) {
-            value = Instant.now()
+            value = SystemZoneClock.instant()
             delay(1_000)
         }
     }

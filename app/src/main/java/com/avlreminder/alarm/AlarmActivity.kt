@@ -30,7 +30,6 @@ import com.avlreminder.ui.theme.AvlTheme
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
 import java.time.Duration
-import java.time.Instant
 import java.time.ZoneId
 
 /** Full-screen alarm, also over the lock screen. Always dark. */
@@ -125,10 +124,10 @@ class AlarmActivity : ComponentActivity() {
                 }
             }
         }
-        val now by produceState(Instant.now()) {
+        val now by produceState(graph.now()) {
             while (true) {
                 delay(15_000)
-                value = Instant.now()
+                value = graph.now()
             }
         }
         // Another alarm (switchTo): nothing of the old one's screen stays – view, photo, text (Review-Lauf 5).

@@ -22,6 +22,10 @@ import com.avlreminder.core.model.Schedule
 import com.avlreminder.core.model.WeeklyGoal
 import com.avlreminder.core.model.WhenAway
 import com.avlreminder.core.ports.ReminderRepository
+import kotlinx.coroutines.flow.Flow
+import kotlinx.coroutines.flow.combine
+import kotlinx.coroutines.flow.first
+import kotlinx.coroutines.flow.map
 import java.io.File
 import java.time.DayOfWeek
 import java.time.Instant
@@ -38,6 +42,35 @@ class RoomReminderRepository(private val db: AvlDatabase) : ReminderRepository {
     }
 
     override suspend fun reminder(id: Long) = dao.reminder(id)?.toModel(dao.items(id))
+
+    // --- Flows for the screens: the same queries and mapping as the reads of the engine, so
+    // "open" and the model mean the same everywhere (Review-Lauf 5, E21). ---------------------
+
+    fun observeReminders(): Flow<List<Reminder>> = combine(dao.observeReminders(), dao.observeItems()) { l, items ->
+        val byReminder = items.groupBy { it.reminderId }
+        l.map { it.toModel(byReminder[it.id].orEmpty()) }
+    }
+
+    /** The places with their WLANs; the first is "Zuhause" (Anf. 7.29 OZ6). */
+    fun observePlaces(): Flow<List<Place>> = combine(dao.observePlaces(), dao.observePlaceWifis()) { places, wifis ->
+        val byPlace = wifis.groupBy { it.placeId }
+        places.map { it.toModel(byPlace[it.id].orEmpty()) }
+    }
+
+    fun observeOpenOccurrences(): Flow<List<Occurrence>> = dao.observeOpenOccurrences().map { l -> l.map { it.toModel() } }
+
+    /** Done and closed, newest first. */
+    fun observeResolved(): Flow<List<Occurrence>> = dao.observeResolved().map { l -> l.map { it.toModel() } }
+
+    suspend fun resolvedOccurrences(): List<Occurrence> = observeResolved().first()
+
+    fun observeItemsDone(): Flow<List<ItemDone>> = dao.observeItemsDone().map { l -> l.map { it.toModel() } }
+
+    fun observeProofs(): Flow<List<Proof>> = dao.observeProofs().map { l -> l.map { it.toModel() } }
+
+    fun observePrepAnswers(): Flow<List<PrepAnswer>> = dao.observePrepAnswers().map { l -> l.map { it.toModel() } }
+
+    fun observeBlockers(): Flow<List<Blocker>> = dao.observeBlockers().map { l -> l.map { it.toModel() } }
 
     /** An unknown id changes nothing, as in the fake (Review-Lauf 4, E14). */
     override suspend fun saveReminder(reminder: Reminder): Long {

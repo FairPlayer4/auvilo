@@ -33,7 +33,7 @@ import java.time.Instant
  * last scan. Never starts a scan. BSSIDs need the location permission; without it Android only
  * tells a placeholder, which counts as unknown.
  */
-class AndroidWifi(private val context: Context) : WifiPort {
+class AndroidWifi(private val context: Context, private val clock: java.time.Clock) : WifiPort {
     private val cm get() = context.getSystemService(ConnectivityManager::class.java)
     private val wifi get() = context.getSystemService(WifiManager::class.java)
 
@@ -45,7 +45,7 @@ class AndroidWifi(private val context: Context) : WifiPort {
         // ScanResult.timestamp: microseconds since boot, when the access point was last seen.
         val newest = results.maxOf { it.timestamp }
         val ageMicros = (SystemClock.elapsedRealtimeNanos() / 1000 - newest).coerceAtLeast(0)
-        return WifiScan(results.map { it.BSSID.lowercase() }.toSet(), Instant.now().minusMillis(ageMicros / 1000))
+        return WifiScan(results.map { it.BSSID.lowercase() }.toSet(), clock.instant().minusMillis(ageMicros / 1000))
     }
 
     /**

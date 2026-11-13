@@ -19,6 +19,17 @@ import java.time.temporal.TemporalAdjusters
 data class Preset(val proof: ProofSpec, val postponeLimit: Int?, val minimumLimitPerWeek: Int?)
 
 object Presets {
+    /** What a new reminder starts with: "festhalten", normal (form, interface for Claude, widget). */
+    val DEFAULT_CHARACTER = Character.DOCUMENT
+    val DEFAULT_STRICTNESS = Strictness.NORMAL
+
+    /**
+     * A new reminder with the start values everyone uses (Review-Lauf 5, E21): the form, the
+     * interface for Claude and the one-tap reminders of the widget.
+     */
+    fun newReminder(title: String, schedule: Schedule, createdAt: Instant, strictness: Strictness = DEFAULT_STRICTNESS): Reminder =
+        apply(Reminder(title = title, character = DEFAULT_CHARACTER, schedule = schedule, createdAt = createdAt), strictness)
+
     fun of(strictness: Strictness): Preset = when (strictness) {
         Strictness.RELAXED -> Preset(ProofSpec.CONFIRM, postponeLimit = null, minimumLimitPerWeek = null)
         Strictness.NORMAL -> Preset(ProofSpec.CONFIRM, postponeLimit = 3, minimumLimitPerWeek = null)
@@ -118,13 +129,10 @@ object Weeks {
 
 /** One-tap reminders from the widget. */
 object QuickReminders {
-    fun meeting(minutes: Long, now: Instant, zone: ZoneId): Reminder = Reminder(
+    /** Normal, but without even a confirmation. */
+    fun meeting(minutes: Long, now: Instant, zone: ZoneId): Reminder = Presets.newReminder(
         title = "Meeting",
-        strictness = Strictness.NORMAL,
         schedule = Schedule.Once(now.plusSeconds(minutes * 60).atZone(zone).toLocalDateTime().withNano(0)),
-        character = Character.DOCUMENT,
-        proof = ProofSpec.NONE,
-        postponeLimit = 3,
         createdAt = now,
-    )
+    ).copy(proof = ProofSpec.NONE)
 }

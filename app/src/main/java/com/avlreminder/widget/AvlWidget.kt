@@ -41,8 +41,6 @@ import com.avlreminder.ui.Format
 import com.avlreminder.ui.MainActivity
 import com.avlreminder.ui.theme.DarkColors
 import com.avlreminder.ui.theme.LightColors
-import java.time.Instant
-import java.time.ZoneId
 
 class AvlWidgetReceiver : GlanceAppWidgetReceiver() {
     override val glanceAppWidget: GlanceAppWidget = AvlWidget()
@@ -53,7 +51,7 @@ class AvlWidget : GlanceAppWidget() {
     override suspend fun provideGlance(context: Context, id: GlanceId) {
         val graph = context.graph
         val zone = graph.zone
-        val now = Instant.now()
+        val now = graph.now()
         val next = Overview.next(graph.today(now))
         val label = next?.let { Format.moment(it.occurrence.currentAt, zone, now.atZone(zone).toLocalDate()) }
         provideContent { Content(next, label) }
@@ -108,6 +106,7 @@ class MeetingAction : ActionCallback {
 
     override suspend fun onAction(context: Context, glanceId: GlanceId, parameters: ActionParameters) {
         val minutes = parameters[MINUTES] ?: return
-        context.graph.withEngine { it.save(QuickReminders.meeting(minutes, Instant.now(), ZoneId.systemDefault())) }
+        val graph = context.graph
+        graph.withEngine { it.save(QuickReminders.meeting(minutes, graph.now(), graph.zone)) }
     }
 }

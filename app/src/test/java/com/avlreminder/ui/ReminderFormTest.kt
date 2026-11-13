@@ -39,6 +39,14 @@ class ReminderFormTest {
         assertEquals(Strictness.NORMAL, form.strictness)
     }
 
+    /** The same start values as the interface for Claude and the widget (Review-Lauf 5, E21). */
+    @Test
+    fun aNewFormGivesTheReminderEveryoneStartsWith() {
+        val form = ReminderForm.new(now, zone).copy(title = "Lesen")
+        val r = form.toReminder(now)!!
+        assertEquals(com.avlreminder.core.rules.Presets.newReminder("Lesen", r.schedule, r.createdAt), r)
+    }
+
     @Test
     fun strictnessAppliesThePreset() {
         val strict = ReminderForm.new(now, zone).withStrictness(Strictness.STRICT)

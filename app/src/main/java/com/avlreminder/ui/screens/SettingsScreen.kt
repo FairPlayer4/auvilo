@@ -52,6 +52,7 @@ import com.avlreminder.ui.SectionTitle
 import com.avlreminder.ui.TimeDialog
 import com.avlreminder.ui.theme.Avl
 import java.time.Duration
+import com.avlreminder.SystemZoneClock
 import java.time.Instant
 import java.time.LocalTime
 import java.time.ZoneId
@@ -90,7 +91,7 @@ fun SettingsScreen(
     onRenameTemplate: (Long, String) -> Unit = { _, _ -> },
     onDeleteTemplate: (Long) -> Unit = {},
     onPause: (Instant?) -> Unit = {},
-    now: Instant = Instant.now(),
+    now: Instant = SystemZoneClock.instant(),
     zone: ZoneId = ZoneId.systemDefault(),
     claudeAccess: Boolean? = null,
     onClaudeAccess: (Boolean) -> Unit = {},
@@ -348,7 +349,7 @@ private fun PauseSetting(alert: AlertSettings, onPause: (Instant?) -> Unit, now:
                     Triple("bis morgen früh", "pauseMorning", { n: Instant -> AlarmPause.untilMorning(n, zone) }),
                     Triple("bis ich einschalte", "pauseForGood", { _: Instant -> AlertSettings.PAUSED_FOR_GOOD }),
                 ).forEach { (label, tag, end) ->
-                    OutlinedButton(onClick = { asking = label to end(Instant.now()) }, Modifier.testTag(tag)) { Text(label) }
+                    OutlinedButton(onClick = { asking = label to end(SystemZoneClock.instant()) }, Modifier.testTag(tag)) { Text(label) }
                 }
             }
             Text(

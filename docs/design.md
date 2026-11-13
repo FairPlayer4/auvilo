@@ -49,17 +49,31 @@
 - **Die Alarm-Ansicht kommt aus `core`** (`AlarmView`): Alarm-Bildschirm, Benachrichtigung
   und der Knopf „✓ Punkt“ zeigen dieselben erlaubten Aktionen; `Ring` trägt sie mit der
   Lautstärke.
-- **Die Datenbank ist die einzige Wahrheit.** Alarme, Geofences, Übersicht und
-  Vorab-Reminder sind abgeleitet und werden jederzeit aus der DB neu aufgebaut
-  (`sync` bei Änderung, Alarm, App-Start, Neustart, Update, Zeitänderung).
+- **Wahrheit sind Room und DataStore** (Daten und Einstellungen; beides sichert das
+  Cloud-Backup). Alarme, Geofences, Übersicht, Vorab-Reminder, Widget und die
+  Benachrichtigungen von Sitzung und Pause sind abgeleitet und werden jederzeit daraus neu
+  aufgebaut (`sync` bei Änderung, Alarm, App-Start, Neustart, Update, Zeitänderung).
+- **Gerätezustand (nicht im Backup)** ist eine dritte Kategorie: Merker, die nur für dieses
+  Gerät gelten, z. B. `CloudStore` (Sitzung, Sicherungsstand), die Entprellung der
+  WLAN-Meldungen, Schlüsseldateien und Keystore. Ein Wiederherstellen bringt sie nicht mit;
+  wer sie liest, kommt ohne sie zurecht.
+- **Lesen geht über das Repository.** Auch die Flows der Bildschirme kommen aus
+  `RoomReminderRepository.observe…`, mit derselben Abfrage und Umwandlung wie die Engine;
+  „offen“ ist damit überall gleich. Direkt an die DAO gehen nur Vorlagen und Vorschläge,
+  die keine Regeln haben. Neue Reminder starten überall mit `Presets.newReminder`
+  (Formular, Schnittstelle für Claude, Widget).
 - **Keine langsame I/O im Befehl.** Alarm- und Vorab-Änderungen sammelt `EngineContext`
   während des Befehls und führt sie erst nach dem Speichern aus; bei einem Rollback fallen
   sie weg. Braucht ein Befehl den Ort, wirft `EngineContext` beim ersten Mal
   `PositionNeeded`: Die Engine rollt zurück, fragt `LocationPort.check` außerhalb der
   Transaktion und startet den Befehl neu, jetzt mit dem Ergebnis. Höchstens eine Prüfung
   pro Ort und Befehl. Am Ende jedes Befehls plant `planChecks()` die Prüf-Alarme der Orte (6.).
-- Zeit kommt in `:core` immer über `Clock` (in `:app` teils direkt). Keine DI-Bibliothek:
-  ein kleiner Container (`AppGraph`). Engine-Aufrufe laufen nacheinander (`withEngine`).
+- **Zeit kommt über die Uhr der Engine**, in `:core` als `Clock`, in `:app` als
+  `AppGraph.clock` (`SystemZoneClock`). Das gilt für alles, wonach die App entscheidet:
+  *Heute*-Ticks, Widget, Alarm-Bildschirm, Timer der Sitzung, Notaus-Ende, Alter des
+  WLAN-Scans. Frei sind nur Log-Stempel und Dateinamen; `ClockRuleTest` hält die Liste.
+  Keine DI-Bibliothek: ein kleiner Container (`AppGraph`). Engine-Aufrufe laufen
+  nacheinander (`withEngine`).
 
 **Tech:** AGP 9.4.1, Kotlin 2.4.21, Gradle 9.8.1, Compose BOM 2026.09, Room 2.8 + KSP,
 DataStore, Glance, CameraX, Play-Services-Location, Kover. minSdk = targetSdk = 37.

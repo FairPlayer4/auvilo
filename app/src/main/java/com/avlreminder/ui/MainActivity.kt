@@ -108,12 +108,12 @@ class MainActivity : ComponentActivity() {
             val claudeAccess by vm.claudeAccess.collectAsStateWithLifecycle()
             val cloud by vm.cloud.collectAsStateWithLifecycle()
             val local by vm.local.collectAsStateWithLifecycle()
-            var now by androidx.compose.runtime.remember { mutableStateOf(Instant.now()) }
+            var now by androidx.compose.runtime.remember { mutableStateOf(graph.now()) }
             var dnd by androidx.compose.runtime.remember { mutableStateOf(device.isDoNotDisturb()) }
             LaunchedEffect(Unit) {
                 while (true) {
                     delay(30_000)
-                    now = Instant.now()
+                    now = graph.now()
                     dnd = device.isDoNotDisturb()
                 }
             }

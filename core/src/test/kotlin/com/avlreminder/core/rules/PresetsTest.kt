@@ -71,7 +71,18 @@ class PresetsTest {
         assertEquals(Schedule.Once(LocalDateTime.of(2026, 10, 26, 14, 35)), m.schedule)
         assertEquals(ProofSpec.NONE, m.proof)
         assertEquals(Character.DOCUMENT, m.character)
+        assertEquals(3, m.postponeLimit)
         assertTrue(Validation.problems(m).isEmpty())
+    }
+
+    @Test
+    fun `a new reminder starts with the preset of its strictness`() {
+        val r = Presets.newReminder("Lesen", Schedule.Daily(java.time.LocalTime.NOON), at(26, 14))
+        assertEquals(Character.DOCUMENT, r.character)
+        assertEquals(Presets.apply(r, Strictness.NORMAL), r)
+        val strict = Presets.newReminder("Lesen", Schedule.Daily(java.time.LocalTime.NOON), at(26, 14), Strictness.STRICT)
+        assertEquals(ProofSpec.PHOTO, strict.proof)
+        assertEquals(1, strict.minimumLimitPerWeek)
     }
 
     @Test

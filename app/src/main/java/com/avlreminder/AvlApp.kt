@@ -45,7 +45,6 @@ import com.avlreminder.verbindung.Verbindung
 import java.io.File
 import com.avlreminder.core.model.Occurrence
 import com.avlreminder.core.model.Reminder
-import com.avlreminder.data.toModel
 import com.avlreminder.core.ports.DeviceStatePort
 import com.avlreminder.core.rules.AlertSettings
 import com.avlreminder.core.rules.Lifecycle
@@ -151,8 +150,14 @@ class AppGraph(private val context: Context) : ClaudeApi.Access {
     val scope = CoroutineScope(SupervisorJob() + Dispatchers.Default)
     @Volatile private var alert = AlertSettings()
     @Volatile private var dwell = Settings.DEFAULT_DWELL
+    /**
+     * The engine's clock. Time the app decides by (*Heute*, widget, alarm screen, age of a WLAN
+     * scan) comes from here, not from the system clock; log stamps and file names are free
+     * (design.md 1, Review-Lauf 5; checked by `ClockRuleTest`).
+     */
+    val clock: Clock = SystemZoneClock
     val location = AndroidLocation(context)
-    val wifi = AndroidWifi(context)
+    val wifi = AndroidWifi(context, clock)
 
     /** Cloud backup (design.md 16); nothing touches the network until it is switched on. */
     private val cloudStore = CloudStore(context)
@@ -234,7 +239,7 @@ class AppGraph(private val context: Context) : ClaudeApi.Access {
     suspend fun addSuggestion(text: String, important: Boolean, screen: String, reminder: Reminder? = null) {
         db.suggestions().insert(
             SuggestionEntity(
-                text = text.trim(), important = important, createdAt = Instant.now(), screen = screen,
+                text = text.trim(), important = important, createdAt = now(), screen = screen,
                 reminderId = reminder?.id, reminderTitle = reminder?.title, appVersion = appVersion,
             ),
         )
@@ -284,9 +289,9 @@ class AppGraph(private val context: Context) : ClaudeApi.Access {
 
     override suspend fun enabled(): Boolean = debuggable && settings.claudeAccess.first()
     override suspend fun reminders(): List<Reminder> = repository.reminders()
-    override suspend fun openOccurrences(): List<Occurrence> = db.dao().openOccurrences().map { it.toModel() }
-    override suspend fun resolvedOccurrences(): List<Occurrence> = db.dao().observeResolved().first().map { it.toModel() }
-    override fun now(): Instant = SystemZoneClock.instant()
+    override suspend fun openOccurrences(): List<Occurrence> = repository.openOccurrences()
+    override suspend fun resolvedOccurrences(): List<Occurrence> = repository.resolvedOccurrences()
+    override fun now(): Instant = clock.instant()
     override val zone: ZoneId get() = ZoneId.systemDefault()
 
     /**
@@ -316,8 +321,8 @@ class AppGraph(private val context: Context) : ClaudeApi.Access {
      * [sync] plans the open occurrences for the end of the pause.
      */
     suspend fun setAlarmsPaused(until: Instant?) {
-        val wasPaused = settings.alert.first().alarmsPaused(SystemZoneClock.instant())
-        settings.setAlarmsPaused(until, SystemZoneClock.instant())
+        val wasPaused = settings.alert.first().alarmsPaused(now())
+        settings.setAlarmsPaused(until, now())
         Diag.log(if (until == null) "alarms on again" else "alarms paused until $until")
         // What rang stays in sight as a silent notification (Review-Lauf 1).
         if (until != null) AlarmService.ringing.value?.let { AlarmService.quiet(context, it) }

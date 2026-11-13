@@ -31,7 +31,6 @@ import com.avlreminder.data.SuggestionEntity
 import com.avlreminder.data.SuggestionStatus
 import com.avlreminder.data.TemplateEntity
 import com.avlreminder.data.ThemeMode
-import com.avlreminder.data.toModel
 import com.avlreminder.graph
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.Flow
@@ -50,13 +49,15 @@ import java.time.ZoneId
 /** Screen state straight from the database flows; all changes go through the engine. */
 class AppViewModel(app: Application) : AndroidViewModel(app) {
     private val graph = app.graph
+    /** Templates only; everything of the reminders is read through [repo] (Review-Lauf 5, E21). */
     private val dao = graph.db.dao()
+    private val repo = graph.repository
     private val zone: ZoneId get() = ZoneId.systemDefault()
 
     /** Moves entries from "later today" to "due now" and keeps "today" correct after midnight. */
     private val ticks = flow {
         while (true) {
-            emit(Instant.now())
+            emit(graph.now())
             delay(30_000)
         }
     }
@@ -67,19 +68,13 @@ class AppViewModel(app: Application) : AndroidViewModel(app) {
     /** null until loaded, like [places] and [prep]: the form waits for them (Review-Lauf 5). */
     val reminders: StateFlow<List<Reminder>?> = state(
         null,
-        combine(dao.observeReminders(), dao.observeItems()) { l, items ->
-            val byReminder = items.groupBy { it.reminderId }
-            l.map { it.toModel(byReminder[it.id].orEmpty()) }
-        },
+        repo.observeReminders(),
     )
 
     /** The places with their WLANs; the first is "Zuhause" (Anf. 7.29 OZ6). */
     val places: StateFlow<List<Place>?> = state(
         null,
-        combine(dao.observePlaces(), dao.observePlaceWifis()) { places, wifis ->
-            val byPlace = wifis.groupBy { it.placeId }
-            places.map { it.toModel(byPlace[it.id].orEmpty()) }
-        },
+        repo.observePlaces(),
     )
 
     val arrivalHintSeen: StateFlow<Boolean> = state(true, graph.settings.arrivalHintSeen)
@@ -87,8 +82,8 @@ class AppViewModel(app: Application) : AndroidViewModel(app) {
 
     val dwellMinutes: StateFlow<Int> = state(com.avlreminder.data.Settings.DEFAULT_DWELL, graph.settings.dwellMinutes)
 
-    private val open = dao.observeOpenOccurrences().map { l -> l.map { it.toModel() } }
-    private val resolved = dao.observeResolved().map { l -> l.map { it.toModel() } }
+    private val open = repo.observeOpenOccurrences()
+    private val resolved = repo.observeResolved()
 
     val today: StateFlow<Today?> = state(
         null,
@@ -101,8 +96,8 @@ class AppViewModel(app: Application) : AndroidViewModel(app) {
      */
     val itemsDone: StateFlow<Map<Long, List<ItemDone>>> = state(
         emptyMap(),
-        combine(dao.observeItemsDone(), reminders.filterNotNull(), open, resolved) { l, r, o, d ->
-            Checklists.doneByOccurrence(r, o, d, l.map { it.toModel() })
+        combine(repo.observeItemsDone(), reminders.filterNotNull(), open, resolved) { l, r, o, d ->
+            Checklists.doneByOccurrence(r, o, d, l)
         },
     )
 
@@ -117,13 +112,13 @@ class AppViewModel(app: Application) : AndroidViewModel(app) {
     /** Proofs per occurrence, for the history. */
     val proofs: StateFlow<Map<Long, List<Proof>>> = state(
         emptyMap(),
-        dao.observeProofs().map { l -> l.map { it.toModel() }.groupBy { it.occurrenceId } },
+        repo.observeProofs().map { l -> l.groupBy { it.occurrenceId } },
     )
 
     /** Current "Startklar" answers per reminder. */
     val prep: StateFlow<Map<Long, Map<Int, PrepAnswer>>?> = state(
         null,
-        dao.observePrepAnswers().map { l -> l.map { it.toModel() }.groupBy { it.reminderId }.mapValues { Prep.latest(it.value) } },
+        repo.observePrepAnswers().map { l -> l.groupBy { it.reminderId }.mapValues { Prep.latest(it.value) } },
     )
 
     val theme: StateFlow<ThemeMode> = state(ThemeMode.SYSTEM, graph.settings.theme)
@@ -137,7 +132,7 @@ class AppViewModel(app: Application) : AndroidViewModel(app) {
     /** Blockers per reminder, open and solved. */
     val blockers: StateFlow<Map<Long, List<Blocker>>> = state(
         emptyMap(),
-        dao.observeBlockers().map { l -> l.map { it.toModel() }.groupBy { it.reminderId } },
+        repo.observeBlockers().map { l -> l.groupBy { it.reminderId } },
     )
 
     /** Most recently used first; null until loaded. */
@@ -178,7 +173,7 @@ class AppViewModel(app: Application) : AndroidViewModel(app) {
     }
 
     fun templateUsed(id: Long) {
-        viewModelScope.launch { dao.templateUsed(id, Instant.now()) }
+        viewModelScope.launch { dao.templateUsed(id, graph.now()) }
     }
 
     fun renameTemplate(id: Long, name: String) {
@@ -256,7 +251,7 @@ class AppViewModel(app: Application) : AndroidViewModel(app) {
     /** Asked again whenever a reminder or a resolved occurrence changes (NT2). */
     val snoozeHints: StateFlow<List<SnoozeHint>> = state(
         emptyList(),
-        combine(dao.observeReminders(), resolved) { _, _ -> graph.withEngine { it.snoozeHints() } },
+        combine(repo.observeReminders(), resolved) { _, _ -> graph.withEngine { it.snoozeHints() } },
     )
 
     fun answerSnoozeHint(reminderId: Long, choice: SnoozeHintChoice) {
@@ -304,7 +299,7 @@ class AppViewModel(app: Application) : AndroidViewModel(app) {
     fun updateSuggestion(suggestion: SuggestionEntity) {
         val old = suggestions.value.firstOrNull { it.id == suggestion.id }
         val statusAt = if (old?.status == suggestion.status) suggestion.statusAt
-        else if (suggestion.status == SuggestionStatus.OPEN) null else Instant.now()
+        else if (suggestion.status == SuggestionStatus.OPEN) null else graph.now()
         viewModelScope.launch { graph.db.suggestions().update(suggestion.copy(text = suggestion.text.trim(), statusAt = statusAt)) }
     }
 
