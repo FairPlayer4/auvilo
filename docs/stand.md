@@ -63,6 +63,10 @@ einer Fassung.
    Backend `docs/b2b-entwurf.md`): A-15 neu (Papier als Standard, Hinweis vor dem
    Speichern), *Konto löschen*, Bestätigung mit der Displaysperre für *Cloud-Daten
    löschen*, *Konto löschen* und *Gerät sperren*; Format v2 kommt über `client/`.
+9. **Repo veröffentlichen** (in Wochen bis Monaten, 7.34): keine Secrets gefunden.
+   Vorher Server auf erlaubte Konten beschränken und URL konfigurierbar (OV1), echte
+   Testdaten nur lokal (OV2), Lizenz (OV3); offen sind Lizenz, Umfang beim Backend und
+   bereinigte Historie in einem neuen Repo (OV4, OV5).
 
 ## Beobachtungen aus der echten Nutzung
 - „Test-Reminder“ klingelte am 2026-10-31 in Runden um 11:30 und 12:00; prüfen, ob das zur

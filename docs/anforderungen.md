@@ -1112,6 +1112,56 @@ Beim ersten Gerätetest war das Aufschreiben des Wiederherstellungsschlüssels u
   und alles entschlüsseln (Backend `anforderungen.md` Kap. 11, 2026-11-12). Papier
   bleibt als zusätzliche Kopie empfohlen.
 
+### 7.34 Repo veröffentlichen (geplant, 2026-11-14)
+Kevin will das App-Repo `FairPlayer4/avlreminder` in den nächsten Wochen oder Monaten
+öffentlich machen. Prüfung vom 2026-11-14 (Arbeitsbaum, alle 226 Commits auf allen
+Branches, CI): **keine Secrets** (keine Schlüssel, Tokens, Keystores, Passwörter; gelöschte
+Dateien ohne echte BSSIDs oder Koordinaten). Das einzige CI-Secret `BACKEND_DEPLOY_KEY`
+bleibt auch im öffentlichen Repo verborgen und geht nicht an PRs aus Forks.
+
+Was vorher zu tun ist, in dieser Reihenfolge (Vorschlag, noch nicht entschieden):
+- OV1 **Server absichern:** Laut Backend kann jedes Google-Konto ein Konto anlegen. Mit
+  der öffentlichen Server-URL und Web-Client-ID (`CloudConfig.kt`, beide kein Secret)
+  könnten Fremde sichern: Kosten bis zum Kill-Switch, danach ist Kevins Backup gesperrt,
+  und fremde Daten lägen ohne Datenschutzerklärung (PS3) auf dem Server. Deshalb auf dem
+  Server eine Liste erlaubter Konten (nur Kevins `sub`) und in der App URL und Client-ID
+  als Gradle-Property bzw. aus `local.properties`; ohne Wert ist das Cloud-Backup im Build
+  aus, fremde Builds treffen nicht Kevins Server. Gehört zur Sicherheitsphase
+  ([backend.md](backend.md)).
+- OV2 **Echte Testdaten nicht veröffentlichen:** In `testdata/real-*.json` sind Texte
+  ersetzt und Orte verschoben, aber die Zeiten echt; öffentlich verraten sie Kevins
+  Tagesablauf (z. B. Ankunft zuhause). Die Dateien bleiben lokal (`.gitignore`);
+  `RealDataTest` überspringt sich ohne Datei.
+- OV3 **Lizenz** (`LICENSE`) wählen; ohne sie darf niemand den Code verwenden. Kandidaten:
+  MIT/Apache-2.0 (freizügig) oder GPL-3.0 (Ableitungen bleiben offen).
+- OV4 **Backend:** Muss nicht öffentlich werden, aber ohne `client/` und `proto/` kann
+  niemand außer Kevin die App bauen (Composite Build, cloud-entscheidungen.md A-2), und
+  PR-Builds aus Forks scheitern am Deploy-Key. Empfehlung: das Backend-Repo nach eigener
+  Prüfung mit veröffentlichen (die Verschlüsselung aus `client/protokoll` steckt ohnehin in
+  der APK, „der Server sieht keine Inhalte“ wird erst so überprüfbar); danach Deploy-Key
+  und Secret löschen. Alternative: nur `client/` und `proto/` in ein eigenes öffentliches
+  Repo. Zugleich die Neuentscheidung zu A-2.
+- OV5 **Historie bereinigen statt verwerfen:** 45 Commits vom 18. bis 31.10. tragen Kevins
+  Arbeits-Adresse (`@arbeitgeber.example`); falls diese Anfänge auf dem Firmenrechner entstanden
+  sind, vorher klären, ob der Arbeitgeber Rechte daran haben könnte (§ 69b UrhG). Mit
+  `git filter-repo` die Autoren per `--mailmap` auf die GitHub-noreply-Adresse setzen und
+  `testdata/real-*` aus allen Commits entfernen; Commits und Nachrichten bleiben. Das
+  Ergebnis in ein **neues** GitHub-Repo pushen, nicht per Force-Push ins alte: GitHub hält
+  alte Commits über `refs/pull/*` erreichbar. Das alte Repo bleibt privat als Archiv (mit
+  PRs und CI-Läufen). Kurz vor der Veröffentlichung, danach alle Klone und Worktrees neu.
+- OV6 **CI:** wieder bei PRs bauen (für öffentliche Repos kostenlos, Kap. 9, 2026-11-13);
+  „Require approval for fork PR workflows“ lassen.
+- OV7 **GitHub-Einstellungen:** Secret Scanning mit Push Protection, Dependabot-Alerts,
+  Branch-Schutz für `main`; im Konto „Keep my email addresses private“ und künftig mit
+  der noreply-Adresse committen.
+- OV8 **Durchsehen (optional):** `CLAUDE.md`, `docs/` und `.review/` nennen durchgehend
+  Kevin, sein Handy und `%USERPROFILE%`; heikle Lebensdetails stehen nicht drin. Mit dem
+  Repo werden auch alte CI-Logs und Artefakte (Debug-APK, 14 Tage) und die PR-Texte
+  öffentlich, beim neuen Repo aus OV5 nicht.
+
+Offen (Kevin entscheidet): Lizenz (OV3), Backend ganz oder nur `client/`/`proto/` (OV4),
+bereinigte Historie oder ganz neu (OV5). OV1–OV3 lohnen sich schon vorher.
+
 ## 8. Zielplattform und Technik
 
 ### 8.1 Zielgerät
@@ -1189,6 +1239,7 @@ Neueste zuerst. Kap. 7 enthält immer den gültigen Stand; diese Tabelle ist die
 
 | Datum | Entscheidung |
 |---|---|
+| 2026-11-14 | **App-Repo soll öffentlich werden** (in den nächsten Wochen oder Monaten). Prüfung: keine Secrets in Repo, Historie und CI. Checkliste OV1–OV8 in 7.34: Server auf erlaubte Konten beschränken und URL konfigurierbar, echte Testdaten lokal halten, Lizenz, `client/`/`proto/` (oder das Backend) mit veröffentlichen, Historie mit `git filter-repo` bereinigen (Arbeits-Adresse, Testdaten) und in ein neues Repo pushen, PR-Builds wieder an. Offen: Lizenz, Umfang beim Backend, Art der Historie |
 | 2026-11-13 | Verschiebe-Limit wahlweise pro Termin, Woche oder Monat (Z2b, nach Vorschlag): Kalenderwoche Mo–So bzw. Kalendermonat, gezählt zum Zeitpunkt des Verschiebens über alle Termine des Reminders; zählt *Verschieben* (auch vorab) und ein zählendes *Rest auf morgen*, *Später* bleibt frei; Bestand, Vorlagen und Strenge-Startwerte pro Termin; der Alarm zeigt, was bleibt und ab wann es wieder geht. Umgesetzt in V1.3c1 |
 | 2026-11-13 | Antworten auf Review-Lauf 6 (`.review/runs/2026-11-13.md`), beide nach Vorschlag: (1) Ändert sich die Ankunftsregel, nachdem ein *verschobener* Termin schon angekommen ist, wartet er wieder auf die Ankunft, jetzt nach der neuen Regel (`awaitsArrival`, zur Tagesgrenze *verpasst*); ergänzt Frage 5 vom 2026-11-12. (2) Ohne Bildschirm (Benachrichtigung, Uhr) gibt es *Teilschritt* wie *Erledigt* nicht, wenn ein Nachweis mit Foto, Text oder Audio nötig ist. Außerdem Wunsch: Das Verschiebe-Limit soll sich auch wöchentlich oder monatlich erneuern können (Z2b, Details in Klärung) |
 | 2026-11-13 | **CI nur nach dem Merge auf `main`** (GitHub-Minuten, privates Repo): kein Build bei PRs und auf `develop`, reine Doku-Merges ohne Lauf; vor dem PR lokal mit `-PbackendStreng=true` bauen. Actions auf Commit-SHA festgelegt, Dependabot meldet monatlich neue Versionen. Mit der Veröffentlichung als Open Source wieder bei PRs bauen |
@@ -1283,6 +1334,8 @@ Was schon umgesetzt ist, steht in 10.1.
    - Möglicher Kandidat: Einkaufsliste nur für einen selbst mit Geschäfts-Trigger (7.23,
      E1–E3), ohne Inventar, KI und Abgleich. Nicht festgelegt.
 4. GPS für die Ortsprüfung (7.30), wenn WLAN im Alltag nicht reicht.
+   - Unabhängig davon: **Repo veröffentlichen** (7.34), in den nächsten Wochen oder
+     Monaten; OV1–OV3 schon vorher.
 5. **V2** (Kap. 4), vorher Testsession und Nutzung zählen (NT4); danach erst der
    **Play-Store-Release** mit Backend für Backup und Sync, EU-Datenschutz (7.28 PS5).
 6. Weitere Anforderungen ergeben sich aus der Nutzung.
