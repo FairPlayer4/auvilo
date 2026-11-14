@@ -22,7 +22,6 @@ import com.avlreminder.core.model.Reminder
 import com.avlreminder.core.model.Schedule
 import com.avlreminder.core.model.WhenAway
 import com.avlreminder.core.usecases.SaveResult
-import com.avlreminder.AvlApp
 import com.avlreminder.graph
 import android.net.ConnectivityManager
 import com.avlreminder.location.AndroidPlaceAlarms
@@ -72,9 +71,6 @@ class ReceiverGlueTest {
     @Before
     fun setUp() {
         TestClock.at()
-        // The app syncs on start (on Dispatchers.Default); let that finish so it does not race
-        // with the test. Idling the main looper alone did not wait for it.
-        runBlocking { (context as AvlApp).started.join() }
         ShadowLooper.idleMainLooper()
     }
 
