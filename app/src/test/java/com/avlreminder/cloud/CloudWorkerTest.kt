@@ -12,7 +12,6 @@ import androidx.work.WorkManager
 import androidx.work.testing.SynchronousExecutor
 import androidx.work.testing.TestListenableWorkerBuilder
 import androidx.work.testing.WorkManagerTestInitHelper
-import com.avlreminder.AvlApp
 import kotlinx.coroutines.runBlocking
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertTrue
@@ -66,7 +65,6 @@ class CloudWorkerTest {
     // WorkManager's backoff. What it does is in CloudBackupTest.
     @Test
     fun theWorkerAlwaysEndsAsSuccess() {
-        runBlocking { (context as AvlApp).started.join() }
         val worker = TestListenableWorkerBuilder<CloudBackupWorker>(context).build()
         assertEquals(ListenableWorker.Result.success(), runBlocking { worker.doWork() })
     }

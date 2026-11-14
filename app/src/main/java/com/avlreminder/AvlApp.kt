@@ -57,7 +57,7 @@ import java.time.Duration
 import java.time.Instant
 import java.time.ZoneId
 
-class AvlApp : Application() {
+open class AvlApp : Application() {
     lateinit var graph: AppGraph
         private set
 

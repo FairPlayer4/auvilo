@@ -8,7 +8,6 @@ import androidx.compose.ui.test.performTextReplacement
 import androidx.test.core.app.ActivityScenario
 import androidx.test.core.app.ApplicationProvider
 import androidx.test.ext.junit.runners.AndroidJUnit4
-import com.avlreminder.AvlApp
 import com.avlreminder.TestClock
 import com.avlreminder.core.model.Reminder
 import com.avlreminder.core.model.Schedule
@@ -33,7 +32,6 @@ class MainActivityTest {
     @Before
     fun setUp() {
         TestClock.at()
-        runBlocking { (context as AvlApp).started.join() }
         ShadowLooper.idleMainLooper()
     }
 

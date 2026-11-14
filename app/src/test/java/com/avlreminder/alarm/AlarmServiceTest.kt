@@ -5,10 +5,8 @@ import android.app.Notification
 import android.app.NotificationManager
 import androidx.test.core.app.ApplicationProvider
 import androidx.test.ext.junit.runners.AndroidJUnit4
-import com.avlreminder.AvlApp
 import com.avlreminder.core.model.ChecklistItem
 import com.avlreminder.core.rules.Escalation
-import kotlinx.coroutines.runBlocking
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertNull
 import org.junit.Before
@@ -30,7 +28,6 @@ class AlarmServiceTest {
 
     @Before
     fun setUp() {
-        runBlocking { (app as AvlApp).started.join() }
         ShadowLooper.idleMainLooper()
     }
 

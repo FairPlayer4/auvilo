@@ -8,7 +8,6 @@ import android.content.Context
 import android.content.Intent
 import androidx.test.core.app.ApplicationProvider
 import androidx.test.ext.junit.runners.AndroidJUnit4
-import com.avlreminder.AvlApp
 import com.avlreminder.core.model.Occurrence
 import com.avlreminder.core.model.OccurrenceState
 import com.avlreminder.core.model.ProofSpec
@@ -44,9 +43,6 @@ class AlarmGlueTest {
     @Before
     fun setUp() {
         TestClock.at()
-        // The app syncs on start (on Dispatchers.Default); let that finish so it does not race
-        // with the test. Idling the main looper alone did not wait for it.
-        runBlocking { (context as AvlApp).started.join() }
         ShadowLooper.idleMainLooper()
     }
 

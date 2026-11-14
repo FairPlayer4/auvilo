@@ -5,7 +5,6 @@ import android.database.sqlite.SQLiteDatabase
 import androidx.room.Room
 import androidx.test.core.app.ApplicationProvider
 import androidx.test.ext.junit.runners.AndroidJUnit4
-import com.avlreminder.AvlApp
 import com.avlreminder.cloud.BackupContents
 import com.avlreminder.data.AvlDatabase
 import com.avlreminder.data.SchemaDatabases
@@ -18,7 +17,6 @@ import org.junit.Assert.assertFalse
 import org.junit.Assert.assertNotEquals
 import org.junit.Assert.assertTrue
 import org.junit.Assert.fail
-import org.junit.Before
 import org.junit.Rule
 import org.junit.Test
 import org.junit.rules.TemporaryFolder
@@ -37,11 +35,6 @@ class RestoreFilesTest {
     private val context = ApplicationProvider.getApplicationContext<Context>()
     private val files by lazy { RestoreFiles(tmp.newFolder("files")) }
     private val live by lazy { File(tmp.root, "databases/avlreminder.db") }
-
-    // The app start reads the same settings in the background; on Windows that can make a write fail
-    // ("Unable to rename …", see CloudBackupTest.clean).
-    @Before
-    fun waitForTheAppStart() = runBlocking { (context as AvlApp).started.join() }
 
     /** A database file of the app with one suggestion per text, closed again. */
     private fun database(file: File, vararg texts: String): File {

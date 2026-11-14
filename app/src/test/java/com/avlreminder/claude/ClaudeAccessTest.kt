@@ -8,7 +8,6 @@ import com.avlreminder.AvlApp
 import kotlinx.coroutines.runBlocking
 import org.junit.After
 import org.junit.Assert.assertEquals
-import org.junit.Before
 import org.junit.Test
 import org.junit.runner.RunWith
 
@@ -22,10 +21,6 @@ class ClaudeAccessTest {
     private val graph get() = (context as AvlApp).graph
     private val originalFlags = context.applicationInfo.flags
 
-    @Before
-    fun setUp() {
-        runBlocking { (context as AvlApp).started.join() }
-    }
 
     @After
     fun tearDown() {

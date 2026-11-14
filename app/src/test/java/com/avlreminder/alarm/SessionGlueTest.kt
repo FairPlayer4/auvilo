@@ -9,7 +9,6 @@ import android.content.Context
 import android.content.Intent
 import androidx.test.core.app.ApplicationProvider
 import androidx.test.ext.junit.runners.AndroidJUnit4
-import com.avlreminder.AvlApp
 import com.avlreminder.alarm.Notifications.Button
 import com.avlreminder.core.model.ChecklistItem
 import com.avlreminder.core.model.Character
@@ -51,7 +50,6 @@ class SessionGlueTest {
     @Before
     fun setUp() {
         TestClock.at()
-        runBlocking { (context as AvlApp).started.join() }
         ShadowLooper.idleMainLooper()
     }
 

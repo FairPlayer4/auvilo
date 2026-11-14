@@ -5,7 +5,6 @@ import android.app.Notification
 import android.app.NotificationManager
 import androidx.test.core.app.ApplicationProvider
 import androidx.test.ext.junit.runners.AndroidJUnit4
-import com.avlreminder.AvlApp
 import com.avlreminder.TestClock
 import com.avlreminder.alarm.AlarmInfo
 import com.avlreminder.alarm.Notifications
@@ -45,7 +44,6 @@ class AppViewModelTest {
     @Before
     fun setUp() {
         TestClock.at()
-        runBlocking { (app as AvlApp).started.join() }
         ShadowLooper.idleMainLooper()
     }
 

@@ -3,9 +3,7 @@ package com.avlreminder.data
 import android.content.Context
 import androidx.test.core.app.ApplicationProvider
 import androidx.test.ext.junit.runners.AndroidJUnit4
-import com.avlreminder.AvlApp
 import kotlinx.coroutines.flow.first
-import kotlinx.coroutines.runBlocking
 import kotlinx.coroutines.test.runTest
 import com.avlreminder.core.rules.AlertSettings
 import com.avlreminder.core.rules.DayTimes
@@ -13,7 +11,6 @@ import com.avlreminder.core.usecases.ReminderSort
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertNull
 import org.junit.Assert.assertTrue
-import org.junit.Before
 import org.junit.Test
 import org.junit.runner.RunWith
 import java.time.Duration
@@ -24,11 +21,6 @@ import java.time.LocalTime
 class SettingsTest {
     private val settings = Settings(ApplicationProvider.getApplicationContext<Context>())
     private val now = Instant.parse("2026-11-03T20:00:00Z")
-
-    // The app start reads the same DataStore in the background; on Windows that can make a write fail
-    // ("Unable to rename …", see CloudBackupTest.clean).
-    @Before
-    fun waitForTheAppStart() = runBlocking { (ApplicationProvider.getApplicationContext<Context>() as AvlApp).started.join() }
 
     /** The start of a pause decides whether it excuses an open occurrence (PS7). */
     @Test

@@ -9,7 +9,6 @@ import androidx.credentials.exceptions.GetCredentialUnknownException
 import androidx.credentials.exceptions.NoCredentialException
 import androidx.test.core.app.ApplicationProvider
 import androidx.test.ext.junit.runners.AndroidJUnit4
-import com.avlreminder.AvlApp
 import com.avlreminder.data.AvlDatabase
 import com.avlreminder.protokoll.BackupAblage
 import com.avlreminder.restore.BackupTable
@@ -371,14 +370,8 @@ class CloudBackupTest {
     }
     private var existingKey: Wiederherstellungsschluessel? = null
 
-    // The app starts anew for every test and reads the same DataStore in the background. On Windows an
-    // open reader makes DataStore's rename on writing fail ("Unable to rename …"); the step then ends as
-    // a network error and ShowKey never comes. So wait for the start first, like the other tests do.
     @Before
-    fun clean() = blocking {
-        (ApplicationProvider.getApplicationContext<Context>() as AvlApp).started.join()
-        store.clear()
-    }
+    fun clean() = blocking { store.clear() }
 
     @After
     fun stop() = scope.cancel()
