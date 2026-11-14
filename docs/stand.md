@@ -64,12 +64,13 @@ einer Fassung.
    Speichern), *Konto löschen*, Bestätigung mit der Displaysperre für *Cloud-Daten
    löschen*, *Konto löschen* und *Gerät sperren*; Format v2 kommt über `client/`.
 9. **Repo veröffentlichen** (in Wochen bis Monaten, 7.34): keine Secrets gefunden.
-   Vorher URL konfigurierbar (OV1; Zugang nur nach Freigabe und Kostengrenzen sind seit
-   2026-11-14 umgesetzt und deployt, die App zeigt die Kennung), echte
-   Testdaten nur lokal (OV2), Lizenz (OV3); offen sind Lizenz, Umfang beim Backend und
-   bereinigte Historie in einem neuen Repo (OV4, OV5).
+   App und Backend sollen in den nächsten Wochen öffentlich werden. Erledigt: Zugang nur
+   nach Freigabe und Kostengrenzen (OV1, deployt), echte Testdaten nur lokal (OV2),
+   Lizenz Apache-2.0 (OV3), Doku bereinigt (OV8). Offen: konfigurierbarer Server (OV1),
+   für die App eine bereinigte Historie in einem neuen Repo (OV5: Arbeits-Adresse,
+   Testdaten), kurz vorher OV6 und OV7.
 
 ## Beobachtungen aus der echten Nutzung
-- „Test-Reminder“ klingelte am 2026-10-31 in Runden um 11:30 und 12:00; prüfen, ob das zur
+- Ein Reminder klingelte am 2026-10-31 in Runden um 11:30 und 12:00; prüfen, ob das zur
   eingestellten Eskalation passt.
 - Morgen-Übersicht steht auf 8:00; vermutlich von Kevin so eingestellt.

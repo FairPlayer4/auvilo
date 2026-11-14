@@ -1113,8 +1113,8 @@ Beim ersten Gerätetest war das Aufschreiben des Wiederherstellungsschlüssels u
   bleibt als zusätzliche Kopie empfohlen.
 
 ### 7.34 Repo veröffentlichen (geplant, 2026-11-14)
-Kevin will das App-Repo `FairPlayer4/avlreminder` in den nächsten Wochen oder Monaten
-öffentlich machen. Prüfung vom 2026-11-14 (Arbeitsbaum, alle 226 Commits auf allen
+Kevin will das App-Repo `FairPlayer4/avlreminder` und das Backend-Repo in den nächsten
+Wochen öffentlich machen. Prüfung vom 2026-11-14 (Arbeitsbaum, alle 226 Commits auf allen
 Branches, CI): **keine Secrets** (keine Schlüssel, Tokens, Keystores, Passwörter; gelöschte
 Dateien ohne echte BSSIDs oder Koordinaten). Das einzige CI-Secret `BACKEND_DEPLOY_KEY`
 bleibt auch im öffentlichen Repo verborgen und geht nicht an PRs aus Forks.
@@ -1145,16 +1145,20 @@ Was vorher zu tun ist, in dieser Reihenfolge (Vorschlag, noch nicht entschieden)
 - OV2 **Echte Testdaten nicht veröffentlichen:** In `testdata/real-*.json` sind Texte
   ersetzt und Orte verschoben, aber die Zeiten echt; öffentlich verraten sie Kevins
   Tagesablauf (z. B. Ankunft zuhause). Die Dateien bleiben lokal (`.gitignore`);
-  `RealDataTest` überspringt sich ohne Datei.
-- OV3 **Lizenz** (`LICENSE`) wählen; ohne sie darf niemand den Code verwenden. Kandidaten:
-  MIT/Apache-2.0 (freizügig) oder GPL-3.0 (Ableitungen bleiben offen).
+  `RealDataTest` überspringt sich ohne Datei. **Umgesetzt 2026-11-14**; in den alten
+  Commits steht die Datei weiter, deshalb OV5.
+- OV3 **Lizenz** (`LICENSE`) wählen; ohne sie darf niemand den Code verwenden.
+  **Entschieden 2026-11-14: Apache-2.0** für App und Backend (freizügig mit Patentklausel;
+  GPL verträgt sich schlecht mit den proprietären Play-Services-Bibliotheken der App).
+  `LICENSE` und Hinweis im README in beiden Repos.
 - OV4 **Backend:** Muss nicht öffentlich werden, aber ohne `client/` und `proto/` kann
   niemand außer Kevin die App bauen (Composite Build, cloud-entscheidungen.md A-2), und
   PR-Builds aus Forks scheitern am Deploy-Key. Empfehlung: das Backend-Repo nach eigener
   Prüfung mit veröffentlichen (die Verschlüsselung aus `client/protokoll` steckt ohnehin in
   der APK, „der Server sieht keine Inhalte“ wird erst so überprüfbar); danach Deploy-Key
   und Secret löschen. Alternative: nur `client/` und `proto/` in ein eigenes öffentliches
-  Repo. Zugleich die Neuentscheidung zu A-2.
+  Repo. Zugleich die Neuentscheidung zu A-2. **Obsolet 2026-11-14:** Das Backend wird
+  ganz mit veröffentlicht; Deploy-Key und Secret danach löschen bleibt (OV6/OV7).
 - OV5 **Historie bereinigen statt verwerfen:** 45 Commits vom 18. bis 31.10. tragen Kevins
   Arbeits-Adresse (`@arbeitgeber.example`); falls diese Anfänge auf dem Firmenrechner entstanden
   sind, vorher klären, ob der Arbeitgeber Rechte daran haben könnte (§ 69b UrhG). Mit
@@ -1163,18 +1167,30 @@ Was vorher zu tun ist, in dieser Reihenfolge (Vorschlag, noch nicht entschieden)
   Ergebnis in ein **neues** GitHub-Repo pushen, nicht per Force-Push ins alte: GitHub hält
   alte Commits über `refs/pull/*` erreichbar. Das alte Repo bleibt privat als Archiv (mit
   PRs und CI-Läufen). Kurz vor der Veröffentlichung, danach alle Klone und Worktrees neu.
-- OV6 **CI:** wieder bei PRs bauen (für öffentliche Repos kostenlos, Kap. 9, 2026-11-13);
+  **Kevin, 2026-11-14:** nur bei Bedarf, kurz vorher prüfen. Stand der Prüfung vom
+  2026-11-14: Für die **App** ist er gegeben (90 Autor-/Committer-Einträge mit der
+  Arbeits-Adresse, ein Commit mit `testdata/real-*.json`, ältere Doku-Stände mit einem
+  echten Reminder-Titel und Benutzerpfaden). Das **Backend** braucht ihn nicht: nur die
+  Gmail-Adresse und GitHub-Adressen, keine Testdaten, kein Rechnungskonto in der Historie.
+  Die Mailmap setzt die Arbeits-Adresse auf die Gmail-Adresse (nicht noreply, siehe OV7).
+- OV6 **CI** (erst kurz vorher): wieder bei PRs bauen (für öffentliche Repos kostenlos, Kap. 9, 2026-11-13);
   „Require approval for fork PR workflows“ lassen.
-- OV7 **GitHub-Einstellungen:** Secret Scanning mit Push Protection, Dependabot-Alerts,
-  Branch-Schutz für `main`; im Konto „Keep my email addresses private“ und künftig mit
-  der noreply-Adresse committen.
+- OV7 **GitHub-Einstellungen** (erst kurz vorher): Secret Scanning mit Push Protection,
+  Dependabot-Alerts, Branch-Schutz für `main`. **Keine noreply-Adresse** (Kevin,
+  2026-11-14): `kevin.bartik@gmail.com` wird eine rein geschäftliche, öffentliche Adresse
+  und steht schon in fast allen Commits. „Keep my email addresses private“ bleibt aus,
+  sonst blockt GitHub Pushes mit dieser Adresse.
 - OV8 **Durchsehen (optional):** `CLAUDE.md`, `docs/` und `.review/` nennen durchgehend
   Kevin, sein Handy und `%USERPROFILE%`; heikle Lebensdetails stehen nicht drin. Mit dem
   Repo werden auch alte CI-Logs und Artefakte (Debug-APK, 14 Tage) und die PR-Texte
-  öffentlich, beim neuen Repo aus OV5 nicht.
+  öffentlich, beim neuen Repo aus OV5 nicht. **Bereinigt 2026-11-14:** Benutzerpfade
+  durch `%USERPROFILE%` ersetzt, der echte Reminder-Titel in `stand.md` entfernt; Kevin,
+  das S24 und Testtitel bleiben (kein Geheimnis). Das Backend war schon sauber. Ältere
+  Stände stehen in der Historie, das deckt OV5 ab.
 
-Offen (Kevin entscheidet): Lizenz (OV3), Backend ganz oder nur `client/`/`proto/` (OV4),
-bereinigte Historie oder ganz neu (OV5). OV1–OV3 lohnen sich schon vorher.
+Reihenfolge (Kevin, 2026-11-14): OV2, OV3, OV8 jetzt in App und Backend; OV1 Rest
+(konfigurierbarer Server) vorher; OV5 kurz vorher prüfen (für die App nötig); OV6, OV7
+kurz davor.
 
 ## 8. Zielplattform und Technik
 
@@ -1256,6 +1272,7 @@ Neueste zuerst. Kap. 7 enthält immer den gültigen Stand; diese Tabelle ist die
 | 2026-11-14 | OV1 präzisiert (7.34, Backend ID7/ID8): **Zugang nur nach Freigabe** über eine Liste von Kennungen; nicht Freigegebene sehen ihren Code und fragen bei Kevin an, andere betreiben bei Bedarf einen eigenen Server. Server-URL kein Geheimnis und nach dem Zurücksetzen unverändert; Schutz über signierte Sitzungs-Token und einen Anfragealarm, der den Kill-Switch auslöst |
 | 2026-11-14 | **App-Repo soll öffentlich werden** (in den nächsten Wochen oder Monaten). Prüfung: keine Secrets in Repo, Historie und CI. Checkliste OV1–OV8 in 7.34: Server auf erlaubte Konten beschränken und URL konfigurierbar, echte Testdaten lokal halten, Lizenz, `client/`/`proto/` (oder das Backend) mit veröffentlichen, Historie mit `git filter-repo` bereinigen (Arbeits-Adresse, Testdaten) und in ein neues Repo pushen, PR-Builds wieder an. Offen: Lizenz, Umfang beim Backend, Art der Historie |
 | 2026-11-14 | OV1 Teil Freigabe und Kostengrenzen umgesetzt (Backend ID7/ID8, deployt): App zeigt bei nicht freigegebenem Konto die Kennung zum Kopieren; Entzug beendet die Sitzung mit sofortiger Meldung. Offen in OV1: konfigurierbarer Server |
+| 2026-11-14 | Veröffentlichen (7.34, Kevin): **App und Backend** in den nächsten Wochen; Lizenz **Apache-2.0**; OV4 obsolet (Backend ganz öffentlich); OV5 nur bei Bedarf, für die App nötig (Arbeits-Adresse, Testdaten); **keine noreply-Adresse**, Gmail wird geschäftlich; OV2 und OV8 umgesetzt; OV6/OV7 erst kurz davor |
 | 2026-11-13 | Verschiebe-Limit wahlweise pro Termin, Woche oder Monat (Z2b, nach Vorschlag): Kalenderwoche Mo–So bzw. Kalendermonat, gezählt zum Zeitpunkt des Verschiebens über alle Termine des Reminders; zählt *Verschieben* (auch vorab) und ein zählendes *Rest auf morgen*, *Später* bleibt frei; Bestand, Vorlagen und Strenge-Startwerte pro Termin; der Alarm zeigt, was bleibt und ab wann es wieder geht. Umgesetzt in V1.3c1 |
 | 2026-11-13 | Antworten auf Review-Lauf 6 (`.review/runs/2026-11-13.md`), beide nach Vorschlag: (1) Ändert sich die Ankunftsregel, nachdem ein *verschobener* Termin schon angekommen ist, wartet er wieder auf die Ankunft, jetzt nach der neuen Regel (`awaitsArrival`, zur Tagesgrenze *verpasst*); ergänzt Frage 5 vom 2026-11-12. (2) Ohne Bildschirm (Benachrichtigung, Uhr) gibt es *Teilschritt* wie *Erledigt* nicht, wenn ein Nachweis mit Foto, Text oder Audio nötig ist. Außerdem Wunsch: Das Verschiebe-Limit soll sich auch wöchentlich oder monatlich erneuern können (Z2b, Details in Klärung) |
 | 2026-11-13 | **CI nur nach dem Merge auf `main`** (GitHub-Minuten, privates Repo): kein Build bei PRs und auf `develop`, reine Doku-Merges ohne Lauf; vor dem PR lokal mit `-PbackendStreng=true` bauen. Actions auf Commit-SHA festgelegt, Dependabot meldet monatlich neue Versionen. Mit der Veröffentlichung als Open Source wieder bei PRs bauen |

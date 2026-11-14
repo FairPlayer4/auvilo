@@ -700,7 +700,7 @@ umgesetzt / verworfen. Liste in den Einstellungen, *Teilen* als Markdown.
   (`scenarios/RepositoryCases` in den Testhilfen), laufen in `core` gegen das
   Fake-Repository und in `:app` gegen Room.
 - **Echte Daten:** Kevins Daten pseudonymisiert als JSON in
-  `testdata/` ([README](../testdata/README.md)), erzeugt mit
+  `testdata/` ([README](../testdata/README.md)), nur lokal (Anf. 7.34 OV2), erzeugt mit
   `tools/testdata/export_testdata.py` über adb, ohne Import/Export in der App.
   `RealDataTest` lädt sie in das Schema ihrer Version, migriert, baut die Alarm-Ansicht
   jedes offenen Termins, öffnet und speichert jeden Reminder im Formular (Round-Trip) und
