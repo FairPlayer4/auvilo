@@ -50,6 +50,7 @@ class CloudWiring(
         restore = restoreTarget,
         reminders = { db.dao().reminderCount() },
         log = Diag::log,
+        configured = CloudConfig.configured(),
     )
 
     /** Restoring from a daily copy and undoing a restore (R-1, W-6); no network. */

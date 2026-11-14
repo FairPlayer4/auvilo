@@ -37,7 +37,8 @@ Strenge und invasive Mechanismen sind gewollt. Kommunikation auf **Deutsch, mit 
 - Der Build braucht das Backend-Repo daneben (`../avlreminder-backend`, Composite Build,
   [cloud-entscheidungen.md](docs/cloud-entscheidungen.md) A-2). Steht dort ein anderer Commit als in
   `gradle/backend-commit.txt` oder gibt es uncommittete Änderungen in `client/`/`proto/`,
-  warnt der Build: **eine solche APK nicht installieren**. Nach Änderungen im Backend den
+  warnt der Build: **eine solche APK nicht installieren**. Dasselbe gilt für die Warnung
+  „Cloud-Backup ausgeblendet“ (Server-Werte fehlen, cloud-entscheidungen.md, Einrichtung). Nach Änderungen im Backend den
   Commit dort pushen und in `gradle/backend-commit.txt` eintragen.
 - Android Lint (`:app:lintDebug`) bricht bei jedem neuen Fund ab, auch bei Warnungen. Funde
   beheben statt in die Baseline (`app/lint-baseline.xml`) zu schieben; nur wenn ein Fund

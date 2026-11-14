@@ -81,6 +81,12 @@ macht Claude dort keine Bildschirmfotos und keine UI-Abzüge; geprüft wird übe
   Android-Client (Paket `com.avlreminder`, SHA-1 des Debug-Schlüssels aus
   `keytool -list -v -keystore ~/.android/debug.keystore`). Ein neuer PC mit anderem
   `debug.keystore` braucht einen weiteren Android-Client.
+- Server für den Build (Anf. 7.34 OV1, 2026-11-14): `avlCloudServerUrl` (= `tofu output
+  server_url`) und `avlCloudWebClientId` (Web-Client) in der `gradle.properties` von
+  `GRADLE_USER_HOME` (`E:\caches\gradle`, gilt auch in Worktrees) oder in
+  `local.properties`. Ohne beide blendet die App das Cloud-Backup aus, stoppt die
+  stündliche Sicherung und der Build warnt; so baut auch die CI. Nur einer der beiden
+  Werte, eine Adresse ohne `https://` oder eine falsche Client-ID brechen den Build ab.
 - Deploy-Key der CI (in einem eigenen Terminal, der private Schlüssel gehört nicht in den
   Gesprächsverlauf):
   ```bash

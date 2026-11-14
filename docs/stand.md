@@ -65,9 +65,8 @@ einer Fassung.
    löschen*, *Konto löschen* und *Gerät sperren*; Format v2 kommt über `client/`.
 9. **Repo veröffentlichen** (in Wochen bis Monaten, 7.34): keine Secrets gefunden.
    App und Backend sollen in den nächsten Wochen öffentlich werden. Erledigt: Zugang nur
-   nach Freigabe und Kostengrenzen (OV1, deployt), echte Testdaten nur lokal (OV2),
-   Lizenz Apache-2.0 (OV3), Doku bereinigt (OV8). Offen: konfigurierbarer Server (OV1),
-   für die App eine bereinigte Historie in einem neuen Repo (OV5: Arbeits-Adresse,
+   nach Freigabe, Kostengrenzen und konfigurierbarer Server (OV1), echte Testdaten nur
+   lokal (OV2), Lizenz Apache-2.0 (OV3), Doku bereinigt (OV8). Offen: für die App eine bereinigte Historie in einem neuen Repo (OV5: Arbeits-Adresse,
    Testdaten), kurz vorher OV6 und OV7.
 
 ## Beobachtungen aus der echten Nutzung

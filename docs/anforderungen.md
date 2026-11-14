@@ -1135,7 +1135,9 @@ Was vorher zu tun ist, in dieser Reihenfolge (Vorschlag, noch nicht entschieden)
     abgelehnte Anmeldung und meldet sich sofort).
   - **Konfigurierbarer Server:** URL und Web-Client-ID als Gradle-Property bzw. aus
     `local.properties`; ohne Wert ist das Cloud-Backup im Build ausgeblendet, fremde
-    Builds treffen nicht Kevins Server.
+    Builds treffen nicht Kevins Server. **Umgesetzt 2026-11-14** (`avlCloudServerUrl`,
+    `avlCloudWebClientId`; Einrichtung in cloud-entscheidungen.md): ohne Werte keine
+    Cloud-Einstellungen, die stündliche Sicherung stoppt, der Build warnt.
   - **Kosten bei Angriffen** (Backend ID8): Die Adresse gilt nicht als Geheimnis, sie
     bleibt auch nach dem Zurücksetzen der Sicherheitsphase gleich (gleiches Projekt).
     Geschützt wird über Grenzen: signierte Sitzungs-Token, damit gefälschte kein
@@ -1189,7 +1191,7 @@ Was vorher zu tun ist, in dieser Reihenfolge (Vorschlag, noch nicht entschieden)
   Stände stehen in der Historie, das deckt OV5 ab.
 
 Reihenfolge (Kevin, 2026-11-14): OV2, OV3, OV8 jetzt in App und Backend; OV1 Rest
-(konfigurierbarer Server) vorher; OV5 kurz vorher prüfen (für die App nötig); OV6, OV7
+(konfigurierbarer Server) vorher, erledigt; OV5 kurz vorher prüfen (für die App nötig); OV6, OV7
 kurz davor.
 
 ## 8. Zielplattform und Technik
@@ -1273,6 +1275,7 @@ Neueste zuerst. Kap. 7 enthält immer den gültigen Stand; diese Tabelle ist die
 | 2026-11-14 | **App-Repo soll öffentlich werden** (in den nächsten Wochen oder Monaten). Prüfung: keine Secrets in Repo, Historie und CI. Checkliste OV1–OV8 in 7.34: Server auf erlaubte Konten beschränken und URL konfigurierbar, echte Testdaten lokal halten, Lizenz, `client/`/`proto/` (oder das Backend) mit veröffentlichen, Historie mit `git filter-repo` bereinigen (Arbeits-Adresse, Testdaten) und in ein neues Repo pushen, PR-Builds wieder an. Offen: Lizenz, Umfang beim Backend, Art der Historie |
 | 2026-11-14 | OV1 Teil Freigabe und Kostengrenzen umgesetzt (Backend ID7/ID8, deployt): App zeigt bei nicht freigegebenem Konto die Kennung zum Kopieren; Entzug beendet die Sitzung mit sofortiger Meldung. Offen in OV1: konfigurierbarer Server |
 | 2026-11-14 | Veröffentlichen (7.34, Kevin): **App und Backend** in den nächsten Wochen; Lizenz **Apache-2.0**; OV4 obsolet (Backend ganz öffentlich); OV5 nur bei Bedarf, für die App nötig (Arbeits-Adresse, Testdaten); **keine noreply-Adresse**, Gmail wird geschäftlich; OV2 und OV8 umgesetzt; OV6/OV7 erst kurz davor |
+| 2026-11-14 | OV1 konfigurierbarer Server umgesetzt: Adresse und Web-Client-ID aus Gradle-Property oder `local.properties`; ohne beide kein Cloud-Backup in der App und Warnung im Build, halb gesetzt bricht ab. Die CI baut ohne Server |
 | 2026-11-13 | Verschiebe-Limit wahlweise pro Termin, Woche oder Monat (Z2b, nach Vorschlag): Kalenderwoche Mo–So bzw. Kalendermonat, gezählt zum Zeitpunkt des Verschiebens über alle Termine des Reminders; zählt *Verschieben* (auch vorab) und ein zählendes *Rest auf morgen*, *Später* bleibt frei; Bestand, Vorlagen und Strenge-Startwerte pro Termin; der Alarm zeigt, was bleibt und ab wann es wieder geht. Umgesetzt in V1.3c1 |
 | 2026-11-13 | Antworten auf Review-Lauf 6 (`.review/runs/2026-11-13.md`), beide nach Vorschlag: (1) Ändert sich die Ankunftsregel, nachdem ein *verschobener* Termin schon angekommen ist, wartet er wieder auf die Ankunft, jetzt nach der neuen Regel (`awaitsArrival`, zur Tagesgrenze *verpasst*); ergänzt Frage 5 vom 2026-11-12. (2) Ohne Bildschirm (Benachrichtigung, Uhr) gibt es *Teilschritt* wie *Erledigt* nicht, wenn ein Nachweis mit Foto, Text oder Audio nötig ist. Außerdem Wunsch: Das Verschiebe-Limit soll sich auch wöchentlich oder monatlich erneuern können (Z2b, Details in Klärung) |
 | 2026-11-13 | **CI nur nach dem Merge auf `main`** (GitHub-Minuten, privates Repo): kein Build bei PRs und auf `develop`, reine Doku-Merges ohne Lauf; vor dem PR lokal mit `-PbackendStreng=true` bauen. Actions auf Commit-SHA festgelegt, Dependabot meldet monatlich neue Versionen. Mit der Veröffentlichung als Open Source wieder bei PRs bauen |

@@ -70,6 +70,8 @@ class CloudBackup(
     private val reminders: suspend () -> Int,
     private val log: (String) -> Unit = {},
     private val clock: () -> Instant = Instant::now,
+    /** Built with a server ([CloudConfig.configured]); without one nothing runs in the cloud. */
+    private val configured: Boolean = true,
 ) {
     private val state = MutableStateFlow(CloudStatus(CloudPhase.Off))
     val status: StateFlow<CloudStatus> = state.asStateFlow()
@@ -428,6 +430,13 @@ class CloudBackup(
      * older than 3 days ([AutomaticBackup.checkStale]).
      */
     suspend fun backUpAutomatically() {
+        // KRITISCH: An app built without a server (installed over one with the cloud backup)
+        // stops the hourly backup instead of trying an empty address every hour.
+        if (!configured) {
+            schedule.stop()
+            log("cloud: no server in this build, hourly backup stopped")
+            return
+        }
         work(CloudStep.AUTO_BACKUP, clearNotes = false) { automatic.run(::busy) }.join()
         try {
             automatic.checkStale()

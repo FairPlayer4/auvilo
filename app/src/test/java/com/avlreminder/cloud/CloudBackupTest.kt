@@ -259,7 +259,7 @@ class CloudBackupTest {
     /** The logged events after the header, as JSON. */
     private fun events() = events.lines().drop(1).map(::JSONObject)
 
-    private fun cloud() = CloudBackup(
+    private fun cloud(configured: Boolean = true) = CloudBackup(
         store,
         server = { serversCreated++; server },
         keys = { acc ->
@@ -297,6 +297,7 @@ class CloudBackupTest {
         reminders = { reminderCount },
         log = { logged += it },
         clock = { now },
+        configured = configured,
     )
 
     /** The password service; by default the phone has none (as the older tests assume). */
@@ -1500,6 +1501,45 @@ class CloudBackupTest {
         blocking { cloud.signIn(activity).join() }
         assertTrue(notices.shown.isEmpty())
         assertNotNull(cloud.status.value.error)
+    }
+
+    // --- Built without a server (7.34 OV1) ------------------------------------------------
+
+    // KRITISCH: an app built without a server, installed over one with the cloud backup, stops
+    // the hourly backup and reaches no server.
+    @Test
+    fun withoutAServerTheHourlyBackupStopsAndReachesNoServer() {
+        val with = cloud()
+        ready(with)
+        blocking { with.backUp().join() }
+        val data = server.data
+        val stops = schedule.stops
+
+        val without = cloud(configured = false)
+        payload = "neue Daten".toByteArray()
+        auto(without)
+        assertEquals(data, server.data)
+        assertEquals(stops + 1, schedule.stops)
+        assertTrue(notices.shown.isEmpty())
+    }
+
+    // Counter-check: with a server the same step backs up.
+    @Test
+    fun withAServerTheHourlyBackupUploads() {
+        val cloud = cloud()
+        ready(cloud)
+        blocking { cloud.backUp().join() }
+        payload = "neue Daten".toByteArray()
+        auto(cloud)
+        assertTrue(onServer().nutzlast.contentEquals(payload))
+    }
+
+    @Test
+    fun aServerNeedsBothValues() {
+        assertTrue(CloudConfig.configured("https://server.example", "1-abc.apps.googleusercontent.com"))
+        assertFalse(CloudConfig.configured("", ""))
+        assertFalse(CloudConfig.configured("https://server.example", ""))
+        assertFalse(CloudConfig.configured("", "1-abc.apps.googleusercontent.com"))
     }
 
     // --- Account not let in by the server (backend ID7) -------------------------------

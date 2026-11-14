@@ -1,6 +1,7 @@
 package com.avlreminder.ui
 
 import com.avlreminder.PlaceSetResult
+import com.avlreminder.cloud.CloudConfig
 import com.avlreminder.graph
 import com.avlreminder.ui.screens.CloudActions
 
@@ -139,7 +140,7 @@ class MainActivity : ComponentActivity() {
                             appVersion = graph.appVersion, arrivalHint = !arrivalHintSeen, dwellMinutes = dwell, itemsDone = itemsDone,
                             reminderSort = reminderSort, suggestions = suggestions, overview = overview,
                             blockers = blockers, templates = templates, snoozeHints = snoozeHints,
-                            claudeAccess = claudeAccess, cloud = cloud, local = local,
+                            claudeAccess = claudeAccess, cloud = cloud.takeIf { CloudConfig.configured() }, local = local,
                         ),
                         actions = actions,
                         now = now,

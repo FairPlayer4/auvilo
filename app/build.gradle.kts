@@ -1,7 +1,32 @@
+import java.util.Properties
+
 plugins {
     id("com.android.application")
     id("org.jetbrains.kotlin.plugin.compose")
     id("com.google.devtools.ksp")
+}
+
+// Server des Cloud-Backups (Anf. 7.34 OV1): Adresse und Web-Client-ID stehen nicht im Repo,
+// damit fremde Builds nicht Kevins Server treffen. Gelesen als Gradle-Property (-P, die
+// gradle.properties in GRADLE_USER_HOME) oder aus local.properties. Ohne beide Werte blendet
+// die App das Cloud-Backup aus; eine solche APK kommt nicht auf ein Handy mit Cloud-Backup.
+val lokaleWerte = providers.fileContents(rootProject.layout.projectDirectory.file("local.properties")).asText
+    .map { text -> Properties().apply { load(text.reader()) } }
+fun cloudWert(name: String): String =
+    (providers.gradleProperty(name).orNull ?: lokaleWerte.orNull?.getProperty(name)).orEmpty().trim()
+val cloudServerUrl = cloudWert("avlCloudServerUrl")
+val cloudWebClientId = cloudWert("avlCloudWebClientId")
+when {
+    cloudServerUrl.isEmpty() && cloudWebClientId.isEmpty() ->
+        // quiet statt warn: Der übliche Build läuft mit -q und zeigte eine Warnung nicht.
+        logger.quiet("WARNUNG: avlCloudServerUrl und avlCloudWebClientId fehlen - Cloud-Backup ausgeblendet, " +
+            "diese APK nicht auf ein Handy mit Cloud-Backup installieren.")
+    cloudServerUrl.isEmpty() || cloudWebClientId.isEmpty() ->
+        throw GradleException("avlCloudServerUrl und avlCloudWebClientId nur zusammen setzen")
+    !cloudServerUrl.startsWith("https://") ->
+        throw GradleException("avlCloudServerUrl muss mit https:// beginnen")
+    !cloudWebClientId.endsWith(".apps.googleusercontent.com") ->
+        throw GradleException("avlCloudWebClientId ist keine OAuth-Client-ID (*.apps.googleusercontent.com)")
 }
 
 android {
@@ -16,10 +41,13 @@ android {
         targetSdk = 37
         versionCode = 21
         versionName = "1.3c1-backup5"
+        buildConfigField("String", "CLOUD_SERVER_URL", "\"$cloudServerUrl\"")
+        buildConfigField("String", "CLOUD_WEB_CLIENT_ID", "\"$cloudWebClientId\"")
     }
 
     buildFeatures {
         compose = true
+        buildConfig = true
     }
 
     compileOptions {
