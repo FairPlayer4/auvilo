@@ -101,6 +101,19 @@ class AndroidCloudNotices(private val context: Context) : CloudNotices {
         manager.cancel(TAG, ID_BRAKE)
     }
 
+    // KRITISCH: Not part of clear(): backing up by hand does not settle a deletion requested from
+    // elsewhere (a taken-over Google account); only cancelling it, or its end, does.
+    override fun deletionPending(at: Instant) = show(
+        ID_DELETION,
+        "Cloud-Konto wird gelöscht",
+        "Für dieses Konto ist die Löschung beantragt, ab ${time(at)} löscht der Server alles. Warst du das nicht, in den " +
+            "Einstellungen unter Cloud-Backup mit einem freigeschalteten Gerät „Löschung abbrechen“.",
+    )
+
+    override fun deletionGone() {
+        runCatching { context.getSystemService(NotificationManager::class.java).cancel(TAG, ID_DELETION) }
+    }
+
     private fun show(id: Int, title: String, text: String) {
         val open = PendingIntent.getActivity(
             context,
@@ -131,6 +144,7 @@ class AndroidCloudNotices(private val context: Context) : CloudNotices {
         const val ID_STALE = 2
         const val ID_BRAKE = 3
         const val ID_SIGN_IN = 4
+        const val ID_DELETION = 5
         private val FORMAT = DateTimeFormatter.ofPattern("dd.MM.yyyy, HH:mm")
 
         fun createChannel(context: Context) {

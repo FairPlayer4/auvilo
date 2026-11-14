@@ -2,11 +2,12 @@ package com.avlreminder.cloud
 
 import android.app.Activity
 import com.avlreminder.data.AvlDatabase
-import com.avlreminder.protokoll.CloudLoeschen
 import com.avlreminder.protokoll.Datensicherung
 import com.avlreminder.protokoll.Diagnose
 import com.avlreminder.protokoll.Eingerichtet
 import com.avlreminder.protokoll.Einrichtung
+import com.avlreminder.protokoll.KontoLoeschen
+import com.avlreminder.protokoll.KontoLoeschung
 import com.avlreminder.protokoll.Gesichert
 import com.avlreminder.protokoll.LokaleAblage
 import com.avlreminder.protokoll.NeueresSchema
@@ -76,6 +77,12 @@ class CloudBackup(
     private val state = MutableStateFlow(CloudStatus(CloudPhase.Off))
     val status: StateFlow<CloudStatus> = state.asStateFlow()
 
+    /** The server of the running step, for [heardFromServer]; null = none, or its news is outdated. */
+    @Volatile private var stepServer: CloudServer? = null
+
+    /** [server], remembered for [heardFromServer]. Every step gets its server here. */
+    private val connect: () -> CloudServer = { server().also { stepServer = it } }
+
     private val running = Mutex()
     private val confirm = Question<Boolean>()
     private val typed = Question<String?>()
@@ -84,7 +91,7 @@ class CloudBackup(
     private val brakeAnswer = Question<Boolean>()
     private val questions = listOf(confirm, typed, overwrite, restoreAnswer, brakeAnswer)
 
-    private val uploads = CloudUpload(store, server, backupState, events, log, clock)
+    private val uploads = CloudUpload(store, connect, backupState, events, log, clock)
     private val automatic = AutomaticBackup(store, keys, backupState, source, notices, restore, reminders, uploads, events, log, clock)
 
     /** The key on screen ([CloudPhase.ShowKey]) and its account, for [saveKey]. */
@@ -105,7 +112,7 @@ class CloudBackup(
     fun signIn(activity: Activity): Job = work(CloudStep.SIGN_IN) {
         if (!store.enabled()) return@work
         busy("Anmelden …")
-        val server = server()
+        val server = connect()
         val signedIn = server.signIn { nonce -> google.idToken(activity, nonce) }
         store.setUnlocked(signedIn.freigeschaltet)
         notices.signedIn()
@@ -121,7 +128,7 @@ class CloudBackup(
     fun continueSetup(activity: Activity? = null): Job = work(CloudStep.SETUP) {
         if (!store.enabled()) return@work
         busy("Verbinden …")
-        val server = server()
+        val server = connect()
         server.withSession { setUp(server, it, activity) }
     }
 
@@ -232,7 +239,7 @@ class CloudBackup(
         val local = keys(known.kontoId).laden() ?: return
         if (local.offenesBackup != null) return
         busy("Sicherung holen …")
-        val server = server()
+        val server = connect()
         val (session, fetched) = server.withSession { session ->
             if (session.kontoId != known.kontoId) error("Die Sitzung gehört zu einem anderen Konto")
             session to server.dataBackups(session.token).holen()
@@ -294,7 +301,7 @@ class CloudBackup(
             return@work
         }
         busy("Sicherung holen …")
-        val server = server()
+        val server = connect()
         server.withSession { session -> restoreWith(server, session, known.kontoId, local.bund.tresor) }
     }
 
@@ -377,7 +384,7 @@ class CloudBackup(
         if (!store.enabled()) return@work
         val known = store.lesen() ?: return@work
         busy("Sicherung löschen …")
-        val server = server()
+        val server = connect()
         server.withSession { session ->
             if (session.kontoId != known.kontoId) error("Die Sitzung gehört zu einem anderen Konto")
             Sicherungsablauf.loeschen(server.dataBackups(session.token), backupState(session.kontoId))
@@ -405,7 +412,7 @@ class CloudBackup(
         if (session != null) {
             busy("Abmelden …")
             try {
-                val server = server()
+                val server = connect()
                 server.withSession { server.lock(it.token, session.geraetId) }
                 locked = true
             } catch (e: CancellationException) {
@@ -418,6 +425,7 @@ class CloudBackup(
         busy("Auf dem Handy löschen …")
         schedule.stop()
         notices.clear()
+        notices.deletionGone()
         wipe()
         store.clear()
         events.record(CloudEvent.SIGNED_OUT, mapOf("gesperrt" to locked))
@@ -437,7 +445,10 @@ class CloudBackup(
             log("cloud: no server in this build, hourly backup stopped")
             return
         }
-        work(CloudStep.AUTO_BACKUP, clearNotes = false) { automatic.run(::busy) }.join()
+        work(CloudStep.AUTO_BACKUP, clearNotes = false) {
+            automatic.run(::busy)
+            askAboutDeletion()
+        }.join()
         try {
             automatic.checkStale()
         } catch (e: CancellationException) {
@@ -455,7 +466,7 @@ class CloudBackup(
     fun sendDiagnosis(): Job = work(CloudStep.DIAGNOSIS) {
         if (!store.enabled()) return@work
         busy("Diagnose senden …")
-        val server = server()
+        val server = connect()
         val size = server.withSession { Diagnose.senden(server.diagnosis(it.token), events.lines()) }
         val kib = CloudUpload.kib(size)
         events.record(CloudEvent.DIAGNOSIS_SENT, mapOf("kib" to kib))
@@ -464,56 +475,137 @@ class CloudBackup(
     }
 
     /**
-     * "Cloud-Daten löschen" (R-3): on the server the data backup with all its older versions and
-     * the key backup are deleted for good and this device is locked; on the phone the key file,
-     * the session and the Keystore keys go. Reminders and settings stay. Afterwards it is off and
-     * can be set up again. For a test device "Dieses Gerät abmelden" ([signOut]) is the way: this
-     * deletes the backup of every device of the account.
+     * "Konto löschen" (backend B1, DSGVO Art. 17; replaces "Cloud-Daten löschen", R-3). An unlocked
+     * device deletes the account on the server at once: both backups with all their versions, the
+     * devices, sessions, diagnoses and the account itself. This phone then forgets keys and session
+     * and is off; reminders and settings stay. A device that is not unlocked only requests it: the
+     * server deletes on a date ([CloudStatus.deletion]), any unlocked device can cancel until then,
+     * and this phone keeps its keys.
      *
-     * KRITISCH: Is the server just not reachable (no network, kill switch, limit), nothing is
-     * deleted on the phone: otherwise "reset" would leave the backup on the server unnoticed. Only
-     * when this device may not delete there anymore (locked, not unlocked, session rejected) the
-     * phone is reset anyway, with a note: waiting would not help.
+     * KRITISCH: The phone forgets its keys only after the server confirmed the deletion
+     * (`KontoLoeschen`). Not reachable, or only requested, the data on the server are still there,
+     * and without the keys this phone could neither read them nor cancel.
      */
-    fun deleteCloudData(): Job = work(CloudStep.RESET) {
+    fun deleteAccount(): Job = work(CloudStep.DELETE_ACCOUNT) {
         if (!store.enabled()) return@work
-        val session = store.lesen()
-        // Without a session nothing is deleted on the server; the log must not say otherwise.
-        var cleared = false
-        var othersLocked = 0
-        if (session != null) {
-            busy("Auf dem Server löschen …")
-            val server = server()
-            var token: String? = null
-            try {
-                // KRITISCH: locks every device of the account, the others first (Kap. 11, 2026-11-09).
-                othersLocked = server.withSession {
-                    token = it.token
-                    CloudLoeschen.alles(server.account(it.token))
-                }
-                cleared = true
-            } catch (e: CancellationException) {
-                throw e
-            } catch (e: Throwable) {
-                if (!CloudErrors.cannotActOnServer(e)) throw e
-                // Not unlocked: it cannot delete, but it can still lock itself.
-                token?.let { t -> runCatching { server.lock(t, session.geraetId) } }
-                log("cloud: reset, server not cleared (${CloudErrors.logDetail(e)})")
-                state.update {
-                    it.copy(
-                        notes = it.notes + "Auf dem Server ließ sich nichts löschen (${CloudErrors.describe(e)}). Ein Backup dort " +
-                            "bleibt mit dem Wiederherstellungsschlüssel erreichbar.",
-                    )
-                }
+        val known = store.lesen() ?: return@work
+        busy("Konto löschen …")
+        val server = connect()
+        val result = server.withSession { session ->
+            if (session.kontoId != known.kontoId) error("Die Sitzung gehört zu einem anderen Konto")
+            KontoLoeschen.loeschen(server.deletion(session.token)) {
+                busy("Auf dem Handy löschen …")
+                schedule.stop()
+                notices.clear()
+                notices.deletionGone()
+                wipe()
+                store.clear()
             }
         }
+        // What the server said at the renewal before is outdated now.
+        stepServer = null
+        when (result) {
+            KontoLoeschung.Geloescht -> {
+                events.record(CloudEvent.ACCOUNT_DELETED)
+                log("cloud: account deleted")
+                note("Das Konto ist auf dem Server gelöscht, mit allen Sicherungen. Reminder und Einstellungen auf diesem Handy bleiben.")
+            }
+            is KontoLoeschung.Beantragt -> {
+                // Set before the step reads the server's news: the own request is no notification.
+                store.setDeletion(result.ab, clock())
+                events.record(CloudEvent.DELETION_REQUESTED)
+                log("cloud: account deletion requested")
+                note(
+                    "Dieses Gerät ist nicht freigeschaltet, deshalb ist die Löschung nur beantragt. Bis zum Termin kann ein " +
+                        "freigeschaltetes Gerät sie abbrechen. Die Schlüssel bleiben so lange auf diesem Handy.",
+                )
+            }
+        }
+    }
+
+    /**
+     * "Löschung abbrechen" (backend B1): a requested deletion of the account does not happen. Only an
+     * unlocked device may; due already, the server refuses (`LoeschungLaeuft`).
+     */
+    fun cancelDeletion(): Job = work(CloudStep.CANCEL_DELETION) {
+        if (!store.enabled()) return@work
+        val known = store.lesen() ?: return@work
+        busy("Löschung abbrechen …")
+        val server = connect()
+        server.withSession { session ->
+            if (session.kontoId != known.kontoId) error("Die Sitzung gehört zu einem anderen Konto")
+            server.deletion(session.token).abbrechen()
+        }
+        stepServer = null
+        store.setDeletion(null, clock())
+        notices.deletionGone()
+        events.record(CloudEvent.DELETION_CANCELLED, mapOf("hier" to true))
+        log("cloud: account deletion cancelled")
+        note("Die Löschung ist abgebrochen, das Konto bleibt.")
+    }
+
+    /**
+     * "Nur dieses Handy zurücksetzen" (signed out, Review-Lauf 10, 2026-11-09): without a session
+     * nothing can be deleted on the server. The keys and the session of the backup on this phone go;
+     * reminders and settings stay. Afterwards it is off.
+     */
+    fun resetPhone(): Job = work(CloudStep.RESET) {
+        if (!store.enabled()) return@work
         busy("Auf dem Handy löschen …")
         schedule.stop()
         notices.clear()
+        notices.deletionGone()
         wipe()
         store.clear()
-        events.record(CloudEvent.RESET, mapOf("server_geleert" to cleared, "andere_gesperrt" to othersLocked))
-        log("cloud: reset, $othersLocked other devices locked")
+        events.record(CloudEvent.RESET)
+        log("cloud: phone reset")
+    }
+
+    /**
+     * KRITISCH: Learns at least once a day whether a deletion of the account is requested (backend
+     * B1), also while the data stay unchanged and nothing is uploaded. The server says it at every
+     * sign-in and renewal; so this renews the session when its last answer is older than
+     * [DELETION_CHECK]. The 7 days of a request leave time to cancel one made with a taken-over
+     * Google account. Only under the conditions of the automatic backup itself (A-9): switched on,
+     * unlocked (only such a device can cancel) and backed up by hand once.
+     */
+    private suspend fun askAboutDeletion() {
+        if (!store.enabled() || !store.unlocked()) return
+        val known = store.lesen() ?: return
+        if (store.lastBackup(known.kontoId) == null) return
+        val checked = store.deletionChecked()
+        if (checked != null && Duration.between(checked, clock()) < DELETION_CHECK) return
+        // Not session(): a session still valid comes from the phone, without the server's word.
+        connect().renew()
+    }
+
+    /**
+     * Takes in what the server said about a requested deletion during the step (sign-in, renewal).
+     * A new date shows as a notification, its end takes it away. Never throws: the step is done.
+     */
+    private suspend fun heardFromServer() {
+        val news = stepServer?.deletionNews() ?: return
+        stepServer = null
+        try {
+            // Signed out or reset meanwhile: nothing to keep.
+            if (!store.enabled() || store.lesen() == null) return
+            val before = store.deletion()
+            store.setDeletion(news.at, clock())
+            if (news.at == before) return
+            if (news.at != null) {
+                notices.deletionPending(news.at)
+                events.record(CloudEvent.DELETION_PENDING)
+                log("cloud: account deletion pending")
+            } else {
+                notices.deletionGone()
+                events.record(CloudEvent.DELETION_CANCELLED, mapOf("hier" to false))
+                log("cloud: account deletion no longer pending")
+            }
+        } catch (e: CancellationException) {
+            throw e
+        } catch (e: Throwable) {
+            log("cloud: deletion news not kept (${CloudErrors.logDetail(e)})")
+        }
     }
 
     private suspend fun setUp(server: CloudServer, session: Sitzung, activity: Activity?) {
@@ -571,6 +663,7 @@ class CloudBackup(
     private fun work(step: CloudStep, clearNotes: Boolean = true, block: suspend () -> Unit): Job {
         if (!running.tryLock()) return Job().apply { complete() }
         if (clearNotes) dismissNotes()
+        stepServer = null
         return scope.launch {
             // KRITISCH: The lock is released only after the final phase is set (Review-Lauf 10).
             // Released before, the next step could show its question (AskKey, AskRestore) and
@@ -598,12 +691,14 @@ class CloudBackup(
                     questions.forEach { it.close() }
                     shown = null
                 }
+                heardFromServer()
                 val phase = runCatching { current() }.getOrElse { e ->
                     if (error == null) error = CloudErrors.describe(e)
                     // Even the switch may be unreadable here; the app must not crash over the backup.
                     if (runCatching { store.enabled() }.getOrDefault(false)) CloudPhase.NotSetUp else CloudPhase.Off
                 }
-                state.update { it.copy(phase = phase, error = error) }
+                val deletion = runCatching { store.deletion() }.getOrNull()
+                state.update { it.copy(phase = phase, error = error, deletion = deletion) }
                 // KRITISCH: The hourly backup runs only while it may (switched on, set up, unlocked,
                 // backed up by hand once); switching off and resetting stop it.
                 if (phase is CloudPhase.Ready && phase.automatic) schedule.start()
@@ -676,6 +771,11 @@ class CloudBackup(
         overwrite.ask { phase(CloudPhase.AskOverwrite(head.erstellt)) }.also { busy("Sichern …") }
 
     private fun note(text: String) = state.update { it.copy(notes = it.notes + text) }
+
+    companion object {
+        /** How old the server's last word on a deletion may be before the hourly backup asks again. */
+        val DELETION_CHECK: Duration = Duration.ofHours(23)
+    }
     private fun busy(what: String) = phase(CloudPhase.Busy(what))
     private fun phase(p: CloudPhase) = state.update { it.copy(phase = p) }
 

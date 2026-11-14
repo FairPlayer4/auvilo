@@ -785,8 +785,15 @@ Fassung eines anderen Geräts fragt die nächste Sicherung vor dem Ersetzen (W-7
 `SicherungHolen` mit Version (R-4).
 
 **Abmelden und Löschen.** *Dieses Gerät abmelden* sperrt das Gerät beim Server.
-*Cloud-Daten löschen* sperrt erst alle anderen Geräte, löscht dann Sicherung und
-Schlüssel-Backup und sperrt zuletzt dieses Gerät (`CloudLoeschen`, R-3). Ein nicht
+*Konto löschen* (`deleteAccount`, R-3) löscht über `KontoLoeschen` das ganze Konto auf
+dem Server; das Handy vergisst Schlüssel und Sitzung erst nach der Bestätigung des
+Servers. Ein nicht freigeschaltetes Gerät beantragt nur (Termin in `CloudStatus.deletion`),
+*Löschung abbrechen* (`cancelDeletion`) geht nur freigeschaltet. Den Termin meldet der
+Server bei Anmeldung und Erneuerung (`Anmeldung.loeschenAb`); `CloudBackup` liest ihn
+nach jedem Schritt vom Server dieses Schritts (`deletionNews`, null = nicht gefragt) und
+meldet einen neuen Termin mit Benachrichtigung. Der stündliche Lauf erneuert die Sitzung,
+wenn die letzte Antwort älter als 23 Stunden ist (`askAboutDeletion`), auch bei
+unveränderten Daten. Ohne Sitzung setzt `resetPhone` nur das Handy zurück. Ein nicht
 freigeschaltetes Gerät kann sich mit dem Wiederherstellungsschlüssel freischalten.
 
 **Diagnose.** Eigener Logger mit festen Ereignissen und typisierten Feldern, ohne Texte

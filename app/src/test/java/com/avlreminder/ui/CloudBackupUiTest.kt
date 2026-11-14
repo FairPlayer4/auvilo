@@ -56,7 +56,9 @@ class CloudBackupUiTest {
         override fun answerBrake(yes: Boolean) { calls += "brake $yes" }
         override fun deleteBackup() { calls += "deleteBackup" }
         override fun signOut() { calls += "signOut" }
-        override fun deleteCloudData() { calls += "deleteCloudData" }
+        override fun deleteAccount() { calls += "deleteAccount" }
+        override fun cancelDeletion() { calls += "cancelDeletion" }
+        override fun resetPhone() { calls += "resetPhone" }
     }
 
     private fun show(status: CloudStatus): Recorder {
@@ -108,6 +110,21 @@ class CloudBackupUiTest {
         assertEquals(listOf("key abcd efgh"), actions.calls)
     }
 
+    // KRITISCH: the whole account ID shows, also on a device that is not unlocked: only with it can a
+    // request for information (DSGVO Art. 15) be matched. Not set up, there is no account to show.
+    @Test
+    fun theWholeAccountIdShowsOnceSetUp() {
+        val id = "0123456789abcdef0123456789abcdef"
+        var shown by mutableStateOf(CloudStatus(CloudPhase.Ready(id, "geraet-1", "AB12", unlocked = false)))
+        compose.setContent { AvlTheme(dark = false) { CloudBackupSetting(shown, Recorder()) } }
+        compose.onNodeWithTag("cloudAccountId").assertTextEquals("Konto-ID $id")
+        for (phase in listOf(CloudPhase.Off, CloudPhase.SignedOut, CloudPhase.NotSetUp)) {
+            shown = CloudStatus(phase)
+            compose.waitForIdle()
+            compose.onNodeWithTag("cloudAccountId").assertDoesNotExist()
+        }
+    }
+
     @Test
     fun readyShowsTheFingerprintAndAnError() {
         show(CloudStatus(CloudPhase.Ready("konto-1", "geraet-123456789", "AB12 CD34", unlocked = false), error = "Server gerade nicht erreichbar"))
@@ -138,28 +155,67 @@ class CloudBackupUiTest {
 
     private val readyUnlocked = CloudPhase.Ready("konto-1", "geraet-1", "AB12", unlocked = true, lastBackup = Instant.parse("2026-11-08T10:00:00Z"))
 
-    // KRITISCH: deleting the cloud data for good (R-3) needs the typed word; cancel does nothing.
+    // KRITISCH: deleting the account for good (backend B1) needs the typed word; cancel does nothing.
     @Test
-    fun deletingTheCloudDataNeedsTheTypedWord() {
+    fun deletingTheAccountNeedsTheTypedWord() {
         val actions = show(CloudStatus(readyUnlocked))
-        compose.onNodeWithTag("cloudDeleteAll").performScrollTo().performClick()
+        compose.onNodeWithTag("cloudDeleteAccount").performScrollTo().performClick()
+        compose.onNodeWithText("auch den anderen Handys", substring = true).assertExists()
+        compose.onNodeWithTag("cloudDeleteRequestOnly").assertDoesNotExist()
         compose.onNodeWithText("Abbrechen").performClick()
         assertEquals(emptyList<String>(), actions.calls)
 
-        compose.onNodeWithTag("cloudDeleteAll").performScrollTo().performClick()
-        compose.onNodeWithTag("cloudDeleteAllOk").assertIsNotEnabled()
+        compose.onNodeWithTag("cloudDeleteAccount").performScrollTo().performClick()
+        compose.onNodeWithTag("cloudDeleteAccountOk").assertIsNotEnabled()
         compose.onNodeWithTag("cloudDeleteWord").performTextInput("lösch")
-        compose.onNodeWithTag("cloudDeleteAllOk").assertIsNotEnabled()
+        compose.onNodeWithTag("cloudDeleteAccountOk").assertIsNotEnabled()
         compose.onNodeWithTag("cloudDeleteWord").performTextInput("en")
-        compose.onNodeWithTag("cloudDeleteAllOk").performClick()
-        assertEquals(listOf("deleteCloudData"), actions.calls)
+        compose.onNodeWithTag("cloudDeleteAccountOk").performClick()
+        assertEquals(listOf("deleteAccount"), actions.calls)
+    }
+
+    // Not unlocked, the dialog says that the server only takes a request and waits 7 days.
+    @Test
+    fun notUnlockedTheDialogSaysItOnlyRequests() {
+        show(CloudStatus(CloudPhase.Ready("konto-1", "geraet-1", "AB12", unlocked = false)))
+        compose.onNodeWithTag("cloudDeleteAccount").performScrollTo().performClick()
+        compose.onNodeWithTag("cloudDeleteRequestOnly").assertExists()
+    }
+
+    // KRITISCH: a requested deletion shows with its date (it may come from a taken-over Google
+    // account); an unlocked device cancels with one tap, any other says where it can be cancelled.
+    @Test
+    fun aRequestedDeletionShowsAndOnlyAnUnlockedDeviceCancels() {
+        val at = Instant.parse("2026-11-20T10:00:00Z")
+        var shown by mutableStateOf(CloudStatus(readyUnlocked, deletion = at))
+        val actions = Recorder()
+        compose.setContent { AvlTheme(dark = false) { Column(Modifier.verticalScroll(rememberScrollState())) { CloudBackupSetting(shown, actions) } } }
+        compose.onNodeWithTag("cloudDeletion").assertExists()
+        compose.onNodeWithTag("cloudCancelElsewhere").assertDoesNotExist()
+        compose.onNodeWithTag("cloudCancelDeletion").performClick()
+        assertEquals(listOf("cancelDeletion"), actions.calls)
+
+        for (phase in listOf(CloudPhase.Ready("konto-1", "geraet-1", "AB12", unlocked = false), CloudPhase.NotSetUp)) {
+            shown = CloudStatus(phase, deletion = at)
+            compose.waitForIdle()
+            compose.onNodeWithTag("cloudDeletion").assertExists()
+            compose.onNodeWithTag("cloudCancelElsewhere").assertExists()
+            compose.onNodeWithTag("cloudCancelDeletion").assertDoesNotExist()
+            // Requested already: asking again would change nothing.
+            compose.onNodeWithTag("cloudDeleteAccount").assertDoesNotExist()
+        }
+
+        shown = CloudStatus(readyUnlocked)
+        compose.waitForIdle()
+        compose.onNodeWithTag("cloudDeletion").assertDoesNotExist()
+        compose.onNodeWithTag("cloudCancelDeletion").assertDoesNotExist()
     }
 
     // Without a session nothing can be deleted on the server: the button says so and asks first.
     @Test
     fun signedOutTheButtonOnlyResetsThePhoneAndAsksFirst() {
         val actions = show(CloudStatus(CloudPhase.SignedOut))
-        compose.onNodeWithTag("cloudDeleteAll").assertDoesNotExist()
+        compose.onNodeWithTag("cloudDeleteAccount").assertDoesNotExist()
         compose.onNodeWithTag("cloudResetPhone").performScrollTo().performClick()
         compose.onNodeWithText("Die Sicherung auf dem Server bleibt", substring = true).assertExists()
         compose.onNodeWithText("Abbrechen").performClick()
@@ -167,7 +223,7 @@ class CloudBackupUiTest {
 
         compose.onNodeWithTag("cloudResetPhone").performScrollTo().performClick()
         compose.onNodeWithTag("cloudResetPhoneOk").performClick()
-        assertEquals(listOf("deleteCloudData"), actions.calls)
+        assertEquals(listOf("resetPhone"), actions.calls)
     }
 
     // KRITISCH: signing out and deleting the backup ask first (R-3, W-8).
@@ -202,7 +258,7 @@ class CloudBackupUiTest {
         for (phase in listOf(CloudPhase.Off, CloudPhase.ShowKey("ABCD-EFGH"))) {
             shown = CloudStatus(phase)
             compose.waitForIdle()
-            for (tag in listOf("cloudDeleteAll", "cloudSignOut", "cloudDeleteBackup")) {
+            for (tag in listOf("cloudDeleteAccount", "cloudSignOut", "cloudDeleteBackup")) {
                 compose.onNodeWithTag(tag).assertDoesNotExist()
             }
         }
@@ -233,7 +289,7 @@ class CloudBackupUiTest {
         val at = Instant.parse("2026-11-08T10:00:00Z")
         val actions = Recorder()
         var status by mutableStateOf(CloudStatus(readyUnlocked, report = BackupReport(at, fromThisDevice = true, unchanged = true, comparison = sameEverywhere())))
-        compose.setContent { AvlTheme(dark = false) { CloudBackupSetting(status, actions) } }
+        compose.setContent { AvlTheme(dark = false) { Column(Modifier.verticalScroll(rememberScrollState())) { CloudBackupSetting(status, actions) } } }
         compose.onNodeWithTag("restoreSame").assertExists()
         compose.onNodeWithTag("cloudBackUpAndCheck").assertDoesNotExist()
 
@@ -243,7 +299,7 @@ class CloudBackupUiTest {
         compose.onNodeWithText("Reminder: 1 geändert").assertExists()
         compose.onNodeWithTag("cloudChangedSince").assertExists()
         compose.onNodeWithTag("cloudOtherDevice").assertDoesNotExist()
-        compose.onNodeWithTag("cloudBackUpAndCheck").performClick()
+        compose.onNodeWithTag("cloudBackUpAndCheck").performScrollTo().performClick()
         assertEquals(listOf("backUpAndCheck"), actions.calls)
 
         // KRITISCH: another device's backup is no "change since", and checking it never offers to
@@ -353,7 +409,7 @@ class CloudBackupUiTest {
         val actions = show(CloudStatus(CloudPhase.AskOverwrite(Instant.parse("2026-11-01T08:00:00Z"))))
         compose.onNodeWithTag("cloudOverwriteText").assertExists()
         compose.onNodeWithTag("cloudSwitch").assertIsNotEnabled()
-        compose.onNodeWithTag("cloudDeleteAll").assertDoesNotExist()
+        compose.onNodeWithTag("cloudDeleteAccount").assertDoesNotExist()
         compose.onNodeWithTag("cloudKeep").performClick()
         compose.onNodeWithTag("cloudOverwrite").performClick()
         assertEquals(listOf("overwrite false", "overwrite true"), actions.calls)

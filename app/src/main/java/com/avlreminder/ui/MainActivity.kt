@@ -230,7 +230,9 @@ class MainActivity : ComponentActivity() {
             override fun answerBrake(yes: Boolean) = graph.cloud.answerBrake(yes)
             override fun deleteBackup() { graph.cloud.deleteBackup() }
             override fun signOut() { graph.cloud.signOut() }
-            override fun deleteCloudData() { graph.cloud.deleteCloudData() }
+            override fun deleteAccount() { graph.cloud.deleteAccount() }
+            override fun cancelDeletion() { graph.cloud.cancelDeletion() }
+            override fun resetPhone() { graph.cloud.resetPhone() }
         }
         override val local = object : com.avlreminder.ui.screens.LocalActions {
             override fun fromSnapshot(date: java.time.LocalDate) { graph.local.fromSnapshot(date) }

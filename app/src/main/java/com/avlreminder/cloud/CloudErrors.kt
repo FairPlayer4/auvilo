@@ -11,6 +11,7 @@ import com.avlreminder.protokoll.DiagnoseZuGross
 import com.avlreminder.protokoll.EinrichtungAbgebrochen
 import com.avlreminder.protokoll.EntschluesselnFehlgeschlagen
 import com.avlreminder.protokoll.GeraetNichtFreigeschaltet
+import com.avlreminder.protokoll.LoeschungLaeuft
 import com.avlreminder.protokoll.NeueresSchema
 import com.avlreminder.protokoll.SicherungTageslimit
 import com.avlreminder.protokoll.SicherungZuGross
@@ -42,11 +43,6 @@ object CloudErrors {
         }
     }
 
-    /** Errors after which this device can do nothing more on the server ("Cloud-Daten löschen"). */
-    fun cannotActOnServer(e: Throwable): Boolean =
-        e is GeraetNichtFreigeschaltet || e is GeraetGesperrt || e is AnmeldungAbgelehnt || e is NichtAngemeldet ||
-            e is KontoNichtFreigegeben
-
     /**
      * For the diag log: the kind of error and what Google or the server said about it. The
      * cause of a failed Google sign-in (wrong SHA-1, client not set up) is only in
@@ -73,6 +69,7 @@ object CloudErrors {
         is GeraetGesperrt -> "Dieses Gerät ist beim Server gesperrt."
         is NichtAngemeldet -> "Nicht angemeldet. Bitte mit Google anmelden."
         is GeraetNichtFreigeschaltet -> "Dieses Gerät ist noch nicht freigeschaltet."
+        is LoeschungLaeuft -> "Die Löschung des Kontos ist schon fällig, abbrechen geht nicht mehr."
         is EinrichtungAbgebrochen -> "Einrichtung abgebrochen: ${e.message}"
         is KeysOfOtherAccount -> e.message
         is SicherungZuGross -> "Sicherung zu groß, nichts hochgeladen."
@@ -104,7 +101,7 @@ object CloudErrors {
 /** The kind of error, for [CloudEvent.FAILED]; the same split as [CloudErrors.describe]. */
 enum class FailureKind {
     GOOGLE, REJECTED, NOT_ALLOWED, LOCKED, SIGNED_OUT, NOT_UNLOCKED, SETUP_CANCELLED, OTHER_ACCOUNT, TOO_LARGE, DAILY_LIMIT,
-    OLDER_BACKUP, CHANGED_MEANWHILE, NEWER_SCHEMA, DIAGNOSIS_NOT_ALLOWED, SERVER, NETWORK, DAMAGED, BUSY, OTHER;
+    OLDER_BACKUP, CHANGED_MEANWHILE, NEWER_SCHEMA, DIAGNOSIS_NOT_ALLOWED, DELETION_DUE, SERVER, NETWORK, DAMAGED, BUSY, OTHER;
 
     companion object {
         fun of(e: Throwable) = when (e) {
@@ -124,6 +121,7 @@ enum class FailureKind {
             is DamagedBackup, is DamagedDatabase, is EntschluesselnFehlgeschlagen -> DAMAGED
             is RestoreBusy -> BUSY
             is DiagnoseNichtFreigeschaltet -> DIAGNOSIS_NOT_ALLOWED
+            is LoeschungLaeuft -> DELETION_DUE
             is Serverfehler -> SERVER
             is IOException -> NETWORK
             else -> OTHER

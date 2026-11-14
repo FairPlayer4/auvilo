@@ -30,6 +30,10 @@ enum class CloudEvent(val area: String, val id: String, val level: LogLevel) {
     RESTORED("wiederherstellen", "getauscht", LogLevel.INFO),
     SWAP_FAILED("wiederherstellen", "fehlgeschlagen", LogLevel.ERROR),
     DIAGNOSIS_SENT("diagnose", "gesendet", LogLevel.INFO),
+    ACCOUNT_DELETED("konto", "geloescht", LogLevel.INFO),
+    DELETION_REQUESTED("konto", "loeschung_beantragt", LogLevel.INFO),
+    DELETION_PENDING("konto", "loeschung_gemeldet", LogLevel.WARN),
+    DELETION_CANCELLED("konto", "loeschung_abgebrochen", LogLevel.INFO),
 }
 
 /**

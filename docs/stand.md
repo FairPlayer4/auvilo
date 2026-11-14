@@ -1,6 +1,6 @@
 # Stand und nächste Schritte
 
-Stand: 2026-11-13. Bei jedem größeren Schritt aktualisieren. Erledigtes steht in git, in
+Stand: 2026-11-14. Bei jedem größeren Schritt aktualisieren. Erledigtes steht in git, in
 anforderungen.md Kap. 10.1 und in den Review-Berichten (`.review/runs/`), nicht hier.
 
 ## Auf dem Gerät (S24)
@@ -39,7 +39,11 @@ einer Fassung.
    Nachweis-Pflicht. Darauf aufbauend **V1.3c1** (`versionCode` 21, `feature/v1.3c1`, noch
    nicht installiert): Verschiebe-Limit pro Termin, Woche oder Monat (Z2b), Schema 11. Am
    Gerät: einen Reminder auf „1× pro Woche“ stellen, verschieben; der nächste Termin zeigt
-   „wieder ab Mo …“ ausgegraut (K35).
+   „wieder ab Mo …“ ausgegraut (K35). Darauf **V1.3c2** (`versionCode` 22,
+   `feature/konto-loeschen`, noch nicht installiert): *Konto löschen* ersetzt *Cloud-Daten
+   löschen* (R-3, Backend B1/K1), mit Antrag, *Löschung abbrechen* und Benachrichtigung bei
+   einem Antrag von anderswo; die Konto-ID wird zum Kopieren angezeigt (Auskunft, Art. 15).
+   Am Gerät nur auf dem Emulator mit Testkonto: C15–C17.
 1. **Gerätetests** aus [geraetetest.md](geraetetest.md): K15, K23–K26 (vorher *Zuhause* in
    *Orte* mit WLAN neu festlegen), K27–K30 (Sitzung, dabei: zeigt die Uhr den
    Chronometer?), K31, K32. In den nächsten Tagen im `diag.log` prüfen, dass keine Ankunft mehr direkt nach
@@ -61,8 +65,8 @@ einer Fassung.
    `main` setzt Kevin.
 8. **Vor der Sicherheitsphase** (Backend-Prüfung 2026-11-12; Liste „Vorher fertig“ in
    Backend `docs/b2b-entwurf.md`): A-15 neu (Papier als Standard, Hinweis vor dem
-   Speichern), *Konto löschen*, Bestätigung mit der Displaysperre für *Cloud-Daten
-   löschen*, *Konto löschen* und *Gerät sperren*; Format v2 kommt über `client/`.
+   Speichern), Bestätigung mit der Displaysperre für *Konto löschen* und *Gerät sperren*
+   (SE5); Format v2 kommt über `client/`. *Konto löschen* ist in V1.3c2 umgesetzt.
 9. **Repo veröffentlichen** (in Wochen bis Monaten, 7.34): keine Secrets gefunden.
    App und Backend sollen in den nächsten Wochen öffentlich werden. Erledigt: Zugang nur
    nach Freigabe, Kostengrenzen und konfigurierbarer Server (OV1), echte Testdaten nur

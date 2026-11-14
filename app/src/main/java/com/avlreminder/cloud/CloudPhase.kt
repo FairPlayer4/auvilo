@@ -61,9 +61,16 @@ sealed interface CloudPhase {
 
 /**
  * [notes]: what the setup told the person; [error]: why the last step failed; [report]: the result
- * of the last "Sicherung prüfen".
+ * of the last "Sicherung prüfen"; [deletion]: when the server deletes the account (backend B1),
+ * null = no deletion requested.
  */
-data class CloudStatus(val phase: CloudPhase, val notes: List<String> = emptyList(), val error: String? = null, val report: BackupReport? = null)
+data class CloudStatus(
+    val phase: CloudPhase,
+    val notes: List<String> = emptyList(),
+    val error: String? = null,
+    val report: BackupReport? = null,
+    val deletion: Instant? = null,
+)
 
 /**
  * The result of "Sicherung prüfen" (W-1, W-2): the backup made at [created], from this device or
@@ -73,7 +80,7 @@ data class CloudStatus(val phase: CloudPhase, val notes: List<String> = emptyLis
 data class BackupReport(val created: Instant, val fromThisDevice: Boolean, val unchanged: Boolean, val comparison: Comparison)
 
 /** The step a [CloudEvent.FAILED] happened in. */
-enum class CloudStep { LOAD, SWITCH, SIGN_IN, SETUP, BACKUP, AUTO_BACKUP, DIAGNOSIS, RESET, CHECK, RESTORE, DELETE_BACKUP, SIGN_OUT }
+enum class CloudStep { LOAD, SWITCH, SIGN_IN, SETUP, BACKUP, AUTO_BACKUP, DIAGNOSIS, RESET, CHECK, RESTORE, DELETE_BACKUP, SIGN_OUT, DELETE_ACCOUNT, CANCEL_DELETION }
 
 /** How the setup ended, for [CloudEvent.SET_UP]. */
 enum class SetupKind {

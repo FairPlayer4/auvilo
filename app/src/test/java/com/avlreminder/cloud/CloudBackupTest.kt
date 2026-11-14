@@ -26,9 +26,10 @@ import com.avlreminder.protokoll.GeholteSicherung
 import com.avlreminder.protokoll.GeholtesBackup
 import com.avlreminder.protokoll.GeraeteFreischaltung
 import com.avlreminder.protokoll.GeraetNichtFreigeschaltet
-import com.avlreminder.protokoll.KontoAufDemServer
-import com.avlreminder.protokoll.KontoGeraet
+import com.avlreminder.protokoll.KontoLoeschenAmServer
+import com.avlreminder.protokoll.KontoLoeschung
 import com.avlreminder.protokoll.LokaleAblage
+import com.avlreminder.protokoll.LoeschungLaeuft
 import com.avlreminder.protokoll.LokalerStand
 import com.avlreminder.protokoll.Schluesselbund
 import com.avlreminder.protokoll.Sicherung
@@ -108,12 +109,23 @@ class CloudBackupTest {
             signIns++
             val session = Sitzung(account, "geraet-1", "token-$signIns", 4_000_000_000)
             store.speichern(session)
+            hear()
             return Angemeldet(session, neuesKonto = backup == null, freigeschaltet = unlockedAtSignIn)
         }
 
         override suspend fun session(): Sitzung {
             sessionError?.let { throw it }
             return store.lesen() ?: throw NichtAngemeldet()
+        }
+
+        var renewals = 0
+
+        override suspend fun renew(): Sitzung {
+            sessionError?.let { throw it }
+            val session = store.lesen() ?: throw NichtAngemeldet()
+            renewals++
+            hear()
+            return session
         }
 
         override fun keyBackups() = object : BackupAblage {
@@ -161,31 +173,46 @@ class CloudBackupTest {
             }
         }
 
-        /** Thrown where this device needs to be unlocked: deleting, locking another device. */
-        var deleteError: Throwable? = null
-        var dataBackup = true
+        /** The devices locked on the server. */
         val locked = mutableListOf<String>()
 
-        /** The other devices of the account. */
-        val others = mutableListOf<String>()
+        /** "Konto löschen" (backend B1): requested until [deletionAt], or done. */
+        var unlockedHere = true
+        var deletionAt: Instant? = null
+        var deletionError: Throwable? = null
+        var cancelError: Throwable? = null
+        var accountDeleted = false
 
-        override fun account(token: String) = object : KontoAufDemServer {
-            override suspend fun geraete() =
-                (listOf("geraet-1") + others).map { KontoGeraet(it, gesperrt = it in locked, diesesGeraet = it == "geraet-1") }
+        /** Like `Anmeldung.loeschenAb`: what this instance heard at its last sign-in or renewal. */
+        var heard = false
+        private var reported: Instant? = null
 
-            override suspend fun sperren(geraetId: String) {
-                if (geraetId != "geraet-1") deleteError?.let { throw it }
-                locked += geraetId
-            }
+        private fun hear() {
+            reported = deletionAt
+            heard = true
+        }
 
-            override suspend fun datensicherungLoeschen() {
-                deleteError?.let { throw it }
-                dataBackup = false
-                data = null
-            }
+        override fun deletionNews() = if (heard) DeletionNews(reported) else null
 
-            override suspend fun schluesselBackupLoeschen() {
+        override fun deletion(token: String) = object : KontoLoeschenAmServer {
+            override suspend fun loeschen(): KontoLoeschung {
+                deletionError?.let { throw it }
+                if (!unlockedHere) {
+                    val at = deletionAt ?: now.plus(Duration.ofDays(7))
+                    deletionAt = at
+                    return KontoLoeschung.Beantragt(at)
+                }
+                accountDeleted = true
                 backup = null
+                data = null
+                deletionAt = null
+                return KontoLoeschung.Geloescht
+            }
+
+            override suspend fun abbrechen() {
+                cancelError?.let { throw it }
+                if (!unlockedHere) throw GeraetNichtFreigeschaltet()
+                deletionAt = null
             }
         }
 
@@ -219,7 +246,9 @@ class CloudBackupTest {
         override fun brake(before: Int, now: Int) { shown += "brake $before $now" }
         override fun signInAgain() { shown += "signInAgain" }
         override fun signedIn() { shown.remove("signInAgain") }
-        override fun clear() { shown.clear() }
+        override fun clear() { shown.removeAll { !it.startsWith("deletion ") } }
+        override fun deletionPending(at: Instant) { deletionGone(); shown += "deletion $at" }
+        override fun deletionGone() { shown.removeAll { it.startsWith("deletion ") } }
     }
     private var payloadReads = 0
     private var reminderCount = 3
@@ -261,7 +290,7 @@ class CloudBackupTest {
 
     private fun cloud(configured: Boolean = true) = CloudBackup(
         store,
-        server = { serversCreated++; server },
+        server = { serversCreated++; server.heard = false; server },
         keys = { acc ->
             object : LokaleAblage {
                 override fun laden(): LokalerStand? {
@@ -776,85 +805,191 @@ class CloudBackupTest {
         assertEquals(2, safe.reads)
     }
 
-    // --- Reset ---------------------------------------------------------------------------
+    // --- Konto löschen (backend B1, R-3) --------------------------------------------------
 
-    // KRITISCH: after a reset nothing of the old setup is left, and it can be set up anew.
+    /** Set up and backed up by hand: the hourly backup may run. */
+    private fun backedUpByHand(cloud: CloudBackup): CloudPhase.Ready {
+        ready(cloud)
+        blocking { cloud.backUp().join() }
+        return cloud.status.value.phase as CloudPhase.Ready
+    }
+
+    private fun event(id: String) = events().filter { it.getString("ereignis") == id }
+
+    // KRITISCH: an unlocked device deletes the account at once; afterwards nothing of the old
+    // setup is left on the phone, and it can be set up anew.
     @Test
-    fun aResetDeletesOnTheServerAndOnThePhoneAndAllowsANewSetup() {
+    fun anUnlockedDeviceDeletesTheAccountAndCanSetUpAnew() {
         val cloud = cloud()
-        val before = ready(cloud)
-        blocking { cloud.deleteCloudData().join() }
+        val before = backedUpByHand(cloud)
+        val stops = schedule.stops
+        blocking { cloud.deleteAccount().join() }
         assertEquals(CloudPhase.Off, cloud.status.value.phase)
         assertNull(cloud.status.value.error)
-        assertNull("key backup", server.backup)
-        assertFalse("data backup", server.dataBackup)
-        assertEquals(listOf("geraet-1"), server.locked)
+        assertTrue(server.accountDeleted)
         assertEquals(1, wiped)
         assertTrue(local.isEmpty())
         assertNull(blocking { store.lesen() })
+        assertEquals(stops + 1, schedule.stops)
+        assertNull(cloud.status.value.deletion)
+        assertTrue(cloud.status.value.notes.toString(), cloud.status.value.notes.any { "auf dem Server gelöscht" in it })
+        assertEquals(1, event("geloescht").count { it.getString("bereich") == "konto" })
 
         val again = ready(cloud)
         assertTrue("new keys", again.fingerprint != before.fingerprint)
     }
 
+    // KRITISCH: a device that is not unlocked only requests the deletion. It keeps its keys (to
+    // read the data and to see the date), and its own request is no notification.
+    @Test
+    fun aDeviceThatIsNotUnlockedOnlyRequestsAndKeepsItsKeys() {
+        val cloud = cloud()
+        val before = backedUpByHand(cloud)
+        server.unlockedHere = false
+        blocking { cloud.deleteAccount().join() }
+        val status = cloud.status.value
+        assertNull(status.error)
+        assertFalse(server.accountDeleted)
+        assertEquals(now.plus(Duration.ofDays(7)), status.deletion)
+        assertEquals(before, status.phase)
+        assertEquals(0, wiped)
+        assertTrue(local.isNotEmpty())
+        assertNotNull(blocking { store.lesen() })
+        assertTrue(notices.shown.toString(), notices.shown.none { it.startsWith("deletion") })
+        assertEquals(1, event("loeschung_beantragt").size)
+        assertTrue(status.notes.toString(), status.notes.any { "nur beantragt" in it })
+    }
+
     // KRITISCH: the server just not reachable, nothing is deleted on the phone.
     @Test
-    fun aResetWithoutTheServerDeletesNothingOnThePhone() {
+    fun withoutTheServerNothingIsDeletedOnThePhone() {
         val cloud = cloud()
-        val before = ready(cloud)
-        server.deleteError = Serverfehler(ConnectException(Code.UNAVAILABLE), vomDienst = false)
-        blocking { cloud.deleteCloudData().join() }
+        val before = backedUpByHand(cloud)
+        server.deletionError = Serverfehler(ConnectException(Code.UNAVAILABLE), vomDienst = false)
+        blocking { cloud.deleteAccount().join() }
         assertEquals(before, cloud.status.value.phase)
         assertTrue(cloud.status.value.error.orEmpty().contains("nicht erreichbar"))
         assertEquals(0, wiped)
         assertTrue(local.isNotEmpty())
         assertNotNull(blocking { store.lesen() })
-        assertTrue(server.locked.isEmpty())
+        assertNull(cloud.status.value.deletion)
     }
 
-    // KRITISCH: "Cloud-Daten löschen" locks every device of the account, this one last; otherwise
-    // another device sets the data backup up again without a key backup (Kap. 11, 2026-11-09).
+    // KRITISCH: a request made elsewhere (perhaps with a taken-over Google account) shows here
+    // once as a notification and in the status; cancelled elsewhere, both go (backend B1).
     @Test
-    fun aResetLocksEveryOtherDeviceFirstAndThisOneLast() {
+    fun aRequestFromElsewhereShowsOnceAndGoesWhenCancelledElsewhere() {
         val cloud = cloud()
-        ready(cloud)
-        server.others += listOf("geraet-2", "geraet-3")
-        blocking { cloud.deleteCloudData().join() }
-        assertEquals(CloudPhase.Off, cloud.status.value.phase)
-        assertEquals(listOf("geraet-2", "geraet-3", "geraet-1"), server.locked)
-        assertNull("key backup", server.backup)
-        assertFalse("data backup", server.dataBackup)
+        backedUpByHand(cloud)
+        val at = now.plus(Duration.ofDays(7))
+        server.deletionAt = at
+        now = now.plus(Duration.ofDays(1))
+        auto(cloud)
+        assertEquals(at, cloud.status.value.deletion)
+        assertEquals(listOf("deletion $at"), notices.shown)
+        assertEquals(1, event("loeschung_gemeldet").size)
+
+        // Heard again: no second notification, no second event.
+        now = now.plus(Duration.ofDays(1))
+        auto(cloud)
+        assertEquals(1, event("loeschung_gemeldet").size)
+        // Backing up by hand clears the backup's notices, not this one.
+        blocking { cloud.backUp().join() }
+        assertEquals(listOf("deletion $at"), notices.shown)
+
+        server.deletionAt = null
+        now = now.plus(Duration.ofDays(1))
+        auto(cloud)
+        assertNull(cloud.status.value.deletion)
+        assertTrue(notices.shown.toString(), notices.shown.isEmpty())
+        val cancelled = event("loeschung_abgebrochen").single()
+        assertFalse(cancelled.getJSONObject("felder").getBoolean("hier"))
     }
 
+    // KRITISCH: the hourly backup asks the server at least daily, also while the data stay
+    // unchanged and nothing is uploaded; within the day it does not ask again.
     @Test
-    fun aDeviceThatMayNotDeleteResetsThePhoneLocksItselfAndSaysSo() {
+    fun theHourlyBackupAsksAboutADeletionDailyEvenWithUnchangedData() {
         val cloud = cloud()
-        ready(cloud)
-        server.others += "geraet-2"
-        server.deleteError = GeraetNichtFreigeschaltet()
-        blocking { cloud.deleteCloudData().join() }
-        assertEquals(CloudPhase.Off, cloud.status.value.phase)
-        assertEquals(1, wiped)
-        assertEquals("only itself", listOf("geraet-1"), server.locked)
-        assertTrue(cloud.status.value.notes.toString(), cloud.status.value.notes.any { "nichts löschen" in it })
+        backedUpByHand(cloud)
+        val data = server.data
+        val renewals = server.renewals
+        for (hour in 1..22) {
+            now = now.plusSeconds(3600)
+            auto(cloud)
+        }
+        assertEquals("within the day", renewals, server.renewals)
+        now = now.plusSeconds(3600)
+        auto(cloud)
+        assertEquals("after 23 hours", renewals + 1, server.renewals)
+        now = now.plusSeconds(3600)
+        auto(cloud)
+        assertEquals("the hour after", renewals + 1, server.renewals)
+        assertEquals("nothing uploaded", data, server.data)
+    }
+
+    // Only an unlocked device may cancel; due already, nobody can.
+    @Test
+    fun cancellingTheDeletionNeedsAnUnlockedDeviceAndTime() {
+        data class Case(val name: String, val unlocked: Boolean, val error: Throwable?, val says: String?)
+        val cases = listOf(
+            Case("freigeschaltet", true, null, null),
+            Case("nicht freigeschaltet", false, null, "nicht freigeschaltet"),
+            Case("schon fällig", true, LoeschungLaeuft(), "schon fällig"),
+        )
+        for (case in cases) {
+            blocking { store.clear() }
+            local.clear()
+            remembered.clear()
+            server.data = null
+            server.backup = null
+            server.unlockedHere = true
+            server.cancelError = null
+            notices.shown.clear()
+            val cloud = cloud()
+            backedUpByHand(cloud)
+            val at = now.plus(Duration.ofDays(7))
+            server.deletionAt = at
+            now = now.plus(Duration.ofDays(1))
+            auto(cloud)
+            assertEquals(case.name, at, cloud.status.value.deletion)
+
+            server.unlockedHere = case.unlocked
+            server.cancelError = case.error
+            blocking { cloud.cancelDeletion().join() }
+            val status = cloud.status.value
+            if (case.says == null) {
+                assertNull(case.name, status.error)
+                assertNull(case.name, server.deletionAt)
+                assertNull(case.name, status.deletion)
+                assertTrue(case.name, notices.shown.isEmpty())
+                assertTrue(case.name, event("loeschung_abgebrochen").last().getJSONObject("felder").getBoolean("hier"))
+            } else {
+                assertTrue("${case.name}: ${status.error}", status.error.orEmpty().contains(case.says))
+                assertEquals(case.name, at, server.deletionAt)
+                assertEquals(case.name, at, status.deletion)
+                assertEquals(case.name, listOf("deletion $at"), notices.shown)
+            }
+        }
     }
 
     @Test
     fun signedOutAResetOnlyClearsThePhone() {
         val cloud = cloud()
         blocking { cloud.setEnabled(true).join() }
-        blocking { cloud.deleteCloudData().join() }
+        blocking { cloud.resetPhone().join() }
         assertEquals(CloudPhase.Off, cloud.status.value.phase)
         assertEquals(1, wiped)
         assertEquals(0, serversCreated)
-        // The log must not claim the server was cleared.
-        assertEquals(false, events().single { it.getString("ereignis") == "zurueckgesetzt" }.getJSONObject("felder").getBoolean("server_geleert"))
+        assertEquals(1, event("zurueckgesetzt").size)
     }
 
     @Test
-    fun switchedOffAResetDoesNothing() {
+    fun switchedOffNeitherResetNorDeletionDoAnything() {
         val cloud = cloud()
-        blocking { cloud.deleteCloudData().join() }
+        blocking { cloud.resetPhone().join() }
+        blocking { cloud.deleteAccount().join() }
+        blocking { cloud.cancelDeletion().join() }
         assertEquals(0, wiped)
         assertEquals(0, serversCreated)
     }
@@ -1153,7 +1288,7 @@ class CloudBackupTest {
     }
 
     // KRITISCH: signing out (R-3) deletes nothing on the server, also when the server is not
-    // reachable; deleting the cloud data does.
+    // reachable; deleting the account does.
     @Test
     fun signingOutDeletesNothingOnTheServer() {
         for (reachable in listOf(true, false)) {
@@ -1168,7 +1303,7 @@ class CloudBackupTest {
             assertEquals(CloudPhase.Off, cloud.status.value.phase)
             assertEquals(data, server.data)
             assertEquals(keyBackup, server.backup)
-            assertTrue(server.dataBackup)
+            assertFalse(server.accountDeleted)
             assertEquals(1, wiped)
             assertNull(blocking { store.lesen() })
             if (reachable) {
@@ -1356,7 +1491,7 @@ class CloudBackupTest {
     }
 
     // KRITISCH: the hourly backup touches nothing unless it may: switched on, set up, unlocked and
-    // backed up by hand once.
+    // backed up by hand once. A day later, so that the daily question about a deletion is due too.
     @Test
     fun theAutomaticBackupDoesNothingUnlessItMay() {
         val cases = listOf<Pair<String, (CloudBackup) -> Unit>>(
@@ -1386,6 +1521,7 @@ class CloudBackupTest {
             val reads = payloadReads
             val before = server.data
             payload = "geändert $case".toByteArray()
+            now = now.plus(Duration.ofDays(1))
             auto(cloud)
             assertEquals(case, servers, serversCreated)
             assertEquals(case, reads, payloadReads)
@@ -1618,7 +1754,7 @@ class CloudBackupTest {
     }
 
     // KRITISCH: the hourly rhythm runs only after the first backup by hand; switching off and
-    // resetting stop it.
+    // deleting the account stop it.
     @Test
     fun theScheduleRunsOnlyWhileTheAutomaticBackupMay() {
         val cloud = cloud()
@@ -1637,7 +1773,7 @@ class CloudBackupTest {
 
         blocking { cloud.setEnabled(true).join() }
         assertEquals(3, schedule.starts)
-        blocking { cloud.deleteCloudData().join() }
+        blocking { cloud.deleteAccount().join() }
         assertEquals(2, schedule.stops)
         assertEquals(CloudPhase.Off, cloud.status.value.phase)
         assertEquals(3, schedule.starts)

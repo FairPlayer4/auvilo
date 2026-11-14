@@ -60,23 +60,29 @@ interface CloudActions {
     fun answerBrake(yes: Boolean) {}
     fun deleteBackup() {}
     fun signOut() {}
-    fun deleteCloudData() {}
+    fun deleteAccount() {}
+    fun cancelDeletion() {}
+    fun resetPhone() {}
 }
 
 /**
  * "Cloud-Backup (experimentell)" (A-14): setting up, backing up, checking and restoring
- * (cloud-entscheidungen.md W, R-3), deleting and sending a diagnosis.
+ * (cloud-entscheidungen.md W, R-3), deleting the backup or the account (backend B1) and sending
+ * a diagnosis.
  */
 @Composable
 fun CloudBackupSetting(status: CloudStatus, actions: CloudActions) {
     val c = Avl.colors
     val phase = status.phase
     var asking by remember { mutableStateOf(false) }
-    var deletingCloud by remember { mutableStateOf(false) }
+    var deletingAccount by remember { mutableStateOf(false) }
     var resettingPhone by remember { mutableStateOf(false) }
     var deletingBackup by remember { mutableStateOf(false) }
     var signingOut by remember { mutableStateOf(false) }
     var diagnosing by remember { mutableStateOf(false) }
+    val unlocked = phase is CloudPhase.Ready && phase.unlocked
+    // A device that is not unlocked has requested already; asking again changes nothing.
+    val canDeleteAccount = (phase is CloudPhase.Ready || phase == CloudPhase.NotSetUp) && (unlocked || status.deletion == null)
     val busy = phase is CloudPhase.Busy || phase is CloudPhase.ShowKey || phase is CloudPhase.AskKey || phase is CloudPhase.AskOverwrite ||
         phase is CloudPhase.AskRestore || phase is CloudPhase.AskBrake
     Column(Modifier.padding(16.dp)) {
@@ -89,6 +95,9 @@ fun CloudBackupSetting(status: CloudStatus, actions: CloudActions) {
                 phase != CloudPhase.Off, { on -> if (on) asking = true else actions.setEnabled(false) },
                 Modifier.testTag("cloudSwitch"), enabled = !busy,
             )
+        }
+        if (status.deletion != null && (phase is CloudPhase.Ready || phase == CloudPhase.NotSetUp)) {
+            DeletionPending(status.deletion, unlocked, actions)
         }
         when (phase) {
             CloudPhase.Off -> Unit
@@ -114,6 +123,11 @@ fun CloudBackupSetting(status: CloudStatus, actions: CloudActions) {
             is CloudPhase.Ready -> {
                 Text("Fingerabdruck ${phase.fingerprint}", Modifier.padding(top = 8.dp).testTag("cloudFingerprint"), color = c.text, fontSize = 14.sp, fontFamily = FontFamily.Monospace)
                 Text("Gerät ${phase.device.take(12)}", color = c.muted, fontSize = 13.sp, fontFamily = FontFamily.Monospace)
+                // KRITISCH: in full and selectable. The server knows neither name nor address, so a
+                // request for information (DSGVO Art. 15) can be matched only by this ID.
+                SelectionContainer {
+                    Text("Konto-ID ${phase.account}", Modifier.testTag("cloudAccountId"), color = c.muted, fontSize = 13.sp, fontFamily = FontFamily.Monospace)
+                }
                 Text(
                     phase.lastBackup?.let { "Zuletzt gesichert: ${shortTime(it)}" } ?: "Noch nicht gesichert",
                     Modifier.padding(top = 4.dp).testTag("cloudLastBackup"), color = c.text, fontSize = 14.sp,
@@ -171,9 +185,9 @@ fun CloudBackupSetting(status: CloudStatus, actions: CloudActions) {
                 TextButton(onClick = { resettingPhone = true }, Modifier.testTag("cloudResetPhone")) {
                     Text("Nur dieses Handy zurücksetzen", color = c.strict)
                 }
-            } else {
-                TextButton(onClick = { deletingCloud = true }, Modifier.testTag("cloudDeleteAll")) {
-                    Text("Cloud-Daten löschen", color = c.strict)
+            } else if (canDeleteAccount) {
+                TextButton(onClick = { deletingAccount = true }, Modifier.testTag("cloudDeleteAccount")) {
+                    Text("Konto löschen", color = c.strict)
                 }
             }
         }
@@ -252,7 +266,7 @@ fun CloudBackupSetting(status: CloudStatus, actions: CloudActions) {
             dismissButton = { TextButton(onClick = { deletingBackup = false }) { Text("Abbrechen") } },
         )
     }
-    if (deletingCloud) DeleteCloudData(onDone = { deletingCloud = false }, actions)
+    if (deletingAccount) DeleteAccount(unlocked, onDone = { deletingAccount = false }, actions)
     if (resettingPhone) {
         AlertDialog(
             onDismissRequest = { resettingPhone = false },
@@ -266,7 +280,7 @@ fun CloudBackupSetting(status: CloudStatus, actions: CloudActions) {
                 )
             },
             confirmButton = {
-                TextButton(onClick = { resettingPhone = false; actions.deleteCloudData() }, Modifier.testTag("cloudResetPhoneOk")) {
+                TextButton(onClick = { resettingPhone = false; actions.resetPhone() }, Modifier.testTag("cloudResetPhoneOk")) {
                     Text("Zurücksetzen", color = c.strict)
                 }
             },
@@ -275,40 +289,69 @@ fun CloudBackupSetting(status: CloudStatus, actions: CloudActions) {
     }
 }
 
-/** The word to type before "Cloud-Daten löschen" (R-3). */
+/** The word to type before "Konto löschen" (backend B1, R-3). */
 const val DELETE_WORD = "löschen"
 
 /**
- * "Cloud-Daten löschen" (R-3): deletes the backups of every device of the account for good, so it
- * asks for the word [DELETE_WORD] and says that "Dieses Gerät abmelden" is the way for a test device.
+ * "Konto löschen" (backend B1): deletes everything of the account on the server, for every device,
+ * so it asks for the word [DELETE_WORD] and says that "Dieses Gerät abmelden" is the way for a test
+ * device. [unlocked]: the server deletes at once; otherwise it may only take a request.
  */
 @Composable
-private fun DeleteCloudData(onDone: () -> Unit, actions: CloudActions) {
+private fun DeleteAccount(unlocked: Boolean, onDone: () -> Unit, actions: CloudActions) {
     val c = Avl.colors
     var typed by remember { mutableStateOf("") }
     AlertDialog(
         onDismissRequest = onDone,
-        title = { Text("Cloud-Daten endgültig löschen?") },
+        title = { Text("Konto endgültig löschen?") },
         text = {
             Column {
                 Text(
-                    "Löscht auf dem Server die Sicherung mit allen älteren Fassungen und das Schlüssel-Backup, für alle Geräte " +
-                        "dieses Kontos, und sperrt dort dieses Handy. Das lässt sich nicht rückgängig machen. Reminder und " +
-                        "Einstellungen auf diesem Handy bleiben. Nur dieses Handy abmelden geht mit „Dieses Gerät abmelden“.",
+                    "Löscht auf dem Server das Konto mit der Sicherung und allen älteren Fassungen, dem Schlüssel-Backup, " +
+                        "den Diagnosen und allen Geräten, auch den anderen Handys dieses Kontos. Das lässt sich nicht " +
+                        "rückgängig machen. Reminder und Einstellungen auf diesem Handy bleiben. Nur dieses Handy abmelden " +
+                        "geht mit „Dieses Gerät abmelden“.",
                 )
+                if (!unlocked) {
+                    Text(
+                        "Ist dieses Gerät nicht freigeschaltet, beantragt es die Löschung nur: Der Server löscht nach 7 Tagen, " +
+                            "bis dahin kann jedes freigeschaltete Gerät abbrechen.",
+                        Modifier.padding(top = 8.dp).testTag("cloudDeleteRequestOnly"), color = c.text, fontSize = 14.sp,
+                    )
+                }
                 Text("Zum Bestätigen „$DELETE_WORD“ eingeben.", Modifier.padding(top = 8.dp), color = c.text, fontSize = 14.sp)
                 OutlinedTextField(typed, { typed = it }, Modifier.fillMaxWidth().testTag("cloudDeleteWord"), singleLine = true)
             }
         },
         confirmButton = {
             TextButton(
-                onClick = { onDone(); actions.deleteCloudData() },
-                Modifier.testTag("cloudDeleteAllOk"),
+                onClick = { onDone(); actions.deleteAccount() },
+                Modifier.testTag("cloudDeleteAccountOk"),
                 enabled = typed.trim().equals(DELETE_WORD, ignoreCase = true),
             ) { Text("Endgültig löschen", color = c.strict) }
         },
         dismissButton = { TextButton(onClick = onDone) { Text("Abbrechen") } },
     )
+}
+
+/**
+ * A deletion of the account is requested (backend B1), here or elsewhere: perhaps by someone with
+ * the Google account but without an unlocked device. An unlocked device can cancel it.
+ */
+@Composable
+private fun DeletionPending(at: Instant, unlocked: Boolean, actions: CloudActions) {
+    val c = Avl.colors
+    Text(
+        "Löschung des Kontos beantragt: Ab ${shortTime(at)} löscht der Server alles.",
+        Modifier.padding(top = 8.dp).testTag("cloudDeletion"), color = c.strict, fontSize = 14.sp,
+    )
+    if (unlocked) {
+        OutlinedButton(onClick = actions::cancelDeletion, Modifier.padding(top = 4.dp).testTag("cloudCancelDeletion")) {
+            Text("Löschung abbrechen")
+        }
+    } else {
+        Text("Abbrechen kann nur ein freigeschaltetes Gerät des Kontos.", Modifier.testTag("cloudCancelElsewhere"), color = c.muted, fontSize = 13.sp)
+    }
 }
 
 /** The result of "Sicherung prüfen" (W-2). */

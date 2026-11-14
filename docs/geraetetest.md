@@ -57,9 +57,11 @@ löscht oder ein zweites Gerät braucht, läuft im **Emulator** mit einem eigene
 | C12 | Emulator | Fassung des anderen Geräts wiederherstellen, danach sichern | Rückfrage vor dem Ersetzen (W-7) |
 | C13 | Emulator | anderes Gerät sperrt dieses | nächster Aufruf: Hinweis „gesperrt“, keine automatische Sicherung mehr |
 | C14 | Emulator | mehr als 10 Reminder löschen, stündliche Sicherung abwarten | Bremse (R-2): nichts hochgeladen, Hinweis bis *Jetzt sichern* |
-| C15 | Emulator | *Cloud-Daten löschen* | erst andere Geräte gesperrt, dann Sicherung und Schlüssel-Backup weg, zuletzt dieses Gerät |
+| C15 | Emulator, Testkonto | *Konto löschen* auf einem freigeschalteten Gerät, „löschen“ eintippen | Hinweis „auf dem Server gelöscht“, Cloud-Backup aus, Reminder unverändert; im Test-Client ist das Konto weg; neu anmelden richtet ein neues Konto ein |
+| C16 | Emulator, Testkonto | zweites, nicht freigeschaltetes Gerät: *Konto löschen* | Dialog sagt „beantragt nur“; danach „Löschung des Kontos beantragt: Ab …“, keine Benachrichtigung auf diesem Gerät |
+| C17 | Emulator, Testkonto | nach C16 auf dem freigeschalteten Gerät den stündlichen Lauf abwarten (spätestens etwa 24 h nach der letzten Antwort des Servers; die Uhr nicht vorstellen, sonst lehnt der Server die Erneuerung ab), dann *Löschung abbrechen* | Benachrichtigung „Cloud-Konto wird gelöscht“ mit Termin; nach dem Abbrechen weg, auf beiden Geräten kein Termin mehr |
 
-**Nie auf dem S24:** C13–C15 und *Dieses Gerät abmelden* (sperrt das Gerät beim Server).
+**Nie auf dem S24:** C13–C17 und *Dieses Gerät abmelden* (sperrt das Gerät beim Server).
 
 ## D. Neu seit 1.3b0.6 (nach dem ersten bestandenen Test in B einsortieren)
 
@@ -78,6 +80,7 @@ löscht oder ein zweites Gerät braucht, läuft im **Emulator** mit einem eigene
 | K33 | Notaus beim Klingeln (Review-Lauf 5) | Test-Reminder klingeln lassen, in der App *Alle Alarme pausieren* 1 h | Klingeln hört sofort auf; eine **stille** Benachrichtigung des Termins bleibt stehen, Antippen öffnet den Alarm |
 | K34 | Formular-Entwurf (Review-Lauf 5) | Reminder bearbeiten, Titel ändern, ohne Speichern Dunkelmodus (Schnelleinstellungen) umschalten | Formular zeigt weiter den geänderten Titel; nach *Speichern* steht er in der Liste |
 | K35 | Verschieben pro Woche (Z2b, V1.3c1) | Test-Reminder täglich, *Feineinstellungen*: Verschieben 1× *pro Woche*; heute vorab verschieben, morgen den Alarm öffnen | Zusammenfassung „Verschieben 1× pro Woche“; morgen ist *Verschieben* ausgegraut mit „wieder ab Mo …“ (nächster Montag) |
+| K36 | Konto-ID (Auskunft, V1.3c2) | *Einstellungen → Cloud-Backup*, Konto-ID lange drücken und kopieren | 32 Zeichen (hex), lässt sich markieren und kopieren |
 
 ## E. Nach dem Test
 - Claude liest `adb logcat -d -s AvlDiag` und `files/diag/diag.log` (per `run-as`) und

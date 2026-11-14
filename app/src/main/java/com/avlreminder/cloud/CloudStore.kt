@@ -12,6 +12,7 @@ import androidx.datastore.preferences.preferencesDataStore
 import com.avlreminder.verbindung.Sitzung
 import com.avlreminder.verbindung.SitzungsAblage
 import kotlinx.coroutines.flow.first
+import java.time.Instant
 
 // A damaged file counts as empty (switched off, signed out) instead of crashing the app at
 // every start: the backup may fail, the app may not (backend.md). The keys are in another file.
@@ -39,6 +40,8 @@ class CloudStore(private val context: Context) : SitzungsAblage {
     private val staleNoticeKey = booleanPreferencesKey("staleNoticeShown")
     private val remindersKey = intPreferencesKey("lastBackupReminders")
     private val brakedKey = booleanPreferencesKey("braked")
+    private val deletionKey = longPreferencesKey("deletionUnix")
+    private val deletionCheckedKey = longPreferencesKey("deletionCheckedUnix")
 
     private suspend fun prefs() = context.backendStore.data.first()
 
@@ -132,6 +135,20 @@ class CloudStore(private val context: Context) : SitzungsAblage {
 
     suspend fun setStaleNoticeShown() {
         context.backendStore.edit { it[staleNoticeKey] = true }
+    }
+
+    /** When the server deletes the account (backend B1), as it last said; null = none requested. */
+    suspend fun deletion(): Instant? = prefs()[deletionKey]?.let(Instant::ofEpochSecond)
+
+    /** When the server last said whether a deletion is requested; null = never. */
+    suspend fun deletionChecked(): Instant? = prefs()[deletionCheckedKey]?.let(Instant::ofEpochSecond)
+
+    /** The server said at [checked] that the account is deleted at [at] (null = not at all). */
+    suspend fun setDeletion(at: Instant?, checked: Instant) {
+        context.backendStore.edit {
+            if (at == null) it.remove(deletionKey) else it[deletionKey] = at.epochSecond
+            it[deletionCheckedKey] = checked.epochSecond
+        }
     }
 
     /** The account of the last session, also after the server rejected it (A-13 counts on). */
