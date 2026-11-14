@@ -40,6 +40,7 @@ import com.avlreminder.protokoll.VersionVeraltet
 import com.avlreminder.protokoll.Wiederherstellungsschluessel
 import com.avlreminder.verbindung.Angemeldet
 import com.avlreminder.verbindung.AnmeldungAbgelehnt
+import com.avlreminder.verbindung.KontoNichtFreigegeben
 import com.avlreminder.verbindung.NichtAngemeldet
 import com.avlreminder.verbindung.Serverfehler
 import com.avlreminder.verbindung.Sitzung
@@ -1499,6 +1500,47 @@ class CloudBackupTest {
         blocking { cloud.signIn(activity).join() }
         assertTrue(notices.shown.isEmpty())
         assertNotNull(cloud.status.value.error)
+    }
+
+    // --- Account not let in by the server (backend ID7) -------------------------------
+
+    private val identifier = "49b0c816cea554249a707f70df22eeedaa1d502f5fca0c8122257cc1a0accc2c"
+
+    // KRITISCH: whoever is not on the server's list sees the identifier to ask for access with.
+    @Test
+    fun anAccountNotLetInSeesItsIdentifierWhenSigningIn() {
+        val cloud = cloud()
+        blocking { cloud.setEnabled(true).join() }
+        server.signInError = KontoNichtFreigegeben(identifier)
+        blocking { cloud.signIn(activity).join() }
+        val error = cloud.status.value.error.orEmpty()
+        assertTrue(error, error.contains("nicht freigegeben"))
+        assertTrue(error, error.contains(identifier))
+        assertEquals(CloudPhase.SignedOut, cloud.status.value.phase)
+        assertTrue(notices.shown.isEmpty())
+        assertEquals(FailureKind.NOT_ALLOWED, FailureKind.of(KontoNichtFreigegeben(identifier)))
+    }
+
+    // KRITISCH: an approval withdrawn later ends the session like a rejection: the hourly backup
+    // stops and the person learns it at once.
+    @Test
+    fun aWithdrawnApprovalEndsTheSessionAndWarnsAtOnce() {
+        val cloud = cloud()
+        ready(cloud)
+        blocking { cloud.backUp().join() }
+        payload = "neue Daten".toByteArray()
+        server.sessionError = KontoNichtFreigegeben(identifier)
+        auto(cloud)
+        assertNull(blocking { store.lesen() })
+        assertEquals(listOf("signInAgain"), notices.shown)
+    }
+
+    // Counter-check: an answer without identifier says so and shows no empty one.
+    @Test
+    fun withoutIdentifierTheTextSaysOnlyThatTheAccountIsNotLetIn() {
+        val text = CloudErrors.describe(KontoNichtFreigegeben(null)).orEmpty()
+        assertTrue(text, text.contains("nicht freigegeben"))
+        assertFalse(text, text.contains("Kennung"))
     }
 
     @Test

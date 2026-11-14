@@ -9,6 +9,7 @@ import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.text.KeyboardOptions
+import androidx.compose.foundation.text.selection.SelectionContainer
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Button
 import androidx.compose.material3.CircularProgressIndicator
@@ -177,7 +178,11 @@ fun CloudBackupSetting(status: CloudStatus, actions: CloudActions) {
             }
         }
         status.notes.forEach { Text(it, Modifier.padding(top = 6.dp), color = c.muted, fontSize = 13.sp) }
-        status.error?.let { Text(it, Modifier.padding(top = 6.dp).testTag("cloudError"), color = c.strict, fontSize = 14.sp) }
+        // Selectable, so that a text like the identifier of an account not let in (backend ID7)
+        // can be copied and passed on.
+        status.error?.let {
+            SelectionContainer { Text(it, Modifier.padding(top = 6.dp).testTag("cloudError"), color = c.strict, fontSize = 14.sp) }
+        }
     }
     if (asking) {
         AlertDialog(

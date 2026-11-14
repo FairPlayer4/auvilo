@@ -64,7 +64,8 @@ einer Fassung.
    Speichern), *Konto löschen*, Bestätigung mit der Displaysperre für *Cloud-Daten
    löschen*, *Konto löschen* und *Gerät sperren*; Format v2 kommt über `client/`.
 9. **Repo veröffentlichen** (in Wochen bis Monaten, 7.34): keine Secrets gefunden.
-   Vorher Server auf erlaubte Konten beschränken und URL konfigurierbar (OV1), echte
+   Vorher URL konfigurierbar (OV1; Zugang nur nach Freigabe und Kostengrenzen sind seit
+   2026-11-14 umgesetzt und deployt, die App zeigt die Kennung), echte
    Testdaten nur lokal (OV2), Lizenz (OV3); offen sind Lizenz, Umfang beim Backend und
    bereinigte Historie in einem neuen Repo (OV4, OV5).
 

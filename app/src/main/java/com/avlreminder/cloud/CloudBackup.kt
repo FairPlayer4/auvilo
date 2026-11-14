@@ -19,6 +19,7 @@ import com.avlreminder.protokoll.Wiederhergestellt
 import com.avlreminder.restore.RestoreKind
 import com.avlreminder.restore.RestoreTarget
 import com.avlreminder.verbindung.AnmeldungAbgelehnt
+import com.avlreminder.verbindung.KontoNichtFreigegeben
 import com.avlreminder.verbindung.Sitzung
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.CoroutineScope
@@ -573,7 +574,9 @@ class CloudBackup(
                 } catch (e: CancellationException) {
                     throw e
                 } catch (e: Throwable) {
-                    if (e is AnmeldungAbgelehnt) {
+                    // A withdrawn approval (backend ID7) ends the session like a rejection: renewing
+                    // fails until the operator lets the account in again and the person signs in.
+                    if (e is AnmeldungAbgelehnt || e is KontoNichtFreigegeben) {
                         store.forgetSession()
                         // KRITISCH: without a session the hourly backup stops for good; the person
                         // must learn it at once, not only from the notice after 3 days (A-13).

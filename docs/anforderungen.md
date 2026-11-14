@@ -1130,6 +1130,9 @@ Was vorher zu tun ist, in dieser Reihenfolge (Vorschlag, noch nicht entschieden)
     auf einer Liste steht; leer heißt niemand. Sonst legt er nichts an und antwortet mit
     der Kennung. Die App zeigt dann „Zugang nicht freigegeben. Schick diesen Code an den
     Betreiber: …“, Kevin trägt ihn ein. Wer mehr will, betreibt einen eigenen Server.
+    **Umgesetzt und deployt 2026-11-14** (Backend PR #25; App: Fehlertext mit Kennung,
+    markierbar zum Kopieren; ein später entzogener Zugang beendet die Sitzung wie eine
+    abgelehnte Anmeldung und meldet sich sofort).
   - **Konfigurierbarer Server:** URL und Web-Client-ID als Gradle-Property bzw. aus
     `local.properties`; ohne Wert ist das Cloud-Backup im Build ausgeblendet, fremde
     Builds treffen nicht Kevins Server.
@@ -1137,7 +1140,8 @@ Was vorher zu tun ist, in dieser Reihenfolge (Vorschlag, noch nicht entschieden)
     bleibt auch nach dem Zurücksetzen der Sicherheitsphase gleich (gleiches Projekt).
     Geschützt wird über Grenzen: signierte Sitzungs-Token, damit gefälschte kein
     Firestore-Lesen kosten, und ein Alarm auf die Anfragezahl, der den Kill-Switch
-    direkt auslöst, statt auf die verzögerten Budgetdaten zu warten.
+    direkt auslöst, statt auf die verzögerten Budgetdaten zu warten. **Umgesetzt und
+    deployt 2026-11-14** (Kill-Switch ab mehr als 10.000 Anfragen je Stunde).
 - OV2 **Echte Testdaten nicht veröffentlichen:** In `testdata/real-*.json` sind Texte
   ersetzt und Orte verschoben, aber die Zeiten echt; öffentlich verraten sie Kevins
   Tagesablauf (z. B. Ankunft zuhause). Die Dateien bleiben lokal (`.gitignore`);
@@ -1251,6 +1255,7 @@ Neueste zuerst. Kap. 7 enthält immer den gültigen Stand; diese Tabelle ist die
 |---|---|
 | 2026-11-14 | OV1 präzisiert (7.34, Backend ID7/ID8): **Zugang nur nach Freigabe** über eine Liste von Kennungen; nicht Freigegebene sehen ihren Code und fragen bei Kevin an, andere betreiben bei Bedarf einen eigenen Server. Server-URL kein Geheimnis und nach dem Zurücksetzen unverändert; Schutz über signierte Sitzungs-Token und einen Anfragealarm, der den Kill-Switch auslöst |
 | 2026-11-14 | **App-Repo soll öffentlich werden** (in den nächsten Wochen oder Monaten). Prüfung: keine Secrets in Repo, Historie und CI. Checkliste OV1–OV8 in 7.34: Server auf erlaubte Konten beschränken und URL konfigurierbar, echte Testdaten lokal halten, Lizenz, `client/`/`proto/` (oder das Backend) mit veröffentlichen, Historie mit `git filter-repo` bereinigen (Arbeits-Adresse, Testdaten) und in ein neues Repo pushen, PR-Builds wieder an. Offen: Lizenz, Umfang beim Backend, Art der Historie |
+| 2026-11-14 | OV1 Teil Freigabe und Kostengrenzen umgesetzt (Backend ID7/ID8, deployt): App zeigt bei nicht freigegebenem Konto die Kennung zum Kopieren; Entzug beendet die Sitzung mit sofortiger Meldung. Offen in OV1: konfigurierbarer Server |
 | 2026-11-13 | Verschiebe-Limit wahlweise pro Termin, Woche oder Monat (Z2b, nach Vorschlag): Kalenderwoche Mo–So bzw. Kalendermonat, gezählt zum Zeitpunkt des Verschiebens über alle Termine des Reminders; zählt *Verschieben* (auch vorab) und ein zählendes *Rest auf morgen*, *Später* bleibt frei; Bestand, Vorlagen und Strenge-Startwerte pro Termin; der Alarm zeigt, was bleibt und ab wann es wieder geht. Umgesetzt in V1.3c1 |
 | 2026-11-13 | Antworten auf Review-Lauf 6 (`.review/runs/2026-11-13.md`), beide nach Vorschlag: (1) Ändert sich die Ankunftsregel, nachdem ein *verschobener* Termin schon angekommen ist, wartet er wieder auf die Ankunft, jetzt nach der neuen Regel (`awaitsArrival`, zur Tagesgrenze *verpasst*); ergänzt Frage 5 vom 2026-11-12. (2) Ohne Bildschirm (Benachrichtigung, Uhr) gibt es *Teilschritt* wie *Erledigt* nicht, wenn ein Nachweis mit Foto, Text oder Audio nötig ist. Außerdem Wunsch: Das Verschiebe-Limit soll sich auch wöchentlich oder monatlich erneuern können (Z2b, Details in Klärung) |
 | 2026-11-13 | **CI nur nach dem Merge auf `main`** (GitHub-Minuten, privates Repo): kein Build bei PRs und auf `develop`, reine Doku-Merges ohne Lauf; vor dem PR lokal mit `-PbackendStreng=true` bauen. Actions auf Commit-SHA festgelegt, Dependabot meldet monatlich neue Versionen. Mit der Veröffentlichung als Open Source wieder bei PRs bauen |
