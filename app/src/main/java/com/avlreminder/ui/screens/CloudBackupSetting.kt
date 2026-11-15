@@ -413,14 +413,21 @@ private fun SecureScreen() {
     }
 }
 
+/** Protecting the password manager itself: where the biggest risk lies (A-15, 2026-11-15). */
+private const val PROTECT_THE_MANAGER =
+    "Den Passwortmanager selbst mit seinem Wiederherstellungscode auf Papier schützen: Dort liegt das größte Risiko."
+
 /**
- * A new recovery key; nothing is stored until it is kept (Einrichtung, KRITISCH). In the password
- * service ([saved], 7.33) one tap confirms; written down only, a second question makes sure.
+ * A new recovery key; nothing is stored until it is kept (Einrichtung, KRITISCH). The main way is
+ * an end-to-end encrypted password manager (A-15, 2026-11-15): used every day, it is not lost as
+ * easily as paper. In it ([saved], 7.33) one tap confirms; written down only, a second question
+ * makes sure.
  */
 @Composable
 private fun ShowKey(key: String, saved: Boolean, actions: CloudActions) {
     val c = Avl.colors
     var sure by remember { mutableStateOf(false) }
+    var hint by remember { mutableStateOf(false) }
     SecureScreen()
     if (saved) {
         Text(
@@ -429,14 +436,14 @@ private fun ShowKey(key: String, saved: Boolean, actions: CloudActions) {
             Modifier.padding(top = 8.dp).testTag("cloudKeySaved"), color = c.text, fontSize = 14.sp,
         )
         Text(
-            "Im Google Passwortmanager ist er nur mit eingeschalteter Geräteverschlüsselung Ende-zu-Ende geschützt. " +
-                "Zusätzlich auf Papier aufschreiben ist am sichersten.",
-            Modifier.padding(top = 4.dp), color = c.muted, fontSize = 13.sp,
+            "$PROTECT_THE_MANAGER Im Google Passwortmanager ist der Schlüssel nur mit eingeschalteter " +
+                "Geräteverschlüsselung Ende-zu-Ende geschützt.",
+            Modifier.padding(top = 4.dp).testTag("cloudProtectManager"), color = c.muted, fontSize = 13.sp,
         )
     } else {
         Text(
-            "Diesen Wiederherstellungsschlüssel im Passwortmanager speichern oder auf Papier aufschreiben. Ohne ihn " +
-                "sind die gesicherten Daten weg, wenn das Handy verloren geht. Nicht fotografieren.",
+            "Diesen Wiederherstellungsschlüssel im Passwortmanager speichern. Ohne ihn sind die gesicherten Daten " +
+                "weg, wenn das Handy verloren geht. Nicht fotografieren.",
             Modifier.padding(top = 8.dp), color = c.text, fontSize = 14.sp,
         )
     }
@@ -445,12 +452,30 @@ private fun ShowKey(key: String, saved: Boolean, actions: CloudActions) {
         if (saved) {
             Button(onClick = { actions.confirmKey(true) }, Modifier.testTag("cloudDone")) { Text("Fertig") }
         } else {
-            Button(onClick = { sure = true }, Modifier.testTag("cloudWritten")) { Text("Aufgeschrieben") }
+            Button(onClick = { hint = true }, Modifier.testTag("cloudSaveKey")) { Text("Im Passwortmanager speichern") }
         }
         OutlinedButton(onClick = { actions.confirmKey(false) }, Modifier.testTag("cloudKeyCancel")) { Text("Abbrechen") }
     }
     if (!saved) {
-        TextButton(onClick = actions::saveKey, Modifier.testTag("cloudSaveKey")) { Text("Im Passwortmanager speichern") }
+        TextButton(onClick = { sure = true }, Modifier.testTag("cloudWritten")) { Text("Ohne Passwortmanager: auf Papier aufgeschrieben") }
+    }
+    if (hint) {
+        // KRITISCH (7.33 WS4): said before the password service sees the key, not after.
+        AlertDialog(
+            onDismissRequest = { hint = false },
+            title = { Text("Vor dem Speichern") },
+            text = {
+                Text(
+                    "Sicher ist der Schlüssel nur in einem Passwortmanager mit Ende-zu-Ende-Verschlüsselung, z. B. " +
+                        "Bitwarden oder 1Password; im Google Passwortmanager nur mit eingeschalteter " +
+                        "Geräteverschlüsselung. Ohne sie kann, wer das Google-Konto übernimmt, ein eigenes Gerät " +
+                        "freischalten und alle gesicherten Daten entschlüsseln.\n\n$PROTECT_THE_MANAGER",
+                    Modifier.testTag("cloudSaveHint"),
+                )
+            },
+            confirmButton = { TextButton(onClick = { hint = false; actions.saveKey() }, Modifier.testTag("cloudSaveKeyOk")) { Text("Speichern") } },
+            dismissButton = { TextButton(onClick = { hint = false }) { Text("Zurück") } },
+        )
     }
     if (sure) {
         AlertDialog(

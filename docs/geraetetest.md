@@ -63,7 +63,9 @@ löscht oder ein zweites Gerät braucht, läuft im **Emulator** mit einem eigene
 
 | C18 | Emulator **ohne** Displaysperre, Testkonto | *Sicherung löschen* | keine Abfrage, Sicherung gelöscht; im Diagnose-Log `ohne_displaysperre` |
 
-**Nie auf dem S24:** C13–C18 und *Dieses Gerät abmelden* (sperrt das Gerät beim Server).
+| C19 | Emulator, Testkonto (V1.3c3) | neu einrichten: *Im Passwortmanager speichern*, im Hinweis erst *Zurück*, dann *Speichern* | kein Speicher-Dialog von selbst; Hinweis nennt Ende-zu-Ende und den Papiercode des Passwortmanagers; *Zurück* öffnet nichts; nach dem Speichern *Fertig*, Hinweis auf den Papiercode bleibt |
+
+**Nie auf dem S24:** C13–C19 und *Dieses Gerät abmelden* (sperrt das Gerät beim Server).
 
 ## D. Neu seit 1.3b0.6 (nach dem ersten bestandenen Test in B einsortieren)
 

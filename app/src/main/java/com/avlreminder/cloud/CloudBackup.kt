@@ -133,7 +133,7 @@ class CloudBackup(
         server.withSession { setUp(server, it, activity) }
     }
 
-    /** Offers the key on screen to the password service again (the first offer was declined). */
+    /** Offers the key on screen to the password service (button, after the hint; A-15). */
     fun saveKey(activity: Activity): Job = scope.launch {
         val (account, key) = shown ?: return@launch
         saveShown(activity, account, key)
@@ -666,11 +666,9 @@ class CloudBackup(
             zeigeWiederherstellung = { key ->
                 val text = key.alsText()
                 shown = session.kontoId to text
-                confirm.ask {
-                    phase(CloudPhase.ShowKey(text))
-                    // Offered right away (7.33); declined, the person writes it down as before.
-                    if (activity != null) saveShown(activity, session.kontoId, text)
-                }.also { shown = null; busy("Hochladen …") }
+                // KRITISCH (A-15, 2026-11-15): the password service is not asked by itself; only
+                // the button does it ([saveKey]), after the screen said what to look out for.
+                confirm.ask { phase(CloudPhase.ShowKey(text)) }.also { shown = null; busy("Hochladen …") }
             },
             meldung = { text -> state.update { it.copy(notes = it.notes + text) } },
         ).ausfuehren()

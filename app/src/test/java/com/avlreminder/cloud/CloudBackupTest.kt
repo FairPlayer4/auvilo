@@ -55,7 +55,6 @@ import kotlinx.coroutines.TimeoutCancellationException
 import kotlinx.coroutines.async
 import kotlinx.coroutines.cancel
 import kotlinx.coroutines.coroutineScope
-import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.runBlocking
 import kotlinx.coroutines.selects.select
@@ -691,16 +690,49 @@ class CloudBackupTest {
 
     // --- Password service (Anf. 7.33) -------------------------------------------------
 
-    // KRITISCH: the key offered to the password service is the one that opens the uploaded
-    // backup, and saving it does not replace the confirmation: nothing is uploaded before.
+    // KRITISCH (A-15): the password service gets the key only on request, never by itself, with
+    // or without an activity; kept written down, it never sees it.
     @Test
-    fun aNewKeyIsOfferedToThePasswordServiceRightAway() {
+    fun aNewKeyGoesToThePasswordServiceOnlyOnRequest() {
+        safe.available = true
+        val starts = listOf<Pair<String, (CloudBackup) -> Job>>(
+            "Anmelden" to { it.signIn(activity) },
+            "Einrichtung fortsetzen" to { it.continueSetup(activity) },
+            "ohne Activity" to { it.continueSetup() },
+        )
+        for ((case, start) in starts) {
+            blocking { store.clear() }
+            local.clear()
+            server.backup = null
+            safe.saved.clear()
+            val cloud = cloud()
+            blocking {
+                store.setEnabled(true)
+                store.speichern(Sitzung(account, "geraet-1", "token", 4_000_000_000))
+            }
+            val job = start(cloud)
+            val shown = cloud.awaitPhase(CloudPhase.ShowKey::class.java).phase as CloudPhase.ShowKey
+            assertFalse(case, shown.saved)
+            cloud.confirmKey(true)
+            blocking { job.join() }
+            assertTrue(case, cloud.status.value.phase is CloudPhase.Ready)
+            assertEquals(case, emptyList<Pair<String, String>>(), safe.saved)
+        }
+    }
+
+    // KRITISCH: the key saved on request is the one that opens the uploaded backup, and saving it
+    // does not replace the confirmation: nothing is uploaded before.
+    @Test
+    fun theKeySavedOnRequestOpensTheBackup() {
         safe.available = true
         val cloud = cloud()
         blocking { cloud.setEnabled(true).join() }
         val job = cloud.signIn(activity)
-        val shown = cloud.await { (it.phase as? CloudPhase.ShowKey)?.saved == true }.phase as CloudPhase.ShowKey
-        assertEquals(listOf(account to shown.key), safe.saved)
+        val key = (cloud.awaitPhase(CloudPhase.ShowKey::class.java).phase as CloudPhase.ShowKey).key
+        blocking { cloud.saveKey(activity).join() }
+        val shown = cloud.status.value.phase as CloudPhase.ShowKey
+        assertTrue(shown.saved)
+        assertEquals(listOf(account to key), safe.saved)
         assertNull("nothing uploaded before the confirmation", server.backup)
 
         cloud.confirmKey(true)
@@ -725,6 +757,7 @@ class CloudBackupTest {
             blocking { cloud.setEnabled(true).join() }
             val job = cloud.signIn(activity)
             val key = (cloud.awaitPhase(CloudPhase.ShowKey::class.java).phase as CloudPhase.ShowKey).key
+            blocking { cloud.saveKey(activity).join() }
             cloud.confirmKey(true)
             blocking { job.join() }
             assertTrue("available=$available: $logged", logged.any { "password service" in it })
@@ -740,7 +773,8 @@ class CloudBackupTest {
         blocking { cloud.setEnabled(true).join() }
         val job = cloud.signIn(activity)
         cloud.awaitPhase(CloudPhase.ShowKey::class.java)
-        blocking { while (logged.none { "not saved" in it }) delay(10) }
+        blocking { cloud.saveKey(activity).join() }
+        assertTrue(logged.any { "not saved" in it })
         val shown = cloud.status.value.phase as CloudPhase.ShowKey
         assertFalse(shown.saved)
         assertNull("declining is no error", cloud.status.value.error)
@@ -749,22 +783,6 @@ class CloudBackupTest {
         blocking { cloud.saveKey(activity).join() }
         assertEquals(CloudPhase.ShowKey(shown.key, saved = true), cloud.status.value.phase)
         assertEquals(listOf(account to shown.key), safe.saved)
-        cloud.confirmKey(false)
-        blocking { job.join() }
-    }
-
-    @Test
-    fun withoutAnActivityThePasswordServiceIsNotAsked() {
-        safe.available = true
-        val cloud = cloud()
-        blocking {
-            store.setEnabled(true)
-            store.speichern(Sitzung(account, "geraet-1", "token", 4_000_000_000))
-        }
-        val job = cloud.continueSetup()
-        val shown = cloud.awaitPhase(CloudPhase.ShowKey::class.java).phase as CloudPhase.ShowKey
-        assertFalse(shown.saved)
-        assertTrue(safe.saved.isEmpty())
         cloud.confirmKey(false)
         blocking { job.join() }
     }

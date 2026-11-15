@@ -7,6 +7,7 @@ import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.test.assertIsNotEnabled
+import androidx.compose.ui.test.assertTextContains
 import androidx.compose.ui.test.assertTextEquals
 import androidx.compose.ui.test.junit4.v2.createComposeRule
 import androidx.compose.ui.test.onAllNodesWithTag
@@ -134,22 +135,36 @@ class CloudBackupUiTest {
         compose.onNodeWithTag("cloudError").assertExists()
     }
 
-    // KRITISCH: one tap is enough only when the key is in the password service (7.33).
+    // KRITISCH: one tap is enough only when the key is in the password service (7.33); the screen
+    // then says to protect the password manager itself with its paper code (A-15).
     @Test
     fun aSavedKeyNeedsOneTapAndTellsAboutDeviceEncryption() {
         val actions = show(CloudStatus(CloudPhase.ShowKey("ABCD-EFGH", saved = true)))
         compose.onNodeWithTag("cloudKeySaved").assertExists()
-        compose.onNodeWithText("Geräteverschlüsselung", substring = true).assertExists()
+        compose.onNodeWithTag("cloudProtectManager").assertTextContains("Geräteverschlüsselung", substring = true)
+        compose.onNodeWithTag("cloudProtectManager").assertTextContains("Wiederherstellungscode auf Papier", substring = true)
+        compose.onNodeWithTag("cloudSaveKey").assertDoesNotExist()
         compose.onNodeWithTag("cloudWritten").assertDoesNotExist()
         compose.onNodeWithTag("cloudDone").performClick()
         assertEquals(listOf("confirm true"), actions.calls)
     }
 
+    // KRITISCH (7.33 WS4, A-15): the hint comes before the password service sees the key; back
+    // from it, nothing is saved.
     @Test
-    fun anUnsavedKeyCanBeOfferedToThePasswordServiceAgain() {
+    fun savingInThePasswordManagerNeedsTheHintFirst() {
         val actions = show(CloudStatus(CloudPhase.ShowKey("ABCD-EFGH")))
         compose.onNodeWithTag("cloudDone").assertDoesNotExist()
         compose.onNodeWithTag("cloudSaveKey").performClick()
+        compose.onNodeWithTag("cloudSaveHint").assertTextContains("Ende-zu-Ende", substring = true)
+        compose.onNodeWithTag("cloudSaveHint").assertTextContains("Google-Konto übernimmt", substring = true)
+        compose.onNodeWithTag("cloudSaveHint").assertTextContains("Wiederherstellungscode auf Papier", substring = true)
+        compose.onNodeWithText("Zurück").performClick()
+        compose.onNodeWithTag("cloudSaveHint").assertDoesNotExist()
+        assertEquals(emptyList<String>(), actions.calls)
+
+        compose.onNodeWithTag("cloudSaveKey").performClick()
+        compose.onNodeWithTag("cloudSaveKeyOk").performClick()
         assertEquals(listOf("saveKey"), actions.calls)
     }
 

@@ -43,7 +43,9 @@ einer Fassung.
    `feature/konto-loeschen`, noch nicht installiert): *Konto löschen* ersetzt *Cloud-Daten
    löschen* (R-3, Backend B1/K1), mit Antrag, *Löschung abbrechen* und Benachrichtigung bei
    einem Antrag von anderswo; die Konto-ID wird zum Kopieren angezeigt (Auskunft, Art. 15); *Konto löschen* und
-   *Sicherung löschen* fragen die Displaysperre ab (SE5).
+   *Sicherung löschen* fragen die Displaysperre ab (SE5). Darauf **V1.3c3** (`versionCode` 23,
+   `develop`, noch nicht installiert): A-15 neu, Passwortmanager als Hauptweg mit Hinweis
+   davor (Ende-zu-Ende, Papiercode des Passwortmanagers), Papier als Ausweg. Am Gerät C19.
    Am Gerät nur auf dem Emulator mit Testkonto: C15–C18.
 1. **Gerätetests** aus [geraetetest.md](geraetetest.md): K15, K23–K26 (vorher *Zuhause* in
    *Orte* mit WLAN neu festlegen), K27–K30 (Sitzung, dabei: zeigt die Uhr den
@@ -65,9 +67,8 @@ einer Fassung.
 7. **Play-Store-Release** ohne Eile, frühestens mit V2 (7.28 PS5–PS9). Branch-Regel für
    `main` setzt Kevin.
 8. **Vor der Sicherheitsphase** (Backend-Prüfung 2026-11-12; Liste „Vorher fertig“ in
-   Backend `docs/b2b-entwurf.md`): A-15 neu (Papier als Standard, Hinweis vor dem
-   Speichern); Format v2 kommt über `client/`. *Konto löschen* und die Displaysperre (SE5)
-   sind in V1.3c2 umgesetzt.
+   Backend `docs/b2b-entwurf.md`): Format v2 kommt über `client/`. *Konto löschen* und
+   die Displaysperre (SE5) sind in V1.3c2 umgesetzt, A-15 neu in V1.3c3.
 9. **Repo veröffentlichen** (in Wochen bis Monaten, 7.34): keine Secrets gefunden.
    App und Backend sollen in den nächsten Wochen öffentlich werden. Erledigt: Zugang nur
    nach Freigabe, Kostengrenzen und konfigurierbarer Server (OV1), echte Testdaten nur

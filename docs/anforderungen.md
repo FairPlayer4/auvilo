@@ -1093,13 +1093,16 @@ vorher schieben oder auslassen können, wie man Checklisten-Punkte vorab abhakt.
 ### 7.33 Wiederherstellungsschlüssel im Passwortdienst (2026-11-08)
 Beim ersten Gerätetest war das Aufschreiben des Wiederherstellungsschlüssels umständlich
 (langen Code abtippen). Die App soll das Sichern deshalb selbst anbieten.
-- WS1 **Auf Knopfdruck angeboten** (geändert 2026-11-12, vorher automatisch): Zeigt die
-  App einen neuen Wiederherstellungsschlüssel, ist „aufgeschrieben“ der Hauptweg (Papier
-  ist der Standard). *Im Passwortmanager speichern* nennt vorher die Folge (WS4) und
-  öffnet dann den Speicher-Dialog des Passwortdienstes (Credential Manager,
+- WS1 **Auf Knopfdruck angeboten** (geändert 2026-11-12, vorher automatisch; Hauptweg
+  wieder seit 2026-11-15): Zeigt die App einen neuen Wiederherstellungsschlüssel, ist
+  *Im Passwortmanager speichern* der Hauptknopf: Ein Ende-zu-Ende-verschlüsselter
+  Passwortmanager geht nicht so leicht verloren wie Papier, weil man ihn regelmäßig nutzt.
+  Der Knopf zeigt vorher den Hinweis (WS4) und öffnet erst nach *Speichern* den
+  Speicher-Dialog des Passwortdienstes (Credential Manager,
   `CreatePasswordRequest`; Standard ist der Google Passwortmanager, andere Dienste wie
   Bitwarden gehen genauso). Name: „avlreminder Wiederherstellung“, als Nutzername das
-  Konto-Pseudonym. Gespeichert → fertig, eine Bestätigung genügt.
+  Konto-Pseudonym. Gespeichert → fertig, eine Bestätigung genügt. Ohne Passwortmanager:
+  *auf Papier aufgeschrieben* mit Rückfrage. Von selbst öffnet sich kein Speicher-Dialog.
 - WS2 **Automatisch geholt:** Fragt die App nach dem Schlüssel (neues Gerät, App-Daten
   gelöscht), bietet sie zuerst den gespeicherten aus dem Passwortdienst an
   (`GetPasswordOption`); Eintippen bleibt möglich.
@@ -1109,8 +1112,11 @@ Beim ersten Gerätetest war das Aufschreiben des Wiederherstellungsschlüssels u
   **Geräteverschlüsselung** Ende-zu-Ende; ohne sie könnte Google Schlüssel und (in GCP
   liegende) Sicherung zusammenbringen. Die App sagt das **vor** dem Speichern und nennt
   die Folge: Wer das Google-Konto übernimmt, kann dann ein eigenes Gerät freischalten
-  und alles entschlüsseln (Backend `anforderungen.md` Kap. 11, 2026-11-12). Papier
-  bleibt als zusätzliche Kopie empfohlen.
+  und alles entschlüsseln (Backend `anforderungen.md` Kap. 11, 2026-11-12). Empfohlen sind
+  Passwortmanager, die immer Ende-zu-Ende verschlüsseln (z. B. Bitwarden, 1Password); die
+  App kann nicht erkennen, welcher speichert. Dazu, vor und nach dem Speichern: den
+  Passwortmanager selbst mit seinem Wiederherstellungscode auf Papier schützen, denn dort
+  liegt das größte Risiko (2026-11-15).
 
 ### 7.34 Repo veröffentlichen (geplant, 2026-11-14)
 Kevin will das App-Repo `FairPlayer4/avlreminder` und das Backend-Repo in den nächsten
@@ -1271,6 +1277,7 @@ Neueste zuerst. Kap. 7 enthält immer den gültigen Stand; diese Tabelle ist die
 
 | Datum | Entscheidung |
 |---|---|
+| 2026-11-15 | **A-15 neu: Passwortmanager als Hauptweg** (Kevin: „realistisch ist es sicherer wenn man es in einen (E2E) Passwortmanager packt“): Hauptknopf *Im Passwortmanager speichern*, davor ein Hinweis (Ende-zu-Ende-Verschlüsselung, beim Google Passwortmanager nur mit Geräteverschlüsselung, sonst reicht das Google-Konto; den Passwortmanager selbst mit seinem Wiederherstellungscode auf Papier schützen). Papier bleibt als Ausweg mit Rückfrage. Kein Speicher-Dialog mehr von selbst. Ändert den Eintrag vom 2026-11-12 (7.33 WS1, WS4). Umgesetzt in V1.3c3 |
 | 2026-11-15 | **Displaysperre vor dem Löschen** (Backend SE5, Kevin: „SE5 angehen“): *Konto löschen* und *Sicherung löschen* fragen nach dem eingetippten Wort die Displaysperre ab (BiometricPrompt, starke Biometrie oder Geräte-PIN), bevor etwas den Server erreicht. *Sicherung löschen* dazu, weil es wie *Konto löschen* alle Fassungen endgültig löscht (Empfehlung, Kevin kann widersprechen). Ohne Displaysperre geht es weiter und wird protokolliert: Es gibt nichts zum Bestätigen, und Löschen (Art. 17) muss möglich bleiben. Abbrechen, Fehlversuche oder fehlender Sensor heißen nein. *Gerät sperren* gibt es in der App nicht als eigene Aktion (nur *Dieses Gerät abmelden*, das nichts löscht). Umgesetzt in V1.3c2 |
 | 2026-11-14 | ***Konto löschen* ersetzt *Cloud-Daten löschen*** (R-3, Backend B1/K1, Kevin nach Vorschlag): freigeschaltet sofort, sonst Antrag mit 7 Tagen, in denen jedes freigeschaltete Gerät abbrechen kann; das Handy vergisst die Schlüssel erst nach der Bestätigung des Servers. Einen beantragten Termin zeigt die App mit Benachrichtigung; der stündliche Lauf fragt dafür spätestens nach 23 Stunden beim Server nach, auch bei unveränderten Daten. Neu anfangen heißt: Konto löschen und neu anmelden. Die Bestätigung mit der Displaysperre (SE5) gilt damit für *Konto löschen* und *Gerät sperren*. Außerdem zeigt *Cloud-Backup* die **Konto-ID** zum Kopieren: Nur mit ihr lässt sich eine Anfrage auf Auskunft (DSGVO Art. 15) zuordnen (Backend `docs/datenschutz/`). Umgesetzt in V1.3c2 |
 | 2026-11-14 | OV1 präzisiert (7.34, Backend ID7/ID8): **Zugang nur nach Freigabe** über eine Liste von Kennungen; nicht Freigegebene sehen ihren Code und fragen bei Kevin an, andere betreiben bei Bedarf einen eigenen Server. Server-URL kein Geheimnis und nach dem Zurücksetzen unverändert; Schutz über signierte Sitzungs-Token und einen Anfragealarm, der den Kill-Switch auslöst |
