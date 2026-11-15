@@ -113,9 +113,12 @@ betrifft P4.
 - N3 **Einstieg für Fremde**: Die App setzt Kevins Wissen voraus. Für Tester fehlt ein
   kurzer Einstieg (erster Reminder, Berechtigungen der Reihe nach, wofür sie gut sind;
   passt zu PS6) und eine Kontaktmöglichkeit für Rückmeldungen.
-- N4 **Daten-Export/Import als Datei** (8.4 „später nachrüstbar“): Ohne Backend die einzige
-  Sicherung für Tester und der Weg, Kevins Daten aus der Sideload-App zu übernehmen, falls
-  sich die `applicationId` ändert.
+- N4 **Daten-Export/Import als Datei**: ~~fehlt~~ umgesetzt in V1.3c8 (Anf. 7.28 PS14):
+  *Sicherungsdatei* in den lokalen Kopien, mit eigenem Passwort verschlüsselt, ohne Fotos und
+  Audio. Ohne Backend die einzige Sicherung für Tester und der Weg, Kevins Daten aus der
+  Sideload-App zu übernehmen, falls sich die `applicationId` ändert. Für die Data-Safety-
+  Angaben: Die Datei geht nur dorthin, wo der Nutzer sie im Dateidialog ablegt; die App
+  sendet nichts.
 
 ## Empfohlene Reihenfolge
 1. Entscheiden: `applicationId` zum Namen AuViLo-Reminder (N1, B7), Play-Fassung ohne Backend
@@ -123,6 +126,6 @@ betrifft P4.
 2. Code, der auch der Sideload-App nicht schadet: P1, P3, P4, P5 (Offenlegung), B1, B4, B5.
    P1 und P4 ändern Kevins Alltag kaum, brauchen aber je einmal einen Gerätetest
    (Erlaubnis entziehen, Alarm kommt trotzdem bzw. Hinweis erscheint).
-3. N4 Export/Import, N3 Einstieg.
+3. N3 Einstieg (N4 Export/Import ist in V1.3c8 umgesetzt).
 4. Konto anlegen, Datenschutzerklärung, Store-Eintrag, interner Test, dann geschlossener
    Test mit 12 Testern (Android 17 vorher klären).

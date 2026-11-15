@@ -2,6 +2,7 @@ package com.avlreminder.restore
 
 import androidx.test.ext.junit.runners.AndroidJUnit4
 import com.avlreminder.cloud.BackupContents
+import com.avlreminder.cloud.BackupZip
 import com.avlreminder.cloud.CloudLog
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
@@ -60,9 +61,13 @@ class LocalRestoreTest {
     }
     private val target = FakeTarget()
 
+    private val backup = BackupContents("datenbank".toByteArray(), "einstellungen")
+    private val password = "richtig-langes-passwort"
+
     private fun local() = LocalRestore(
         target, files, snapshots, currentSettings = { "jetzt" }, scope = scope, events = events,
         clock = { now }, zone = { ZoneOffset.UTC },
+        source = { BackupZip.pack(backup) }, iterations = 1_000,
     )
 
     private fun <T> blocking(block: suspend () -> T): T = runBlocking { withTimeout(10_000) { block() } }
@@ -217,5 +222,64 @@ class LocalRestoreTest {
         assertEquals(listOf("getauscht"), events())
         local.started(SwapOutcome.None)
         assertEquals(listOf("getauscht"), events())
+    }
+
+    // --- Export file (Anf. 7.28 PS14) -----------------------------------------------------------
+
+    // KRITISCH: the file holds the backup ZIP, encrypted; the password is wiped afterwards.
+    @Test
+    fun anExportFileHoldsTheBackupEncryptedAndCanBeRestored() {
+        val local = local()
+        var written: ByteArray? = null
+        val exportPassword = password.toCharArray()
+        blocking { local.export("AuViLo-Sicherung-2026-11-09.auvilo", exportPassword) { written = it }.join() }
+        val file = checkNotNull(written)
+        assertEquals("AuViLo-Sicherung-2026-11-09.auvilo", local.status.value.exported)
+        assertNull(local.status.value.error)
+        assertTrue("password wiped", exportPassword.all { it == ' ' })
+        assertFalse("not readable without the password", String(file, Charsets.ISO_8859_1).contains("datenbank"))
+
+        val importPassword = password.toCharArray()
+        local.fromFile("AuViLo-Sicherung-2026-11-09.auvilo", importPassword) { file }
+        val ask = local.awaitAsk()
+        assertEquals(RestoreKind.FILE, ask.kind)
+        assertEquals("Datei „AuViLo-Sicherung-2026-11-09.auvilo“", ask.label)
+        local.answer(true)
+        blocking { local.status.first { it.phase == LocalPhase.Idle } }
+        assertTrue("password wiped", importPassword.all { it == ' ' })
+        assertEquals("datenbank", String(target.compared.single().database))
+        assertEquals("the settings come with the file", "einstellungen", target.compared.single().settings)
+        assertEquals(listOf(RestoreKind.FILE), target.staged)
+        assertEquals(1, target.restarts)
+
+        local.dismiss()
+        assertNull(local.status.value.exported)
+    }
+
+    @Test
+    fun aWrongPasswordOrAnotherFileChangesNothing() {
+        val local = local()
+        var written: ByteArray? = null
+        blocking { local.export("datei", password.toCharArray()) { written = it }.join() }
+        val cases = listOf(
+            Triple(checkNotNull(written), "falsches-passwort", LocalRestore.describe(WrongPassword())),
+            Triple(BackupZip.pack(backup), password, LocalRestore.describe(NotAnExport("x"))),
+        )
+        for ((bytes, pw, expected) in cases) {
+            blocking { local.fromFile("datei", pw.toCharArray()) { bytes }.join() }
+            assertEquals(expected, local.status.value.error)
+            assertEquals(LocalPhase.Idle, local.status.value.phase)
+            local.dismiss()
+        }
+        assertTrue(target.compared.isEmpty())
+        assertTrue(target.staged.isEmpty())
+    }
+
+    @Test
+    fun aFailedWriteIsShownAndNothingCountsAsExported() {
+        val local = local()
+        blocking { local.export("datei", password.toCharArray()) { throw java.io.IOException("voll") }.join() }
+        assertNull(local.status.value.exported)
+        assertEquals(LocalRestore.describe(java.io.IOException("voll")), local.status.value.error)
     }
 }

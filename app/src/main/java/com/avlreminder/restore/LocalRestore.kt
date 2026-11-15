@@ -1,6 +1,9 @@
 package com.avlreminder.restore
 
 import com.avlreminder.cloud.BackupContents
+import com.avlreminder.cloud.BackupSource
+import com.avlreminder.cloud.BackupZip
+import com.avlreminder.cloud.DamagedBackup
 import com.avlreminder.cloud.CloudEvent
 import com.avlreminder.cloud.CloudLog
 import kotlinx.coroutines.CancellationException
@@ -35,7 +38,8 @@ sealed interface LocalPhase {
 
 /**
  * [snapshots]: the daily copies (R-1); [undoUntil]: until when the last restore can be undone
- * (W-6), null = not; [restored]: this start swapped data in; [failed]: the last swap failed.
+ * (W-6), null = not; [restored]: this start swapped data in; [failed]: the last swap failed;
+ * [exported]: name of the export file just written (PS14).
  */
 data class LocalStatus(
     val phase: LocalPhase = LocalPhase.Idle,
@@ -44,13 +48,16 @@ data class LocalStatus(
     val restored: RestoreKind? = null,
     val failed: SwapFailure? = null,
     val error: String? = null,
+    val exported: String? = null,
 )
 
 /**
- * Restoring from a daily copy (R-1) and undoing a restore (W-6), without the cloud. The same
- * steps as from the cloud (W-5): check in its own file, show, confirm, swap at the next start.
+ * Restoring from a daily copy (R-1) or an export file (Anf. 7.28 PS14) and undoing a restore
+ * (W-6), without the cloud. The same steps as from the cloud (W-5): check in its own file, show,
+ * confirm, swap at the next start. Also writes the export file.
  *
  * @param currentSettings the settings now; a daily copy holds only the database, so they stay.
+ * @param source what goes into an export file: the same ZIP as the cloud backup.
  */
 class LocalRestore(
     private val target: RestoreTarget,
@@ -62,6 +69,8 @@ class LocalRestore(
     private val log: (String) -> Unit = {},
     private val clock: () -> Instant = Instant::now,
     private val zone: () -> ZoneId = ZoneId::systemDefault,
+    private val source: BackupSource = BackupSource { error("no backup source") },
+    private val iterations: Int = ExportFile.ITERATIONS,
 ) {
     private val state = MutableStateFlow(LocalStatus())
     val status: StateFlow<LocalStatus> = state.asStateFlow()
@@ -110,6 +119,31 @@ class LocalRestore(
         }
     }
 
+    /**
+     * Writes the export file: the backup ZIP, encrypted with [password] ([ExportFile]). [write]
+     * puts the bytes where the person chose (Android's file dialog).
+     */
+    fun export(name: String, password: CharArray, write: suspend (ByteArray) -> Unit): Job = work {
+        state.update { it.copy(phase = LocalPhase.Busy("Verschlüsseln …"), exported = null) }
+        try {
+            val bytes = withContext(Dispatchers.IO) { ExportFile.encrypt(source.payload(), password, iterations) }
+            withContext(Dispatchers.IO) { write(bytes) }
+            log("export: written (${bytes.size} bytes)")
+            state.update { it.copy(exported = name) }
+        } finally {
+            password.fill(' ')
+        }
+    }
+
+    /** Restores from an export file; [read] gives its bytes. Asks like any restore. */
+    fun fromFile(name: String, password: CharArray, read: suspend () -> ByteArray): Job = work {
+        try {
+            ask(RestoreKind.FILE, "Datei „$name“") { BackupZip.unpack(ExportFile.decrypt(read(), password)) }
+        } finally {
+            password.fill(' ')
+        }
+    }
+
     /** The answer to [LocalPhase.Ask]: true = swap in. */
     fun answer(yes: Boolean) {
         answer?.complete(yes)
@@ -117,7 +151,7 @@ class LocalRestore(
 
     fun dismiss() {
         files.failed.delete()
-        state.update { it.copy(restored = null, failed = null, error = null) }
+        state.update { it.copy(restored = null, failed = null, error = null, exported = null) }
     }
 
     private suspend fun ask(kind: RestoreKind, label: String, contents: suspend () -> BackupContents) {
@@ -188,6 +222,9 @@ class LocalRestore(
         /** A short text for the person. */
         fun describe(e: Throwable): String = when (e) {
             is NewerDatabase -> "Die Kopie stammt von einer neueren App-Version."
+            is WrongPassword -> "Passwort falsch oder Datei verändert. Nichts geändert."
+            is NotAnExport -> "Das ist keine Sicherungsdatei von AuViLo-Reminder. Nichts geändert."
+            is DamagedBackup -> "Die Sicherungsdatei ist beschädigt. Nichts geändert."
             is DamagedDatabase -> "Die Kopie ist beschädigt oder passt nicht zur App. Nichts geändert."
             is RestoreBusy -> "Es läuft schon eine Prüfung."
             else -> "Unerwarteter Fehler (${e::class.simpleName}). Nichts geändert."

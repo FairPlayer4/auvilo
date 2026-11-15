@@ -948,6 +948,18 @@ Vordergrund, nicht Reichweite.
     Standort-Berechtigung heraus, im Hintergrund nur mit „Immer erlauben“ (design.md 6,
     WLAN). Streichen hieße deshalb: Ankunft am Ort im Play-Build ganz aus, nicht nur der
     Geofence.
+- PS14 **Sicherungsdatei: Export und Import (2026-11-15):** Daten und Einstellungen lassen
+  sich als Datei exportieren und wieder importieren (*Einstellungen → Lokale Kopien →
+  Sicherungsdatei*), ohne Backend. Gedacht für Tester ohne Cloud-Backup, als zusätzliche
+  Sicherung und für den Umzug, falls sich die `applicationId` ändert (playstore.md N1, N4).
+  - Die Datei ist mit einem **eigenen Passwort** verschlüsselt (mindestens 12 Zeichen,
+    zweimal eingeben), weil sie das Handy verlässt (8.4). Ohne Passwort ist sie nicht zu
+    öffnen; die App merkt sich das Passwort nicht.
+  - **Ohne Fotos und Audio** (wie das Cloud-Backup); ob sie später dazukommen, entscheidet
+    Kevin nach dem Gerätetest.
+  - Importieren fragt wie jedes Wiederherstellen: Vergleich, Rückfrage, Tausch beim
+    nächsten Start, vorher eine Tageskopie zum Rückgängigmachen (W-5, W-6).
+  - Umgesetzt in V1.3c8.
   - Die auffällige Offenlegung kommt vor Androids Dialog: Tippt man in der
     Berechtigungsliste auf *Standort „Immer erlauben“*, erklärt erst ein eigener Hinweis
     (Standort und WLAN, auch wenn die App geschlossen ist, bleibt auf dem Handy), dann fragt
@@ -1310,8 +1322,9 @@ Siehe design.md 1 (*Tech*) und [entwicklungsumgebung.md](entwicklungsumgebung.md
   das Ergebnis (Dauer, erkanntes Muster) bleibt.
 - **Nutzer-Backup** ist das Cloud-Backup des Backends (B2b, [backend.md](backend.md),
   Einbindung [cloud-entscheidungen.md](cloud-entscheidungen.md)): Ende-zu-Ende verschlüsselt, ohne
-  Fotos und Audio, nur nach ausdrücklichem Einschalten (7.28 PS8). Ein Export als Datei
-  ist später nachrüstbar (z. B. als ZIP). Die Kopie der Datenbank vor jeder Migration
+  Fotos und Audio, nur nach ausdrücklichem Einschalten (7.28 PS8). Dazu die
+  **Sicherungsdatei** (7.28 PS14): mit eigenem Passwort verschlüsselt, ohne Fotos und Audio;
+  wohin sie geht, wählt der Nutzer in Androids Dateidialog. Die Kopie der Datenbank vor jeder Migration
   (design.md 13) ist nur eine Sicherung gegen Datenverlust beim Update, kein Backup.
 - Aufbewahrung: vorerst unbegrenzt.
 
@@ -1321,6 +1334,7 @@ Neueste zuerst. Kap. 7 enthält immer den gültigen Stand; diese Tabelle ist die
 
 | Datum | Entscheidung |
 |---|---|
+| 2026-11-15 | **Sicherungsdatei mit Passwort, ohne Fotos und Audio** (Kevin wählte „Mit Passwort“ und „Erstmal ohne“): Export und Import als Datei in den lokalen Kopien; AES-256-GCM mit einem Schlüssel aus dem Passwort (PBKDF2, 600 000 Runden), mindestens 12 Zeichen; Import wie jedes Wiederherstellen (7.28 PS14, playstore.md N4). Umgesetzt in V1.3c8 |
 | 2026-11-15 | **Standort im Hintergrund behalten und begründen** (Kevin: „Wir sollten es nur bei Ablehnung streichen und bei der Einreichung begründen.“): Ort per WLAN reicht heute, der Geofence muss ohnehin überarbeitet werden; da auch das WLAN „Immer erlauben“ braucht, hieße Streichen: Ankunft im Play-Build aus (7.28 PS13, playstore.md P5). Hinweis vor Androids Dialog umgesetzt in V1.3c7 |
 | 2026-11-15 | **Akku-Optimierung nur empfohlen, ohne direkten Dialog** (Kevin: „Theoretisch sollte die App auch mit Battery Optimizations funktionieren nur ohne Garantie.“): kein Pflichtpunkt mehr, keine Warnung auf *Heute*; der Knopf öffnet die App-Info statt Androids Dialog; `REQUEST_IGNORE_BATTERY_OPTIMIZATIONS` entfällt (7.28 PS12, playstore.md P4). Umgesetzt in V1.3c6 |
 | 2026-11-15 | **Name „AuViLo-Reminder“** (Kevin: „Erstmal nur Anzeigename ändern damit keine Neuinstallation nötig ist. Restliche Teile ändern wir vor einem Playstore Antrag.“): sichtbarer Name sofort, `applicationId`, Paket und Logo vor dem Antrag; Marke wahrscheinlich, falls der Play Store kommt (7.28 PS11, playstore.md N1). Anzeigename umgesetzt in V1.3c5 |
@@ -1410,6 +1424,8 @@ Neueste zuerst. Kap. 7 enthält immer den gültigen Stand; diese Tabelle ist die
 | V1.3b3 | 2026-11-12 | Antworten auf Review-Lauf 5, Etappe A: Formular (Entwurf übersteht Neuaufbau, Probleme sichtbar, Limit für Sitzungs-Minimum, Startklar nicht leerbar, Ankunft ohne Ort nicht still weg), F2 auch für eine vorher geplante Prüfung, geänderte Ankunftsregel entscheidet neu, Zurücknehmen einer Sitzung nur vor dem Maximum; Tests der UI-Verdrahtung (Kap. 9, 2026-11-12) |
 | V1.3c0 | 2026-11-13 | Umbau-Etappe B aus Review-Lauf 5: Zeit über die Uhr der Engine und Lesen über das Repository (E21), `Database.kt` geteilt (E23), Ende eines Alarms als Effekt der Engine, auch wenn das System den Termin schließt (E17, Frage 3), Sitzungsantworten aus dem Core (E18), `AppGraph.rebuild`, „Hier festlegen“ und Blocker mit Aufgabe in der Engine, `CloudWiring` (E19), `Scheduler` intern geteilt (E20); Fixes aus Review-Lauf 6 (Entwurf beim Neuaufbau nach Start aus Benachrichtigung, Übersicht nicht bei jedem Öffnen neu geplant, Snooze auf altem Termin, Rückgängig nur vor dem Maximum, Nachfrage-Text); Antworten auf Lauf 6: verschobener Termin wartet nach neuer Ankunftsregel wieder, ohne Bildschirm kein *Teilschritt* mit Nachweis |
 | V1.3c1 | 2026-11-13 | Verschiebe-Limit pro Termin, Woche oder Monat (Z2b): Formular, Alarm mit „noch 1× diese Woche“ und „wieder ab …“, Vorlagen, Schnittstelle für Claude; Schema 11 |
+| V1.3c2–c7 | 2026-11-15 | Konto löschen und Displaysperre (R-3, SE5), Passwortmanager als Hauptweg, exakte Alarme mit `SCHEDULE_EXACT_ALARM`, Name „AuViLo-Reminder“ (7.28 PS11), Akku nur empfohlen (PS12), Hinweis vor dem Standort-Dialog (PS13) |
+| V1.3c8 | – | Sicherungsdatei: Export und Import mit Passwort, ohne Fotos und Audio (7.28 PS14) |
 
 Details zum Verhalten: [design.md](design.md), Gerätetests: [geraetetest.md](geraetetest.md).
 

@@ -792,6 +792,23 @@ Fassung eines anderen Geräts fragt die nächste Sicherung vor dem Ersetzen (W-7
 `Sicherungsablauf`). Ältere Fassungen liefert der Server über `FassungenAuflisten` und
 `SicherungHolen` mit Version (R-4).
 
+**Sicherungsdatei** (Anf. 7.28 PS14, `restore/ExportFile.kt`, `ui/screens/ExportViews.kt`).
+In den lokalen Kopien, also auch ohne Cloud-Backup. *Exportieren …* fragt zuerst ein
+Passwort (mindestens 12 Zeichen, zweimal), dann wählt Androids Dateidialog den Ort
+(`CreateDocument`, Name `AuViLo-Sicherung-<Datum>.auvilo`). Inhalt ist dieselbe Nutzlast wie
+beim Cloud-Backup (`AppBackupSource`, eigene Kopie `export.db` im Cache, damit sich Export
+und stündliche Sicherung nicht in die Quere kommen), verschlüsselt mit AES-256-GCM; der
+Schlüssel kommt per PBKDF2-HMAC-SHA256 aus dem Passwort (600 000 Runden, 16 Byte Salt,
+12 Byte Nonce, beide je Datei neu). Kopf: Kennung `AUVILO-SICHERUNG`, Version 1, Runden,
+Salt, Nonce; er ist Zusatzdaten der Verschlüsselung, Änderungen fallen also auf. Ein
+falsches Passwort und eine veränderte Datei sehen gleich aus („Passwort falsch oder Datei
+verändert“). *Importieren …* fragt das Passwort einmal, öffnet die Datei (`OpenDocument`) und
+läuft dann wie jedes Wiederherstellen (`LocalRestore.fromFile`, Art `FILE`): Vergleich,
+Rückfrage, Tausch beim nächsten Start, Tageskopie zum Rückgängigmachen; danach vergisst die
+App den Stand der letzten Cloud-Sicherung wie bei einer Tageskopie. Das Passwort liegt nur
+als `CharArray` im Speicher und wird nach dem Lauf überschrieben; es kommt in keine Datei
+und kein Log.
+
 **Abmelden und Löschen.** *Dieses Gerät abmelden* sperrt das Gerät beim Server.
 *Konto löschen* (`deleteAccount`, R-3) löscht über `KontoLoeschen` das ganze Konto auf
 dem Server; das Handy vergisst Schlüssel und Sitzung erst nach der Bestätigung des
@@ -811,7 +828,8 @@ freigeschaltetes Gerät kann sich mit dem Wiederherstellungsschlüssel freischal
 aus der App (A-12); *Diagnose senden* nur für Konten mit Diagnose-Erlaubnis.
 
 **Tests.** `CloudBackupTest` (gegen `FakeServer` mit den Serverregeln fürs erste
-Schlüssel-Backup), `RestoreFilesTest`, `LocalRestoreTest`, `CorruptCopyTest`; auf dem
+Schlüssel-Backup), `RestoreFilesTest`, `LocalRestoreTest`, `CorruptCopyTest`,
+`ExportFileTest` (Format festgenagelt), `ExportFileUiTest`; auf dem
 Gerät [geraetetest.md](geraetetest.md) Abschnitt D.
 
 ## Entwurf V1.3c – Abläufe (Skizze)

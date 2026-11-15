@@ -69,11 +69,17 @@ object BackupZip {
 /**
  * The app's data as backup payload: a copy of the database (`VACUUM INTO`, which also takes what
  * is still in the WAL file) and the settings meant for the backup (`Settings.backup`, PS8a).
- * The copy lives in the cache only while the ZIP is built.
+ * The copy lives in the cache only while the ZIP is built; [copyName] differs per user (cloud
+ * backup, export file), so the two never delete each other's copy.
  */
-class AppBackupSource(private val db: AvlDatabase, private val settings: Settings, private val cacheDir: File) : BackupSource {
+class AppBackupSource(
+    private val db: AvlDatabase,
+    private val settings: Settings,
+    private val cacheDir: File,
+    private val copyName: String = "cloud-backup.db",
+) : BackupSource {
     override suspend fun payload(): ByteArray = withContext(Dispatchers.IO) {
-        val copy = File(cacheDir, "cloud-backup.db")
+        val copy = File(cacheDir, copyName)
         copy.delete() // VACUUM INTO needs a file that does not exist
         try {
             db.openHelper.writableDatabase.execSQL("VACUUM INTO '${copy.path.replace("'", "''")}'")

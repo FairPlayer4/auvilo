@@ -12,26 +12,4 @@
             column="6"/>
     </issue>
 
-    <issue
-        id="InvalidFragmentVersionForActivityResult"
-        message="Upgrade Fragment version to at least 1.3.0."
-        errorLine1="    private val requestLocation = registerForActivityResult(ActivityResultContracts.RequestMultiplePermissions()) { refreshPermissions() }"
-        errorLine2="                                  ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~">
-        <location
-            file="src/main/java/com/avlreminder/ui/MainActivity.kt"
-            line="72"
-            column="35"/>
-    </issue>
-
-    <issue
-        id="InvalidFragmentVersionForActivityResult"
-        message="Upgrade Fragment version to at least 1.3.0."
-        errorLine1="    private val requestPermission = registerForActivityResult(ActivityResultContracts.RequestPermission()) {"
-        errorLine2="                                    ^">
-        <location
-            file="src/main/java/com/avlreminder/ui/MainActivity.kt"
-            line="74"
-            column="37"/>
-    </issue>
-
 </issues>

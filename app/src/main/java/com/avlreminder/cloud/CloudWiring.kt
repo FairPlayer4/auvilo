@@ -54,6 +54,9 @@ class CloudWiring(
         configured = CloudConfig.configured(),
     )
 
-    /** Restoring from a daily copy and undoing a restore (R-1, W-6); no network. */
-    val local = LocalRestore(restoreTarget, restoreFiles, snapshots, settings::backup, scope, log, Diag::log)
+    /** Restoring from a daily copy or an export file and undoing a restore (R-1, W-6, PS14); no network. */
+    val local = LocalRestore(
+        restoreTarget, restoreFiles, snapshots, settings::backup, scope, log, Diag::log,
+        source = AppBackupSource(db, settings, context.cacheDir, copyName = "export.db"),
+    )
 }

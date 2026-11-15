@@ -4,6 +4,8 @@ Stand: 2026-11-15. Bei jedem größeren Schritt aktualisieren. Erledigtes steht 
 anforderungen.md Kap. 10.1 und in den Review-Berichten (`.review/runs/`), nicht hier.
 
 ## Auf dem Gerät (S24)
+- **V1.3c8** (`versionCode` 28) gebaut, noch nicht installiert: Sicherungsdatei, Export und
+  Import mit Passwort, ohne Fotos und Audio (7.28 PS14, playstore.md N4). Keine Migration.
 - **V1.3c7** (`versionCode` 27), installiert am 2026-11-15: Hinweis vor Androids
   Standort-Dialog (7.28 PS13). Keine Migration. Start ohne Fehler, Alarme neu geplant,
   Standort „Immer erlauben“ weiter erteilt (`background=true`).
@@ -33,12 +35,12 @@ Kevins echte Daten; vor dem ersten weiteren Nutzer kommt die Sicherheitsphase (B
 einer Fassung.
 
 ## Offen
-0. **Gerätetests zu V1.3c0–V1.3c7** (alles installiert, siehe oben): ein verpasster Termin
+0. **Gerätetests zu V1.3c0–V1.3c8** (bis V1.3c7 installiert, siehe oben): ein verpasster Termin
    und ein Notaus-Skip nehmen die Benachrichtigung mit; ein abgelehnter Knopf in der
    Benachrichtigung lässt sie stehen; die Morgenübersicht kommt, auch wenn die App kurz
    nach ihrer Zeit geöffnet wird; einen Punkt aus der Benachrichtigung eines klingelnden
    Vollbild-Alarms abhaken und im Vollbild den Nachweis starten: der nächste Punkt bzw.
-   „Nachweis läuft“ bleibt stehen (Lauf 6, E26); K33–K37, K38 (nur noch das Antippen), K39 (nur, falls die Erlaubnis einmal fehlt), C19; ohne Vollbild-Erlaubnis ein Alarm (playstore-erklaerungen.md P2). Nur auf dem Emulator mit
+   „Nachweis läuft“ bleibt stehen (Lauf 6, E26); K33–K37, K38 (nur noch das Antippen), K39 (nur, falls die Erlaubnis einmal fehlt), K40, C19; ohne Vollbild-Erlaubnis ein Alarm (playstore-erklaerungen.md P2). Nur auf dem Emulator mit
    Testkonto: C15–C18.
 1. **Gerätetests** aus [geraetetest.md](geraetetest.md): K15, K23–K26 (vorher *Zuhause* in
    *Orte* mit WLAN neu festlegen), K27–K30 (Sitzung, dabei: zeigt die Uhr den

@@ -49,7 +49,8 @@ class RestoreFiles(filesDir: File) {
 }
 
 /** What a restore swaps in. */
-enum class RestoreKind { CLOUD, SNAPSHOT, UNDO }
+/** [FILE]: an export file of the person's own (Anf. 7.28 PS14). */
+enum class RestoreKind { CLOUD, SNAPSHOT, UNDO, FILE }
 
 /** The order in `auftrag.json`. [before]: name of the copy of the old data, without extension. */
 data class RestoreOrder(val kind: RestoreKind, val sha256: String, val before: String, val swapped: Boolean = false) {
@@ -197,7 +198,7 @@ object DatabaseSwap {
 object RestoreFinish {
     /**
      * Takes the settings that came with the swapped database via [take], then removes the order.
-     * After a restore on the phone ([RestoreKind.SNAPSHOT], [RestoreKind.UNDO]) [forgetLastBackup]
+     * After a restore on the phone ([RestoreKind.SNAPSHOT], [RestoreKind.UNDO], [RestoreKind.FILE]) [forgetLastBackup]
      * runs first.
      *
      * KRITISCH:

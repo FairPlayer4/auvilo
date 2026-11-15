@@ -6,6 +6,7 @@ import com.avlreminder.graph
 import com.avlreminder.ui.screens.CloudActions
 
 import android.Manifest
+import android.annotation.SuppressLint
 import android.app.NotificationManager
 import android.content.Context
 import android.content.Intent
@@ -40,6 +41,7 @@ import com.avlreminder.core.rules.SnoozeHintChoice
 import com.avlreminder.core.usecases.SaveResult
 import com.avlreminder.data.ThemeMode
 import com.avlreminder.location.hasBackgroundLocation
+import com.avlreminder.restore.ExportFile
 import com.avlreminder.system.Battery
 import com.avlreminder.location.hasLocation
 import com.avlreminder.ui.screens.LocationDisclosureDialog
@@ -50,6 +52,9 @@ import kotlinx.coroutines.delay
 import java.time.Instant
 import java.time.ZoneId
 
+// Lint reads the declared androidx.fragment 1.1.0 of a transitive dependency; resolved is 1.5.7,
+// and this is a ComponentActivity, not a FragmentActivity, so the check does not apply.
+@SuppressLint("InvalidFragmentVersionForActivityResult")
 class MainActivity : ComponentActivity() {
     companion object {
         private const val EXTRA_NEW = "new"
@@ -80,6 +85,33 @@ class MainActivity : ComponentActivity() {
     private var permissions by mutableStateOf(emptyList<PermissionItem>())
     private var startRoute by mutableStateOf(Routes.TODAY)
     private var launch by mutableIntStateOf(0)
+
+    /** The password for the export file while Android's file dialog is open (Anf. 7.28 PS14). */
+    private var filePassword: CharArray? = null
+
+    private val createExport = registerForActivityResult(ActivityResultContracts.CreateDocument(ExportFile.MIME)) { uri ->
+        val password = filePassword.also { filePassword = null } ?: return@registerForActivityResult
+        if (uri == null) return@registerForActivityResult password.fill(' ')
+        graph.local.export(displayName(uri), password) { bytes ->
+            checkNotNull(contentResolver.openOutputStream(uri, "wt")) { "no output stream" }.use { it.write(bytes) }
+        }
+    }
+
+    private val openImport = registerForActivityResult(ActivityResultContracts.OpenDocument()) { uri ->
+        val password = filePassword.also { filePassword = null } ?: return@registerForActivityResult
+        if (uri == null) return@registerForActivityResult password.fill(' ')
+        graph.local.fromFile(displayName(uri), password) {
+            checkNotNull(contentResolver.openInputStream(uri)) { "no input stream" }.use { it.readBytes() }
+        }
+    }
+
+    /** The file's name as Android's file dialog shows it. */
+    private fun displayName(uri: android.net.Uri): String =
+        runCatching {
+            contentResolver.query(uri, arrayOf(android.provider.OpenableColumns.DISPLAY_NAME), null, null, null)?.use {
+                if (it.moveToFirst()) it.getString(0) else null
+            }
+        }.getOrNull() ?: "Sicherungsdatei"
 
     /** Google Play's prominent disclosure before Android's location dialog (Anf. 7.28 PS13). */
     private var locationDisclosure by mutableStateOf(false)
@@ -251,6 +283,15 @@ class MainActivity : ComponentActivity() {
         override val local = object : com.avlreminder.ui.screens.LocalActions {
             override fun fromSnapshot(date: java.time.LocalDate) { graph.local.fromSnapshot(date) }
             override fun undo() { graph.local.undo() }
+            override fun exportFile(password: CharArray) {
+                filePassword = password
+                createExport.launch(ExportFile.fileName(java.time.LocalDate.now(graph.clock)))
+            }
+            override fun importFile(password: CharArray) {
+                filePassword = password
+                // The file has no type Android knows; any file can be chosen, the app checks it.
+                openImport.launch(arrayOf("*/*"))
+            }
             override fun answer(yes: Boolean) = graph.local.answer(yes)
             override fun dismiss() = graph.local.dismiss()
         }

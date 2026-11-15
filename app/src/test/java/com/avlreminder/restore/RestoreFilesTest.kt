@@ -459,6 +459,7 @@ class RestoreFilesTest {
         val cases = listOf(
             RestoreKind.SNAPSHOT to true,
             RestoreKind.UNDO to true,
+            RestoreKind.FILE to true,
             RestoreKind.CLOUD to false,
         )
         for ((kind, forgets) in cases) {

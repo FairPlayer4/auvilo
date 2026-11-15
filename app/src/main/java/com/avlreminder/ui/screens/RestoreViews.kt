@@ -108,10 +108,14 @@ fun RestoreQuestion(title: String, comparison: Comparison, onAnswer: (Boolean) -
     }
 }
 
-/** What the section "Lokale Kopien" can do (R-1, W-6); the defaults do nothing (previews, tests). */
+/** What the section "Lokale Kopien" can do (R-1, W-6, PS14); the defaults do nothing (previews, tests). */
 interface LocalActions {
     fun fromSnapshot(date: LocalDate) {}
     fun undo() {}
+    /** Chooses where with Android's file dialog, then writes the export file with [password]. */
+    fun exportFile(password: CharArray) {}
+    /** Chooses an export file with Android's file dialog and restores from it. */
+    fun importFile(password: CharArray) {}
     fun answer(yes: Boolean) {}
     fun dismiss() {}
 }
@@ -150,6 +154,7 @@ fun LocalRestoreSetting(status: LocalStatus, actions: LocalActions, zone: ZoneId
                     RestoreKind.CLOUD -> "Daten aus der Cloud-Sicherung wiederhergestellt."
                     RestoreKind.SNAPSHOT -> "Daten aus der lokalen Kopie wiederhergestellt."
                     RestoreKind.UNDO -> "Wiederherstellen rückgängig gemacht."
+                    RestoreKind.FILE -> "Daten aus der Sicherungsdatei wiederhergestellt."
                 },
                 Modifier.testTag("localRestored"), color = c.text, fontSize = 14.sp,
             )
@@ -177,6 +182,7 @@ fun LocalRestoreSetting(status: LocalStatus, actions: LocalActions, zone: ZoneId
                         Text("Wiederherstellen rückgängig machen (bis ${UNTIL.format(until.atZone(zone))})")
                     }
                 }
+                ExportFileSetting(status, actions)
             }
         }
     }
