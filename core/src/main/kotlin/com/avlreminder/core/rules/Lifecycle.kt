@@ -9,6 +9,7 @@ import com.avlreminder.core.model.OccurrenceState.DUE
 import com.avlreminder.core.model.OccurrenceState.ESCALATING
 import com.avlreminder.core.model.OccurrenceState.PLANNED
 import com.avlreminder.core.model.OccurrenceState.RUNNING
+import com.avlreminder.core.model.PostponePeriod
 import com.avlreminder.core.model.Reminder
 import com.avlreminder.core.model.Resolution
 import com.avlreminder.core.model.severalADay
@@ -97,6 +98,8 @@ data class Limits(
     val nextTime: Instant? = null,
     /** Taken back after a completion with complete proof: that proof counts again (Anf. 7.31). */
     val proofCarried: Boolean = false,
+    /** Postponements of the reminder in the current week or month, for a limit per period (Z2b). */
+    val postponesInPeriod: Int = 0,
 )
 
 sealed interface TransitionResult {
@@ -117,15 +120,31 @@ object Lifecycle {
             (occurrence.state == CLOSED && occurrence.resolution == Resolution.SKIPPED && occurrence.note !in SkipReasons.SYSTEM) ||
             (occurrence.state == CLOSED && occurrence.resolution == Resolution.ABORTED && occurrence.startedAt != null)
 
-    fun canPostpone(reminder: Reminder, occurrence: Occurrence): Boolean =
-        reminder.postponeLimit == null || occurrence.postponeCount < reminder.postponeLimit
+    /** As [canReopen], and an aborted session only before its maximum duration, as [transition] decides (Review-Lauf 5). */
+    fun canReopen(reminder: Reminder, occurrence: Occurrence, now: Instant): Boolean {
+        if (!canReopen(occurrence)) return false
+        if (occurrence.resolution != Resolution.ABORTED) return true
+        val spec = reminder.session ?: return false
+        val started = occurrence.startedAt ?: return false
+        return now < Sessions.maxAt(spec, started)
+    }
 
-    fun postponesLeft(reminder: Reminder, occurrence: Occurrence): Int? =
-        reminder.postponeLimit?.let { (it - occurrence.postponeCount).coerceAtLeast(0) }
+    fun canPostpone(reminder: Reminder, occurrence: Occurrence, limits: Limits): Boolean =
+        reminder.postponeLimit == null || postponesUsed(reminder, occurrence, limits) < reminder.postponeLimit
+
+    fun postponesLeft(reminder: Reminder, occurrence: Occurrence, limits: Limits): Int? =
+        reminder.postponeLimit?.let { (it - postponesUsed(reminder, occurrence, limits)).coerceAtLeast(0) }
+
+    /** Per occurrence its own count; per week or month all of the reminder's in that span (Z2b). */
+    private fun postponesUsed(reminder: Reminder, occurrence: Occurrence, limits: Limits): Int =
+        if (reminder.postponePeriod == PostponePeriod.OCCURRENCE) occurrence.postponeCount else limits.postponesInPeriod
+
+    /** Marks the detail of a "Rest auf morgen" that counted as a postponement (Z2b). */
+    const val COUNTED = " counted"
 
     /** A minimum as text, or as a duration of the session (7.11 D4). */
     fun canUseMinimum(reminder: Reminder, limits: Limits): Boolean =
-        (reminder.minimum != null || reminder.session?.minimumMinutes != null) && minimumLeft(reminder, limits)
+        reminder.hasMinimum && minimumLeft(reminder, limits)
 
     /** A solved blocker as the minimum (S7); the weekly limit for the minimum applies. */
     fun canUseSolvedBlocker(reminder: Reminder, limits: Limits): Boolean =
@@ -231,7 +250,7 @@ object Lifecycle {
                 )
 
             is Action.Postpone -> when {
-                !canPostpone(reminder, occurrence) -> TransitionResult.Rejected("postpone limit reached")
+                !canPostpone(reminder, occurrence, limits) -> TransitionResult.Rejected("postpone limit reached")
                 action.to <= now -> TransitionResult.Rejected("postpone target must lie in the future")
                 limits.deadline != null && action.to >= limits.deadline -> TransitionResult.Rejected("postpone target after the deadline")
                 limits.nextTime != null && action.to >= limits.nextTime -> TransitionResult.Rejected("postpone target after the next time")
@@ -304,13 +323,13 @@ object Lifecycle {
                     reminder.checklist.isEmpty() -> TransitionResult.Rejected("no checklist")
                     limits.nextTime != null -> TransitionResult.Rejected("no rest for tomorrow several times a day")
                     action.to <= now -> TransitionResult.Rejected("defer target must lie in the future")
-                    counts && !canPostpone(reminder, occurrence) -> TransitionResult.Rejected("postpone limit reached")
+                    counts && !canPostpone(reminder, occurrence, limits) -> TransitionResult.Rejected("postpone limit reached")
                     else -> ok(
                         occurrence.copy(
                             state = PLANNED, currentAt = action.to, pausedUntil = null, awaitsArrival = false, arrivedAt = null,
                             postponeCount = occurrence.postponeCount + if (counts) 1 else 0,
                         ),
-                        EventType.DEFERRED, action.to.toString(),
+                        EventType.DEFERRED, action.to.toString() + if (counts) COUNTED else "",
                     )
                 }
             }

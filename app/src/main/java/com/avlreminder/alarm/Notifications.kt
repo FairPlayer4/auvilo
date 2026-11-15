@@ -1,6 +1,7 @@
 package com.avlreminder.alarm
 
 import com.avlreminder.core.rules.SessionAnswer
+import com.avlreminder.core.rules.Sessions
 import android.os.Bundle
 import android.app.Notification
 import android.app.NotificationChannel
@@ -52,8 +53,7 @@ data class AlarmInfo(
 
         fun of(view: AlarmView, zone: ZoneId = ZoneId.systemDefault()): AlarmInfo {
             val reminder = view.reminder
-            // Photo, text or audio cannot be given from the notification, so "done" there would always count as without proof.
-            val quick = !reminder.proof.needsEvidence
+            val quick = view.quickDone
             val session = view.session?.let { SessionCheck(it.startedAt, it.final, view.minimumAllowed, it.suggestion) }
             // In a session the checklist is not ticked off from the notification; the answers come first.
             val nextItem = view.nextItem?.takeIf { session == null }
@@ -95,6 +95,8 @@ data class AlarmInfo(
             val ask = when {
                 s.final -> "Maximale Dauer erreicht"
                 s.suggestion == SessionAnswer.DONE -> "Ziel erreicht – Fertig?"
+                // Without the button it says why, as the running session's notification (Review-Lauf 6).
+                s.suggestion == SessionAnswer.MINIMUM && !s.minimum -> "Minimum erreicht – Teilschritt diese Woche aufgebraucht"
                 s.suggestion == SessionAnswer.MINIMUM -> "Minimum erreicht – Teilschritt?"
                 else -> "Noch dran?"
             }
@@ -246,10 +248,16 @@ object Notifications {
     fun buttons(info: AlarmInfo): Buttons {
         val session = info.session
         if (session != null) {
-            val stillOn = Button.StillOn.takeIf { !session.final }
-            val done = Button.SessionDone.takeIf { info.quickDone }
-            val minimum = Button.Minimum.takeIf { session.minimum }
-            val ends = if (session.suggestion == SessionAnswer.MINIMUM) listOfNotNull(minimum, done) else listOfNotNull(done, minimum)
+            // The answers and their order come from core (E18); without the screen none with a proof.
+            val answers = Sessions.quickAnswers(session.final, session.suggestion, session.minimum, info.quickDone)
+            val stillOn = Button.StillOn.takeIf { SessionAnswer.STILL_ON in answers }
+            val ends = answers.mapNotNull {
+                when (it) {
+                    SessionAnswer.DONE -> Button.SessionDone
+                    SessionAnswer.MINIMUM -> Button.Minimum
+                    else -> null
+                }
+            }
             return Buttons(
                 phone = listOfNotNull(stillOn, ends.firstOrNull(), Button.Abort),
                 watch = listOfNotNull(stillOn) + ends + Button.Abort,

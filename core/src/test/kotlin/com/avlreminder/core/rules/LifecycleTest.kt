@@ -3,6 +3,7 @@ package com.avlreminder.core.rules
 import com.avlreminder.core.at
 import com.avlreminder.core.model.EventType
 import com.avlreminder.core.model.Occurrence
+import com.avlreminder.core.model.PostponePeriod
 import com.avlreminder.core.model.OccurrenceState.CLOSED
 import com.avlreminder.core.model.OccurrenceState.DONE
 import com.avlreminder.core.model.OccurrenceState.DUE
@@ -11,6 +12,7 @@ import com.avlreminder.core.model.OccurrenceState.PLANNED
 import com.avlreminder.core.model.ProofKind
 import com.avlreminder.core.model.ProofSpec
 import com.avlreminder.core.model.Resolution
+import com.avlreminder.core.model.SessionSpec
 import com.avlreminder.core.reminder
 import java.time.Duration
 import org.junit.jupiter.api.Assertions.assertEquals
@@ -64,15 +66,28 @@ class LifecycleTest {
         assertEquals(1, res.occurrence.postponeCount)
         assertEquals(at(27, 18), res.occurrence.currentAt)
         assertEquals(PLANNED, res.occurrence.state)
-        assertEquals(0, Lifecycle.postponesLeft(r, res.occurrence))
+        assertEquals(0, Lifecycle.postponesLeft(r, res.occurrence, Limits()))
         rejected(Lifecycle.transition(r, res.occurrence.copy(state = DUE), Action.Postpone(at(28, 18)), now))
     }
 
     @Test
     fun `postpone without limit is always possible`() {
         val unlimited = r.copy(postponeLimit = null)
-        assertTrue(Lifecycle.canPostpone(unlimited, due.copy(postponeCount = 99)))
-        assertNull(Lifecycle.postponesLeft(unlimited, due))
+        assertTrue(Lifecycle.canPostpone(unlimited, due.copy(postponeCount = 99), Limits()))
+        assertNull(Lifecycle.postponesLeft(unlimited, due, Limits()))
+    }
+
+    // Pro Woche oder Monat zählt der Zeitraum, nicht der Termin (Z2b, 2026-11-13).
+    @Test
+    fun `a limit per week counts the period, not the occurrence`() {
+        val weekly = r.copy(postponePeriod = PostponePeriod.WEEK)
+        val moved = due.copy(postponeCount = 5)
+        assertTrue(Lifecycle.canPostpone(weekly, moved, Limits()))
+        assertEquals(1, Lifecycle.postponesLeft(weekly, moved, Limits()))
+        assertFalse(Lifecycle.canPostpone(weekly, due, Limits(postponesInPeriod = 1)))
+        assertEquals(0, Lifecycle.postponesLeft(weekly, due, Limits(postponesInPeriod = 3)))
+        rejected(Lifecycle.transition(weekly, due, Action.Postpone(at(27, 18)), now, Limits(postponesInPeriod = 1)))
+        assertEquals(6, ok(Lifecycle.transition(weekly, moved, Action.Postpone(at(27, 18)), now, Limits())).occurrence.postponeCount)
     }
 
     @Test
@@ -160,6 +175,19 @@ class LifecycleTest {
         assertEquals(EventType.PROOF_STARTED, res.event.type)
         rejected(Lifecycle.transition(r, planned, Action.StartProof(at(26, 18, 15)), now))
         rejected(Lifecycle.transition(r, due, Action.StartProof(now), now))
+    }
+
+    @Test
+    fun `an aborted session can be taken back only before its maximum`() {
+        val session = r.copy(session = SessionSpec(maxMinutes = 60))
+        val started = now.minus(Duration.ofMinutes(30))
+        val aborted = planned.copy(state = CLOSED, resolution = Resolution.ABORTED, startedAt = started, resolvedAt = now)
+        assertTrue(Lifecycle.canReopen(session, aborted, now))
+        assertFalse(Lifecycle.canReopen(session, aborted, started.plus(Duration.ofMinutes(60))))
+        assertFalse(Lifecycle.canReopen(r, aborted, now))
+        // Anything else as before, without a maximum.
+        val done = planned.copy(state = DONE, resolution = Resolution.GOAL, resolvedAt = now)
+        assertTrue(Lifecycle.canReopen(r, done, now.plus(Duration.ofDays(1))))
     }
 
     @Test

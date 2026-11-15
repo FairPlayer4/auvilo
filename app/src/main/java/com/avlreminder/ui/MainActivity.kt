@@ -1,6 +1,7 @@
 package com.avlreminder.ui
 
 import com.avlreminder.PlaceSetResult
+import com.avlreminder.cloud.CloudConfig
 import com.avlreminder.graph
 import com.avlreminder.ui.screens.CloudActions
 
@@ -58,6 +59,9 @@ class MainActivity : ComponentActivity() {
             Intent(context, MainActivity::class.java).putExtra(EXTRA_NEW, true)
                 .addFlags(Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_CLEAR_TOP)
 
+        private const val STATE_LAUNCH = "launch"
+        private const val STATE_ROUTE = "startRoute"
+
         /** Opens the settings (tap on a notification of the cloud backup). */
         fun openSettings(context: Context): Intent =
             Intent(context, MainActivity::class.java).putExtra(EXTRA_SETTINGS, true)
@@ -85,7 +89,14 @@ class MainActivity : ComponentActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         enableEdgeToEdge()
-        handle(intent)
+        // Rebuilt (design, font size, process death): the same screen with its draft, not the
+        // intent again – it was handled already, its extras are gone (Review-Lauf 6).
+        if (savedInstanceState == null) {
+            handle(intent)
+        } else {
+            launch = savedInstanceState.getInt(STATE_LAUNCH)
+            startRoute = savedInstanceState.getString(STATE_ROUTE) ?: Routes.TODAY
+        }
         setContent {
             val theme by vm.theme.collectAsStateWithLifecycle()
             val today by vm.today.collectAsStateWithLifecycle()
@@ -108,12 +119,12 @@ class MainActivity : ComponentActivity() {
             val claudeAccess by vm.claudeAccess.collectAsStateWithLifecycle()
             val cloud by vm.cloud.collectAsStateWithLifecycle()
             val local by vm.local.collectAsStateWithLifecycle()
-            var now by androidx.compose.runtime.remember { mutableStateOf(Instant.now()) }
+            var now by androidx.compose.runtime.remember { mutableStateOf(graph.now()) }
             var dnd by androidx.compose.runtime.remember { mutableStateOf(device.isDoNotDisturb()) }
             LaunchedEffect(Unit) {
                 while (true) {
                     delay(30_000)
-                    now = Instant.now()
+                    now = graph.now()
                     dnd = device.isDoNotDisturb()
                 }
             }
@@ -124,11 +135,12 @@ class MainActivity : ComponentActivity() {
                 androidx.compose.runtime.key(launch) {
                     AvlAppUi(
                         state = AppState(
-                            today, reminders, openByReminder, history, proofs, theme, permissions, prep, alert, dnd,
-                            places = places, arrivalHint = !arrivalHintSeen, dwellMinutes = dwell, itemsDone = itemsDone,
+                            today, reminders.orEmpty(), openByReminder, history, proofs, theme, permissions, prep.orEmpty(), alert, dnd,
+                            places = places.orEmpty(), formReady = reminders != null && prep != null && places != null,
+                            appVersion = graph.appVersion, arrivalHint = !arrivalHintSeen, dwellMinutes = dwell, itemsDone = itemsDone,
                             reminderSort = reminderSort, suggestions = suggestions, overview = overview,
                             blockers = blockers, templates = templates, snoozeHints = snoozeHints,
-                            claudeAccess = claudeAccess, cloud = cloud, local = local,
+                            claudeAccess = claudeAccess, cloud = cloud.takeIf { CloudConfig.configured() }, local = local,
                         ),
                         actions = actions,
                         now = now,
@@ -139,6 +151,12 @@ class MainActivity : ComponentActivity() {
                 }
             }
         }
+    }
+
+    override fun onSaveInstanceState(outState: Bundle) {
+        super.onSaveInstanceState(outState)
+        outState.putInt(STATE_LAUNCH, launch)
+        outState.putString(STATE_ROUTE, startRoute)
     }
 
     override fun onNewIntent(intent: Intent) {
@@ -264,8 +282,8 @@ class MainActivity : ComponentActivity() {
         val notifications = getSystemService(NotificationManager::class.java)
         val power = getSystemService(PowerManager::class.java)
         val blocked = Notifications.channelsBlockedByDnd(this)
-        val dndNeeded = vm.reminders.value.any { it.active && it.ignoreDnd }
-        val locationNeeded = vm.reminders.value.any { it.active && it.arrival != null }
+        val dndNeeded = vm.reminders.value.orEmpty().any { it.active && it.ignoreDnd }
+        val locationNeeded = vm.reminders.value.orEmpty().any { it.active && it.arrival != null }
         permissions = listOfNotNull(
             PermissionItem("Benachrichtigungen", "ohne sie gibt es keinen Alarm", granted(Manifest.permission.POST_NOTIFICATIONS)) {
                 requestPermission.launch(Manifest.permission.POST_NOTIFICATIONS)

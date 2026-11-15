@@ -17,6 +17,7 @@ import com.avlreminder.core.rules.Checklists
 import com.avlreminder.core.rules.Deadlines
 import com.avlreminder.core.rules.Escalation
 import com.avlreminder.core.rules.Lifecycle
+import com.avlreminder.core.rules.PostponePeriods
 import com.avlreminder.core.rules.Limits
 import com.avlreminder.core.rules.Prep
 import com.avlreminder.core.rules.ScheduleRules
@@ -58,6 +59,9 @@ internal class AlarmViews(private val c: EngineContext) {
             blockerSolved = reminder.solvedBlockerIsMinimum && Blockers.solvedSince(repo.blockers(reminder.id), since),
             nextTime = occurrence?.let { ScheduleRules.nextTime(reminder.schedule, it.dueAt, zone) },
             proofCarried = occurrence != null && proofCarried(reminder, occurrence),
+            // Counted when postponed, also for a running session (Z2b).
+            postponesInPeriod = PostponePeriods.range(reminder.postponePeriod, now(), zone)
+                ?.let { (start, end) -> repo.countPostponed(reminder.id, start, end) } ?: 0,
         )
     }
 
@@ -159,8 +163,10 @@ internal class AlarmViews(private val c: EngineContext) {
             occurrence = occurrence,
             minimumAllowed = Lifecycle.canUseMinimum(reminder, limits),
             minimumsLeft = Lifecycle.minimumsLeft(reminder, limits),
-            canPostpone = Lifecycle.canPostpone(reminder, occurrence),
-            postponesLeft = Lifecycle.postponesLeft(reminder, occurrence),
+            canPostpone = Lifecycle.canPostpone(reminder, occurrence, limits),
+            postponesLeft = Lifecycle.postponesLeft(reminder, occurrence, limits),
+            postponeAgainAt = PostponePeriods.range(reminder.postponePeriod, now(), zone)
+                ?.takeIf { !Lifecycle.canPostpone(reminder, occurrence, limits) }?.second,
             snooze = snoozeOptions(reminder, occurrence),
             prep = prep(reminder.id),
             lastProofText = limits.lastProofText,
@@ -168,7 +174,7 @@ internal class AlarmViews(private val c: EngineContext) {
             done = limits.itemsDone.keys,
             // Doing an item today makes "Rest auf morgen" free; otherwise it is a postponement.
             canDeferRest = reminder.checklist.isNotEmpty() && limits.nextTime == null &&
-                (limits.itemDoneToday || Lifecycle.canPostpone(reminder, occurrence)),
+                (limits.itemDoneToday || Lifecycle.canPostpone(reminder, occurrence, limits)),
             week = weekStatus(reminder, occurrence.dueAt.atZone(zone).toLocalDate()),
             blockerSolved = Lifecycle.canUseSolvedBlocker(reminder, limits),
             askBlocker = !early && askBlocker(reminder, occurrence),

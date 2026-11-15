@@ -295,7 +295,16 @@ Erster Satz, wird mit der Nutzung angepasst: **[V1]**
 - Z1c **Ziel über Zeitraum**: z. B. Wochenziel 3–4×, Minimum 1× pro Woche **[V1]**
 - Z2 **Gutes Rescheduling**: Verschieben ist eine bewusste Entscheidung mit neuem
   konkretem Zeitpunkt – kein endloses Snooze. **[V1]**
-- Z2b **Limit für Verschieben** pro Reminder einstellbar **[V1]**
+- Z2b **Limit für Verschieben** pro Reminder einstellbar **[V1]**, wahlweise **pro Termin**
+  (jeder neue Termin fängt bei 0 an), **pro Woche** oder **pro Monat** (2026-11-13, V1.3c1):
+  - Woche und Monat sind Kalenderwoche (Mo–So) und Kalendermonat; es zählen alle
+    Verschiebungen des Reminders in diesem Zeitraum, zum Zeitpunkt des Verschiebens. Mit der
+    neuen Woche bzw. dem neuen Monat geht es wieder, auch für einen schon verschobenen Termin.
+  - Es zählen *Verschieben* (auch vorab, 7.32 VB3) und *Rest auf morgen*, wenn es bisher
+    zählte (ohne erledigten Punkt am selben Tag); *Später* bleibt ohne Limit.
+  - Bestehende Reminder, Vorlagen und die Startwerte der Strenge zählen pro Termin.
+  - Der Alarm zeigt, was bleibt („noch 1× diese Woche“), aufgebraucht ausgegraut mit
+    „wieder ab Mo 02.11.“.
 
 ### 7.7 Verstärkung (Psychologie)
 **Positiv (Schwerpunkt):**
@@ -1084,12 +1093,13 @@ vorher schieben oder auslassen können, wie man Checklisten-Punkte vorab abhakt.
 ### 7.33 Wiederherstellungsschlüssel im Passwortdienst (2026-11-08)
 Beim ersten Gerätetest war das Aufschreiben des Wiederherstellungsschlüssels umständlich
 (langen Code abtippen). Die App soll das Sichern deshalb selbst anbieten.
-- WS1 **Automatisch angeboten:** Zeigt die App einen neuen Wiederherstellungsschlüssel,
-  öffnet sie sofort den Speicher-Dialog des Passwortdienstes (Credential Manager,
+- WS1 **Auf Knopfdruck angeboten** (geändert 2026-11-12, vorher automatisch): Zeigt die
+  App einen neuen Wiederherstellungsschlüssel, ist „aufgeschrieben“ der Hauptweg (Papier
+  ist der Standard). *Im Passwortmanager speichern* nennt vorher die Folge (WS4) und
+  öffnet dann den Speicher-Dialog des Passwortdienstes (Credential Manager,
   `CreatePasswordRequest`; Standard ist der Google Passwortmanager, andere Dienste wie
   Bitwarden gehen genauso). Name: „avlreminder Wiederherstellung“, als Nutzername das
-  Konto-Pseudonym. Gespeichert → fertig, eine Bestätigung genügt. Abgelehnt oder kein
-  Dienst → wie bisher anzeigen und „aufgeschrieben“ bestätigen.
+  Konto-Pseudonym. Gespeichert → fertig, eine Bestätigung genügt.
 - WS2 **Automatisch geholt:** Fragt die App nach dem Schlüssel (neues Gerät, App-Daten
   gelöscht), bietet sie zuerst den gespeicherten aus dem Passwortdienst an
   (`GetPasswordOption`); Eintippen bleibt möglich.
@@ -1097,8 +1107,92 @@ Beim ersten Gerätetest war das Aufschreiben des Wiederherstellungsschlüssels u
   Zwischenablage oder ans Backend.
 - WS4 **Hinweis:** Der Google Passwortmanager verschlüsselt nur mit eingeschalteter
   **Geräteverschlüsselung** Ende-zu-Ende; ohne sie könnte Google Schlüssel und (in GCP
-  liegende) Sicherung zusammenbringen. Die App sagt das in einem Satz; Papier bleibt als
-  zusätzliche Kopie empfohlen.
+  liegende) Sicherung zusammenbringen. Die App sagt das **vor** dem Speichern und nennt
+  die Folge: Wer das Google-Konto übernimmt, kann dann ein eigenes Gerät freischalten
+  und alles entschlüsseln (Backend `anforderungen.md` Kap. 11, 2026-11-12). Papier
+  bleibt als zusätzliche Kopie empfohlen.
+
+### 7.34 Repo veröffentlichen (geplant, 2026-11-14)
+Kevin will das App-Repo `FairPlayer4/avlreminder` und das Backend-Repo in den nächsten
+Wochen öffentlich machen. Prüfung vom 2026-11-14 (Arbeitsbaum, alle 226 Commits auf allen
+Branches, CI): **keine Secrets** (keine Schlüssel, Tokens, Keystores, Passwörter; gelöschte
+Dateien ohne echte BSSIDs oder Koordinaten). Das einzige CI-Secret `BACKEND_DEPLOY_KEY`
+bleibt auch im öffentlichen Repo verborgen und geht nicht an PRs aus Forks.
+
+Was vorher zu tun ist, in dieser Reihenfolge (Vorschlag, noch nicht entschieden):
+- OV1 **Server absichern:** Laut Backend kann jedes Google-Konto ein Konto anlegen. Mit
+  der öffentlichen Server-URL und Web-Client-ID (`CloudConfig.kt`, beide kein Secret)
+  könnten Fremde sichern: Kosten bis zum Kill-Switch, danach ist Kevins Backup gesperrt,
+  und fremde Daten lägen ohne Datenschutzerklärung (PS3) auf dem Server. Gehört zur
+  Sicherheitsphase ([backend.md](backend.md)). Präzisiert 2026-11-14:
+  - **Zugang nur nach Freigabe** (Backend ID7): Der Server nimmt nur Google-Konten an,
+    deren Kennung (HMAC aus Pfeffer und `sub`, bleibt über *Konto löschen* hinweg gleich)
+    auf einer Liste steht; leer heißt niemand. Sonst legt er nichts an und antwortet mit
+    der Kennung. Die App zeigt dann „Zugang nicht freigegeben. Schick diesen Code an den
+    Betreiber: …“, Kevin trägt ihn ein. Wer mehr will, betreibt einen eigenen Server.
+    **Umgesetzt und deployt 2026-11-14** (Backend PR #25; App: Fehlertext mit Kennung,
+    markierbar zum Kopieren; ein später entzogener Zugang beendet die Sitzung wie eine
+    abgelehnte Anmeldung und meldet sich sofort).
+  - **Konfigurierbarer Server:** URL und Web-Client-ID als Gradle-Property bzw. aus
+    `local.properties`; ohne Wert ist das Cloud-Backup im Build ausgeblendet, fremde
+    Builds treffen nicht Kevins Server. **Umgesetzt 2026-11-14** (`avlCloudServerUrl`,
+    `avlCloudWebClientId`; Einrichtung in cloud-entscheidungen.md): ohne Werte keine
+    Cloud-Einstellungen, die stündliche Sicherung stoppt, der Build warnt.
+  - **Kosten bei Angriffen** (Backend ID8): Die Adresse gilt nicht als Geheimnis, sie
+    bleibt auch nach dem Zurücksetzen der Sicherheitsphase gleich (gleiches Projekt).
+    Geschützt wird über Grenzen: signierte Sitzungs-Token, damit gefälschte kein
+    Firestore-Lesen kosten, und ein Alarm auf die Anfragezahl, der den Kill-Switch
+    direkt auslöst, statt auf die verzögerten Budgetdaten zu warten. **Umgesetzt und
+    deployt 2026-11-14** (Kill-Switch ab mehr als 10.000 Anfragen je Stunde).
+- OV2 **Echte Testdaten nicht veröffentlichen:** In `testdata/real-*.json` sind Texte
+  ersetzt und Orte verschoben, aber die Zeiten echt; öffentlich verraten sie Kevins
+  Tagesablauf (z. B. Ankunft zuhause). Die Dateien bleiben lokal (`.gitignore`);
+  `RealDataTest` überspringt sich ohne Datei. **Umgesetzt 2026-11-14**; in den alten
+  Commits steht die Datei weiter, deshalb OV5.
+- OV3 **Lizenz** (`LICENSE`) wählen; ohne sie darf niemand den Code verwenden.
+  **Entschieden 2026-11-14: Apache-2.0** für App und Backend (freizügig mit Patentklausel;
+  GPL verträgt sich schlecht mit den proprietären Play-Services-Bibliotheken der App).
+  `LICENSE` und Hinweis im README in beiden Repos.
+- OV4 **Backend:** Muss nicht öffentlich werden, aber ohne `client/` und `proto/` kann
+  niemand außer Kevin die App bauen (Composite Build, cloud-entscheidungen.md A-2), und
+  PR-Builds aus Forks scheitern am Deploy-Key. Empfehlung: das Backend-Repo nach eigener
+  Prüfung mit veröffentlichen (die Verschlüsselung aus `client/protokoll` steckt ohnehin in
+  der APK, „der Server sieht keine Inhalte“ wird erst so überprüfbar); danach Deploy-Key
+  und Secret löschen. Alternative: nur `client/` und `proto/` in ein eigenes öffentliches
+  Repo. Zugleich die Neuentscheidung zu A-2. **Obsolet 2026-11-14:** Das Backend wird
+  ganz mit veröffentlicht; Deploy-Key und Secret danach löschen bleibt (OV6/OV7).
+- OV5 **Historie bereinigen statt verwerfen:** 45 Commits vom 18. bis 31.10. tragen Kevins
+  Arbeits-Adresse (`@arbeitgeber.example`); falls diese Anfänge auf dem Firmenrechner entstanden
+  sind, vorher klären, ob der Arbeitgeber Rechte daran haben könnte (§ 69b UrhG). Mit
+  `git filter-repo` die Autoren per `--mailmap` auf die GitHub-noreply-Adresse setzen und
+  `testdata/real-*` aus allen Commits entfernen; Commits und Nachrichten bleiben. Das
+  Ergebnis in ein **neues** GitHub-Repo pushen, nicht per Force-Push ins alte: GitHub hält
+  alte Commits über `refs/pull/*` erreichbar. Das alte Repo bleibt privat als Archiv (mit
+  PRs und CI-Läufen). Kurz vor der Veröffentlichung, danach alle Klone und Worktrees neu.
+  **Kevin, 2026-11-14:** nur bei Bedarf, kurz vorher prüfen. Stand der Prüfung vom
+  2026-11-14: Für die **App** ist er gegeben (90 Autor-/Committer-Einträge mit der
+  Arbeits-Adresse, ein Commit mit `testdata/real-*.json`, ältere Doku-Stände mit einem
+  echten Reminder-Titel und Benutzerpfaden). Das **Backend** braucht ihn nicht: nur die
+  Gmail-Adresse und GitHub-Adressen, keine Testdaten, kein Rechnungskonto in der Historie.
+  Die Mailmap setzt die Arbeits-Adresse auf die Gmail-Adresse (nicht noreply, siehe OV7).
+- OV6 **CI** (erst kurz vorher): wieder bei PRs bauen (für öffentliche Repos kostenlos, Kap. 9, 2026-11-13);
+  „Require approval for fork PR workflows“ lassen.
+- OV7 **GitHub-Einstellungen** (erst kurz vorher): Secret Scanning mit Push Protection,
+  Dependabot-Alerts, Branch-Schutz für `main`. **Keine noreply-Adresse** (Kevin,
+  2026-11-14): `kevin.bartik@gmail.com` wird eine rein geschäftliche, öffentliche Adresse
+  und steht schon in fast allen Commits. „Keep my email addresses private“ bleibt aus,
+  sonst blockt GitHub Pushes mit dieser Adresse.
+- OV8 **Durchsehen (optional):** `CLAUDE.md`, `docs/` und `.review/` nennen durchgehend
+  Kevin, sein Handy und `%USERPROFILE%`; heikle Lebensdetails stehen nicht drin. Mit dem
+  Repo werden auch alte CI-Logs und Artefakte (Debug-APK, 14 Tage) und die PR-Texte
+  öffentlich, beim neuen Repo aus OV5 nicht. **Bereinigt 2026-11-14:** Benutzerpfade
+  durch `%USERPROFILE%` ersetzt, der echte Reminder-Titel in `stand.md` entfernt; Kevin,
+  das S24 und Testtitel bleiben (kein Geheimnis). Das Backend war schon sauber. Ältere
+  Stände stehen in der Historie, das deckt OV5 ab.
+
+Reihenfolge (Kevin, 2026-11-14): OV2, OV3, OV8 jetzt in App und Backend; OV1 Rest
+(konfigurierbarer Server) vorher, erledigt; OV5 kurz vorher prüfen (für die App nötig); OV6, OV7
+kurz davor.
 
 ## 8. Zielplattform und Technik
 
@@ -1177,6 +1271,16 @@ Neueste zuerst. Kap. 7 enthält immer den gültigen Stand; diese Tabelle ist die
 
 | Datum | Entscheidung |
 |---|---|
+| 2026-11-14 | OV1 präzisiert (7.34, Backend ID7/ID8): **Zugang nur nach Freigabe** über eine Liste von Kennungen; nicht Freigegebene sehen ihren Code und fragen bei Kevin an, andere betreiben bei Bedarf einen eigenen Server. Server-URL kein Geheimnis und nach dem Zurücksetzen unverändert; Schutz über signierte Sitzungs-Token und einen Anfragealarm, der den Kill-Switch auslöst |
+| 2026-11-14 | **App-Repo soll öffentlich werden** (in den nächsten Wochen oder Monaten). Prüfung: keine Secrets in Repo, Historie und CI. Checkliste OV1–OV8 in 7.34: Server auf erlaubte Konten beschränken und URL konfigurierbar, echte Testdaten lokal halten, Lizenz, `client/`/`proto/` (oder das Backend) mit veröffentlichen, Historie mit `git filter-repo` bereinigen (Arbeits-Adresse, Testdaten) und in ein neues Repo pushen, PR-Builds wieder an. Offen: Lizenz, Umfang beim Backend, Art der Historie |
+| 2026-11-14 | OV1 Teil Freigabe und Kostengrenzen umgesetzt (Backend ID7/ID8, deployt): App zeigt bei nicht freigegebenem Konto die Kennung zum Kopieren; Entzug beendet die Sitzung mit sofortiger Meldung. Offen in OV1: konfigurierbarer Server |
+| 2026-11-14 | Veröffentlichen (7.34, Kevin): **App und Backend** in den nächsten Wochen; Lizenz **Apache-2.0**; OV4 obsolet (Backend ganz öffentlich); OV5 nur bei Bedarf, für die App nötig (Arbeits-Adresse, Testdaten); **keine noreply-Adresse**, Gmail wird geschäftlich; OV2 und OV8 umgesetzt; OV6/OV7 erst kurz davor |
+| 2026-11-14 | OV1 konfigurierbarer Server umgesetzt: Adresse und Web-Client-ID aus Gradle-Property oder `local.properties`; ohne beide kein Cloud-Backup in der App und Warnung im Build, halb gesetzt bricht ab. Die CI baut ohne Server |
+| 2026-11-13 | Verschiebe-Limit wahlweise pro Termin, Woche oder Monat (Z2b, nach Vorschlag): Kalenderwoche Mo–So bzw. Kalendermonat, gezählt zum Zeitpunkt des Verschiebens über alle Termine des Reminders; zählt *Verschieben* (auch vorab) und ein zählendes *Rest auf morgen*, *Später* bleibt frei; Bestand, Vorlagen und Strenge-Startwerte pro Termin; der Alarm zeigt, was bleibt und ab wann es wieder geht. Umgesetzt in V1.3c1 |
+| 2026-11-13 | Antworten auf Review-Lauf 6 (`.review/runs/2026-11-13.md`), beide nach Vorschlag: (1) Ändert sich die Ankunftsregel, nachdem ein *verschobener* Termin schon angekommen ist, wartet er wieder auf die Ankunft, jetzt nach der neuen Regel (`awaitsArrival`, zur Tagesgrenze *verpasst*); ergänzt Frage 5 vom 2026-11-12. (2) Ohne Bildschirm (Benachrichtigung, Uhr) gibt es *Teilschritt* wie *Erledigt* nicht, wenn ein Nachweis mit Foto, Text oder Audio nötig ist. Außerdem Wunsch: Das Verschiebe-Limit soll sich auch wöchentlich oder monatlich erneuern können (Z2b, Details in Klärung) |
+| 2026-11-13 | **CI nur nach dem Merge auf `main`** (GitHub-Minuten, privates Repo): kein Build bei PRs und auf `develop`, reine Doku-Merges ohne Lauf; vor dem PR lokal mit `-PbackendStreng=true` bauen. Actions auf Commit-SHA festgelegt, Dependabot meldet monatlich neue Versionen. Mit der Veröffentlichung als Open Source wieder bei PRs bauen |
+| 2026-11-12 | Antworten auf Review-Lauf 5 (`.review/runs/2026-11-12-2.md`), alle nach Vorschlag: (1) Umbau-Etappe **V1.3c0** vor V1.3c (Review-Empfehlungen E17–E21, E23): Ende eines Alarms als Effekt der Engine, Sitzungsantworten aus einer Quelle, `AppGraph` entschlackt, `Scheduler` intern geteilt, `Database.kt` geteilt. (2) Architektur: Wahrheit sind Room und DataStore; Gerätezustand außerhalb des Backups ist eine eigene Kategorie; Zeit, nach der die App entscheidet, kommt auch in `:app` über die Uhr der Engine; Effekte sind planen, klingeln und beenden. (3) Schließt das System einen Termin (*verpasst*, Notaus-Skip), verschwinden auch Klingeln und Benachrichtigung. (4) F2: Eine Ortsprüfung, die vor dem Start des Ankunftszeitraums geplant war und erst danach kommt, zählt als Prüfung zum Start (7.29). (5) Jede Änderung an der Ankunftsregel (Ort, Puffer, Vorlauf, Regel weg) leert `arrivedAt`; reine Textänderungen nicht. (6) Formular: halbe Eingaben überstehen Design-, Schriftgrößenwechsel und Prozesstod; das Wochenlimit gilt im Formular auch für die Minimum-Dauer einer Sitzung; eine Startklar-Antwort lässt sich überschreiben, aber nicht leeren (Hinweis im Feld) |
+| 2026-11-12 | Nach der Sicherheits- und Datenschutzprüfung des Backends (Backend `anforderungen.md` Kap. 11): **Papier ist der Standard** für den Wiederherstellungsschlüssel; den Passwortdienst bietet die App nur auf Knopfdruck nach dem Hinweis an (7.33 WS1, WS4; A-15). Vor der Sicherheitsphase kommen in die App außerdem *Konto löschen* und die Bestätigung mit der Displaysperre für *Cloud-Daten löschen*, *Konto löschen* und *Gerät sperren* (Backend B1, SE5) |
 | 2026-11-12 | Antworten auf Review-Lauf 4 (`.review/runs/2026-11-12.md`): (1) Ein Vollbild zur Zeit, „+1 wartet“, *Rest später* (7.3, 7.4) auf V1.3c verschoben, nicht verworfen. (2) *Abgebrochen* aus Benachrichtigung oder Uhr ohne Rückfrage, aber 60 s zurücknehmbar wie *Erledigt* (7.31); danach läuft die Sitzung mit dem alten Start weiter; auf dem Bildschirm bleibt der Dialog. (3) F2 und WLAN-Meldung: die erste Prüfung des Zeitraums exakt auch im Doze; F2 gilt, wenn die *erste Prüfung dieses Zeitraums* einen schon da findet, egal wie spät sie kommt; eine WLAN-Meldung zählt nur als Ankunft, wenn vorher nicht dasselbe WLAN verbunden war. (4) Sitzungen zählen für Wochenziel, Minimum-Limit und Statistik in der Woche ihres Starts. (5) Doku: Cloud-Entwürfe zu `cloud-entscheidungen.md` zusammengelegt, `testsession.md` bis zur Überarbeitung vor V2 gelöscht, Kap.-9-Einträge bis 2026-10-31 nach `anforderungen-archiv.md`. Außerdem: *Teilschritt* bei aufgebrauchtem Minimum-Limit ausgeblendet, mit Hinweis; „Fassung wählen“ (R-4) in der App erst mit dem Wiederherstellen |
 | 2026-11-11 | Sitzung mit Timer (7.11, 7.20 V2) in V1.3b1 umgesetzt (design.md 3.1). Bei der Umsetzung festgelegt: ohne Antwort am Ende *Minimum* mit erledigten Punkten, unter Notaus *abgebrochen*, sonst *verpasst*; unbeantwortete Nachfrage fragt nach höchstens 10 min erneut; *Teilschritt* nur mit Minimum; Schnitt aus den letzten 10 abgeschlossenen Sitzungen; während der Sitzung nur Texte änderbar; Vorlagen ohne Sitzung. Versionsname ab jetzt `1.3b<n>-backup<Schritt>` (erster: `1.3b1-backup5`, Code 17) |
 | 2026-11-11 | Entwurf 7.29 Z.7 bestätigt und in V1.3b0.6 umgesetzt (design.md 6). Bei der Umsetzung festgelegt: F2 gilt, wenn die erste Prüfung im Zeitraum (bis 5 min nach Beginn) einen schon da findet (→ präzisiert 2026-11-12: die für den Beginn geplante Prüfung, egal wie spät sie kommt); Prüfungen im Raster Beginn + k·Prüfabstand, die späteste Uhrzeit prüft der Alarm des Termins selbst; der Puffer gilt auch für verschobene Termine (`awaitsArrival`), nicht für *Wenn ich ankomme*; Vorlauf 0 = genau das alte Verhalten (kein Puffer, keine Prüfungen); WLAN-Namen und BSSIDs bleiben auf dem Handy (nicht im Diagnose-Log, nicht in der Claude-Schnittstelle, im Testdaten-Export ersetzt); die WLAN-Sonde ist entfernt. Einstellungen *Orte*: Zuhause und ein weiterer Ort, *Hier festlegen* übernimmt Standort und verbundenes WLAN |
@@ -1188,7 +1292,7 @@ Neueste zuerst. Kap. 7 enthält immer den gültigen Stand; diese Tabelle ist die
 | 2026-11-09 | Cloud-Backup Schritt 5 (W-1…W-8, R-1…R-6 in cloud-entscheidungen.md) bestätigt: erst *Sicherung prüfen* in einer eigenen Prüfdatei, kein Umschalten zwischen Datenbanken; Wiederherstellen tauscht beim nächsten Start und behält die alten Daten 7 Tage zum Rückgängigmachen; nach dem Wiederherstellen von einem anderen Gerät sichert die App erst wieder nach *Jetzt sichern* mit Rückfrage. *Zurücksetzen* aufgeteilt in *Dieses Gerät abmelden* (löscht nichts auf dem Server) und *Cloud-Daten löschen* (nur mit eingetipptem „löschen“). Bremse: fehlen mehr als 10 oder mehr als die Hälfte der Reminder, sichert die App nicht automatisch. Lokale Kopien: 7 tägliche und 4 wöchentliche. Gerätetest des Wiederherstellens auf einem Emulator mit Google Play |
 | 2026-11-08 | Cloud-Backup Schritt 4: Trifft das automatische Sichern auf die Sicherung eines anderen Geräts, ruht es sofort (wie nach „Nein“) und meldet das per Benachrichtigung; die Rückfrage „Überschreiben?“ kommt erst mit *Jetzt sichern* in den Einstellungen (cloud-entscheidungen.md A-10). Der Hinweis nach 3 Tagen zählt ab der letzten Stunde, in der die Sicherung aktuell war |
 | 2026-11-08 | Android Lint in Build und CI (`:app:lintDebug`): Altfunde in `app/lint-baseline.xml`, jeder neue Fund (auch Warnung) macht den Build rot; Versions-Hinweise sind abgeschaltet. Go bleibt bei gofmt, go vet und golangci-lint im Backend; detekt erst, wenn Lint ruhig läuft, kein Qodana |
-| 2026-11-08 | Wiederherstellungsschlüssel: Die App bietet automatisch an, ihn im Passwortdienst zu sichern, und holt ihn von dort beim Wiederherstellen (7.33, Wunsch aus dem ersten Gerätetest von Backup Schritt 2). Papier bleibt der Weg ohne Passwortdienst |
+| 2026-11-08 | Wiederherstellungsschlüssel: Die App bietet automatisch an, ihn im Passwortdienst zu sichern, und holt ihn von dort beim Wiederherstellen (7.33, Wunsch aus dem ersten Gerätetest von Backup Schritt 2). Papier bleibt der Weg ohne Passwortdienst → ersetzt 2026-11-12 (Papier ist Standard) |
 | 2026-11-07 | Cloud-Backup in der App: Entwurf A-1 bis A-14 (cloud-entscheidungen.md) bestätigt. Keine eigene App-Variante, solange nur Kevin die App nutzt (Schalter aus PS8 im normalen Build); Composite Build mit festem Backend-Commit und Deploy-Key in der CI; neue Berechtigung `INTERNET` (8.4 präzisiert); Credential Manager, Geräteschlüssel und Keysets im Android Keystore; ZIP aus Datenbank und Einstellungen; stündlich per WorkManager nur bei Änderung; Wiederherstellen ersetzt die Datenbank nach lokaler Kopie; Diagnose ans Backend nur mit eigenem Logger ohne Inhalte. App und `core` bauen für Java 21 statt 17 |
 | 2026-11-07 | Vorab verschieben und auslassen (7.32): Alarm-Bildschirm vorab mit *Verschieben* und *Auslassen*, „heute später“ +30 min/+1/+2 Std ab der geplanten Zeit, zählt aufs Verschieben-Konto, bei *streng* mit Rückfrage; Ort behält die neue Zeit, wartet sonst auf die Ankunft; Vorab-Reminder wandert mit; NT2 zählt Verschieben mit. Umgesetzt in V1.3b0.4 |
 | 2026-11-07 | Erledigung zurücknehmen (7.31): Rückgängig-Benachrichtigung 1 min, danach *Zurücknehmen* auf *Heute*; wieder offen, klingelt in 10 min ohne als *Später* zu zählen; nur der letzte Termin, bis der nächste klingelt bzw. bis zur Tagesgrenze; *Auslassen* auch, *verpasst*/*entfällt* nicht; Nachweis zählt wieder; neues Ereignis statt Löschen. Umgesetzt in V1.3b0.4 |
@@ -1245,6 +1349,9 @@ Neueste zuerst. Kap. 7 enthält immer den gültigen Stand; diese Tabelle ist die
 | V1.3b0.6 | 2026-11-11 | Ankunft im Zeitraum mit WLAN (7.29), weiterer Ort, Geofences nach `GEOFENCE_NOT_AVAILABLE` neu registriert |
 | V1.3b1 | 2026-11-11 | Sitzung mit Timer und Uhr (7.11, 7.20 V2) |
 | V1.3b2 | 2026-11-12 | Antworten auf Review-Lauf 4: Sitzung zählt in der Woche ihres Starts, Abbruch zurücknehmbar, F2 über die geplante erste Prüfung, wiederholte WLAN-Meldung keine Ankunft; Tests (Kap. 9, 2026-11-12) |
+| V1.3b3 | 2026-11-12 | Antworten auf Review-Lauf 5, Etappe A: Formular (Entwurf übersteht Neuaufbau, Probleme sichtbar, Limit für Sitzungs-Minimum, Startklar nicht leerbar, Ankunft ohne Ort nicht still weg), F2 auch für eine vorher geplante Prüfung, geänderte Ankunftsregel entscheidet neu, Zurücknehmen einer Sitzung nur vor dem Maximum; Tests der UI-Verdrahtung (Kap. 9, 2026-11-12) |
+| V1.3c0 | 2026-11-13 | Umbau-Etappe B aus Review-Lauf 5: Zeit über die Uhr der Engine und Lesen über das Repository (E21), `Database.kt` geteilt (E23), Ende eines Alarms als Effekt der Engine, auch wenn das System den Termin schließt (E17, Frage 3), Sitzungsantworten aus dem Core (E18), `AppGraph.rebuild`, „Hier festlegen“ und Blocker mit Aufgabe in der Engine, `CloudWiring` (E19), `Scheduler` intern geteilt (E20); Fixes aus Review-Lauf 6 (Entwurf beim Neuaufbau nach Start aus Benachrichtigung, Übersicht nicht bei jedem Öffnen neu geplant, Snooze auf altem Termin, Rückgängig nur vor dem Maximum, Nachfrage-Text); Antworten auf Lauf 6: verschobener Termin wartet nach neuer Ankunftsregel wieder, ohne Bildschirm kein *Teilschritt* mit Nachweis |
+| V1.3c1 | 2026-11-13 | Verschiebe-Limit pro Termin, Woche oder Monat (Z2b): Formular, Alarm mit „noch 1× diese Woche“ und „wieder ab …“, Vorlagen, Schnittstelle für Claude; Schema 11 |
 
 Details zum Verhalten: [design.md](design.md), Gerätetests: [geraetetest.md](geraetetest.md).
 
@@ -1263,6 +1370,8 @@ Was schon umgesetzt ist, steht in 10.1.
    - Möglicher Kandidat: Einkaufsliste nur für einen selbst mit Geschäfts-Trigger (7.23,
      E1–E3), ohne Inventar, KI und Abgleich. Nicht festgelegt.
 4. GPS für die Ortsprüfung (7.30), wenn WLAN im Alltag nicht reicht.
+   - Unabhängig davon: **Repo veröffentlichen** (7.34), in den nächsten Wochen oder
+     Monaten; OV1–OV3 schon vorher.
 5. **V2** (Kap. 4), vorher Testsession und Nutzung zählen (NT4); danach erst der
    **Play-Store-Release** mit Backend für Backup und Sync, EU-Datenschutz (7.28 PS5).
 6. Weitere Anforderungen ergeben sich aus der Nutzung.

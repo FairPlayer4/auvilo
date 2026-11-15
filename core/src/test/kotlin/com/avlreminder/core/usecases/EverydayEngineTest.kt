@@ -25,6 +25,7 @@ import kotlinx.coroutines.test.runTest
 import org.junit.jupiter.api.Assertions.assertEquals
 import org.junit.jupiter.api.Assertions.assertInstanceOf
 import org.junit.jupiter.api.Assertions.assertNotEquals
+import org.junit.jupiter.api.Assertions.assertNotNull
 import org.junit.jupiter.api.Assertions.assertNull
 import org.junit.jupiter.api.Assertions.assertTrue
 import org.junit.jupiter.api.Test
@@ -259,6 +260,20 @@ class EverydayEngineTest {
         engine.answerSnoozeHint(other, SnoozeHintChoice.DISMISS)
         assertEquals(Schedule.Daily(LocalTime.of(18, 0)), repo.reminder(other)!!.schedule)
         assertEquals(at(28, 19, 20).plus(Duration.ofDays(Snoozing.QUIET_DAYS)), repo.reminder(other)!!.hintQuietUntil)
+    }
+
+    @Test
+    fun `saving from the form keeps the quiet time of the card`() = runTest {
+        val id = create(Schedule.Daily(LocalTime.of(18, 0)))
+        snoozedThreeTimes(id)
+        engine.answerSnoozeHint(id, SnoozeHintChoice.DISMISS)
+        val quiet = repo.reminder(id)!!.hintQuietUntil
+        assertNotNull(quiet)
+
+        // The form does not know the field and saves without it (Review-Lauf 5).
+        engine.save(repo.reminder(id)!!.copy(title = "Katzenbrunnen reinigen", hintQuietUntil = null))
+        assertEquals(quiet, repo.reminder(id)!!.hintQuietUntil)
+        assertTrue(engine.snoozeHints().isEmpty())
     }
 
     // --- Pausing all alarms ----------------------------------------------------------------

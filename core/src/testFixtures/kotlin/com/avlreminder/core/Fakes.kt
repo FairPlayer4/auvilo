@@ -3,6 +3,8 @@ package com.avlreminder.core
 import com.avlreminder.core.model.Blocker
 import com.avlreminder.core.model.Character
 import com.avlreminder.core.model.Event
+import com.avlreminder.core.model.EventType
+import com.avlreminder.core.rules.Lifecycle
 import com.avlreminder.core.model.ItemDone
 import com.avlreminder.core.model.Occurrence
 import com.avlreminder.core.model.Place
@@ -172,6 +174,10 @@ class FakeRepository : ReminderRepository {
     }
 
     override suspend fun occurrence(id: Long) = occurrences[id]
+    override suspend fun countPostponed(reminderId: Long, from: Instant, until: Instant) = events.count { e ->
+        occurrences[e.occurrenceId]?.reminderId == reminderId && e.at >= from && e.at < until &&
+            (e.type == EventType.POSTPONED || e.type == EventType.DEFERRED && e.detail?.endsWith(Lifecycle.COUNTED) == true)
+    }
     override suspend fun openOccurrences() = occurrences.values.filter { it.isOpen }
     override suspend fun openOccurrence(reminderId: Long) =
         occurrences.values.filter { it.reminderId == reminderId && it.isOpen }.minByOrNull { it.id }

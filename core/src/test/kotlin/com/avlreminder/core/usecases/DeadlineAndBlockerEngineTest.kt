@@ -41,7 +41,8 @@ class DeadlineAndBlockerEngineTest {
     private val alarms = FakeAlarms()
     private val notices = FakePreNotices()
     private var settings = AlertSettings()
-    private val engine = ReminderEngine(repo, alarms, clock, settings = { settings }, preNotices = notices)
+    private var commands = 0
+    private val engine = ReminderEngine(repo, alarms, clock, settings = { settings }, preNotices = notices, changed = { commands++ })
 
     /** Friday 2026-10-30 12:00, windows Mo–Fr 9–17, every hour. */
     private val deadline = Schedule.Deadline(
@@ -266,6 +267,26 @@ class DeadlineAndBlockerEngineTest {
         assertFalse(engine.onAlarm(open(id).id)!!.askBlocker)
         assertNull(engine.answerAsk(open(id).id, " "))
         assertNull(engine.answerAsk(9999, "x"))
+    }
+
+    /** The answer and its task are one command (Review-Lauf 5, E19): both or neither. */
+    @Test
+    fun `answering with a task plans it in the same command`() = runTest {
+        val id = create(reminder(character = Character.OVERCOME), allAnswers())
+        clock.now = at(26, 18)
+        val o = open(id)
+        val at = engine.suggestTaskTime(id)
+        commands = 0
+        val blocker = engine.answerAsk(o.id, "Zu müde", planTask = true)!!
+        assertEquals(1, commands, "blocker and task are one command")
+        val task = repo.reminders().single { it.prepFor == id }
+        // Doing the task solves this blocker (S5).
+        assertEquals(task.id, repo.blocker(blocker)!!.taskReminderId)
+        assertEquals("Zu müde", task.title)
+        assertEquals(Schedule.Once(at), task.schedule)
+        assertEquals(BlockerOrigin.ASKED, repo.blocker(blocker)!!.origin)
+        assertNull(engine.answerAsk(o.id, " ", planTask = true))
+        assertEquals(1, repo.reminders().count { it.prepFor == id })
     }
 
     @Test

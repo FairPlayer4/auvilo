@@ -7,6 +7,7 @@ import com.avlreminder.core.model.ChecklistItem
 import com.avlreminder.core.model.PrepAnswer
 import com.avlreminder.core.model.PreNotice
 import com.avlreminder.core.model.ProofSpec
+import com.avlreminder.core.model.PostponePeriod
 import com.avlreminder.core.model.Reminder
 import com.avlreminder.core.model.Schedule
 import com.avlreminder.core.model.Strictness
@@ -26,19 +27,23 @@ enum class ScheduleKind { ONCE, DAILY, WEEKDAYS, AFTER_DONE, ON_ARRIVAL, DEADLIN
 enum class PreNoticeKind { NONE, EVENING, BEFORE }
 
 /** One "Startklar" answer while editing. */
-data class PrepDraft(val text: String = "", val unknown: Boolean = false) {
+data class PrepDraft(val text: String = "", val unknown: Boolean = false) : java.io.Serializable {
     val answered: Boolean get() = unknown || text.isNotBlank()
 }
 
-/** Editable state of the "Reminder anlegen" screen. Keeps all schedule fields so switching kinds loses nothing. */
+/**
+ * Editable state of the "Reminder anlegen" screen. Keeps all schedule fields so switching kinds loses
+ * nothing. Serializable: the draft survives the activity being recreated (Review-Lauf 5).
+ */
 data class ReminderForm(
     val id: Long = 0,
     val createdAt: Instant? = null,
     val active: Boolean = true,
     val title: String = "",
     val why: String = "",
-    val character: Character = Character.DOCUMENT,
-    val strictness: Strictness = Strictness.NORMAL,
+    // The start values of every new reminder (Presets.newReminder).
+    val character: Character = Presets.DEFAULT_CHARACTER,
+    val strictness: Strictness = Presets.DEFAULT_STRICTNESS,
     val kind: ScheduleKind = ScheduleKind.DAILY,
     val date: LocalDate,
     val time: LocalTime,
@@ -48,9 +53,11 @@ data class ReminderForm(
     val intervalDays: Int = 14,
     val goal: String = "",
     val minimum: String = "",
-    val proof: ProofSpec = Presets.of(Strictness.NORMAL).proof,
-    val postponeLimit: Int? = Presets.of(Strictness.NORMAL).postponeLimit,
-    val minimumLimitPerWeek: Int? = Presets.of(Strictness.NORMAL).minimumLimitPerWeek,
+    val proof: ProofSpec = Presets.of(Presets.DEFAULT_STRICTNESS).proof,
+    val postponeLimit: Int? = Presets.of(Presets.DEFAULT_STRICTNESS).postponeLimit,
+    /** The presets count per occurrence (Z2b). */
+    val postponePeriod: PostponePeriod = PostponePeriod.OCCURRENCE,
+    val minimumLimitPerWeek: Int? = Presets.of(Presets.DEFAULT_STRICTNESS).minimumLimitPerWeek,
     val ignoreDnd: Boolean = false,
     val snoozeMinutes: List<Int> = listOf(10),
     val motivationAudio: String? = null,
@@ -90,7 +97,7 @@ data class ReminderForm(
     val sessionMinimum: Int? = null,
     val sessionMax: Int = SessionSpec.DEFAULT_MAX,
     val sessionFinal: Int = SessionSpec.DEFAULT_FINAL,
-) {
+) : java.io.Serializable {
     /** Several times a day are possible for these kinds only (VS1). */
     val timesPossible: Boolean get() = kind == ScheduleKind.DAILY || kind == ScheduleKind.WEEKDAYS
 
@@ -105,7 +112,10 @@ data class ReminderForm(
     /** Picking a strictness resets proof and limits to the preset; each can be changed afterwards. */
     fun withStrictness(s: Strictness): ReminderForm {
         val p = Presets.of(s)
-        return copy(strictness = s, proof = p.proof, postponeLimit = p.postponeLimit, minimumLimitPerWeek = p.minimumLimitPerWeek)
+        return copy(
+            strictness = s, proof = p.proof, postponeLimit = p.postponeLimit, postponePeriod = PostponePeriod.OCCURRENCE,
+            minimumLimitPerWeek = p.minimumLimitPerWeek,
+        )
     }
 
     val schedule: Schedule?
@@ -133,6 +143,9 @@ data class ReminderForm(
             else -> null
         }
 
+    /** A minimum as text, or the minimum duration of a session (Review-Lauf 5, 6b). */
+    val hasMinimum: Boolean get() = minimum.isNotBlank() || (session && sessionMinimum != null)
+
     /** The reminder to save, or null if the schedule is incomplete. */
     fun toReminder(now: Instant): Reminder? {
         val schedule = schedule ?: return null
@@ -146,17 +159,18 @@ data class ReminderForm(
             schedule = schedule,
             goal = goal.trim().ifEmpty { null },
             minimum = minimum,
-            // Without a minimum a weekly limit means nothing.
-            minimumLimitPerWeek = if (minimum == null) null else minimumLimitPerWeek,
+            // Without a minimum a weekly limit means nothing; the minimum duration of a session counts too.
+            minimumLimitPerWeek = if (hasMinimum) minimumLimitPerWeek else null,
             proof = proof,
             postponeLimit = postponeLimit,
+            postponePeriod = postponePeriod,
             active = active,
             createdAt = createdAt ?: now,
             ignoreDnd = ignoreDnd,
             snoozeMinutes = snoozeMinutes,
             motivationAudio = motivationAudio,
-            // Without a place the validation says what is missing.
-            arrival = arrival?.takeIf { placeId != null },
+            // Without a place the engine says what is missing instead of dropping it (Review-Lauf 5).
+            arrival = arrival,
             checklist = checklist.map { it.copy(title = it.title.trim()) }.filter { it.title.isNotEmpty() },
             weeklyGoal = if (weekly && weeklyPossible) WeeklyGoal(weekTarget, weekMax, weekMinimum) else null,
             preNotice = when (preNotice) {
@@ -193,7 +207,7 @@ data class ReminderForm(
                 id = r.id, createdAt = r.createdAt, active = r.active, title = r.title, why = r.why.orEmpty(),
                 character = r.character, strictness = r.strictness, date = today, time = LocalTime.of(18, 0),
                 goal = r.goal.orEmpty(), minimum = r.minimum.orEmpty(), proof = r.proof,
-                postponeLimit = r.postponeLimit, minimumLimitPerWeek = r.minimumLimitPerWeek,
+                postponeLimit = r.postponeLimit, postponePeriod = r.postponePeriod, minimumLimitPerWeek = r.minimumLimitPerWeek,
                 ignoreDnd = r.ignoreDnd, snoozeMinutes = r.snoozeMinutes, motivationAudio = r.motivationAudio,
                 prep = prep.mapValues { (_, a) -> PrepDraft(a.text.orEmpty(), a.unknown) },
                 atHome = r.arrival != null && r.schedule != Schedule.OnArrival,

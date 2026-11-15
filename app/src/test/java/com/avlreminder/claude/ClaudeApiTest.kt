@@ -10,6 +10,7 @@ import androidx.test.core.app.ApplicationProvider
 import androidx.test.ext.junit.runners.AndroidJUnit4
 import com.avlreminder.core.model.Occurrence
 import com.avlreminder.core.model.OccurrenceState
+import com.avlreminder.core.model.PostponePeriod
 import com.avlreminder.core.model.Reminder
 import com.avlreminder.core.model.Schedule
 import com.avlreminder.core.model.Strictness
@@ -102,6 +103,18 @@ class ClaudeApiTest {
         val r = repo.reminder(saved.getLong("id"))!!
         assertEquals(Strictness.NORMAL, r.strictness)
         assertEquals(Presets.of(Strictness.NORMAL).postponeLimit, r.postponeLimit)
+    }
+
+    // Das Verschiebe-Limit pro Woche oder Monat auch über die Schnittstelle (Z2b); neu pro Termin wie die Vorlagen.
+    @Test
+    fun thePostponePeriodGoesBothWays() = runTest {
+        val id = call("save", """{"reminder": {"title": "x", "schedule": {"type": "daily", "time": "19:00"}}}""").getLong("id")
+        assertEquals(PostponePeriod.OCCURRENCE, repo.reminder(id)!!.postponePeriod)
+        assertTrue(call("save", """{"reminder": {"id": $id, "postponeLimit": 2, "postponePeriod": "WEEK"}}""").getBoolean("ok"))
+        assertEquals(PostponePeriod.WEEK, repo.reminder(id)!!.postponePeriod)
+        val listed = call("reminders", "{}").getJSONArray("reminders").getJSONObject(0)
+        assertEquals("WEEK", listed.getString("postponePeriod"))
+        assertEquals(2, listed.getInt("postponeLimit"))
     }
 
     @Test

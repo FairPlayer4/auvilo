@@ -20,6 +20,13 @@ enum class ProofKind {
     EVIDENCE,
 }
 
+/**
+ * What the postpone limit counts over (Z2b, 2026-11-13): each occurrence anew, or the
+ * postponements of all its occurrences in the calendar week (Mo–So) or month, counted when
+ * they were made.
+ */
+enum class PostponePeriod { OCCURRENCE, WEEK, MONTH }
+
 /** What a reminder asks for as proof. Photo, text and audio can be combined. */
 data class ProofSpec(
     val kind: ProofKind = ProofKind.CONFIRM,
@@ -30,10 +37,14 @@ data class ProofSpec(
     val audioMinSeconds: Int? = null,
     /** How long the alarm stays quiet while the proof is being made. */
     val windowMinutes: Int = 10,
-) {
+) : java.io.Serializable {
     val needsEvidence: Boolean get() = kind == ProofKind.EVIDENCE
 
     companion object {
+        /** Limits the validation checks and the form offers (Review-Lauf 5). */
+        const val MAX_TEXT_CHARS = 2000
+        const val MAX_AUDIO_SECONDS = 600
+        const val MAX_WINDOW_MINUTES = 60
         val NONE = ProofSpec(ProofKind.NONE)
         val CONFIRM = ProofSpec(ProofKind.CONFIRM)
         val PHOTO = ProofSpec(ProofKind.EVIDENCE, photo = true)
@@ -123,6 +134,11 @@ sealed interface Schedule {
             require(days.isNotEmpty()) { "at least one weekday" }
             require(intervalMinutes >= 1) { "interval must be at least one minute" }
         }
+
+        companion object {
+            const val MIN_INTERVAL = 5
+            const val MAX_INTERVAL = 480
+        }
     }
 }
 
@@ -147,7 +163,12 @@ val Schedule.severalADay: Boolean get() = (this as? AtTimes)?.severalADay == tru
 sealed interface PreNotice {
     /** The evening before the due day, at [time]. */
     data class Evening(val time: LocalTime) : PreNotice
-    data class Before(val minutes: Int) : PreNotice
+    data class Before(val minutes: Int) : PreNotice {
+        companion object {
+            const val MIN_MINUTES = 5
+            const val MAX_MINUTES = 1440
+        }
+    }
 }
 
 enum class BlockerOrigin {
@@ -266,7 +287,8 @@ data class SessionSpec(
 }
 
 /** One point of a checklist; the list order is the order of the points. */
-data class ChecklistItem(val id: Long = 0, val title: String)
+/** Serializable for the form draft (Review-Lauf 5). */
+data class ChecklistItem(val id: Long = 0, val title: String) : java.io.Serializable
 
 data class Reminder(
     val id: Long = 0,
@@ -281,8 +303,10 @@ data class Reminder(
     /** null = unlimited. */
     val minimumLimitPerWeek: Int? = null,
     val proof: ProofSpec = ProofSpec.CONFIRM,
-    /** Max. postponements per occurrence; null = unlimited. */
+    /** Max. postponements per [postponePeriod]; null = unlimited. */
     val postponeLimit: Int? = null,
+    /** What [postponeLimit] counts over (Z2b, 2026-11-13). */
+    val postponePeriod: PostponePeriod = PostponePeriod.OCCURRENCE,
     val active: Boolean = true,
     val createdAt: Instant,
     /** Rings as set even while the phone is on "do not disturb". */
@@ -308,7 +332,15 @@ data class Reminder(
     val hintQuietUntil: Instant? = null,
     /** "Ich starte jetzt" with timer and checks (7.11); null = done in one go as before. */
     val session: SessionSpec? = null,
-)
+) {
+    /** A minimum as text or as a duration of the session (7.11 D4); its weekly limit is a rule apart. */
+    val hasMinimum: Boolean get() = minimum != null || session?.minimumMinutes != null
+
+    companion object {
+        /** Longest snooze button. */
+        const val MAX_SNOOZE_MINUTES = 240
+    }
+}
 
 /** One concrete time a reminder is due. */
 data class Occurrence(

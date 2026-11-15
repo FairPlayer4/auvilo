@@ -79,6 +79,9 @@ class ArrivalWindowTest {
             arguments("Prüfung zu Beginn findet einen da: späteste Uhrzeit (F2)", PLANNED, at(26, 18), at(26, 18), ArrivalDecision.At(at(26, 19, 30))),
             arguments("Prüfung zu Beginn kommt im Doze 12 min zu spät: trotzdem F2", PLANNED, at(26, 18, 12), at(26, 18), ArrivalDecision.At(at(26, 19, 30))),
             arguments("spätere Prüfung, pünktlich: nach dem Puffer", PLANNED, at(26, 18, 20), at(26, 18, 20), ArrivalDecision.At(at(26, 18, 25))),
+            // Two reminders at one place: the check was planned for the other's earlier start and comes
+            // only in this window; it counts as the check at the start (Review-Lauf 5, Frage 4).
+            arguments("Prüfung vor dem Zeitraum geplant, kommt darin: F2", PLANNED, at(26, 18, 3), at(26, 17, 30), ArrivalDecision.At(at(26, 19, 30))),
             arguments("schon angekommen: die erste zählt", PLANNED.copy(arrivedAt = at(26, 18, 2), currentAt = at(26, 18, 7)), at(26, 18, 4), null, ArrivalDecision.Ignore),
             arguments("zur spätesten Uhrzeit: entscheidet der eigene Alarm", PLANNED, at(26, 19, 30), null, ArrivalDecision.Ignore),
             arguments("verschoben vor der neuen Zeit: behält sie", PLANNED.copy(postponeCount = 1, currentAt = at(26, 20)), at(26, 18, 30), null, ArrivalDecision.Ignore),

@@ -38,7 +38,7 @@
 | A-12 | Diagnose senden | **Eigener Logger fürs Backend** (Ereignisname, typisierte Felder, keine freien Texte; E-D-1), nicht `diag.log`. | `diag.log` enthält Titel (design.md 13); Claude darf Sendungen nur lesen, weil sie keine Inhalte haben. |
 | A-13 | Fehler | Netz weg, Kill-Switch, Tageslimit: nur Status, nächste Stunde neu. Benachrichtigung erst, wenn die Sicherung 3 Tage nicht aktuell war (hängt am gemerkten Konto); lehnt der Server die Sitzung ab, sofort „Bitte neu anmelden“. | „Kosten vor Verfügbarkeit“: Ausfälle sind normal und dürfen nicht nerven. |
 | A-14 | Oberfläche | Einstellungen **„Cloud-Backup (experimentell)“**: Einschalten, Anmelden, Einrichtung (Schlüssel zeigen bzw. eingeben), letzte Sicherung, *Jetzt sichern*, *Sicherung prüfen*, *Wiederherstellen*, *Sicherung löschen*, *Diagnose senden*, *Dieses Gerät abmelden*, *Cloud-Daten löschen* (R-3); ohne Sitzung „Nur dieses Handy zurücksetzen“ (löscht auf dem Server nichts). | Alles an einer Stelle; PS6 (Transparenz). |
-| A-15 | Schlüssel sichern | Neuer Wiederherstellungsschlüssel → sofort Speicher-Dialog des Passwortdienstes (`CreatePasswordRequest`); bei Abfrage zuerst `GetPasswordOption`, Eintippen als Ausweg (Anf. 7.33). Gespeichert genügt *Fertig*, sonst *Aufgeschrieben* mit Rückfrage. Eintrag „avlreminder Wiederherstellung <Konto-Anfang>“. | Abtippen eines langen Codes ist fehleranfällig. Bricht man nach dem Speichern ab, bleibt dort ein Eintrag ohne Backup; löschen kann ihn nur der Passwortmanager. |
+| A-15 | Schlüssel sichern | **Papier ist der Standard** (geändert 2026-11-12, vorher öffnete sich der Speicher-Dialog sofort): Neuer Wiederherstellungsschlüssel → anzeigen, Hauptknopf *Aufgeschrieben* mit Rückfrage. *Im Passwortmanager speichern* nennt vorher die Folge (Anf. 7.33 WS4) und öffnet dann den Speicher-Dialog (`CreatePasswordRequest`); gespeichert genügt *Fertig*. Bei Abfrage zuerst `GetPasswordOption`, Eintippen als Ausweg. Eintrag „avlreminder Wiederherstellung <Konto-Anfang>“. **Umsetzen vor der Sicherheitsphase.** | Der Schlüssel öffnet das Schlüssel-Backup und schaltet neue Geräte frei (Backend E-B2b-13). Ohne geräteinterne Verschlüsselung des Google Passwortmanagers hängt damit die ganze E2E-Verschlüsselung am Google-Konto; der Hinweis kam bisher erst nach dem Speichern. Holen aus dem Passwortdienst bleibt, weil Abtippen fehleranfällig ist. Bricht man nach dem Speichern ab, bleibt dort ein Eintrag ohne Backup; löschen kann ihn nur der Passwortmanager. |
 
 **Einrichtung:** Schalter an → Geräteschlüssel → Credential Manager, ID-Token mit Nonce →
 `Anmelden` → `Einrichtung` aus `protokoll`: ohne Schlüssel-Backup neue Schlüssel, Upload
@@ -81,6 +81,12 @@ macht Claude dort keine Bildschirmfotos und keine UI-Abzüge; geprüft wird übe
   Android-Client (Paket `com.avlreminder`, SHA-1 des Debug-Schlüssels aus
   `keytool -list -v -keystore ~/.android/debug.keystore`). Ein neuer PC mit anderem
   `debug.keystore` braucht einen weiteren Android-Client.
+- Server für den Build (Anf. 7.34 OV1, 2026-11-14): `avlCloudServerUrl` (= `tofu output
+  server_url`) und `avlCloudWebClientId` (Web-Client) in der `gradle.properties` von
+  `GRADLE_USER_HOME` (`E:\caches\gradle`, gilt auch in Worktrees) oder in
+  `local.properties`. Ohne beide blendet die App das Cloud-Backup aus, stoppt die
+  stündliche Sicherung und der Build warnt; so baut auch die CI. Nur einer der beiden
+  Werte, eine Adresse ohne `https://` oder eine falsche Client-ID brechen den Build ab.
 - Deploy-Key der CI (in einem eigenen Terminal, der private Schlüssel gehört nicht in den
   Gesprächsverlauf):
   ```bash

@@ -29,6 +29,7 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.avlreminder.core.model.ItemDone
 import com.avlreminder.core.model.Reminder
+import com.avlreminder.core.model.Resolution
 import com.avlreminder.core.rules.Lifecycle
 import com.avlreminder.core.rules.SnoozeHint
 import com.avlreminder.core.rules.SnoozeHintChoice
@@ -42,6 +43,7 @@ import com.avlreminder.ui.ResultBadge
 import com.avlreminder.ui.SectionTitle
 import com.avlreminder.ui.StrictnessTag
 import com.avlreminder.ui.theme.Avl
+import java.time.Instant
 import java.time.LocalDate
 import java.time.ZoneId
 
@@ -51,6 +53,8 @@ fun TodayScreen(
     today: Today,
     date: LocalDate,
     zone: ZoneId,
+    /** For what depends on the time, e.g. taking back an aborted session (before its maximum). */
+    now: Instant,
     onOpenDue: (Entry) -> Unit,
     onEdit: (Reminder) -> Unit,
     modifier: Modifier = Modifier,
@@ -210,7 +214,7 @@ fun TodayScreen(
                 ) {
                     Column(horizontalAlignment = Alignment.End) {
                         e.occurrence.resolution?.let { ResultBadge(it) }
-                        if (Lifecycle.canReopen(e.occurrence)) {
+                        if (Lifecycle.canReopen(e.reminder, e.occurrence, now)) {
                             TextButton(onClick = { reopening = e }, Modifier.testTag("reopen${e.occurrence.id}")) {
                                 Text("Zurücknehmen", fontSize = 13.sp)
                             }
@@ -225,7 +229,14 @@ fun TodayScreen(
         AlertDialog(
             onDismissRequest = { reopening = null },
             title = { Text("„${e.reminder.title}“ zurücknehmen?") },
-            text = { Text("Er ist wieder offen und klingelt in 10 Minuten. Ein Nachweis bleibt gespeichert und zählt beim nächsten Erledigt.") },
+            text = {
+                val started = e.occurrence.startedAt
+                if (e.occurrence.resolution == Resolution.ABORTED && started != null) {
+                    Text("Die Sitzung läuft mit ihrem Start um ${Format.time(started, zone)} weiter, bis zur maximalen Dauer.")
+                } else {
+                    Text("Er ist wieder offen und klingelt in 10 Minuten. Ein Nachweis bleibt gespeichert und zählt beim nächsten Erledigt.")
+                }
+            },
             confirmButton = {
                 TextButton(onClick = { onReopen(e); reopening = null }, Modifier.testTag("reopenOk")) { Text("Zurücknehmen") }
             },

@@ -7,6 +7,7 @@ import androidx.test.core.app.ApplicationProvider
 import androidx.test.ext.junit.runners.AndroidJUnit4
 import com.avlreminder.core.model.OccurrenceState
 import com.avlreminder.core.scenarios.Simulation
+import com.avlreminder.ui.screens.ReminderForm
 import kotlinx.coroutines.test.runTest
 import org.json.JSONObject
 import org.junit.After
@@ -91,6 +92,19 @@ class RealDataTest {
             repo.itemsDoneOfReminder(r.id)
         }
         assertEquals(count("occurrence"), occurrences)
+    }
+
+    /**
+     * Every real reminder survives opening and saving the form unchanged, apart from what the form
+     * does not know (Review-Lauf 5, E22): the other form tests only use reminders made by the form.
+     */
+    @Test
+    fun everyRealReminderSurvivesTheForm() = runTest {
+        val today = exportedAt().atZone(java.time.ZoneId.of("Europe/Berlin")).toLocalDate()
+        for (r in RoomReminderRepository(load()).reminders()) {
+            val expected = r.copy(archivedAt = null, hintQuietUntil = null)
+            assertEquals("${r.id}", expected, ReminderForm.of(r, today).toReminder(exportedAt()))
+        }
     }
 
     @Test

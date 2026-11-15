@@ -23,9 +23,7 @@ class SystemReceiver : BroadcastReceiver() {
         val graph = context.graph
         graph.scope.launch {
             try {
-                graph.syncAndRing()
-                graph.checkPlacesAndRing()
-                graph.scheduleOverview()
+                graph.rebuild(intent.action.orEmpty().substringAfterLast('.'), checkPlaces = true, overview = true)
             } finally {
                 result.finish()
             }

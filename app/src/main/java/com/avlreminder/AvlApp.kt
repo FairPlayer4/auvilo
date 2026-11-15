@@ -16,41 +16,21 @@ import com.avlreminder.alarm.Notifications
 import com.avlreminder.alarm.OverviewNotifications
 import com.avlreminder.alarm.PreNotices
 import com.avlreminder.alarm.Ringer
-import com.avlreminder.core.model.Place
 import com.avlreminder.claude.ClaudeApi
 import com.avlreminder.cloud.AndroidCloudNotices
-import com.avlreminder.cloud.AppBackupSource
-import com.avlreminder.cloud.BackupStateFile
-import com.avlreminder.cloud.CloudBackup
-import com.avlreminder.cloud.CloudLog
-import com.avlreminder.cloud.CloudConfig
-import com.avlreminder.cloud.CloudStore
-import com.avlreminder.cloud.ConnectCloudServer
-import com.avlreminder.cloud.CredentialManagerSafe
-import com.avlreminder.cloud.CredentialManagerSignIn
-import com.avlreminder.cloud.KeyFile
-import com.avlreminder.cloud.KeystoreDeviceKey
-import com.avlreminder.cloud.KeystoreSealer
-import com.avlreminder.cloud.WorkManagerSchedule
-import com.avlreminder.cloud.deleteBackendKeystoreEntries
-import com.avlreminder.restore.DatabaseRestore
+import com.avlreminder.cloud.CloudWiring
 import com.avlreminder.restore.DatabaseSwap
-import com.avlreminder.restore.LocalRestore
 import com.avlreminder.restore.RestoreFiles
 import com.avlreminder.restore.RestoreFinish
 import com.avlreminder.restore.SnapshotWorker
-import com.avlreminder.restore.Snapshots
 import com.avlreminder.restore.SwapOutcome
-import com.avlreminder.verbindung.Verbindung
-import java.io.File
 import com.avlreminder.core.model.Occurrence
 import com.avlreminder.core.model.Reminder
-import com.avlreminder.data.toModel
 import com.avlreminder.core.ports.DeviceStatePort
 import com.avlreminder.core.rules.AlertSettings
-import com.avlreminder.core.rules.Lifecycle
-import com.avlreminder.core.rules.TransitionResult
 import com.avlreminder.core.usecases.ReminderEngine
+import com.avlreminder.core.usecases.Ring
+import com.avlreminder.core.usecases.RingPort
 import com.avlreminder.core.usecases.Today
 import com.avlreminder.core.usecases.Overview
 import com.avlreminder.data.AvlDatabase
@@ -77,7 +57,7 @@ import java.time.Duration
 import java.time.Instant
 import java.time.ZoneId
 
-class AvlApp : Application() {
+open class AvlApp : Application() {
     lateinit var graph: AppGraph
         private set
 
@@ -102,8 +82,7 @@ class AvlApp : Application() {
         started = graph.scope.launch {
             // A restore swapped data in at this start: take its settings before anything plans alarms.
             graph.finishRestore()
-            graph.syncAndRing()
-            graph.scheduleOverview()
+            graph.rebuild("start", overview = true)
             graph.cloud.load().join()
             graph.local.load().join()
             // R-1: the daily copy; the worker takes it on days the app does not start.
@@ -151,38 +130,22 @@ class AppGraph(private val context: Context) : ClaudeApi.Access {
     val scope = CoroutineScope(SupervisorJob() + Dispatchers.Default)
     @Volatile private var alert = AlertSettings()
     @Volatile private var dwell = Settings.DEFAULT_DWELL
+    /**
+     * The engine's clock. Time the app decides by (*Heute*, widget, alarm screen, age of a WLAN
+     * scan) comes from here, not from the system clock; log stamps and file names are free
+     * (design.md 1, Review-Lauf 5; checked by `ClockRuleTest`).
+     */
+    val clock: Clock = SystemZoneClock
     val location = AndroidLocation(context)
-    val wifi = AndroidWifi(context)
+    val wifi = AndroidWifi(context, clock)
+
+    private val cloudWiring = CloudWiring(context, db, settings, scope, restoreFiles, ::diagnosisHeader)
 
     /** Cloud backup (design.md 16); nothing touches the network until it is switched on. */
-    private val cloudStore = CloudStore(context)
-    private val cloudLog = CloudLog(File(context.filesDir, "cloud-diag"), header = ::diagnosisHeader)
-    private val restoreTarget = DatabaseRestore(context, db, settings, restoreFiles)
-    private val snapshots = Snapshots(File(context.filesDir, "backup"), Snapshots.vacuumInto(db))
-    private val connection by lazy { Verbindung(CloudConfig.SERVER_URL) }
-    val cloud = CloudBackup(
-        cloudStore,
-        server = { ConnectCloudServer(connection, KeystoreDeviceKey(), cloudStore) },
-        keys = { account -> KeyFile(File(context.filesDir, "backend"), KeystoreSealer(), account) },
-        google = CredentialManagerSignIn(),
-        passwords = CredentialManagerSafe(),
-        wipe = {
-            File(context.filesDir, "backend").deleteRecursively()
-            deleteBackendKeystoreEntries()
-        },
-        scope = scope,
-        backupState = { account -> BackupStateFile(File(context.filesDir, "backend"), account) },
-        source = AppBackupSource(db, settings, context.cacheDir),
-        events = cloudLog,
-        schedule = WorkManagerSchedule(context, Diag::log),
-        notices = AndroidCloudNotices(context),
-        restore = restoreTarget,
-        reminders = { db.dao().reminderCount() },
-        log = Diag::log,
-    )
+    val cloud get() = cloudWiring.cloud
 
     /** Restoring from a daily copy and undoing a restore (R-1, W-6); no network. */
-    val local = LocalRestore(restoreTarget, restoreFiles, snapshots, settings::backup, scope, cloudLog, Diag::log)
+    val local get() = cloudWiring.local
 
     /**
      * Ends a restore swapped in at this start (W-5, step 5): takes its settings (without the pause
@@ -210,15 +173,20 @@ class AppGraph(private val context: Context) : ClaudeApi.Access {
         "schema" to AvlDatabase.VERSION,
     )
     private val engine = ReminderEngine(
-        repository, AndroidAlarmPort(context), SystemZoneClock, AndroidDeviceState(context),
+        repository, AndroidAlarmPort(context), clock, AndroidDeviceState(context),
         settings = { alert },
         geofences = AndroidGeofences(context) { dwell },
         // The WLAN first; only at the latest time a coarse position when it is unclear (7.29 OZ2).
-        location = WifiLocation(wifi, SystemZoneClock) { location.isAt(it) },
+        location = WifiLocation(wifi, clock) { location.isAt(it) },
         preNotices = PreNotices.Port(context),
-        ringer = { Ringer.ring(context, it) },
+        // Ringing and its end are effects of the engine (E17); nobody else dismisses an alarm.
+        ringer = object : RingPort {
+            override fun ring(ring: Ring) = Ringer.ring(context, ring)
+            override fun end(occurrenceId: Long) = Ringer.dismiss(context, occurrenceId)
+        },
         placeAlarms = AndroidPlaceAlarms(context),
         diag = Diag::log,
+        changed = { refresh() },
     )
     private val mutex = Mutex()
 
@@ -234,59 +202,39 @@ class AppGraph(private val context: Context) : ClaudeApi.Access {
     suspend fun addSuggestion(text: String, important: Boolean, screen: String, reminder: Reminder? = null) {
         db.suggestions().insert(
             SuggestionEntity(
-                text = text.trim(), important = important, createdAt = Instant.now(), screen = screen,
+                text = text.trim(), important = important, createdAt = now(), screen = screen,
                 reminderId = reminder?.id, reminderTitle = reminder?.title, appVersion = appVersion,
             ),
         )
     }
 
-    /**
-     * Deleting, pausing, archiving or discarding takes the alarm of [occurrenceId] away; its
-     * ringing and notification go with it (Review-Lauf 1). A rejected change (`false`, Rejected)
-     * leaves them.
-     */
-    suspend fun <T> withoutAlarm(occurrenceId: Long?, block: suspend (ReminderEngine) -> T): T {
-        val result = withEngine(block)
-        if (occurrenceId != null && result != false && result !is TransitionResult.Rejected) Ringer.dismiss(context, occurrenceId)
-        return result
+    /** Runs use cases one at a time; the engine says after each command what to refresh. */
+    override suspend fun <T> withEngine(block: suspend (ReminderEngine) -> T): T = mutex.withLock {
+        // Read fresh each time: an alarm may start the process before anything else loaded the settings.
+        alert = settings.alert.first()
+        dwell = settings.dwellMinutes.first()
+        block(engine)
     }
 
-    /** Runs use cases one at a time and refreshes the widget afterwards. */
-    override suspend fun <T> withEngine(block: suspend (ReminderEngine) -> T): T {
-        val result = mutex.withLock {
-            // Read fresh each time: an alarm may start the process before anything else loaded the settings.
-            alert = settings.alert.first()
-            dwell = settings.dwellMinutes.first()
-            block(engine)
-        }
+    /** After each command (not after reading): widget and the notification of running sessions (E17). */
+    private fun refresh() {
         scope.launch { runCatching { AvlWidget().updateAll(context) } }
-        scope.launch { runCatching { SessionService.show(context, sessions()) } }
-        return result
+        scope.launch { runCatching { SessionService.show(context, withEngine { sessions(it) }) } }
     }
 
-    /** The running sessions for their notification (Anf. 7.11). */
-    private suspend fun sessions(): List<SessionNote> {
-        val running = openOccurrences().filter { it.isRunning }
-        if (running.isEmpty()) return emptyList()
-        return running.mapNotNull { o ->
-            val r = repository.reminder(o.reminderId) ?: return@mapNotNull null
-            val hasMinimum = r.minimum != null || r.session?.minimumMinutes != null
-            val minimum = hasMinimum && Lifecycle.canUseMinimum(r, engine.limits(r, o))
-            SessionNote(
-                occurrenceId = o.id, title = r.title, startedAt = o.startedAt ?: return@mapNotNull null,
-                quickDone = !r.proof.needsEvidence,
-                minimum = minimum, minimumUsedUp = hasMinimum && !minimum,
-            )
-        }.sortedBy { it.startedAt }
-    }
+    /** The running sessions for their notification (Anf. 7.11), from the alarm view of the engine (E18). */
+    private suspend fun sessions(engine: ReminderEngine): List<SessionNote> =
+        openOccurrences().filter { it.isRunning }
+            .mapNotNull { o -> engine.alarmView(o.id)?.let(SessionNote::of) }
+            .sortedBy { it.startedAt }
 
     // --- Interface for Claude (Anf. 7.26 AG11) ----------------------------------------------
 
     override suspend fun enabled(): Boolean = debuggable && settings.claudeAccess.first()
     override suspend fun reminders(): List<Reminder> = repository.reminders()
-    override suspend fun openOccurrences(): List<Occurrence> = db.dao().openOccurrences().map { it.toModel() }
-    override suspend fun resolvedOccurrences(): List<Occurrence> = db.dao().observeResolved().first().map { it.toModel() }
-    override fun now(): Instant = SystemZoneClock.instant()
+    override suspend fun openOccurrences(): List<Occurrence> = repository.openOccurrences()
+    override suspend fun resolvedOccurrences(): List<Occurrence> = repository.resolvedOccurrences()
+    override fun now(): Instant = clock.instant()
     override val zone: ZoneId get() = ZoneId.systemDefault()
 
     /**
@@ -304,11 +252,20 @@ class AppGraph(private val context: Context) : ClaudeApi.Access {
         Diag.log("claude access ${if (on) "on" else "off"}")
     }
 
-    /** Rebuilds all alarms; the engine rings what was missed. */
-    suspend fun syncAndRing() {
-        val rings = withEngine { it.sync() }
-        if (rings.isNotEmpty()) Diag.log("sync: ${rings.size} missed alarm(s) ring now")
+    /**
+     * Builds everything derived from the data again (design.md 1, E19): alarms, geofences, checks
+     * of the places and pre-notices (`sync`, the engine rings what was missed), the notification of
+     * the pause and the times of the overview; widget and session follow the command. One recipe
+     * for every trigger: start, reboot/update/time change, geofences lost, settings, app in front.
+     * [checkPlaces]: also look whether one is already at a place it waits for (after a reboot).
+     * [overview]: plan the overview again – only at start, after system events and with new times;
+     * planned at any other moment it would move a pending one of today to tomorrow (Review-Lauf 6).
+     */
+    suspend fun rebuild(reason: String, checkPlaces: Boolean = false, overview: Boolean = false) {
+        val rings = withEngine { it.sync() + if (checkPlaces) it.checkPlaces() else emptyList() }
+        if (rings.isNotEmpty()) Diag.log("rebuild ($reason): ${rings.size} alarm(s) ring now")
         AlarmPause.update(context, settings.alert.first().alarmsPausedUntil)
+        if (overview) OverviewNotifications.schedule(context, settings.overview.first())
     }
 
     /**
@@ -316,8 +273,8 @@ class AppGraph(private val context: Context) : ClaudeApi.Access {
      * [sync] plans the open occurrences for the end of the pause.
      */
     suspend fun setAlarmsPaused(until: Instant?) {
-        val wasPaused = settings.alert.first().alarmsPaused(SystemZoneClock.instant())
-        settings.setAlarmsPaused(until, SystemZoneClock.instant())
+        val wasPaused = settings.alert.first().alarmsPaused(now())
+        settings.setAlarmsPaused(until, now())
         Diag.log(if (until == null) "alarms on again" else "alarms paused until $until")
         // What rang stays in sight as a silent notification (Review-Lauf 1).
         if (until != null) AlarmService.ringing.value?.let { AlarmService.quiet(context, it) }
@@ -326,16 +283,8 @@ class AppGraph(private val context: Context) : ClaudeApi.Access {
             withEngine { it.resume() }
             AlarmPause.update(context, null)
         } else {
-            syncAndRing()
+            rebuild(if (until == null) "alarms on" else "alarms paused")
         }
-    }
-
-    /** Sets the morning and evening overview from the settings. */
-    suspend fun scheduleOverview() = OverviewNotifications.schedule(context, settings.overview.first())
-
-    /** Rings reminders that wait for an arrival when already there (geofences report only entering). */
-    suspend fun checkPlacesAndRing() {
-        withEngine { it.checkPlaces() }
     }
 
     /**
@@ -346,21 +295,9 @@ class AppGraph(private val context: Context) : ClaudeApi.Access {
     suspend fun setPlaceHere(placeId: Long?, name: String): PlaceSetResult {
         val here = location.current()
         val network = wifi.currentNetwork()
-        val saved = withEngine { e ->
-            val old = e.places().firstOrNull { it.id == placeId }
-            val lat = here?.latitude ?: old?.lat
-            val lon = here?.longitude ?: old?.lon
-            if (lat == null || lon == null || (here == null && network == null)) return@withEngine false
-            e.savePlace(
-                Place(
-                    id = old?.id ?: 0, name = name.trim().ifEmpty { old?.name ?: "Ort" }, lat = lat, lon = lon,
-                    radiusMeters = old?.radiusMeters ?: 150, wifis = network ?: old?.wifis.orEmpty(),
-                ),
-            )
-            true
-        }
-        if (!saved) return PlaceSetResult.NoPosition
-        checkPlacesAndRing()
+        // What stays as it was decides the engine (E19); then what waits there rings if already there.
+        withEngine { it.setPlaceHere(placeId, name, here?.latitude, here?.longitude, network) } ?: return PlaceSetResult.NoPosition
+        withEngine { it.checkPlaces() }
         return PlaceSetResult.Saved(position = here != null, ssid = network?.firstNotNullOfOrNull { it.ssid }, wifi = network != null)
     }
 }

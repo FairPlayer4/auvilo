@@ -8,7 +8,6 @@ import android.content.Context
 import android.content.Intent
 import androidx.test.core.app.ApplicationProvider
 import androidx.test.ext.junit.runners.AndroidJUnit4
-import com.avlreminder.AvlApp
 import com.avlreminder.core.model.Occurrence
 import com.avlreminder.core.model.OccurrenceState
 import com.avlreminder.core.model.ProofSpec
@@ -44,9 +43,6 @@ class AlarmGlueTest {
     @Before
     fun setUp() {
         TestClock.at()
-        // The app syncs on start (on Dispatchers.Default); let that finish so it does not race
-        // with the test. Idling the main looper alone did not wait for it.
-        runBlocking { (context as AvlApp).started.join() }
         ShadowLooper.idleMainLooper()
     }
 
@@ -122,7 +118,9 @@ class AlarmGlueTest {
     @Test
     fun pauseForTheProofReplacesTheAlarmWithAQuietNote() {
         Ringer.ring(context, ring(AlarmLevel.BANNER))
-        Ringer.pause(context, AlarmInfo(42, "Katzenbrunnen", null, quickDone = false), at.plusSeconds(600))
+        // Starting the proof ends the ringing (the engine, E17), then the screen leaves a quiet note.
+        Ringer.dismiss(context, 42)
+        Notifications.showProofRunning(context, AlarmInfo(42, "Katzenbrunnen", null, quickDone = false), at.plusSeconds(600))
         val n = shadowOf(notifications).getNotification(Notifications.id(42))
         assertNotNull(n)
         assertEquals(true, n.extras.getCharSequence(android.app.Notification.EXTRA_TEXT).toString().startsWith("Nachweis läuft"))

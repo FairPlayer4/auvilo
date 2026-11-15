@@ -7,6 +7,7 @@ import com.avlreminder.core.model.PrepAnswer
 import com.avlreminder.core.model.Reminder
 import com.avlreminder.core.rules.AlarmLevel
 import com.avlreminder.core.rules.SessionAnswer
+import com.avlreminder.core.rules.Sessions
 import java.time.Duration
 import com.avlreminder.core.rules.WeekStatus
 import java.time.Instant
@@ -57,9 +58,30 @@ data class AlarmView(
     val canStart: Boolean = false,
     /** The running session; the alarm is then a check or the last reminder. */
     val session: SessionView? = null,
+    /** A limit per week or month is used up: from then on postponing works again (Z2b). */
+    val postponeAgainAt: Instant? = null,
 ) {
     /** The first open checklist item. */
     val nextItem: ChecklistItem? get() = reminder.checklist.firstOrNull { it.id !in done }
+
+    /**
+     * Done without the alarm screen (notification, watch): photo, text or audio cannot be given
+     * there, so "done" would always count as without proof.
+     */
+    val quickDone: Boolean get() = !reminder.proof.needsEvidence
+
+    /** "Teilschritt" without the alarm screen: allowed and, as [quickDone], no proof to give (Review-Lauf 6). */
+    val quickMinimum: Boolean get() = minimumAllowed && quickDone
+
+    /** The reminder has a minimum, but its weekly limit is used up. */
+    val minimumUsedUp: Boolean get() = reminder.hasMinimum && !minimumAllowed
+
+    /**
+     * The answers of the running session ([Sessions.answers]); "Teilschritt" with a minimum even
+     * when its weekly limit is used up – the screen shows it, [minimumAllowed] says whether it works.
+     */
+    val sessionAnswers: List<SessionAnswer>
+        get() = session?.let { Sessions.answers(it.final, it.suggestion, reminder.hasMinimum) }.orEmpty()
 }
 
 /** A running session as the check, the session screen and its notification show it (7.11). */
@@ -89,7 +111,17 @@ data class Ring(val view: AlarmView, val level: AlarmLevel) {
     val tomorrow: Instant? get() = view.tomorrow
 }
 
-/** Rings what the engine found due; called once the command that found it is stored. */
+/**
+ * What the user notices of an alarm: the engine rings and ends it, once the command is stored
+ * (design.md 1, Review-Lauf 5, E17). Nobody else stops a ringing alarm or removes its notification.
+ */
 fun interface RingPort {
     fun ring(ring: Ring)
+
+    /**
+     * [occurrenceId] rings no more: stop the sound and take its notification away. After an
+     * action on it, when it is closed (also by the system: missed, the end of the day, the end of
+     * a session), deleted or paused. Not for one that rings again in the same command.
+     */
+    fun end(occurrenceId: Long) {}
 }

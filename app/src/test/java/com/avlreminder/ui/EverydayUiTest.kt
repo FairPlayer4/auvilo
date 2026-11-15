@@ -1,10 +1,19 @@
 package com.avlreminder.ui
 
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.setValue
+import androidx.compose.ui.test.assertIsDisplayed
+import androidx.compose.ui.test.assertTextContains
+import androidx.compose.ui.test.junit4.StateRestorationTester
 import androidx.compose.ui.test.junit4.v2.createComposeRule
 import androidx.compose.ui.test.onNodeWithTag
 import androidx.compose.ui.test.onNodeWithText
 import androidx.compose.ui.test.performClick
 import androidx.compose.ui.test.performScrollTo
+import androidx.compose.ui.test.performTextReplacement
+import com.avlreminder.core.model.Character
+import com.avlreminder.core.model.PrepAnswer as Answer
 import androidx.test.ext.junit.runners.AndroidJUnit4
 import com.avlreminder.alarm.AlarmPause
 import com.avlreminder.alarm.OverviewNotifications
@@ -55,7 +64,10 @@ class EverydayUiTest {
         val paused = mutableListOf<Instant?>()
         val answers = mutableListOf<Pair<Long, SnoozeHintChoice>>()
         val claude = mutableListOf<Boolean>()
+        /** Set: the engine rejects saving with these problems. */
+        var problems: List<String>? = null
         override fun save(reminder: Reminder, prep: List<PrepAnswer>, onResult: (SaveResult) -> Unit) {
+            problems?.let { onResult(SaveResult.Invalid(it)); return }
             saved += reminder
             onResult(SaveResult.Saved(reminder.id))
         }
@@ -107,6 +119,73 @@ class EverydayUiTest {
         assertEquals("täglich 08:00, 13:00, 20:00 · normal", templateSummary(template))
         assertEquals(form.moreTimes, ReminderForm.new(now, zone).withTemplate(template).moreTimes)
         assertNull(form.copy(kind = ScheduleKind.ONCE).toTemplate("x", now).moreTimes)
+    }
+
+    /**
+     * Saving rejected by the engine while the form is scrolled down: the problems are on screen,
+     * not above it out of sight (Review-Lauf 5).
+     */
+    @Test
+    fun aRejectedSaveShowsItsProblemsAlsoWhenScrolledDown() {
+        val actions = FakeActions().apply { problems = listOf("Ort zuerst in den Einstellungen festlegen") }
+        compose.setContent { AvlTheme(dark = false) { AvlAppUi(state(), actions, now, zone, startRoute = Routes.edit(1)) } }
+
+        compose.onNodeWithTag("addTime").performScrollTo()
+        compose.onNodeWithText("Speichern").performClick()
+
+        compose.onNodeWithText("Ort zuerst in den Einstellungen festlegen", substring = true).assertIsDisplayed()
+        assertTrue(actions.saved.isEmpty())
+    }
+
+    /** The draft survives the activity being recreated (dark mode, process death; Review-Lauf 5, 6a). */
+    @Test
+    fun theDraftSurvivesTheActivityBeingRecreated() {
+        val restore = StateRestorationTester(compose)
+        restore.setContent { AvlTheme(dark = false) { AvlAppUi(state(), FakeActions(), now, zone, startRoute = Routes.edit(1)) } }
+
+        compose.onNodeWithTag("title").performTextReplacement("Training lang")
+        restore.emulateSavedInstanceStateRestore()
+
+        compose.onNodeWithTag("title").assertTextContains("Training lang")
+    }
+
+    /**
+     * Opened before the data is loaded (cold start on the edit route): the form is built once
+     * reminders, "Startklar" answers and places are there, not from what was there first (Review-Lauf 5).
+     */
+    @Test
+    fun theFormWaitsForTheData() {
+        val overcome = training.copy(character = Character.OVERCOME)
+        val loaded = state().copy(
+            reminders = listOf(overcome),
+            prep = mapOf(1L to mapOf(1 to Answer(reminderId = 1, question = 1, text = "Rücken stärken", at = now))),
+        )
+        var current by mutableStateOf(loaded.copy(prep = emptyMap(), formReady = false))
+        compose.setContent { AvlTheme(dark = false) { AvlAppUi(current, FakeActions(), now, zone, startRoute = Routes.edit(1)) } }
+        compose.waitForIdle()
+
+        current = loaded
+        compose.onNodeWithTag("prep1").performScrollTo().assertTextContains("Rücken stärken")
+    }
+
+    /** A "Startklar" answer can be overwritten, not emptied; the field says so (Review-Lauf 5, 6c). */
+    @Test
+    fun anEmptiedStartklarAnswerSaysItStays() {
+        val overcome = training.copy(character = Character.OVERCOME)
+        val prep = mapOf(1L to mapOf(1 to Answer(reminderId = 1, question = 1, text = "Rücken stärken", at = now)))
+        compose.setContent { AvlTheme(dark = false) { AvlAppUi(state().copy(reminders = listOf(overcome), prep = prep), FakeActions(), now, zone, startRoute = Routes.edit(1)) } }
+
+        compose.onNodeWithTag("prepKept1").assertDoesNotExist()
+        compose.onNodeWithTag("prep1").performScrollTo().performTextReplacement("")
+        compose.onNodeWithTag("prepKept1", useUnmergedTree = true).assertExists()
+        compose.onNodeWithTag("prep1").performTextReplacement("Kraft")
+        compose.onNodeWithTag("prepKept1", useUnmergedTree = true).assertDoesNotExist()
+    }
+
+    @Test
+    fun settingsShowTheVersionOfTheBuild() {
+        compose.setContent { AvlTheme(dark = false) { AvlAppUi(state().copy(appVersion = "1.3b3-backup5"), FakeActions(), now, zone, startRoute = Routes.SETTINGS) } }
+        compose.onNodeWithText("AVL-Reminder 1.3b3-backup5").performScrollTo().assertExists()
     }
 
     @Test

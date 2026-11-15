@@ -9,7 +9,6 @@ import android.content.Context
 import android.content.Intent
 import androidx.test.core.app.ApplicationProvider
 import androidx.test.ext.junit.runners.AndroidJUnit4
-import com.avlreminder.AvlApp
 import com.avlreminder.alarm.Notifications.Button
 import com.avlreminder.core.model.ChecklistItem
 import com.avlreminder.core.model.Character
@@ -20,6 +19,7 @@ import com.avlreminder.core.model.Resolution
 import com.avlreminder.core.model.Schedule
 import com.avlreminder.core.model.SessionSpec
 import com.avlreminder.core.rules.SessionAnswer
+import com.avlreminder.core.rules.TransitionResult
 import com.avlreminder.graph
 import kotlinx.coroutines.runBlocking
 import org.junit.Assert.assertEquals
@@ -50,7 +50,6 @@ class SessionGlueTest {
     @Before
     fun setUp() {
         TestClock.at()
-        runBlocking { (context as AvlApp).started.join() }
         ShadowLooper.idleMainLooper()
     }
 
@@ -82,6 +81,11 @@ class SessionGlueTest {
         ),
         Fall(
             "Nachweis nötig: kein Fertig aus der Benachrichtigung", check(minimum = false, quickDone = false),
+            listOf(Button.StillOn, Button.Abort), listOf(Button.StillOn, Button.Abort),
+        ),
+        // Wie Fertig: Foto, Text oder Audio gehen nur im Alarm (Review-Lauf 6, Antwort 2).
+        Fall(
+            "Nachweis nötig: auch kein Teilschritt aus der Benachrichtigung", check(SessionAnswer.MINIMUM, quickDone = false),
             listOf(Button.StillOn, Button.Abort), listOf(Button.StillOn, Button.Abort),
         ),
         Fall(
@@ -209,6 +213,25 @@ class SessionGlueTest {
         assertTrue(shadowOf(service).isStoppedBySelf)
     }
 
+    // Die laufende Benachrichtigung bietet mit Nachweis weder Fertig noch Teilschritt (Review-Lauf 6, Antwort 2).
+    @Test
+    fun `mit Nachweis bietet die laufende Benachrichtigung keinen Teilschritt`() {
+        val reminder = Reminder(
+            id = 7, title = "Training", schedule = Schedule.Once(java.time.LocalDateTime.of(2026, 10, 26, 19, 30)),
+            createdAt = start, minimum = "10 Minuten", proof = com.avlreminder.core.model.ProofSpec(kind = com.avlreminder.core.model.ProofKind.EVIDENCE, photo = true),
+        )
+        val view = com.avlreminder.core.usecases.AlarmView(
+            reminder, Occurrence(id = 3, reminderId = 7, dueAt = start, state = OccurrenceState.RUNNING, startedAt = start),
+            minimumAllowed = true, minimumsLeft = null, canPostpone = true, postponesLeft = null,
+            session = com.avlreminder.core.usecases.SessionView(start, start.plusSeconds(7200), false, SessionAnswer.MINIMUM, null, 15),
+        )
+        val note = SessionNote.of(view)!!
+        assertEquals(listOf("Abbruch"), SessionService.notification(context, note).actions.map { it.title.toString() })
+        // Ohne Nachweis wie bisher.
+        val plain = SessionNote.of(view.copy(reminder = reminder.copy(proof = com.avlreminder.core.model.ProofSpec())))!!
+        assertEquals(listOf("Fertig", "Teilschritt", "Abbruch"), SessionService.notification(context, plain).actions.map { it.title.toString() })
+    }
+
     // --- Review-Lauf 4 ---------------------------------------------------------------------------
 
     /** A running session started [minutesAgo] ago, with the given state of its last reminder. */
@@ -241,6 +264,19 @@ class SessionGlueTest {
         assertEquals(started, repo.occurrence(o)!!.startedAt)
     }
 
+    // Nach dem Maximum gibt es nichts zurückzunehmen; abgelehnt sagt die Benachrichtigung warum (Review-Lauf 6).
+    @Test
+    fun `nach dem Maximum bietet der Abbruch kein Rueckgaengig an`() = runBlocking {
+        val id = training(minimum = false)
+        val o = running(id, minutesAgo = 100, finalCallAgo = 5)
+        press(ActionReceiver.ACTION_ABORT, o)
+        waitFor("aborted") { repo.occurrence(o)?.resolution == Resolution.ABORTED }
+        graph.settle()
+        ShadowLooper.idleMainLooper()
+        assertEquals(null, shadowOf(notifications).getNotification(Undo.id(o)))
+        assertTrue(Undo.message(TransitionResult.Rejected("maximum duration reached")).contains("maximale Dauer"))
+    }
+
     // K29: nach dem letzten Reminder ohne Antwort endet die Sitzung, und nichts von ihr bleibt stehen.
     @Test
     fun `nach dem Ende der Sitzung verschwindet die Benachrichtigung des letzten Reminders`() = runBlocking {
@@ -252,6 +288,15 @@ class SessionGlueTest {
         waitFor("ended") { repo.occurrence(o)?.isOpen == false }
         assertEquals(Resolution.MISSED, repo.occurrence(o)!!.resolution)
         waitFor("notification gone") { shadowOf(notifications).getNotification(Notifications.id(o)) == null }
+    }
+
+    // Die Nachfrage schlägt keinen Teilschritt vor, den es nicht mehr gibt (Review-Lauf 6).
+    @Test
+    fun `die Nachfrage sagt, wenn das Minimum diese Woche aufgebraucht ist`() {
+        val zone = java.time.ZoneId.of("Europe/Berlin")
+        val check = SessionCheck(start, final = false, minimum = true, suggestion = SessionAnswer.MINIMUM)
+        assertTrue(AlarmInfo.sessionText(check, zone).startsWith("Minimum erreicht – Teilschritt?"))
+        assertTrue(AlarmInfo.sessionText(check.copy(minimum = false), zone).startsWith("Minimum erreicht – Teilschritt diese Woche aufgebraucht"))
     }
 
     // Teilschritt nur, solange das Wochenlimit reicht; sonst sagt die Benachrichtigung es.

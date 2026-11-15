@@ -9,12 +9,14 @@ import com.avlreminder.core.model.ItemDone
 import com.avlreminder.core.model.Occurrence
 import com.avlreminder.core.model.OccurrenceState
 import com.avlreminder.core.model.Place
+import com.avlreminder.core.model.PlaceWifi
 import com.avlreminder.core.model.PrepAnswer
 import com.avlreminder.core.model.Proof
 import com.avlreminder.core.model.ProofType
 import com.avlreminder.core.model.Reminder
 import com.avlreminder.core.model.Resolution
 import com.avlreminder.core.model.Schedule
+import com.avlreminder.core.model.WhenAway
 import com.avlreminder.core.model.Strictness
 import com.avlreminder.core.rules.Action
 import com.avlreminder.core.rules.Blockers
@@ -53,8 +55,14 @@ internal class Changes(private val c: EngineContext, private val views: AlarmVie
         // KRITISCH: a running session keeps its settings and its time; only the texts may change (7.11 D7).
         if (stored != null && running(stored.id) && !onlyTexts(stored, edited)) return SaveResult.Invalid(listOf(RUNNING))
         val moved = (schedule is Schedule.Once || schedule is Schedule.Deadline) && stored != null && stored.schedule != schedule
-        // The form does not know the archive; moving a one-off brings it back.
-        val reminder = if (moved) edited.copy(active = true, archivedAt = null) else edited.copy(archivedAt = stored?.archivedAt)
+        // The form does not know the archive; moving a one-off brings it back. Nor the quiet time of
+        // the card (NT2): it stays unless the answer to the card sets it (Review-Lauf 5).
+        val quiet = edited.hintQuietUntil ?: stored?.hintQuietUntil
+        val reminder = if (moved) {
+            edited.copy(active = true, archivedAt = null, hintQuietUntil = quiet)
+        } else {
+            edited.copy(archivedAt = stored?.archivedAt, hintQuietUntil = quiet)
+        }
         if (schedule is Schedule.Once) {
             val past = when {
                 reminder.id == 0L -> schedule.at.atZone(zone).toInstant() <= now()
@@ -105,6 +113,18 @@ internal class Changes(private val c: EngineContext, private val views: AlarmVie
                 repo.saveOccurrence(open.copy(dueAt = due, currentAt = due, arrivedAt = null))
             }
         }
+        // A changed arrival rule (place, buffer, lead, rule gone) decides the arrival anew: the
+        // occurrence goes back to its time; a mere text change keeps it (Review-Lauf 5, Frage 5).
+        // Snoozed or postponed its own time is gone: it waits for the arrival under the new rule,
+        // as when it was not there at its new time (Review-Lauf 6, Frage 1; 7.29 OZ5).
+        if (stored != null && stored.arrival != saved.arrival) {
+            repo.openOccurrence(id)?.takeIf { it.state == OccurrenceState.PLANNED && it.arrivedAt != null }?.let {
+                repo.saveOccurrence(
+                    if (!it.rangOrMoved) it.copy(currentAt = it.dueAt, arrivedAt = null)
+                    else it.copy(arrivedAt = null, awaitsArrival = saved.arrival?.whenAway == WhenAway.DROP),
+                )
+            }
+        }
         val ring = scheduler.syncReminder(saved) ?: scheduler.arriveIfThere(saved)
         scheduler.watchPlaces()
         return SaveResult.Saved(id, ring)
@@ -143,7 +163,10 @@ internal class Changes(private val c: EngineContext, private val views: AlarmVie
         reminder?.prepFor?.let { main ->
             repo.blockers(main).filter { it.taskReminderId == reminderId }.forEach { repo.saveBlocker(it.copy(taskReminderId = null)) }
         }
-        repo.openOccurrence(reminderId)?.let { scheduler.cancel(it) }
+        repo.openOccurrence(reminderId)?.let {
+            scheduler.cancel(it)
+            c.end(it.id)
+        }
         repo.deleteReminder(reminderId)
         scheduler.watchPlaces()
     }
@@ -155,7 +178,10 @@ internal class Changes(private val c: EngineContext, private val views: AlarmVie
         repo.saveReminder(reminder.copy(active = active, archivedAt = if (active) null else reminder.archivedAt))
         val open = repo.openOccurrence(reminderId)
         if (!active) {
-            open?.let { scheduler.cancel(it) }
+            open?.let {
+                scheduler.cancel(it)
+                c.end(it.id)
+            }
             scheduler.watchPlaces()
             return true
         }
@@ -186,17 +212,42 @@ internal class Changes(private val c: EngineContext, private val views: AlarmVie
         return id
     }
 
+    /**
+     * "Hier festlegen" (Anf. 7.29 OZ3, OZ6, Review-Lauf 5 E19): [placeId] (null or unknown = a new
+     * place) takes the position and the WLAN found here; what was not found stays as it was. A new
+     * place needs a position; with neither nothing changes. Returns the place's id, null if not saved.
+     */
+    suspend fun setPlaceHere(placeId: Long?, name: String, lat: Double?, lon: Double?, wifis: List<PlaceWifi>?): Long? {
+        val position = if (lat != null && lon != null) lat to lon else null
+        if (position == null && wifis == null) return null
+        val old = placeId?.let { id -> repo.places().firstOrNull { it.id == id } }
+        val base = old ?: position?.let { Place(name = "Ort", lat = it.first, lon = it.second) } ?: return null
+        return savePlace(
+            base.copy(
+                name = name.trim().ifEmpty { base.name },
+                lat = position?.first ?: base.lat, lon = position?.second ?: base.lon,
+                wifis = wifis ?: base.wifis,
+            ),
+        )
+    }
+
     // --- Occurrences -----------------------------------------------------------------------
 
+    /**
+     * After it the occurrence rings no more (E17), except after leaving the proof screen: then the
+     * escalation goes on after a grace. An action on one that is closed or gone ends what is left
+     * of it (an old notification); a rejected action on an open one leaves it ringing.
+     */
     suspend fun act(occurrenceId: Long, action: Action): TransitionResult {
-        val occurrence = repo.occurrence(occurrenceId) ?: return TransitionResult.Rejected("unknown occurrence")
-        val reminder = repo.reminder(occurrence.reminderId) ?: return TransitionResult.Rejected("unknown reminder")
-        if (action is Action.Snooze && now().plus(action.duration) >= views.missedAt(reminder, occurrence)) {
+        val occurrence = repo.occurrence(occurrenceId) ?: return gone(occurrenceId, "unknown occurrence")
+        val reminder = repo.reminder(occurrence.reminderId) ?: return gone(occurrenceId, "unknown reminder")
+        // Only for an open one: a closed one of yesterday goes on to be ended below (Review-Lauf 6).
+        if (action is Action.Snooze && occurrence.isOpen && now().plus(action.duration) >= views.missedAt(reminder, occurrence)) {
             return TransitionResult.Rejected("snooze would pass the end of the day")
         }
         val limits = views.limits(reminder, occurrence)
         val result = Lifecycle.transition(reminder, occurrence, action, now(), limits)
-        if (result !is TransitionResult.Ok) return result
+        if (result !is TransitionResult.Ok) return result.also { if (!occurrence.isOpen) c.end(occurrenceId) }
         repo.saveOccurrence(result.occurrence)
         repo.addEvent(result.event)
         when (action) {
@@ -222,8 +273,14 @@ internal class Changes(private val c: EngineContext, private val views: AlarmVie
                 .forEach { repo.saveBlocker(it.copy(solvedAt = now())) }
         }
         scheduler.cancel(occurrence)
+        if (action !is Action.AbortProof) c.end(occurrence.id)
         scheduler.syncReminder(reminder)
         return result
+    }
+
+    private fun gone(occurrenceId: Long, reason: String): TransitionResult {
+        c.end(occurrenceId)
+        return TransitionResult.Rejected(reason)
     }
 
     /**

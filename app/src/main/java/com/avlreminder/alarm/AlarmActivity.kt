@@ -10,6 +10,7 @@ import androidx.activity.compose.setContent
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.key
 import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.mutableLongStateOf
 import androidx.compose.runtime.produceState
@@ -29,7 +30,6 @@ import com.avlreminder.ui.theme.AvlTheme
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
 import java.time.Duration
-import java.time.Instant
 import java.time.ZoneId
 
 /** Full-screen alarm, also over the lock screen. Always dark. */
@@ -113,7 +113,7 @@ class AlarmActivity : ComponentActivity() {
         // Close as soon as the occurrence is resolved or snoozed elsewhere (notification, other device action).
         LaunchedEffect(id) {
             var last: OccurrenceState? = null
-            graph.db.dao().observeOpenOccurrences().collect { open ->
+            graph.repository.observeOpenOccurrences().collect { open ->
                 val o = open.firstOrNull { it.id == id }
                 if (o == null || (o.state == OccurrenceState.PLANNED && !early)) {
                     finish()
@@ -124,40 +124,43 @@ class AlarmActivity : ComponentActivity() {
                 }
             }
         }
-        val now by produceState(Instant.now()) {
+        val now by produceState(graph.now()) {
             while (true) {
                 delay(15_000)
-                value = Instant.now()
+                value = graph.now()
             }
         }
-        val current = ui ?: return
-        AlarmContent(
-            ui = current,
-            now = now,
-            zone = zone,
-            onComplete = { minimumOnly, evidence, note -> act(id, Action.Complete(minimumOnly, evidence, note)) },
-            onSnooze = { act(id, Action.Snooze(Duration.ofMinutes(it.toLong()))) },
-            onPostpone = { act(id, Action.Postpone(it)) },
-            onSkip = { act(id, Action.Skip(it)) },
-            onCheckItem = { itemId, evidence -> act(id, Action.CheckItem(itemId, evidence), stay = true) },
-            onLeave = ::finish,
-            onDeferRest = { act(id, Action.DeferRest(it)) },
-            onBlockerSolved = { act(id, Action.Complete(minimumOnly = false, blockerSolved = true)) },
-            onTomorrow = { act(id, Action.CloseWindow(it)) },
-            onAnswerAsk = { text, plan -> answerAsk(id, text, plan) },
-            onSuggest = { text, important -> graph.scope.launch { graph.addSuggestion(text, important, "Alarm", current.reminder) } },
-            onStartProof = { startProof(id) },
-            onAbortProof = { abortProof(id) },
-            // Started, the screen becomes the session screen; "Noch dran" goes back to the task.
-            onStart = { act(id, Action.Start, stay = true) },
-            onStillOn = { act(id, Action.StillOn) },
-            onAbort = { act(id, Action.Abort) },
-            devices = AlarmDevices(
-                camera = { onPhoto -> ProofCamera(id, onPhoto) },
-                recorder = { onRecorded -> AudioRecorder("occ-$id", "● Aufnahme starten", onRecorded) },
-                play = { AudioPlayer.play(this, it) },
-            ),
-        )
+        // Another alarm (switchTo): nothing of the old one's screen stays – view, photo, text (Review-Lauf 5).
+        val current = ui?.takeIf { it.occurrence.id == id } ?: return
+        key(id) {
+            AlarmContent(
+                ui = current,
+                now = now,
+                zone = zone,
+                onComplete = { minimumOnly, evidence, note -> act(id, Action.Complete(minimumOnly, evidence, note)) },
+                onSnooze = { act(id, Action.Snooze(Duration.ofMinutes(it.toLong()))) },
+                onPostpone = { act(id, Action.Postpone(it)) },
+                onSkip = { act(id, Action.Skip(it)) },
+                onCheckItem = { itemId, evidence -> act(id, Action.CheckItem(itemId, evidence), stay = true) },
+                onLeave = ::finish,
+                onDeferRest = { act(id, Action.DeferRest(it)) },
+                onBlockerSolved = { act(id, Action.Complete(minimumOnly = false, blockerSolved = true)) },
+                onTomorrow = { act(id, Action.CloseWindow(it)) },
+                onAnswerAsk = { text, plan -> answerAsk(id, text, plan) },
+                onSuggest = { text, important -> graph.scope.launch { graph.addSuggestion(text, important, "Alarm", current.reminder) } },
+                onStartProof = { startProof(id) },
+                onAbortProof = { abortProof(id) },
+                // Started, the screen becomes the session screen; "Noch dran" goes back to the task.
+                onStart = { act(id, Action.Start, stay = true) },
+                onStillOn = { act(id, Action.StillOn) },
+                onAbort = { act(id, Action.Abort) },
+                devices = AlarmDevices(
+                    camera = { onPhoto -> ProofCamera(id, onPhoto) },
+                    recorder = { onRecorded -> AudioRecorder("occ-$id", "● Aufnahme starten", onRecorded) },
+                    play = { AudioPlayer.play(this, it) },
+                ),
+            )
+        }
     }
 
     private suspend fun load(id: Long): AlarmView? = graph.withEngine { it.alarmView(id, early) }
@@ -165,11 +168,8 @@ class AlarmActivity : ComponentActivity() {
     /** Saves the answer as a blocker; [plan] makes it a task for the suggested time. Stays on the alarm. */
     private fun answerAsk(id: Long, text: String?, plan: Boolean) {
         lifecycleScope.launch {
-            graph.withEngine { engine ->
-                val blockerId = engine.answerAsk(id, text)
-                val reminderId = graph.repository.occurrence(id)?.reminderId
-                if (plan && blockerId != null && reminderId != null) engine.planTask(blockerId, engine.suggestTaskTime(reminderId))
-            }
+            // Blocker and task in one command (E19).
+            graph.withEngine { it.answerAsk(id, text, planTask = plan) }
             Diag.log("alarm screen occ=$id asked → ${if (text.isNullOrBlank()) "skipped" else if (plan) "blocker + task" else "blocker"}")
             version++
         }
@@ -181,7 +181,8 @@ class AlarmActivity : ComponentActivity() {
             val result = graph.withEngine { it.startProof(id) }
             val o = (result as? TransitionResult.Ok)?.occurrence ?: return@launch
             val r = graph.repository.reminder(o.reminderId) ?: return@launch
-            Ringer.pause(this@AlarmActivity, AlarmInfo(o.id, r.title, r.why ?: r.goal, quickDone = false), o.pausedUntil!!)
+            // The engine ended the ringing; one silent notification leads back (E17).
+            Notifications.showProofRunning(this@AlarmActivity, AlarmInfo(o.id, r.title, r.why ?: r.goal, quickDone = false), o.pausedUntil!!)
         }
     }
 
@@ -201,7 +202,6 @@ class AlarmActivity : ComponentActivity() {
                 Toast.makeText(this@AlarmActivity, "Nicht möglich: ${(result as TransitionResult.Rejected).reason}", Toast.LENGTH_LONG).show()
                 return@launch
             }
-            Ringer.dismiss(this@AlarmActivity, id)
             if (stay && result.occurrence.state != OccurrenceState.DONE) {
                 early = false
                 version++

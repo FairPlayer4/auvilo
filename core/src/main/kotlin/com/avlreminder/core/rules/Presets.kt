@@ -5,6 +5,7 @@ import com.avlreminder.core.model.AtTimes
 import com.avlreminder.core.model.Character
 import com.avlreminder.core.model.PreNotice
 import com.avlreminder.core.model.ProofKind
+import com.avlreminder.core.model.PostponePeriod
 import com.avlreminder.core.model.ProofSpec
 import com.avlreminder.core.model.Reminder
 import com.avlreminder.core.model.Schedule
@@ -19,6 +20,17 @@ import java.time.temporal.TemporalAdjusters
 data class Preset(val proof: ProofSpec, val postponeLimit: Int?, val minimumLimitPerWeek: Int?)
 
 object Presets {
+    /** What a new reminder starts with: "festhalten", normal (form, interface for Claude, widget). */
+    val DEFAULT_CHARACTER = Character.DOCUMENT
+    val DEFAULT_STRICTNESS = Strictness.NORMAL
+
+    /**
+     * A new reminder with the start values everyone uses (Review-Lauf 5, E21): the form, the
+     * interface for Claude and the one-tap reminders of the widget.
+     */
+    fun newReminder(title: String, schedule: Schedule, createdAt: Instant, strictness: Strictness = DEFAULT_STRICTNESS): Reminder =
+        apply(Reminder(title = title, character = DEFAULT_CHARACTER, schedule = schedule, createdAt = createdAt), strictness)
+
     fun of(strictness: Strictness): Preset = when (strictness) {
         Strictness.RELAXED -> Preset(ProofSpec.CONFIRM, postponeLimit = null, minimumLimitPerWeek = null)
         Strictness.NORMAL -> Preset(ProofSpec.CONFIRM, postponeLimit = 3, minimumLimitPerWeek = null)
@@ -48,11 +60,11 @@ object Validation {
         if (proof.needsEvidence && !proof.photo && proof.textMinChars == null && proof.audioMinSeconds == null) {
             add("Nachweis: Foto, Text oder Audio wählen")
         }
-        proof.textMinChars?.let { if (it !in 1..2000) add("Mindestzeichen 1 bis 2000") }
-        proof.audioMinSeconds?.let { if (it !in 1..600) add("Mindestdauer 1 bis 600 s") }
-        if (proof.windowMinutes !in 1..60) add("Frist für den Nachweis 1 bis 60 min")
+        proof.textMinChars?.let { if (it !in 1..ProofSpec.MAX_TEXT_CHARS) add("Mindestzeichen 1 bis ${ProofSpec.MAX_TEXT_CHARS}") }
+        proof.audioMinSeconds?.let { if (it !in 1..ProofSpec.MAX_AUDIO_SECONDS) add("Mindestdauer 1 bis ${ProofSpec.MAX_AUDIO_SECONDS} s") }
+        if (proof.windowMinutes !in 1..ProofSpec.MAX_WINDOW_MINUTES) add("Frist für den Nachweis 1 bis ${ProofSpec.MAX_WINDOW_MINUTES} min")
         if (reminder.snoozeMinutes.size !in 1..2) add("Ein oder zwei Verschiebe-Knöpfe")
-        if (reminder.snoozeMinutes.any { it !in 1..240 }) add("Verschiebe-Knöpfe 1 bis 240 min")
+        if (reminder.snoozeMinutes.any { it !in 1..Reminder.MAX_SNOOZE_MINUTES }) add("Verschiebe-Knöpfe 1 bis ${Reminder.MAX_SNOOZE_MINUTES} min")
         if (reminder.snoozeMinutes.toSet().size != reminder.snoozeMinutes.size) add("Verschiebe-Knöpfe doppelt")
         reminder.postponeLimit?.let { if (it < 0) add("Verschiebe-Limit darf nicht negativ sein") }
         reminder.minimumLimitPerWeek?.let { if (it < 0) add("Minimum-Limit darf nicht negativ sein") }
@@ -67,12 +79,16 @@ object Validation {
         if (reminder.schedule == Schedule.OnArrival && reminder.arrival == null) add("„Wenn ich zuhause bin“ braucht einen Ort")
         (reminder.schedule as? Schedule.Deadline)?.let { d ->
             if (d.until <= d.from) add("Fenster: Ende nach dem Beginn")
-            if (d.intervalMinutes !in 5..480) add("Abstand 5 bis 480 min")
+            if (d.intervalMinutes !in Schedule.Deadline.MIN_INTERVAL..Schedule.Deadline.MAX_INTERVAL) {
+                add("Abstand ${Schedule.Deadline.MIN_INTERVAL} bis ${Schedule.Deadline.MAX_INTERVAL} min")
+            }
             if (reminder.arrival != null) add("Frist ohne Ankunft")
         }
         reminder.preNotice?.let { n ->
             if (reminder.schedule == Schedule.OnArrival) add("Vorab-Reminder braucht eine Uhrzeit")
-            if (n is PreNotice.Before && n.minutes !in 5..1440) add("Vorab 5 bis 1440 min vorher")
+            if (n is PreNotice.Before && n.minutes !in PreNotice.Before.MIN_MINUTES..PreNotice.Before.MAX_MINUTES) {
+                add("Vorab ${PreNotice.Before.MIN_MINUTES} bis ${PreNotice.Before.MAX_MINUTES} min vorher")
+            }
         }
         (reminder.schedule as? AtTimes)?.let { s ->
             if (s.times.size > MAX_TIMES) add("Höchstens $MAX_TIMES Uhrzeiten am Tag")
@@ -96,6 +112,17 @@ object Validation {
 }
 
 /** Weeks run Monday to Sunday. */
+/** The span a postpone limit per week or month counts in (Z2b). */
+object PostponePeriods {
+    /** [from, to) of [period] containing [now]; null per occurrence. */
+    fun range(period: PostponePeriod, now: Instant, zone: ZoneId): Pair<Instant, Instant>? = when (period) {
+        PostponePeriod.OCCURRENCE -> null
+        PostponePeriod.WEEK -> Weeks.range(now, zone)
+        PostponePeriod.MONTH -> now.atZone(zone).toLocalDate().withDayOfMonth(1)
+            .let { it.atStartOfDay(zone).toInstant() to it.plusMonths(1).atStartOfDay(zone).toInstant() }
+    }
+}
+
 object Weeks {
     fun start(date: LocalDate): LocalDate = date.with(TemporalAdjusters.previousOrSame(DayOfWeek.MONDAY))
 
@@ -114,13 +141,10 @@ object Weeks {
 
 /** One-tap reminders from the widget. */
 object QuickReminders {
-    fun meeting(minutes: Long, now: Instant, zone: ZoneId): Reminder = Reminder(
+    /** Normal, but without even a confirmation. */
+    fun meeting(minutes: Long, now: Instant, zone: ZoneId): Reminder = Presets.newReminder(
         title = "Meeting",
-        strictness = Strictness.NORMAL,
         schedule = Schedule.Once(now.plusSeconds(minutes * 60).atZone(zone).toLocalDateTime().withNano(0)),
-        character = Character.DOCUMENT,
-        proof = ProofSpec.NONE,
-        postponeLimit = 3,
         createdAt = now,
-    )
+    ).copy(proof = ProofSpec.NONE)
 }

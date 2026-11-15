@@ -4,7 +4,6 @@ import android.content.Context
 import com.avlreminder.core.rules.AlarmLevel
 import com.avlreminder.core.usecases.Ring
 import com.avlreminder.system.Diag
-import java.time.Instant
 
 /** Turns the engine's [Ring] into something the user notices. */
 object Ringer {
@@ -27,12 +26,5 @@ object Ringer {
         Diag.log("dismiss occ=$occurrenceId")
         AlarmService.stop(context, occurrenceId)
         Notifications.cancel(context, occurrenceId)
-    }
-
-    /** The proof is being made: quiet until [until], one silent notification to come back. */
-    fun pause(context: Context, info: AlarmInfo, until: Instant) {
-        AlarmService.stop(context, info.occurrenceId)
-        Notifications.cancelMirror(context, info.occurrenceId)
-        Notifications.showProofRunning(context, info, until)
     }
 }

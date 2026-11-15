@@ -106,6 +106,70 @@ class ArrivalWindowScenarioTest {
         assertEquals(listOf("Mo 18:40 Training FULLSCREEN"), sim.rings)
     }
 
+    // Zwei Reminder an einem Ort (Review-Lauf 5, Frage 4): eine Prüfung pro Ort. Die für das Training
+    // um 18:20 geplante kommt im Doze erst 18:35, im Zeitraum von „Lesen“ (ab 18:30): für „Lesen“
+    // ist sie die Prüfung zu Beginn, also F2; für das Training eine Ankunft.
+    @Test
+    fun `zwei Reminder an einem Ort, die Pruefung vor dem zweiten Zeitraum kommt darin`() = runTest {
+        val place = home()
+        training(place)
+        sim.create(reminder(Schedule.Weekdays(LocalTime.of(20, 0), workdays)).copy(title = "Lesen", arrival = Arrival(place)))
+        sim.doze = Duration.ofMinutes(15)
+        sim.wifi(HOME_24, at(26, 18, 10), reported = false)
+        sim.runUntil(at(26, 20, 1))
+        assertEquals(listOf(at(26, 18), at(26, 18, 35)), sim.placeChecks)
+        // Nobody reacts: the training escalates; what counts is the first ring of each.
+        assertEquals("Mo 18:40 Training FULLSCREEN", sim.rings.first())
+        assertEquals("Mo 20:00 Lesen FULLSCREEN", sim.rings.first { "Lesen" in it })
+    }
+
+    // Review-Lauf 5, Frage 5: Wer nach der Ankunft die Ankunftsregel ändert, bekommt sie neu entschieden;
+    // ein neuer Titel ändert nichts.
+    @Test
+    fun `eine geaenderte Ankunftsregel nach der Ankunft gilt neu, ein neuer Titel nicht`() = runTest {
+        val place = home()
+        val id = training(place)
+        sim.wifi(HOME_24, at(26, 18, 40))
+        assertEquals(at(26, 18, 45), sim.open(id).currentAt)
+
+        sim.runUntil(at(26, 18, 41))
+        val r = sim.repo.reminder(id)!!
+        sim.engine.save(r.copy(title = "Training lang"))
+        assertEquals(at(26, 18, 40), sim.open(id).arrivedAt)
+        assertEquals(at(26, 18, 45), sim.open(id).currentAt)
+
+        sim.engine.save(r.copy(arrival = Arrival(place, bufferMinutes = 15)))
+        assertEquals(null, sim.open(id).arrivedAt)
+        assertEquals(at(26, 19, 30), sim.open(id).currentAt)
+        // Still at home: the next check (19:00) finds it, the new buffer counts.
+        sim.runUntil(at(26, 19, 31))
+        assertTrue(at(26, 19) in sim.placeChecks, sim.placeChecks.toString())
+        assertEquals("Mo 19:15 Training FULLSCREEN", sim.rings.first())
+    }
+
+    // Review-Lauf 6, Frage 1: Verschoben und schon angekommen, dann ein anderer Ort: Seine Zeit ist
+    // weg, er wartet wieder auf die Ankunft, jetzt am neuen Ort.
+    @Test
+    fun `verschoben angekommen und dann ein anderer Ort wartet auf die Ankunft dort`() = runTest {
+        val id = training(home())
+        val studio = sim.place(Place(name = "Studio", lat = 48.2, lon = 11.6, wifis = listOf(PlaceWifi(OTHER))))
+        sim.runUntil(at(26, 19, 31))
+        sim.act(id, at(26, 19, 32)) { Action.Postpone(at(26, 20, 30)) }
+        sim.runUntil(at(26, 20, 31))
+        sim.wifi(HOME_5, at(26, 20, 34))
+        assertEquals(at(26, 20, 39), sim.open(id).currentAt)
+
+        sim.runUntil(at(26, 20, 35))
+        sim.engine.save(sim.repo.reminder(id)!!.copy(arrival = Arrival(studio)))
+        assertTrue(sim.open(id).awaitsArrival)
+        assertEquals(null, sim.open(id).arrivedAt)
+        sim.runUntil(at(26, 20, 50))
+        assertEquals(listOf("Mo 19:30 Training FULLSCREEN"), sim.rings)
+        sim.wifi(OTHER, at(26, 20, 50))
+        sim.runUntil(at(26, 21))
+        assertEquals(listOf("Mo 19:30 Training FULLSCREEN", "Mo 20:55 Training FULLSCREEN"), sim.rings)
+    }
+
     // KRITISCH: F1 – eine frische WLAN-Suche ohne das WLAN von Zuhause heißt klar weg: entfällt.
     @Test
     fun `zur spaetesten Uhrzeit klar weg entfaellt ohne Ton`() = runTest {

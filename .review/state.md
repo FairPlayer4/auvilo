@@ -1,19 +1,20 @@
 # Review-Gedächtnis
-Letzter Lauf: 2026-11-12 @ 8a57338 (Lauf 4: Doku, Tests, Sitzung/Ankunft; review/2026-11-12, Fixes bis 7f16054)   Laufzähler: 4
-Letztes Architektur-Review: Lauf 2 (2026-11-03); in Lauf 4 auf Kevins Fokus (Doku/Tests) verschoben, **in Lauf 5 fällig**
+Letzter Lauf: 2026-11-13 @ 71a2508 (Lauf 6: V1.3c0 E17–E21 und V1.3b3; review/2026-11-13, Fixes bis fff1ba6)   Laufzähler: 6
+Letztes Architektur-Review: Lauf 5 (2026-11-12, Bericht `runs/2026-11-12-2.md`); nächstes in Lauf 9
 
 ## Beabsichtigte Architektur
 - **Schichten:** `:core` ist reines Kotlin (model, rules, ports, usecases) und kennt kein Android. `:app` ist Android (ui, alarm, data, location, system, widget, claude) und hängt von `:core` ab, nie umgekehrt. Regeln gehören nach `:core`, `:app` setzt sie nur um.
-- **Änderungen:** Alle Änderungen an Remindern und Fälligkeiten laufen über `ReminderEngine`, auch aus UI, Receivern, Benachrichtigungen und der Claude-Schnittstelle. Die Engine ist eine Fassade mit internen Teilen (`Scheduler`, `AlarmViews`, `Changes`).
-- **Wahrheit:** Die Room-DB und die Einstellungen im DataStore (die mit ins Backup gehen) sind die Wahrheit. Alarme, Geofences, Übersicht und Vorab-Reminder werden daraus abgeleitet und per `sync` neu aufgebaut.
-- **Zeit und Container:** In `:core` kommt Zeit nur über `Clock`; in `:app` ist das ein Ziel, keine Regel. Es gibt keine DI-Bibliothek, nur den Container `AppGraph`. Engine-Aufrufe laufen nacheinander über `withEngine`.
+- **Änderungen:** Alle Änderungen an Remindern und Fälligkeiten laufen über `ReminderEngine`, auch aus UI, Receivern, Benachrichtigungen und der Claude-Schnittstelle. Die Engine ist eine Fassade mit internen Teilen (`Scheduler` mit `Arrivals` und `SessionTimer`, `AlarmViews`, `Changes`).
+- **Wahrheit:** Die Room-DB und die Einstellungen im DataStore (die mit ins Backup gehen) sind die Wahrheit. Alarme, Geofences, Übersicht und Vorab-Reminder werden daraus abgeleitet und per `sync` neu aufgebaut. Gerätezustand, der nicht ins Backup geht (Cloud-Status, WLAN-Entprellung, Schlüsseldateien, *Notaus*, `claudeAccess`), ist eine eigene Kategorie.
+- **Effekte:** Ein Befehl der Engine plant, klingelt und beendet (Klingeln und Benachrichtigung weg) über `EngineContext`, erst nach dem Speichern (ab V1.3c0).
+- **Zeit und Container:** In `:core` kommt Zeit nur über `Clock`; in `:app` gilt das für jede Zeit, nach der die App etwas entscheidet (`graph.clock`), Log-Stempel und Dateinamen ausgenommen. Es gibt keine DI-Bibliothek, nur den Container `AppGraph`. Engine-Aufrufe laufen nacheinander über `withEngine`.
 - **Vertrauensgrenzen:**
   - adb-Provider `com.avlreminder.claude`: `DUMP`, nur im Debug-Build, Schalter in der App.
   - Exportierte Receiver und PendingIntents.
   - Migrationen (Datenverlust), mit Backup vor jeder Migration.
   - Private Inhalte (Nachweise, Positionen) dürfen nicht ins Log.
 
-Vom Entwickler bestätigt am 2026-11-03, die Anpassungen aus Lauf 2 (Wahrheit, Zeit, Fassade) am 2026-11-09.
+Vom Entwickler bestätigt am 2026-11-03, die Anpassungen aus Lauf 2 (Wahrheit, Zeit, Fassade) am 2026-11-09, aus Lauf 5 (Gerätezustand, Zeit in `:app`, Effekte) am 2026-11-12.
 
 Das Cloud-Backup (`app/…/cloud`, `restore`) prüft der review-loop des Backend-Repos mit (Bereich „App: Wiederherstellen“, zuletzt Lauf 10 am 2026-11-09).
 
@@ -21,15 +22,15 @@ Das Cloud-Backup (`app/…/cloud`, `restore`) prüft der review-loop des Backend
 | Bereich | Pfade | Anforderungen/Doku | Tests | Zuletzt reviewt | Zustand |
 |---|---|---|---|---|---|
 | core-Regeln | core/…/rules | design.md 2–10, 3.1, 6 | core/src/test/…/rules (Kover ≥ 90 %, 98,7 %) | 2026-11-12 (Sessions, ArrivalWindow, PlaceChecks) | gut, Mutanten entdeckt; Sitzung zählt seit V1.3b2 in der Woche ihres Starts (`countedAt`) |
-| core-Engine | core/…/usecases | design.md 1, 3, 4 | core/src/test/…/usecases, scenarios | 2026-11-12 (Sitzung/Ankunft) | Runden bei sync behoben aabd19f; `arrivedAt` beim Bearbeiten gefixt 7248e01; F2 über die geplante erste Prüfung (3f49b58), am Gerät noch prüfen |
+| core-Engine | core/…/usecases | design.md 1, 3, 4 | core/src/test/…/usecases, scenarios | 2026-11-13 (Lauf 6: E17–E20, 59efad5) | Ende als Effekt (E17), Teilung (E20) ohne Verhaltensänderung; Snooze auf Termin von gestern gefixt f235e62; Frage 5 nicht für verschobene Termine (Frage 1 Lauf 6). Davor: Runden bei sync behoben aabd19f; `arrivedAt` beim Bearbeiten gefixt 7248e01; F2 über die geplante erste Prüfung (3f49b58), am Gerät noch prüfen; F2 bei zwei Remindern an einem Ort entschieden und umgesetzt (59efad5), `arrivedAt` bei geänderter Ankunftsregel (59efad5); `hintQuietUntil` beim Speichern behalten gefixt 22a5480 |
 | core-Modell/Ports | core/…/model, ports | design.md 2 | indirekt | – | – |
-| app-Alarm | app/…/alarm, system | design.md 3.1, 4, 5, 11.2, 12 | AlarmGlueTest, ReceiverGlueTest, SessionGlueTest, AlarmServiceTest | 2026-11-12 (Tests, Sitzung) | Verdrahtung seit 5f2c6a2 über echte PendingIntents getestet (E13); Schlussruf-Benachrichtigung entfernt (55c7ac2) |
+| app-Alarm | app/…/alarm, system | design.md 3.1, 4, 5, 11.2, 12 | AlarmGlueTest, ReceiverGlueTest, SessionGlueTest, AlarmServiceTest | 2026-11-13 (Lauf 6: E17, E18) | Ende eines Alarms jetzt Engine-Effekt (E17); Nachfrage-Text bei aufgebrauchtem Minimum gefixt 498e365, Rückgängig nach Maximum gefixt fff1ba6; offen: Folge-Benachrichtigung mit gleicher ID (E26, Gerätetest), Regeln „ohne Bildschirm“ in `:app` (E25), Nebenläufigkeit (E27); stille Benachrichtigung nach Notaus am Gerät prüfen |
 | app-Daten | app/…/data | design.md 13 | MigrationTest, RoomReminderRepositoryTest, RoomRepositoryCasesTest | 2026-11-03 (nur Migration 6→7) | gut |
-| app-UI | app/…/ui | design.md 11 | ui-Tests (Robolectric) | – | – |
+| app-UI | app/…/ui | design.md 11 | ui-Tests (Robolectric) | 2026-11-13 (Lauf 6: 3baee36, E21) | Entwurf nach Start aus Widget/Benachrichtigung ging beim Neuaufbau verloren, gefixt aee3952 (`MainActivityTest`); `AlarmActivity` über das Repository cd2e2b4. Davor: Nachweis-Frist gefixt b483ea9; Formular-Funde in V1.3b3 |
 | app-Claude | app/…/claude, app/src/debug | anforderungen.md 7.26 AG11, design.md 15 | ClaudeApiTest | 2026-11-03 | AG5-Frage offen; Freigabe-Prüfung ungetestet |
-| app-Ort/Widget | app/…/location, widget | design.md 6, 11.2 | ReceiverGlueTest (PlaceCheck über echten PendingIntent) | 2026-11-12 (Ankunft, WLAN) | wiederholte WLAN-Meldung keine Ankunft (3f49b58); Geofence-Test in 5f2c6a2; Widget ohne Test |
+| app-Ort/Widget | app/…/location, widget | design.md 6, 11.2 | ReceiverGlueTest (PlaceCheck über echten PendingIntent) | 2026-11-13 (Lauf 6: `rebuild`, `setPlaceHere`) | Übersicht wurde bei jedem Vordergrund neu geplant (Regression E19), gefixt 5b0b6e3; doppeltes „Hier festlegen“ legt zwei Orte an (E28). Davor: wiederholte WLAN-Meldung keine Ankunft (3f49b58); Geofence-Test in 5f2c6a2; Widget ohne Test |
 | Doku | CLAUDE.md, README, docs/*.md | – | – | 2026-11-12 (Lauf 4, alle Dokumente) | nach Lauf 4 umgebaut: design.md nach Themen (3.1 Sitzung, 6 Ankunft), Cloud-Entwürfe → cloud-entscheidungen.md, Kap.-9-Archiv, testsession.md gelöscht |
-| Tests gesamt | core/src/test, testFixtures, app/src/test | design.md 14 | – | 2026-11-12 (Lauf 4) | core sehr gut; E13–E16 umgesetzt (5f2c6a2, 247b44b, Testdaten Schema 10 am 2026-11-12); Mutationslauf: 21/21 entdeckt nach cc337b4 |
+| Tests gesamt | core/src/test, testFixtures, app/src/test | design.md 14 | – | 2026-11-12 (Lauf 4) | core sehr gut; E13–E16 umgesetzt (5f2c6a2, 247b44b, Testdaten Schema 10 am 2026-11-12); Mutationslauf: 21/21 entdeckt nach cc337b4; Lauf 5: 3/4, UI-Verdrahtung `withoutAlarm` unentdeckt (E22), seit 3baee36 von `AppViewModelTest` entdeckt; Lauf 6: 1/3 (M1 `endDay` jetzt abgedeckt f235e62, M2 Filter in `commit` → E24) |
 
 ## Bekannte Schulden und beobachtete Drift
 - 2026-11-03: Regel-Logik in `:app`: `AlarmActivity.canDeferRest`, das Anbieten des nächsten Punkts in `ActionReceiver`. Beginnende Drift. **Trend (Lauf 2):** Die Alarm-Ansicht gibt es viermal (`Ring`, `AlarmUi`, `AlarmInfo`, `ActionReceiver`); `ActionReceiver` nutzt `Checklists.round` nicht. Empfehlung E1.
@@ -53,8 +54,24 @@ Das Cloud-Backup (`app/…/cloud`, `restore`) prüft der review-loop des Backend
 - 2026-11-12: Glue-Tests nutzen die echte Uhr und werden 22:30–0:30 übersprungen. E15. **Behoben 5f2c6a2** (`TestClock`). Nachzügler am selben Tag: `AlarmPause.update` und die Übersicht rechneten noch mit `Instant.now()`, der Pausentest war ab 14 Uhr rot; jetzt `SystemZoneClock`.
 - 2026-11-12: `testdata/` auf Schema 7. E16. **Behoben** (`real-2026-11-12.json`, Schema 10).
 
+## Bekannte Schulden und beobachtete Drift (Lauf 5)
+- 2026-11-12: Das Ende eines Alarms (stoppen, leise, Benachrichtigung weg) ist kein Engine-Effekt; sechs Aufrufer mit eigenen Bedingungen. E17. Knüpft an die Lauf-1-Funde und 7e95a4a an. → 2026-11-13 `RingPort.end` (8208e96).
+- 2026-11-12, **Trend (Lauf 2 → 5): Regeln der Alarm-/Sitzungsansicht entstehen in `:app` neu**, jetzt bei der Sitzung (`AppGraph.sessions`, `Notifications.buttons`, `SessionService`, `SessionContent`). E18. → 2026-11-13 `Sessions.answers`, `SessionNote.of` (9d7ea5b).
+- 2026-11-12: `AppGraph` wird Sammelbecken (186 → 373 Zeilen seit Lauf 2, 18 Commits); Neuaufbau je Auslöser eigens zusammengesetzt. E19. → 2026-11-13 `rebuild`, `setPlaceHere`, `answerAsk(planTask)`, `CloudWiring`; 308 Z. (31d75be).
+- 2026-11-12: `Scheduler` trägt Termine, Sitzungen und Orte (471 Z.); V1.3c bringt Schritte und Signale. E20. → 2026-11-13 `Arrivals`, `SessionTimer`; 339 Z. (52f8bfc).
+- 2026-11-12, **Trend (Lauf 4 → 5): Zeit in `:app` uneinheitlich** (`Instant.now()` in *Heute*-Ticks, Widget, AlarmActivity, WLAN-Scan); zweimal Testfehler. E21, Frage 2. → 2026-11-13 `AppGraph.clock`, `ClockRuleTest` (7b10771).
+- 2026-11-12: design.md 1 „einzige Wahrheit“ widerspricht dem bestätigten Bild (Room + DataStore); Gerätezustand ohne Kategorie. E21. → 2026-11-13 design.md 1 (7b10771).
+- 2026-11-12, **Trend (Lauf 1 → 2 → 4 → 5): Android-Schicht dünn getestet**, jetzt die UI: kein Test mit `SaveResult.Invalid`, Round-Trip nur mit Remindern aus dem Formular, Mutant A (`withoutAlarm` in der UI) unentdeckt. E22.
+- 2026-11-12: `Database.kt` (693 Z., Schema 10) weiter ungeteilt (Lauf 2: „mit Migration 8“). E23. → 2026-11-13 geteilt (Entities, Dao, Converters, Migrations, Database).
+
+## Bekannte Schulden und beobachtete Drift (Lauf 6)
+- 2026-11-13, **Trend (Lauf 2 → 5 → 6): Regeln der Alarm-/Sitzungsansicht in `:app`.** Nach E18 bleiben „Antworten ohne Bildschirm“ und `minimumUsedUp` in der App; Folge war ein falscher Nachfrage-Text (498e365). E25.
+- 2026-11-13: Umbauten verlieren Nebenbedingungen: `rebuild` (E19) plante die Übersicht öfter als vorher und schob sie auf morgen (5b0b6e3). Hinweis für V1.3c: bei „ein Rezept für alles“ prüfen, was vorher bewusst *nicht* geschah.
+- 2026-11-13, **Trend (Lauf 1 → 2 → 4 → 5 → 6): Android-Schicht dünn getestet**, jetzt beim Weg über `MainActivity` (Entwurf beim Neuaufbau, aee3952) und gleichen Benachrichtigungs-IDs (E26). Mit `MainActivityTest` gibt es den ersten Test durch die echte Activity.
+- 2026-11-13: Schutzcode ohne Fall: Filter „was wieder klingelt“ in `EngineContext.commit` (M2). E24.
+
 ## Offene Fragen an den Entwickler
-Keine aus Lauf 4 (alle am 2026-11-12 beantwortet).
+Keine aus Lauf 6 (beide am 2026-11-13 nach Vorschlag beantwortet).
 
 Kleine offene Unklarheiten (Sommerzeit, Handy aus im Zeitraum, *Auslassen* bei mehrmals täglich, Begriff „Pause“) stehen in anforderungen.md Kap. 11.
 
@@ -74,3 +91,5 @@ Kleine offene Unklarheiten (Sommerzeit, Handy aus im Zeitraum, *Auslassen* bei m
 - 2026-11-12 (Lauf 4): Kevin wollte Doku und Tests im Fokus; das Architektur-Review ist deshalb auf Lauf 5 verschoben (Hauptagent).
 - 2026-11-12: Aus Lauf 1 gefixt (Kevin: „jetzt fixen“): abgelehnte Antwort auf die Hinweis-Karte sagt warum; Löschen/Pausieren/Archivieren/Verwerfen nehmen Klingeln und Benachrichtigung weg; anderer Alarm beendet einen offenen Nachweis; Notaus lässt eine stille Benachrichtigung. Offen aus Lauf 1 und mit V1.3c: abgelehnte Aktion in `ActionReceiver` entfernt trotzdem, mehrere Vollbild-Alarme/„Nachweis läuft“ (Gerätetest); nicht nachgeprüft: `Stats.streak` mehrmals täglich, `ClaudeApi.save` bei Ankunft.
 - 2026-11-12 (Lauf 4, Fragen 1–8, alle nach Vorschlag): Vollbild/*+1 wartet*/*Rest später* → V1.3c; *Abgebrochen* 60 s zurücknehmbar; F2 über die geplante erste Prüfung, wiederholte WLAN-Meldung keine Ankunft; Sitzung zählt in der Woche ihres Starts; Doku zusammengelegt und gekürzt; *Teilschritt* nach aufgebrauchtem Limit ausgeblendet. Umgesetzt in V1.3b2 (anforderungen.md Kap. 9, 2026-11-12).
+- 2026-11-12 (Lauf 5, Fragen 1–6, alle nach Vorschlag): Umbau-Etappe V1.3c0 (E17–E21, E23) vor V1.3c; Architekturbild: Room + DataStore, Gerätezustand eigene Kategorie, Zeitregel in `:app`, Effekte inkl. beenden; vom System geschlossene Termine räumen auf; F2 `plannedCheck <= start`; `arrivedAt` bei jeder Änderung der Ankunftsregel leeren; Formular-Entwurf retten, Limit für Sitzungs-Minimum, Startklar nicht leerbar (anforderungen.md Kap. 9). Offene Funde und E22 in V1.3b3.
+- 2026-11-13 (Lauf 6, Fragen 1–2, nach Vorschlag): verschobener, angekommener Termin wartet nach geänderter Ankunftsregel wieder auf die Ankunft; *Teilschritt* ohne Bildschirm nur ohne Nachweis-Pflicht, wie *Erledigt* (anforderungen.md Kap. 9, 2026-11-13).

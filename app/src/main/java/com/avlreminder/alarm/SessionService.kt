@@ -9,23 +9,35 @@ import android.content.Intent
 import android.content.pm.ServiceInfo
 import android.os.IBinder
 import com.avlreminder.R
+import com.avlreminder.core.usecases.AlarmView
 import com.avlreminder.system.Diag
 import java.time.Instant
 import java.time.ZoneId
 import java.time.format.DateTimeFormatter
 
-/** A running session as its notification shows it (Anf. 7.11). */
+/** A running session as its notification shows it (Anf. 7.11); from the engine's [AlarmView] (E18). */
 data class SessionNote(
     val occurrenceId: Long,
     val title: String,
     val startedAt: Instant,
     /** "Fertig" from the notification; not with a proof that needs photo, text or audio. */
     val quickDone: Boolean,
-    /** "Teilschritt" is allowed: the reminder has a minimum and its weekly limit is not used up. */
+    /** "Teilschritt" from the notification: allowed this week and no proof that needs photo, text or audio. */
     val minimum: Boolean,
     /** The reminder has a minimum, but its weekly limit is used up: the notification says so. */
     val minimumUsedUp: Boolean = false,
-)
+) {
+    companion object {
+        /** Null if [view] is not a running session. */
+        fun of(view: AlarmView): SessionNote? {
+            val session = view.session ?: return null
+            return SessionNote(
+                occurrenceId = view.occurrence.id, title = view.reminder.title, startedAt = session.startedAt,
+                quickDone = view.quickDone, minimum = view.quickMinimum, minimumUsedUp = view.minimumUsedUp,
+            )
+        }
+    }
+}
 
 /**
  * Keeps the running sessions visible (design.md 3.1): one ongoing notification each with a

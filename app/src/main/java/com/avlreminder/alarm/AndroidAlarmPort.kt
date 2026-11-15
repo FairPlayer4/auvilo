@@ -73,9 +73,8 @@ class AlarmReceiver : BroadcastReceiver() {
         graph.scope.launch {
             try {
                 val ring = graph.withEngine { it.onAlarm(id) }
+                // Ended by this alarm (a session at its maximum, the end of the day): the engine ends its ringing (E17).
                 Diag.log("alarm fired occ=$id late=$late → ${if (ring == null) "nothing (stale, planned again or day ended)" else "ring"}")
-                // Ended by this alarm (a session at its maximum, the end of the day): nothing of it stays.
-                if (ring == null && graph.repository.occurrence(id)?.isOpen != true) Ringer.dismiss(context, id)
             } finally {
                 result.finish()
             }
@@ -120,7 +119,7 @@ class ActionReceiver : BroadcastReceiver() {
                     if (action !is Action.CheckItem || o == null || o.state != OccurrenceState.DUE) return@withEngine o
                     e.alarmView(o.id)?.let(AlarmInfo::of)
                 }
-                Ringer.dismiss(context, id)
+                // The engine ended the ringing, or left it when the button was rejected (E17).
                 when (next) {
                     is AlarmInfo -> Notifications.show(context, next, quiet = true)
                     // Done from the notification or the watch: "Rückgängig" for a minute (Anf. 7.31).

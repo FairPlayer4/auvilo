@@ -29,13 +29,16 @@ Strenge und invasive Mechanismen sind gewollt. Kommunikation auf **Deutsch, mit 
 ```bash
 ./gradlew -q :core:check :core:koverLog :app:testDebugUnitTest :app:lintDebug :app:assembleDebug
 ```
+- Vor einem PR nach `main` zusätzlich `-PbackendStreng=true` (wie die CI): bricht ab,
+  wenn der Backend-Stand nicht zu `gradle/backend-commit.txt` passt.
 - `JAVA_HOME` und `ANDROID_HOME` sind auf dem Rechner gesetzt, nichts exportieren
   (Pfade in entwicklungsumgebung.md).
 - Gradle, adb und `git push` brauchen in Claude Code Netz/Geräte außerhalb der Sandbox.
 - Der Build braucht das Backend-Repo daneben (`../avlreminder-backend`, Composite Build,
   [cloud-entscheidungen.md](docs/cloud-entscheidungen.md) A-2). Steht dort ein anderer Commit als in
   `gradle/backend-commit.txt` oder gibt es uncommittete Änderungen in `client/`/`proto/`,
-  warnt der Build: **eine solche APK nicht installieren**. Nach Änderungen im Backend den
+  warnt der Build: **eine solche APK nicht installieren**. Dasselbe gilt für die Warnung
+  „Cloud-Backup ausgeblendet“ (Server-Werte fehlen, cloud-entscheidungen.md, Einrichtung). Nach Änderungen im Backend den
   Commit dort pushen und in `gradle/backend-commit.txt` eintragen.
 - Android Lint (`:app:lintDebug`) bricht bei jedem neuen Fund ab, auch bei Warnungen. Funde
   beheben statt in die Baseline (`app/lint-baseline.xml`) zu schieben; nur wenn ein Fund
@@ -60,8 +63,8 @@ Strenge und invasive Mechanismen sind gewollt. Kommunikation auf **Deutsch, mit 
   Logs schreiben, nicht an externe Dienste geben. Lesen über die Schnittstelle ist erlaubt.
   Ausnahme in der Entwicklungsphase: Titel dürfen ins Diagnose-Log (design.md 13).
   Ausnahme Testdaten: `testdata/real-*.json` aus `tools/testdata/export_testdata.py`
-  (alle Texte ersetzt, keine Medien, Orte verschoben, Leck-Prüfung im Skript) dürfen ins
-  Repo; nur dieses Skript benutzen und das Ergebnis vor dem Commit stichprobenartig ansehen.
+  (alle Texte ersetzt, keine Medien, Orte verschoben, Leck-Prüfung im Skript) bleiben
+  lokal (`.gitignore`, Anf. 7.34 OV2: die Zeiten sind echt); nur dieses Skript benutzen.
 - **Schnittstelle für Claude** (Debug-Build, design.md 15): erst nutzbar, wenn Kevin sie
   in den Einstellungen einschaltet. Lesen ohne Rückfrage; Reminder anlegen, ändern,
   pausieren, archivieren nur nach Absprache mit Kevin.
@@ -76,6 +79,10 @@ Strenge und invasive Mechanismen sind gewollt. Kommunikation auf **Deutsch, mit 
 - `main` nur per Pull Request, nie direkt pushen. Nach einer abgeschlossenen Etappe
   einen PR anbieten (`gh pr create`, Basis `main`; ohne `gh` die Compare-URL
   `https://github.com/FairPlayer4/avlreminder/compare/main...<branch>` nennen).
-- PRs nach `main` baut und testet GitHub Actions (`.github/workflows/build.yml`, gleicher
-  Befehl wie lokal; Debug-APK als Artefakt am Lauf).
+- GitHub Actions baut und testet nur nach dem Merge auf `main` (`.github/workflows/build.yml`,
+  gleicher Befehl wie lokal; Debug-APK als Artefakt am Lauf), nicht bei PRs und nicht auf
+  `develop` (GitHub-Minuten, Kap. 9, 2026-11-13). Vor einem PR nach `main` deshalb lokal
+  mit `-PbackendStreng=true` bauen, alles grün, und nach dem Merge den Lauf ansehen.
+  Andere Branches nur bei Bedarf von Hand (`gh workflow run build.yml --ref <branch>`).
+  Wird das Repo öffentlich, wieder bei PRs bauen.
 - Commit-Nachrichten auf Deutsch, Präfix mit Version (z. B. `V1.2b: …`).

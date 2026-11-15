@@ -1,6 +1,8 @@
 # Testdaten
 
-`real-<datum>.json` sind Kevins echte Daten, **pseudonymisiert**. Gemacht werden sie mit
+`real-<datum>.json` sind Kevins echte Daten, **pseudonymisiert**. Sie bleiben **lokal**
+(`.gitignore`, Anf. 7.34 OV2): Die Zeiten sind echt und verraten den Tagesablauf. Gemacht
+werden sie mit
 [tools/testdata/export_testdata.py](../tools/testdata/export_testdata.py), bei
 angeschlossenem Handy und installiertem Debug-Build:
 
@@ -20,4 +22,5 @@ python -I tools/testdata/export_testdata.py testdata/real-2026-11-12.json
 
 Benutzt von `app/src/test/.../data/RealDataTest.kt`. Der Test lädt die neueste Datei in das
 Schema ihrer Version, migriert auf das aktuelle Schema und spielt mit der Engine eine Woche
-durch (`Simulation` aus den Testhilfen von `core`). Ohne Datei werden die Tests übersprungen.
+durch (`Simulation` aus den Testhilfen von `core`). Ohne Datei werden die Tests übersprungen,
+so in der CI und in jedem frischen Klon.

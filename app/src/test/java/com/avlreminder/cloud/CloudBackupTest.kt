@@ -40,6 +40,7 @@ import com.avlreminder.protokoll.VersionVeraltet
 import com.avlreminder.protokoll.Wiederherstellungsschluessel
 import com.avlreminder.verbindung.Angemeldet
 import com.avlreminder.verbindung.AnmeldungAbgelehnt
+import com.avlreminder.verbindung.KontoNichtFreigegeben
 import com.avlreminder.verbindung.NichtAngemeldet
 import com.avlreminder.verbindung.Serverfehler
 import com.avlreminder.verbindung.Sitzung
@@ -47,11 +48,16 @@ import com.connectrpc.Code
 import com.connectrpc.ConnectException
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.Job
 import kotlinx.coroutines.SupervisorJob
+import kotlinx.coroutines.TimeoutCancellationException
+import kotlinx.coroutines.async
 import kotlinx.coroutines.cancel
+import kotlinx.coroutines.coroutineScope
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.runBlocking
+import kotlinx.coroutines.selects.select
 import kotlinx.coroutines.withTimeout
 import org.junit.After
 import org.junit.Assert.assertEquals
@@ -253,7 +259,7 @@ class CloudBackupTest {
     /** The logged events after the header, as JSON. */
     private fun events() = events.lines().drop(1).map(::JSONObject)
 
-    private fun cloud() = CloudBackup(
+    private fun cloud(configured: Boolean = true) = CloudBackup(
         store,
         server = { serversCreated++; server },
         keys = { acc ->
@@ -291,6 +297,7 @@ class CloudBackupTest {
         reminders = { reminderCount },
         log = { logged += it },
         clock = { now },
+        configured = configured,
     )
 
     /** The password service; by default the phone has none (as the older tests assume). */
@@ -321,19 +328,41 @@ class CloudBackupTest {
     private fun ready(cloud: CloudBackup): CloudPhase.Ready {
         blocking { cloud.setEnabled(true).join() }
         val job = cloud.signIn(activity)
-        cloud.awaitPhase(CloudPhase.ShowKey::class.java)
+        cloud.awaitPhase(CloudPhase.ShowKey::class.java, job)
         cloud.confirmKey(true)
         blocking { job.join() }
         return cloud.status.value.phase as CloudPhase.Ready
     }
-    private val logged = java.util.Collections.synchronizedList(mutableListOf<String>())
+    // Copy-on-write: tests read it with any/none while the steps still log; a synchronized list
+    // threw ConcurrentModificationException there once.
+    private val logged = java.util.concurrent.CopyOnWriteArrayList<String>()
     private var brokenKeys: Throwable? = null
 
-    private fun <T> blocking(block: suspend () -> T): T = runBlocking { withTimeout(10_000) { block() } }
+    // Generous: under the load of the full build 10 s were too short once (Review-Lauf 5); a real hang still fails.
+    private fun <T> blocking(block: suspend () -> T): T = runBlocking { withTimeout(30_000) { block() } }
 
-    private fun CloudBackup.await(predicate: (CloudStatus) -> Boolean): CloudStatus = blocking { status.first(predicate) }
+    // Thrown here, outside the coroutine: the stack then shows the waiting test line, and the message the status.
+    private fun CloudBackup.await(predicate: (CloudStatus) -> Boolean): CloudStatus = try {
+        blocking { status.first(predicate) }
+    } catch (e: TimeoutCancellationException) {
+        throw AssertionError("The awaited status did not come; now: ${status.value}", e)
+    }
 
     private fun CloudBackup.awaitPhase(phase: Class<out CloudPhase>): CloudStatus = await { phase.isInstance(it.phase) }
+
+    /**
+     * Waits for [phase] while [step] runs. If the step ends without reaching it (an error of the step), this
+     * fails at once with the status instead of waiting for the time limit.
+     */
+    private fun CloudBackup.awaitPhase(phase: Class<out CloudPhase>, step: Job): CloudStatus = blocking {
+        coroutineScope {
+            val reached = async { status.first { phase.isInstance(it.phase) } }
+            select<CloudStatus?> {
+                reached.onAwait { it }
+                step.onJoin { null }
+            }.also { reached.cancel() }
+        } ?: throw AssertionError("The step ended without ${phase.simpleName}: ${status.value}")
+    }
 
     /** An existing account: keys and their backup under [key]. */
     private fun existingAccount(key: Wiederherstellungsschluessel = Wiederherstellungsschluessel.erzeugen()): Schluesselbund {
@@ -1472,6 +1501,86 @@ class CloudBackupTest {
         blocking { cloud.signIn(activity).join() }
         assertTrue(notices.shown.isEmpty())
         assertNotNull(cloud.status.value.error)
+    }
+
+    // --- Built without a server (7.34 OV1) ------------------------------------------------
+
+    // KRITISCH: an app built without a server, installed over one with the cloud backup, stops
+    // the hourly backup and reaches no server.
+    @Test
+    fun withoutAServerTheHourlyBackupStopsAndReachesNoServer() {
+        val with = cloud()
+        ready(with)
+        blocking { with.backUp().join() }
+        val data = server.data
+        val stops = schedule.stops
+
+        val without = cloud(configured = false)
+        payload = "neue Daten".toByteArray()
+        auto(without)
+        assertEquals(data, server.data)
+        assertEquals(stops + 1, schedule.stops)
+        assertTrue(notices.shown.isEmpty())
+    }
+
+    // Counter-check: with a server the same step backs up.
+    @Test
+    fun withAServerTheHourlyBackupUploads() {
+        val cloud = cloud()
+        ready(cloud)
+        blocking { cloud.backUp().join() }
+        payload = "neue Daten".toByteArray()
+        auto(cloud)
+        assertTrue(onServer().nutzlast.contentEquals(payload))
+    }
+
+    @Test
+    fun aServerNeedsBothValues() {
+        assertTrue(CloudConfig.configured("https://server.example", "1-abc.apps.googleusercontent.com"))
+        assertFalse(CloudConfig.configured("", ""))
+        assertFalse(CloudConfig.configured("https://server.example", ""))
+        assertFalse(CloudConfig.configured("", "1-abc.apps.googleusercontent.com"))
+    }
+
+    // --- Account not let in by the server (backend ID7) -------------------------------
+
+    private val identifier = "49b0c816cea554249a707f70df22eeedaa1d502f5fca0c8122257cc1a0accc2c"
+
+    // KRITISCH: whoever is not on the server's list sees the identifier to ask for access with.
+    @Test
+    fun anAccountNotLetInSeesItsIdentifierWhenSigningIn() {
+        val cloud = cloud()
+        blocking { cloud.setEnabled(true).join() }
+        server.signInError = KontoNichtFreigegeben(identifier)
+        blocking { cloud.signIn(activity).join() }
+        val error = cloud.status.value.error.orEmpty()
+        assertTrue(error, error.contains("nicht freigegeben"))
+        assertTrue(error, error.contains(identifier))
+        assertEquals(CloudPhase.SignedOut, cloud.status.value.phase)
+        assertTrue(notices.shown.isEmpty())
+        assertEquals(FailureKind.NOT_ALLOWED, FailureKind.of(KontoNichtFreigegeben(identifier)))
+    }
+
+    // KRITISCH: an approval withdrawn later ends the session like a rejection: the hourly backup
+    // stops and the person learns it at once.
+    @Test
+    fun aWithdrawnApprovalEndsTheSessionAndWarnsAtOnce() {
+        val cloud = cloud()
+        ready(cloud)
+        blocking { cloud.backUp().join() }
+        payload = "neue Daten".toByteArray()
+        server.sessionError = KontoNichtFreigegeben(identifier)
+        auto(cloud)
+        assertNull(blocking { store.lesen() })
+        assertEquals(listOf("signInAgain"), notices.shown)
+    }
+
+    // Counter-check: an answer without identifier says so and shows no empty one.
+    @Test
+    fun withoutIdentifierTheTextSaysOnlyThatTheAccountIsNotLetIn() {
+        val text = CloudErrors.describe(KontoNichtFreigegeben(null)).orEmpty()
+        assertTrue(text, text.contains("nicht freigegeben"))
+        assertFalse(text, text.contains("Kennung"))
     }
 
     @Test

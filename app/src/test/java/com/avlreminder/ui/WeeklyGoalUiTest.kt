@@ -1,5 +1,8 @@
 package com.avlreminder.ui
 
+import com.avlreminder.core.model.PostponePeriod
+import androidx.compose.ui.test.hasTestTag
+import androidx.compose.ui.test.hasAnyAncestor
 import androidx.compose.ui.test.assertIsNotEnabled
 import androidx.compose.ui.test.assertTextContains
 import androidx.compose.ui.test.hasSetTextAction
@@ -191,6 +194,20 @@ class WeeklyGoalUiTest {
         compose.onAllNodes(hasSetTextAction())[0].performTextReplacement("17")
         compose.onNodeWithTag("timeOk").assertIsNotEnabled()
         compose.onNodeWithText("muss nach", substring = true).assertExists()
+    }
+
+    // Das Verschiebe-Limit zählt pro Termin, Woche oder Monat (Z2b, 2026-11-13).
+    @Test
+    fun thePostponeLimitCountsPerOccurrenceWeekOrMonth() {
+        val actions = FakeActions()
+        val r = training.copy(weeklyGoal = null, postponeLimit = 1, postponePeriod = PostponePeriod.MONTH, snoozeMinutes = listOf(10))
+        compose.setContent { AvlTheme(dark = false) { AvlAppUi(state(r), actions, now, zone, startRoute = Routes.edit(1)) } }
+
+        compose.onNodeWithText("Verschieben 1× pro Monat · Später +10").assertExists()
+        compose.onNodeWithTag("foldFine").performScrollTo().performClick()
+        compose.onNode(hasText("pro Woche") and hasAnyAncestor(hasTestTag("postponePeriod"))).performScrollTo().performClick()
+        compose.onNodeWithText("Speichern").performClick()
+        assertEquals(PostponePeriod.WEEK, actions.saved.single().postponePeriod)
     }
 
     @Test

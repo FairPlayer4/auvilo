@@ -3,11 +3,8 @@ package com.avlreminder.claude
 import android.app.Application
 import androidx.test.core.app.ApplicationProvider
 import androidx.test.ext.junit.runners.AndroidJUnit4
-import com.avlreminder.AvlApp
-import kotlinx.coroutines.runBlocking
 import org.junit.Assert.assertNotNull
 import org.junit.Assert.assertThrows
-import org.junit.Before
 import org.junit.Test
 import org.junit.runner.RunWith
 import org.robolectric.Robolectric
@@ -23,10 +20,6 @@ class ClaudeProviderTest {
     private val app = ApplicationProvider.getApplicationContext<Application>()
     private val provider = Robolectric.setupContentProvider(ClaudeProvider::class.java)
 
-    @Before
-    fun setUp() {
-        runBlocking { (app as AvlApp).started.join() }
-    }
 
     // KRITISCH: Eine andere App ohne DUMP bekommt keine Antwort, auch nicht "ausgeschaltet".
     @Test

@@ -1,5 +1,9 @@
 package com.avlreminder.ui
 
+import com.avlreminder.core.model.PostponePeriod
+import androidx.compose.runtime.setValue
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
 import androidx.compose.material3.Button
 import androidx.compose.material3.Text
 import androidx.compose.ui.test.assertIsDisplayed
@@ -348,6 +352,31 @@ class FlowsTest {
         compose.onNodeWithText("Ja, sofort").performScrollTo().performClick()
         compose.onNodeWithText("Speichern").performClick()
         assertEquals(listOf(1 to "Ruhe im Kopf", 3 to "Ja, sofort"), actions.savedPrep.map { it.question to it.text })
+    }
+
+    // Pro Woche: was bleibt, und wann es wieder geht (Z2b, 2026-11-13).
+    @Test
+    fun alarmPostponePerWeek() {
+        val weekly = strict.copy(postponeLimit = 2, postponePeriod = PostponePeriod.WEEK)
+        var ui by mutableStateOf(alarmUi(reminder = weekly).copy(postponesLeft = 2))
+        compose.setContent {
+            AvlTheme(dark = true) {
+                AlarmContent(
+                    ui = ui, now = now, zone = zone,
+                    onComplete = { _, _, _ -> }, onSnooze = {}, onPostpone = {}, onSkip = {},
+                    onStartProof = {}, onAbortProof = {}, devices = devices,
+                )
+            }
+        }
+        compose.onNodeWithText("Verschieben\nnoch 2× diese Woche").performScrollTo().assertIsEnabled()
+        // Used up on Saturday: again from Monday.
+        ui = ui.copy(canPostpone = false, postponesLeft = 0, postponeAgainAt = Instant.parse("2026-10-25T23:00:00Z"))
+        compose.onNodeWithText("Verschieben\nwieder ab Mo 26.10.").performScrollTo().assertIsNotEnabled()
+        // One left in the step.
+        ui = ui.copy(canPostpone = true, postponesLeft = 1, postponeAgainAt = null)
+        compose.onNodeWithText("Verschieben\nnoch 1× diese Woche").performScrollTo().performClick()
+        compose.onNodeWithText("Katzenbrunnen reinigen · letzte Verschiebung diese Woche").assertExists()
+        compose.onNodeWithText("Danach bleiben diese Woche nur noch Erledigt, Minimum oder Auslassen.").assertExists()
     }
 
     @Test

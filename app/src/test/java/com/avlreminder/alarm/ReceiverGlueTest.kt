@@ -22,7 +22,6 @@ import com.avlreminder.core.model.Reminder
 import com.avlreminder.core.model.Schedule
 import com.avlreminder.core.model.WhenAway
 import com.avlreminder.core.usecases.SaveResult
-import com.avlreminder.AvlApp
 import com.avlreminder.graph
 import android.net.ConnectivityManager
 import com.avlreminder.location.AndroidPlaceAlarms
@@ -37,6 +36,7 @@ import com.avlreminder.location.WifiReceiver
 import org.robolectric.shadows.ShadowNetwork
 import com.avlreminder.location.PlaceCheckReceiver
 import com.avlreminder.system.SystemReceiver
+import com.avlreminder.data.OverviewTimes
 import kotlinx.coroutines.runBlocking
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
@@ -71,9 +71,6 @@ class ReceiverGlueTest {
     @Before
     fun setUp() {
         TestClock.at()
-        // The app syncs on start (on Dispatchers.Default); let that finish so it does not race
-        // with the test. Idling the main looper alone did not wait for it.
-        runBlocking { (context as AvlApp).started.join() }
         ShadowLooper.idleMainLooper()
     }
 
@@ -429,6 +426,23 @@ class ReceiverGlueTest {
      * Android delivers these only to receivers declared in the manifest; a missing filter is not
      * noticed until the time zone changes on a journey (Review-Lauf 4, A5).
      */
+    // Opening the app inside the delivery window of today's overview must not move it to
+    // tomorrow; only start, system events and new times plan it (Review-Lauf 6).
+    @Test
+    fun theAppInFrontLeavesTodaysOverviewPlanned() = runBlocking {
+        fun overview() = shadowOf(alarmManager).scheduledAlarms.single {
+            it.operation?.let { op -> shadowOf(op).savedIntent }?.component?.className == OverviewReceiver::class.java.name
+        }
+        TestClock.at(LocalTime.of(6, 55))
+        graph.settings.setOverview(OverviewTimes(morning = LocalTime.of(7, 0), evening = null))
+        graph.rebuild("overview times", overview = true)
+        val today = overview().triggerAtTime
+        assertEquals(TestClock.now().plus(Duration.ofMinutes(5)).toEpochMilli() / 60_000, today / 60_000)
+        TestClock.advance(Duration.ofMinutes(8))
+        graph.rebuild("app in front")
+        assertEquals(today, overview().triggerAtTime)
+    }
+
     @Test
     fun theManifestDeliversBootTimeAndTimeZoneChangesToTheSystemReceiver() {
         for (action in listOf(Intent.ACTION_BOOT_COMPLETED, Intent.ACTION_TIME_CHANGED, Intent.ACTION_TIMEZONE_CHANGED, Intent.ACTION_MY_PACKAGE_REPLACED)) {

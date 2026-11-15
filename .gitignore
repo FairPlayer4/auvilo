@@ -1,5 +1,6 @@
 # Android / Gradle
 .gradle/
+.kotlin/
 build/
 */build/
 local.properties
@@ -19,3 +20,6 @@ captures/
 # OS
 .DS_Store
 Thumbs.db
+
+# Echte, pseudonymisierte Testdaten bleiben lokal (Anf. 7.34 OV2)
+testdata/real-*.json

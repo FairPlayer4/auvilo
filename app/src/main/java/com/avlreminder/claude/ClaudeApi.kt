@@ -1,6 +1,6 @@
 package com.avlreminder.claude
 
-import com.avlreminder.core.model.Character
+import com.avlreminder.core.rules.Presets
 import com.avlreminder.core.model.Occurrence
 import com.avlreminder.core.model.OccurrenceState
 import com.avlreminder.core.model.Reminder
@@ -127,7 +127,7 @@ class ClaudeApi(private val access: Access) {
         val result = access.withEngine { engine ->
             val base = if (id == 0L) {
                 // Like the form: "festhalten" unless said otherwise; "Überwindung" needs the four answers in "prep".
-                Reminder(title = "", character = Character.DOCUMENT, schedule = Schedule.Daily(LocalTime.NOON), createdAt = access.now())
+                Presets.newReminder(title = "", schedule = Schedule.Daily(LocalTime.NOON), createdAt = access.now())
             } else {
                 notRunning(id)
                 all().firstOrNull { it.id == id } ?: throw Failure("Reminder $id nicht gefunden")

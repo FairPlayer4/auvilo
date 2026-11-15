@@ -1,14 +1,14 @@
 # Stand und nächste Schritte
 
-Stand: 2026-11-12. Bei jedem größeren Schritt aktualisieren. Erledigtes steht in git, in
+Stand: 2026-11-13. Bei jedem größeren Schritt aktualisieren. Erledigtes steht in git, in
 anforderungen.md Kap. 10.1 und in den Review-Berichten (`.review/runs/`), nicht hier.
 
 ## Auf dem Gerät (S24)
-- **V1.3b2** (`versionCode` 18), installiert am 2026-11-12: Antworten auf Review-Lauf 4
-  (Sitzung zählt in der Woche ihres Starts, *Abbruch* 60 s zurücknehmbar, *Teilschritt*
-  nach aufgebrauchtem Limit ausgeblendet, F2 über die geplante erste Prüfung, wiederholte
-  WLAN-Meldung keine Ankunft) und Tests. Start ohne Fehler, Alarme neu geplant.
-- Davor V1.3b1 (2026-11-11): Sitzung mit Timer und Uhr (7.11), davor 1.3b0.6 (Ankunft im Zeitraum mit WLAN, 7.29) und 1.3b0.5 (Cloud-Backup
+- **V1.3b3** (`versionCode` 19), installiert am 2026-11-13: Etappe A aus Review-Lauf 5
+  (Formular-Entwurf übersteht Neuaufbau, F2 auch für eine vorher geplante Prüfung,
+  geänderte Ankunftsregel entscheidet neu, Tests der UI-Verdrahtung). Start ohne Fehler,
+  Alarme neu geplant.
+- Davor V1.3b2 (2026-11-12, Antworten auf Review-Lauf 4), V1.3b1 (2026-11-11): Sitzung mit Timer und Uhr (7.11), davor 1.3b0.6 (Ankunft im Zeitraum mit WLAN, 7.29) und 1.3b0.5 (Cloud-Backup
   Schritte 1–5). Nach dem Start jeweils: Berechtigungen ok, Alarme neu geplant, keine
   Fehler im Diagnose-Log.
 
@@ -21,6 +21,25 @@ Kevins echte Daten; vor dem ersten weiteren Nutzer kommt die Sicherheitsphase (B
 einer Fassung.
 
 ## Offen
+0. **V1.3c0** (`versionCode` 20, Etappe B aus Review-Lauf 5) auf `feature/v1.3c0`
+   umgesetzt, **noch nicht installiert**: Zeit-Regel und Lesen über das Repository (E21),
+   `Database.kt` geteilt (E23), die Engine beendet Alarme auch, wenn das System einen
+   Termin schließt (E17, Frage 3), Sitzungsantworten aus dem Core (E18), `AppGraph.rebuild`
+   und `CloudWiring` (E19), `Scheduler` mit `Arrivals` und `SessionTimer` (E20). Review-Lauf 6
+   (`.review/runs/2026-11-13.md`) mit 7 Fixes, u. a. Entwurf nach Start aus Widget oder
+   Benachrichtigung, Übersicht beim Öffnen der App nicht mehr auf morgen, „+x min“ auf
+   einer alten Benachrichtigung räumt sie ab. Am Gerät nach der Installation: ein
+   verpasster Termin und ein Notaus-Skip nehmen die Benachrichtigung mit; ein abgelehnter
+   Knopf in der Benachrichtigung lässt sie stehen; die Morgenübersicht kommt, auch wenn die
+   App kurz nach ihrer Zeit geöffnet wird; einen Punkt aus der Benachrichtigung eines
+   klingelnden Vollbild-Alarms abhaken und im Vollbild den Nachweis starten: der nächste
+   Punkt bzw. „Nachweis läuft“ bleibt stehen (Lauf 6, E26); K33 und K34. Die Antworten auf
+   Lauf 6 (Kap. 9, 2026-11-13) sind umgesetzt: Ein verschobener Termin wartet nach
+   geänderter Ankunftsregel wieder auf die Ankunft; *Teilschritt* ohne Bildschirm nur ohne
+   Nachweis-Pflicht. Darauf aufbauend **V1.3c1** (`versionCode` 21, `feature/v1.3c1`, noch
+   nicht installiert): Verschiebe-Limit pro Termin, Woche oder Monat (Z2b), Schema 11. Am
+   Gerät: einen Reminder auf „1× pro Woche“ stellen, verschieben; der nächste Termin zeigt
+   „wieder ab Mo …“ ausgegraut (K35).
 1. **Gerätetests** aus [geraetetest.md](geraetetest.md): K15, K23–K26 (vorher *Zuhause* in
    *Orte* mit WLAN neu festlegen), K27–K30 (Sitzung, dabei: zeigt die Uhr den
    Chronometer?), K31, K32. In den nächsten Tagen im `diag.log` prüfen, dass keine Ankunft mehr direkt nach
@@ -40,8 +59,17 @@ einer Fassung.
 6. **Versionsname** je installiertem Stand `1.3b<n>-backup<Schritt>`, `versionCode` +1.
 7. **Play-Store-Release** ohne Eile, frühestens mit V2 (7.28 PS5–PS9). Branch-Regel für
    `main` setzt Kevin.
+8. **Vor der Sicherheitsphase** (Backend-Prüfung 2026-11-12; Liste „Vorher fertig“ in
+   Backend `docs/b2b-entwurf.md`): A-15 neu (Papier als Standard, Hinweis vor dem
+   Speichern), *Konto löschen*, Bestätigung mit der Displaysperre für *Cloud-Daten
+   löschen*, *Konto löschen* und *Gerät sperren*; Format v2 kommt über `client/`.
+9. **Repo veröffentlichen** (in Wochen bis Monaten, 7.34): keine Secrets gefunden.
+   App und Backend sollen in den nächsten Wochen öffentlich werden. Erledigt: Zugang nur
+   nach Freigabe, Kostengrenzen und konfigurierbarer Server (OV1), echte Testdaten nur
+   lokal (OV2), Lizenz Apache-2.0 (OV3), Doku bereinigt (OV8). Offen: für die App eine bereinigte Historie in einem neuen Repo (OV5: Arbeits-Adresse,
+   Testdaten), kurz vorher OV6 und OV7.
 
 ## Beobachtungen aus der echten Nutzung
-- „Test-Reminder“ klingelte am 2026-10-31 in Runden um 11:30 und 12:00; prüfen, ob das zur
+- Ein Reminder klingelte am 2026-10-31 in Runden um 11:30 und 12:00; prüfen, ob das zur
   eingestellten Eskalation passt.
 - Morgen-Übersicht steht auf 8:00; vermutlich von Kevin so eingestellt.

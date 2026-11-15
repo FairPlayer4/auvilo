@@ -24,13 +24,18 @@ import java.time.format.DateTimeFormatter
 object Undo {
     const val TIMEOUT_MS = 60_000L
 
+    /** The engine's reason when a session is past its maximum ([Lifecycle.transition]). */
+    private const val MAX_REACHED = "maximum duration reached"
+
     /** Own id: the alarm's foreground notification goes asynchronously and would take it along. */
     fun id(occurrenceId: Long): Int = Notifications.id(occurrenceId) + 1_000_000_000
 
     /** Offers "Rückgängig" if [occurrence] was just done or skipped by hand. */
     suspend fun offer(context: Context, occurrence: Occurrence) {
-        if (!Lifecycle.canReopen(occurrence)) return
-        val title = context.graph.repository.reminder(occurrence.reminderId)?.title ?: return
+        val reminder = context.graph.repository.reminder(occurrence.reminderId) ?: return
+        // An aborted session only before its maximum, as "Heute" and the engine (Review-Lauf 6).
+        if (!Lifecycle.canReopen(reminder, occurrence, context.graph.now())) return
+        val title = reminder.title
         val what = when {
             occurrence.state == OccurrenceState.DONE -> "erledigt"
             occurrence.resolution == Resolution.ABORTED -> "abgebrochen"
@@ -53,6 +58,7 @@ object Undo {
         is TransitionResult.Ok -> result.occurrence.startedAt?.takeIf { result.occurrence.isRunning }
             ?.let { "Die Sitzung läuft weiter, seit ${time(it, zone)}." }
             ?: "Klingelt wieder um ${time(result.occurrence.currentAt, zone)}."
+        is TransitionResult.Rejected if result.reason == MAX_REACHED -> "Geht nicht mehr: Die Sitzung hat ihre maximale Dauer erreicht."
         else -> "Geht nicht mehr: Der nächste Termin läuft schon, oder es wäre nach dem Ende des Tages."
     }
 

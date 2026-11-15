@@ -20,6 +20,7 @@ import com.avlreminder.restore.NewerDatabase
 import com.avlreminder.restore.RestoreBusy
 import com.avlreminder.verbindung.AnmeldungAbgelehnt
 import com.avlreminder.verbindung.GeraetGesperrt
+import com.avlreminder.verbindung.KontoNichtFreigegeben
 import com.avlreminder.verbindung.NichtAngemeldet
 import com.avlreminder.verbindung.Serverfehler
 import com.avlreminder.verbindung.SitzungAbgelehnt
@@ -43,7 +44,8 @@ object CloudErrors {
 
     /** Errors after which this device can do nothing more on the server ("Cloud-Daten löschen"). */
     fun cannotActOnServer(e: Throwable): Boolean =
-        e is GeraetNichtFreigeschaltet || e is GeraetGesperrt || e is AnmeldungAbgelehnt || e is NichtAngemeldet
+        e is GeraetNichtFreigeschaltet || e is GeraetGesperrt || e is AnmeldungAbgelehnt || e is NichtAngemeldet ||
+            e is KontoNichtFreigegeben
 
     /**
      * For the diag log: the kind of error and what Google or the server said about it. The
@@ -63,6 +65,9 @@ object CloudErrors {
         is NoCredentialException -> "Kein Google-Konto gefunden. Im Handy ein Google-Konto einrichten und erneut versuchen."
         is GetCredentialException -> "Anmeldung bei Google gescheitert (${e.type})."
         is AnmeldungAbgelehnt -> "Der Server hat die Anmeldung abgelehnt. Bitte neu anmelden."
+        // KRITISCH: The identifier is what the operator needs to let the account in (backend ID7);
+        // without it the person could not ask for access.
+        is KontoNichtFreigegeben -> notAllowed(e.kennung)
         // Renewed once already (CloudServer.withSession) and rejected again.
         is SitzungAbgelehnt -> "Der Server hat die Sitzung abgelehnt. Später erneut versuchen oder neu anmelden."
         is GeraetGesperrt -> "Dieses Gerät ist beim Server gesperrt."
@@ -86,17 +91,26 @@ object CloudErrors {
         is IOException -> "Kein Netz oder Server nicht erreichbar."
         else -> "Unerwarteter Fehler (${e::class.simpleName})."
     }
+
+    /**
+     * The server lets in only the Google accounts on its list (backend ID7). The identifier is a
+     * pseudonym of the Google account (no address, no name), so it may be shown and passed on.
+     */
+    fun notAllowed(kennung: String?): String =
+        "Dieses Google-Konto ist für den Server nicht freigegeben." +
+            (kennung?.let { " Zum Freigeben diese Kennung an den Betreiber geben: $it" } ?: "")
 }
 
 /** The kind of error, for [CloudEvent.FAILED]; the same split as [CloudErrors.describe]. */
 enum class FailureKind {
-    GOOGLE, REJECTED, LOCKED, SIGNED_OUT, NOT_UNLOCKED, SETUP_CANCELLED, OTHER_ACCOUNT, TOO_LARGE, DAILY_LIMIT,
+    GOOGLE, REJECTED, NOT_ALLOWED, LOCKED, SIGNED_OUT, NOT_UNLOCKED, SETUP_CANCELLED, OTHER_ACCOUNT, TOO_LARGE, DAILY_LIMIT,
     OLDER_BACKUP, CHANGED_MEANWHILE, NEWER_SCHEMA, DIAGNOSIS_NOT_ALLOWED, SERVER, NETWORK, DAMAGED, BUSY, OTHER;
 
     companion object {
         fun of(e: Throwable) = when (e) {
             is GetCredentialException, is CreateCredentialException -> GOOGLE
             is AnmeldungAbgelehnt, is SitzungAbgelehnt -> REJECTED
+            is KontoNichtFreigegeben -> NOT_ALLOWED
             is GeraetGesperrt -> LOCKED
             is NichtAngemeldet -> SIGNED_OUT
             is GeraetNichtFreigeschaltet -> NOT_UNLOCKED

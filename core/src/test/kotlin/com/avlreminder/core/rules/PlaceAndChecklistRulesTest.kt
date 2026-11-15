@@ -122,12 +122,15 @@ class PlaceAndChecklistRulesTest {
         assertEquals(to, res.occurrence.currentAt)
         assertEquals(0, res.occurrence.postponeCount)
         assertEquals(EventType.DEFERRED, res.event.type)
+        assertEquals(to.toString(), res.event.detail)
     }
 
     @Test
     fun `deferring without progress today counts against the postpone limit`() {
         val res = ok(Lifecycle.transition(r, due, Action.DeferRest(at(27, 18)), now))
         assertEquals(1, res.occurrence.postponeCount)
+        // Marked, so a limit per week or month counts it (Z2b).
+        assertEquals(at(27, 18).toString() + Lifecycle.COUNTED, res.event.detail)
         rejected(Lifecycle.transition(r, res.occurrence.copy(state = DUE), Action.DeferRest(at(28, 18)), now))
     }
 

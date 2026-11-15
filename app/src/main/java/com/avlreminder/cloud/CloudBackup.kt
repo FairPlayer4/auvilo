@@ -19,6 +19,7 @@ import com.avlreminder.protokoll.Wiederhergestellt
 import com.avlreminder.restore.RestoreKind
 import com.avlreminder.restore.RestoreTarget
 import com.avlreminder.verbindung.AnmeldungAbgelehnt
+import com.avlreminder.verbindung.KontoNichtFreigegeben
 import com.avlreminder.verbindung.Sitzung
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.CoroutineScope
@@ -69,6 +70,8 @@ class CloudBackup(
     private val reminders: suspend () -> Int,
     private val log: (String) -> Unit = {},
     private val clock: () -> Instant = Instant::now,
+    /** Built with a server ([CloudConfig.configured]); without one nothing runs in the cloud. */
+    private val configured: Boolean = true,
 ) {
     private val state = MutableStateFlow(CloudStatus(CloudPhase.Off))
     val status: StateFlow<CloudStatus> = state.asStateFlow()
@@ -427,6 +430,13 @@ class CloudBackup(
      * older than 3 days ([AutomaticBackup.checkStale]).
      */
     suspend fun backUpAutomatically() {
+        // KRITISCH: An app built without a server (installed over one with the cloud backup)
+        // stops the hourly backup instead of trying an empty address every hour.
+        if (!configured) {
+            schedule.stop()
+            log("cloud: no server in this build, hourly backup stopped")
+            return
+        }
         work(CloudStep.AUTO_BACKUP, clearNotes = false) { automatic.run(::busy) }.join()
         try {
             automatic.checkStale()
@@ -573,7 +583,9 @@ class CloudBackup(
                 } catch (e: CancellationException) {
                     throw e
                 } catch (e: Throwable) {
-                    if (e is AnmeldungAbgelehnt) {
+                    // A withdrawn approval (backend ID7) ends the session like a rejection: renewing
+                    // fails until the operator lets the account in again and the person signs in.
+                    if (e is AnmeldungAbgelehnt || e is KontoNichtFreigegeben) {
                         store.forgetSession()
                         // KRITISCH: without a session the hourly backup stops for good; the person
                         // must learn it at once, not only from the notice after 3 days (A-13).

@@ -11,6 +11,7 @@ import com.avlreminder.core.model.ChecklistItem
 import com.avlreminder.core.model.EventType
 import com.avlreminder.core.model.OccurrenceState
 import com.avlreminder.core.model.Place
+import com.avlreminder.core.model.PlaceWifi
 import com.avlreminder.core.model.ProofSpec
 import com.avlreminder.core.model.ProofType
 import com.avlreminder.core.model.Reminder
@@ -318,5 +319,25 @@ class PlacesAndChecklistsEngineTest {
         clock.now = at(28, 9)
         engine.act(o, Action.Complete(false))
         assertEquals(at(2, 18, month = 11), open(id).dueAt)
+    }
+
+    // --- "Hier festlegen" (E19) -------------------------------------------------------------
+
+    @Test
+    fun `setting a place here keeps what was not found`() = runTest {
+        val wlan = listOf(PlaceWifi("aa:bb:cc:dd:ee:ff", "Heim"))
+        assertNull(engine.setPlaceHere(null, "Zuhause", null, null, wlan), "a new place needs a position")
+        assertNull(engine.setPlaceHere(null, "Zuhause", null, null, null))
+
+        val id = engine.setPlaceHere(null, " ", 48.1, 11.5, null)!!
+        assertEquals(Place(id, "Ort", 48.1, 11.5), repo.places().single())
+
+        assertEquals(id, engine.setPlaceHere(id, "Zuhause", null, null, wlan))
+        assertEquals(Place(id, "Zuhause", 48.1, 11.5, wifis = wlan), repo.places().single())
+
+        engine.savePlace(repo.places().single().copy(radiusMeters = 300))
+        assertEquals(id, engine.setPlaceHere(id, "", 48.2, 11.6, null))
+        assertEquals(Place(id, "Zuhause", 48.2, 11.6, 300, wlan), repo.places().single())
+        assertNull(engine.setPlaceHere(id, "Zuhause", null, null, null), "nothing found: nothing changes")
     }
 }

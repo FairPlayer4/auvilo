@@ -1,5 +1,6 @@
 package com.avlreminder.ui.screens
 
+import com.avlreminder.core.model.PostponePeriod
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
@@ -243,7 +244,7 @@ fun AlarmContent(
                         OutlinedButton(
                             onClick = { view = View.POSTPONE }, enabled = ui.canPostpone, modifier = Modifier.weight(1f).testTag("postpone"),
                         ) {
-                            Text("Verschieben\n" + (ui.postponesLeft?.let { if (it == 0) "aufgebraucht" else "noch ${it}×" } ?: "beliebig"))
+                            Text("Verschieben\n" + PostponeText.button(ui, zone))
                         }
                         OutlinedButton(onClick = { view = View.SKIP }, modifier = Modifier.weight(1f).testTag("skip")) { Text("Auslassen\nmit Grund") }
                     }
@@ -415,6 +416,28 @@ private fun ProofStep(
     TextButton(onClick = onBack) { Text("Zurück", color = c.muted) }
 }
 
+/** What the alarm says about the postpone limit (Z2b): what is left, and when it works again. */
+internal object PostponeText {
+    /** " diese Woche", " diesen Monat"; nothing per occurrence. */
+    fun period(p: PostponePeriod): String = when (p) {
+        PostponePeriod.OCCURRENCE -> ""
+        PostponePeriod.WEEK -> " diese Woche"
+        PostponePeriod.MONTH -> " diesen Monat"
+    }
+
+    /** The button's second line: "noch 2× diese Woche", "beliebig", "aufgebraucht", "wieder ab Mo 02.11.". */
+    fun button(ui: AlarmView, zone: ZoneId): String {
+        val left = ui.postponesLeft ?: return "beliebig"
+        if (left > 0) return "noch $left×" + period(ui.reminder.postponePeriod)
+        return ui.postponeAgainAt?.let { "wieder ab " + Format.shortDay(it.atZone(zone).toLocalDate()) } ?: "aufgebraucht"
+    }
+
+    /** After the title in the step: " · noch 2× diese Woche", " · letzte Verschiebung". */
+    fun step(ui: AlarmView): String = ui.postponesLeft
+        ?.let { (if (it == 1) " · letzte Verschiebung" else " · noch $it×") + period(ui.reminder.postponePeriod) }
+        .orEmpty()
+}
+
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 private fun PostponeStep(ui: AlarmView, now: Instant, zone: ZoneId, onPostpone: (Instant) -> Unit, onBack: () -> Unit) {
@@ -423,10 +446,7 @@ private fun PostponeStep(ui: AlarmView, now: Instant, zone: ZoneId, onPostpone: 
     var pickedDate by remember { mutableStateOf<java.time.LocalDate?>(null) }
     val today = now.atZone(zone).toLocalDate()
     val left = ui.postponesLeft
-    StepHeader(
-        "Verschieben",
-        ui.reminder.title + (left?.let { if (it == 1) " · letzte Verschiebung" else " · noch ${it}×" } ?: ""),
-    )
+    StepHeader("Verschieben", ui.reminder.title + PostponeText.step(ui))
     val evening = today.atTime(20, 30).atZone(zone).toInstant()
     val tomorrow = today.plusDays(1).atTime(ui.occurrence.dueAt.atZone(zone).toLocalTime()).atZone(zone).toInstant()
     // In advance from the planned time: 18:00 "+1 Std" is 19:00, whenever one taps (7.32 VB2).
@@ -460,7 +480,10 @@ private fun PostponeStep(ui: AlarmView, now: Instant, zone: ZoneId, onPostpone: 
     }
     OutlinedButton(onClick = { pickDate = true }, Modifier.fillMaxWidth().padding(vertical = 4.dp)) { Text("Datum und Uhrzeit wählen …") }
     if (left == 1) {
-        Text("Danach bleiben nur noch Erledigt, Minimum oder Auslassen.", Modifier.padding(top = 12.dp), color = c.muted, fontSize = 13.sp)
+        Text(
+            "Danach bleiben${PostponeText.period(ui.reminder.postponePeriod)} nur noch Erledigt, Minimum oder Auslassen.",
+            Modifier.padding(top = 12.dp), color = c.muted, fontSize = 13.sp,
+        )
     }
     TextButton(onClick = onBack, Modifier.padding(top = 8.dp)) { Text("Abbrechen", color = c.muted) }
     ConfirmEarlyPostpone(confirm, zone, today, onConfirm = { confirm = null; onPostpone(it) }, onDismiss = { confirm = null })

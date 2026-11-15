@@ -5,12 +5,12 @@ import android.app.Notification
 import android.app.NotificationManager
 import androidx.test.core.app.ApplicationProvider
 import androidx.test.ext.junit.runners.AndroidJUnit4
-import com.avlreminder.AvlApp
 import com.avlreminder.TestClock
 import com.avlreminder.core.model.Occurrence
 import com.avlreminder.core.model.OccurrenceState
 import com.avlreminder.core.model.Reminder
 import com.avlreminder.core.model.Schedule
+import com.avlreminder.core.rules.Action
 import com.avlreminder.graph
 import com.avlreminder.settle
 import kotlinx.coroutines.runBlocking
@@ -42,7 +42,6 @@ class AlarmCleanupTest {
     @Before
     fun setUp() {
         TestClock.at()
-        runBlocking { (app as AvlApp).started.join() }
         ShadowLooper.idleMainLooper()
     }
 
@@ -65,7 +64,7 @@ class AlarmCleanupTest {
         Notifications.show(app, AlarmInfo(o, "Katzenbrunnen", null, quickDone = true), quiet = false)
         assertNotNull(shown(o))
 
-        assertEquals(true, runBlocking { graph.withoutAlarm(o) { it.setActive(id, false) } })
+        assertEquals(true, runBlocking { graph.withEngine { it.setActive(id, false) } })
         graph.settle()
 
         assertNull(shown(o))
@@ -76,8 +75,8 @@ class AlarmCleanupTest {
         val (_, o) = due()
         Notifications.show(app, AlarmInfo(o, "Katzenbrunnen", null, quickDone = true), quiet = false)
 
-        // So meldet die Engine eine abgelehnte Pause (laufende Sitzung).
-        runBlocking { graph.withoutAlarm(o) { false } }
+        // Eine abgelehnte Aktion auf einem offenen Termin beendet nichts (E17).
+        runBlocking { graph.withEngine { it.act(o, Action.Complete(minimumOnly = true)) } }
         graph.settle()
 
         assertNotNull(shown(o))

@@ -29,6 +29,7 @@ import com.avlreminder.ui.Format
 import com.avlreminder.ui.theme.Avl
 import kotlinx.coroutines.delay
 import java.time.Duration
+import com.avlreminder.SystemZoneClock
 import java.time.Instant
 import java.time.ZoneId
 
@@ -80,16 +81,9 @@ fun SessionMain(
         r.goal?.let { SessionInfo("Ziel", it) }
         r.minimum?.let { SessionInfo("Minimum", it) }
         Spacer(Modifier.height(24.dp))
-        val suggested = session.suggestion
-        val minimum = r.minimum != null || spec?.minimumMinutes != null
         // The suggested answer is the big button (D4); the others stay one tap away, nothing is locked.
-        val order = buildList {
-            add(suggested)
-            if (!session.final) add(SessionAnswer.STILL_ON)
-            add(SessionAnswer.DONE)
-            if (minimum) add(SessionAnswer.MINIMUM)
-        }.distinct().filter { it != SessionAnswer.STILL_ON || !session.final }
-        order.forEachIndexed { i, answer ->
+        // Which answers and in what order comes from core, as in the notification (E18).
+        ui.sessionAnswers.forEachIndexed { i, answer ->
             val (text, tag, action) = when (answer) {
                 SessionAnswer.STILL_ON -> Triple("Noch dran", "stillOn", onStillOn)
                 SessionAnswer.DONE -> Triple("Fertig", "sessionDone") { onComplete(false) }
@@ -114,9 +108,10 @@ fun SessionMain(
 /** The current time, every second, for the timer. */
 @Composable
 private fun ticking(): Instant {
-    val now by produceState(Instant.now()) {
+    // The engine's clock, as everywhere the app decides by time (design.md 1).
+    val now by produceState(SystemZoneClock.instant()) {
         while (true) {
-            value = Instant.now()
+            value = SystemZoneClock.instant()
             delay(1_000)
         }
     }
