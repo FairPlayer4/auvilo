@@ -108,8 +108,27 @@ betrifft P4.
   - Repo- und Dateinamen, Texte in der Doku; im Backend Paketname und Namen prüfen
     (`backend.md`);
   - Wortmarke „AuViLo“ anmelden, falls der Store kommt (Kevin entscheidet).
-- N2 **Texte im Code**: rund 300 feste Texte in Compose, `strings.xml` fast leer. Für eine
-  deutsche Fassung kein Muss; für eine zweite Sprache später Pflicht.
+- N2 **Texte im Code**: für eine deutsche Fassung kein Muss, für eine zweite Sprache Pflicht.
+  Bewertung vom 2026-11-15 (V1.3c8): kein großer Umbau, aber eine eigene Etappe von etwa
+  4–6 Sitzungen.
+  - Umfang: rund 250 feste Texte in `app` (davon 45 im Formular, etwa 40 mit Platzhaltern,
+    einige Mehrzahlformen in `Format.kt`), etwa 120 in `core` (Prüfmeldungen in `Changes.kt`,
+    Vorlagen in `Presets.kt`, Texte in `Lifecycle`, `Digest`, `Proofs`), dazu feste
+    Datumsformate (`dd.MM.`) und Benachrichtigungen, Widget und Worker außerhalb von Compose.
+  - Mechanisch: `app`-Texte nach `values/strings.xml` (Deutsch bleibt Standard, Englisch in
+    `values-en/`), in Compose `stringResource`/`pluralStringResource`, sonst `getString`. Die
+    Tests mit deutschen Texten bleiben gültig, weil Deutsch der Standard bleibt.
+  - Umbau: `core` hat keine Android-Ressourcen und liefert heute fertige Sätze; dafür
+    Kennungen (z. B. `Problem.TITLE_MISSING`) statt Texten, übersetzt in `app`.
+  - Heikel: Einige Texte sind **gespeicherte Daten** und werden verglichen, z. B.
+    `Prep.READY_YES` („Ja, sofort“, Antwort in der DB), `Lifecycle.COUNTED`, die
+    Abschluss-Gründe in `Blockers` („pausiert“, „Notaus“). Sie bleiben als feste Kennungen in
+    der DB und werden erst bei der Anzeige übersetzt; sonst braucht es eine Migration.
+  - Danach kostet jeder neue Text zwei Fassungen; eine Regel wie `ClockRuleTest` verhindert
+    neue feste Texte. Store-Eintrag, Datenschutzerklärung und Erklärungen kommen pro Sprache
+    dazu.
+  - Empfehlung: jetzt nicht. Die erste Play-Fassung auf Deutsch (DE, AT, CH) braucht es nicht;
+    vor einer englischen Fassung als eigene Etappe, zuerst `core` auf Kennungen.
 - N3 **Einstieg für Fremde**: Die App setzt Kevins Wissen voraus. Für Tester fehlt ein
   kurzer Einstieg (erster Reminder, Berechtigungen der Reihe nach, wofür sie gut sind;
   passt zu PS6) und eine Kontaktmöglichkeit für Rückmeldungen.
