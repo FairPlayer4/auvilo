@@ -120,9 +120,10 @@ die Offenlegung in der App und die Datenschutzerklärung. Feldnamen vor dem Einr
 > leaves the device: no server, no ads, no analytics. Without the permission the reminder
 > rings at its latest time, and the app works as a plain alarm clock.
 
-**Offenlegung in der App (fehlt noch im Code):** ein eigener Bildschirm vor dem Systemdialog,
-wenn ein Reminder zum ersten Mal *Bei Ankunft* bekommt oder in der Berechtigungsliste
-*Standort „Immer erlauben“* angetippt wird. Text-Entwurf:
+**Offenlegung in der App (umgesetzt in V1.3c7, `LocationDisclosure`):** ein eigener Dialog
+vor Androids Dialog, wenn in der Berechtigungsliste *Standort „Immer erlauben“* angetippt wird
+(der einzige Weg, auf dem die App nach dem Standort im Hintergrund fragt; der Punkt erscheint,
+sobald ein Reminder *Bei Ankunft* hat). Text:
 
 > **Standort im Hintergrund**
 > AuViLo-Reminder nutzt deinen Standort und das verbundene WLAN, um zu erkennen, wann du an
@@ -136,7 +137,8 @@ wenn ein Reminder zum ersten Mal *Bei Ankunft* bekommt oder in der Berechtigungs
 
 **Video (Drehbuch, unter 30 s):**
 1. App öffnen, *Einstellungen → Orte*, *Hier festlegen* für „Zuhause“ (mit Testort).
-2. Einen Reminder mit *Bei Ankunft* anlegen; die Offenlegung erscheint, *Weiter*.
+2. Einen Reminder mit *Bei Ankunft* anlegen; *Einstellungen → Berechtigungen → Standort
+   „Immer erlauben“ → Erteilen*; der Hinweis erscheint, *Weiter*.
 3. Androids Dialog, *Immer erlauben* wählen.
 4. Mit geschlossener App am Ort ankommen bzw. das WLAN verbinden: der Reminder klingelt.
 

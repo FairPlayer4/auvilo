@@ -1,9 +1,15 @@
 package com.avlreminder.ui
 
 import android.app.Application
+import android.Manifest
 import android.content.Context
 import androidx.compose.ui.test.hasSetTextAction
+import androidx.compose.ui.test.hasTestTag
 import androidx.compose.ui.test.hasText
+import androidx.compose.ui.test.onNodeWithTag
+import androidx.compose.ui.test.onNodeWithText
+import androidx.compose.ui.test.performClick
+import androidx.compose.ui.test.performScrollTo
 import androidx.compose.ui.test.junit4.v2.createEmptyComposeRule
 import androidx.compose.ui.test.performTextReplacement
 import androidx.lifecycle.Lifecycle
@@ -13,15 +19,21 @@ import androidx.test.core.app.ApplicationProvider
 import androidx.test.ext.junit.runners.AndroidJUnit4
 import com.avlreminder.TestClock
 import com.avlreminder.alarm.ExactAlarms
+import com.avlreminder.core.model.Arrival
+import com.avlreminder.core.model.Place
 import com.avlreminder.core.model.Reminder
 import com.avlreminder.core.model.Schedule
 import com.avlreminder.graph
+import com.avlreminder.ui.screens.LocationDisclosure
 import kotlinx.coroutines.runBlocking
 import org.junit.After
+import org.junit.Assert.assertEquals
+import org.junit.Assert.assertNull
 import org.junit.Before
 import org.junit.Rule
 import org.junit.Test
 import org.junit.runner.RunWith
+import org.robolectric.Shadows.shadowOf
 import org.robolectric.shadows.ShadowAlarmManager
 import org.robolectric.shadows.ShadowLooper
 import java.time.LocalTime
@@ -85,6 +97,62 @@ class MainActivityTest {
             scenario.moveToState(Lifecycle.State.STARTED)
             scenario.moveToState(Lifecycle.State.RESUMED)
             compose.waitUntil(5_000) { exactAlarmsWarning().isEmpty() }
+        }
+    }
+
+    /** A reminder waiting for the arrival at home: only then the list asks for the location. */
+    private fun arrivalReminder() = runBlocking {
+        val home = context.graph.withEngine { it.savePlace(Place(name = "Zuhause", lat = 48.1, lon = 11.5)) }
+        context.graph.repository.saveReminder(
+            Reminder(
+                title = "Training", schedule = Schedule.Daily(LocalTime.of(19, 30)), createdAt = TestClock.now(),
+                arrival = Arrival(home),
+            ),
+        )
+    }
+
+    private fun lastRequested(scenario: ActivityScenario<MainActivity>): List<String>? {
+        var requested: List<String>? = null
+        scenario.onActivity { requested = shadowOf(it).lastRequestedPermission?.requestedPermissions?.toList() }
+        return requested
+    }
+
+    private fun tapGrantLocation() {
+        val grant = "grant:Standort „Immer erlauben“"
+        compose.waitUntil(5_000) { compose.onAllNodes(hasTestTag(grant)).fetchSemanticsNodes().isNotEmpty() }
+        compose.onNodeWithTag(grant).performScrollTo().performClick()
+        compose.waitForIdle()
+    }
+
+    /**
+     * Anf. 7.28 PS13, playstore.md P5: Google Play wants the app's own words on the location in the
+     * background before Android's dialog; "Weiter" asks Android, precise position first.
+     */
+    @Test
+    fun theDisclosureComesBeforeAndroidAsksForTheLocation() {
+        arrivalReminder()
+        ActivityScenario.launch<MainActivity>(MainActivity.openSettings(context)).use { scenario ->
+            tapGrantLocation()
+            compose.onNodeWithText(LocationDisclosure.TITLE).assertExists()
+            compose.onNodeWithText("auch wenn die App geschlossen ist", substring = true).assertExists()
+            assertNull("nothing asked before the disclosure", lastRequested(scenario))
+
+            compose.onNodeWithText(LocationDisclosure.CONTINUE).performClick()
+            compose.waitForIdle()
+            assertEquals(listOf(Manifest.permission.ACCESS_FINE_LOCATION, Manifest.permission.ACCESS_COARSE_LOCATION), lastRequested(scenario))
+            assertEquals(0, compose.onAllNodes(hasText(LocationDisclosure.TITLE)).fetchSemanticsNodes().size)
+        }
+    }
+
+    @Test
+    fun notNowAsksNothing() {
+        arrivalReminder()
+        ActivityScenario.launch<MainActivity>(MainActivity.openSettings(context)).use { scenario ->
+            tapGrantLocation()
+            compose.onNodeWithText(LocationDisclosure.LATER).performClick()
+            compose.waitForIdle()
+            assertEquals(0, compose.onAllNodes(hasText(LocationDisclosure.TITLE)).fetchSemanticsNodes().size)
+            assertNull(lastRequested(scenario))
         }
     }
 }

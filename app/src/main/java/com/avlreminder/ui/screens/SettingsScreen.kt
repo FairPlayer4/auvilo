@@ -268,7 +268,7 @@ fun SettingsScreen(
                             Text(p.why, color = c.muted, fontSize = 13.sp)
                         }
                         if (p.granted) Text("erteilt", color = c.muted, fontSize = 14.sp)
-                        else TextButton(onClick = p.request) { Text("Erteilen", color = c.accent, fontWeight = FontWeight.SemiBold) }
+                        else TextButton(onClick = p.request, Modifier.testTag("grant:${p.label}")) { Text("Erteilen", color = c.accent, fontWeight = FontWeight.SemiBold) }
                     }
                 }
             }

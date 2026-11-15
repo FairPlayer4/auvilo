@@ -42,6 +42,7 @@ import com.avlreminder.data.ThemeMode
 import com.avlreminder.location.hasBackgroundLocation
 import com.avlreminder.system.Battery
 import com.avlreminder.location.hasLocation
+import com.avlreminder.ui.screens.LocationDisclosureDialog
 import com.avlreminder.ui.screens.PermissionItem
 import com.avlreminder.ui.theme.AvlTheme
 import com.avlreminder.ui.theme.isDark
@@ -79,6 +80,9 @@ class MainActivity : ComponentActivity() {
     private var permissions by mutableStateOf(emptyList<PermissionItem>())
     private var startRoute by mutableStateOf(Routes.TODAY)
     private var launch by mutableIntStateOf(0)
+
+    /** Google Play's prominent disclosure before Android's location dialog (Anf. 7.28 PS13). */
+    private var locationDisclosure by mutableStateOf(false)
 
     /** Precise position first; "Immer erlauben" can only be asked for afterwards. */
     private val requestLocation = registerForActivityResult(ActivityResultContracts.RequestMultiplePermissions()) { refreshPermissions() }
@@ -148,6 +152,15 @@ class MainActivity : ComponentActivity() {
                         zone = ZoneId.systemDefault(),
                         startRoute = startRoute,
                         recorder = { onRecorded -> AudioRecorder("motivation", "● Botschaft aufnehmen", onRecorded) },
+                    )
+                }
+                if (locationDisclosure) {
+                    LocationDisclosureDialog(
+                        onContinue = {
+                            locationDisclosure = false
+                            requestBackgroundLocation()
+                        },
+                        onLater = { locationDisclosure = false },
                     )
                 }
             }
@@ -275,6 +288,15 @@ class MainActivity : ComponentActivity() {
         }
     }
 
+    /** Precise position first; "Immer erlauben" can only be asked for once it is granted. */
+    private fun requestBackgroundLocation() {
+        if (!hasLocation()) {
+            requestLocation.launch(arrayOf(Manifest.permission.ACCESS_FINE_LOCATION, Manifest.permission.ACCESS_COARSE_LOCATION))
+        } else {
+            requestPermission.launch(Manifest.permission.ACCESS_BACKGROUND_LOCATION)
+        }
+    }
+
     private fun granted(permission: String) = checkSelfPermission(permission) == PackageManager.PERMISSION_GRANTED
 
     private fun openSettings(action: String) {
@@ -312,14 +334,11 @@ class MainActivity : ComponentActivity() {
                 requestPermission.launch(Manifest.permission.RECORD_AUDIO)
             },
             // Only asked for when a reminder waits for the arrival at home.
+            // Android's dialog only after the app's own disclosure (Anf. 7.28 PS13, playstore.md P5).
             if (!locationNeeded) null else PermissionItem(
                 "Standort „Immer erlauben“", "für die Ankunft an einem Ort (Standort und WLAN); bleibt auf dem Handy", hasBackgroundLocation(),
             ) {
-                if (!hasLocation()) {
-                    requestLocation.launch(arrayOf(Manifest.permission.ACCESS_FINE_LOCATION, Manifest.permission.ACCESS_COARSE_LOCATION))
-                } else {
-                    requestPermission.launch(Manifest.permission.ACCESS_BACKGROUND_LOCATION)
-                }
+                locationDisclosure = true
             },
             // Only asked for when a reminder should ring despite "Nicht stören".
             if (!dndNeeded) null else PermissionItem(
