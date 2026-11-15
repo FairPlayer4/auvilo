@@ -75,7 +75,7 @@ class MainActivity : ComponentActivity() {
                 .addFlags(Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_CLEAR_TOP)
     }
 
-    private val vm: AppViewModel by viewModels()
+    private val vm: AppViewModel by viewModels { AppViewModel.Factory }
     private var permissions by mutableStateOf(emptyList<PermissionItem>())
     private var startRoute by mutableStateOf(Routes.TODAY)
     private var launch by mutableIntStateOf(0)

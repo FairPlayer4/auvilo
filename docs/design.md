@@ -707,6 +707,13 @@ umgesetzt / verworfen. Liste in den Einstellungen, *Teilen* als Markdown.
   jedes offenen Termins, öffnet und speichert jeden Reminder im Formular (Round-Trip) und
   spielt eine Woche sowie zwei Tage mit ausgeschaltetem Handy durch. `Fakes` und `Simulation` liegen dafür in den Testhilfen von `core`
   (`src/testFixtures`, `java-test-fixtures`), die `:app` in den Tests mitbenutzt.
+- **Robolectric-Isolation:** Jeder Test bekommt eine neue, fertig gestartete App
+  (`StartedAvlApp`, `robolectric.properties`) mit eigener Datenbank, statische Felder
+  bleiben aber über Tests hinweg stehen. Deshalb baut `MainActivity` ihr ViewModel mit
+  `AppViewModel.Factory` aus der eigenen Application; Androids Standard-Factory merkt sich die
+  erste Application statisch, und das ViewModel las dann die Datenbank eines früheren Tests
+  (2026-11-15). `MainActivityTest` belegt diesen Singleton vor jedem Test mit einer fremden
+  Application.
 
 - Tests entstehen mit dem Code; Regeln haben sprechende Testnamen.
 - Ein Befehl für alles, lokal wie in CI:

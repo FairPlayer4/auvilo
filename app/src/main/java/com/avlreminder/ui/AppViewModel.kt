@@ -4,6 +4,9 @@ import android.widget.Toast
 import com.avlreminder.PlaceSetResult
 import android.app.Application
 import androidx.lifecycle.AndroidViewModel
+import androidx.lifecycle.ViewModelProvider
+import androidx.lifecycle.viewmodel.initializer
+import androidx.lifecycle.viewmodel.viewModelFactory
 import androidx.lifecycle.viewModelScope
 import com.avlreminder.core.model.Blocker
 import com.avlreminder.core.model.ItemDone
@@ -48,6 +51,18 @@ import java.time.ZoneId
 
 /** Screen state straight from the database flows; all changes go through the engine. */
 class AppViewModel(app: Application) : AndroidViewModel(app) {
+    companion object {
+        /**
+         * Builds the view model with the activity's own application. Android's default factory keeps
+         * the first application it saw in a static singleton (`AndroidViewModelFactory.getInstance`);
+         * in Robolectric every test has a new one, and the view model read the database of an earlier
+         * test (MainActivityTest, 2026-11-15).
+         */
+        val Factory = viewModelFactory {
+            initializer { AppViewModel(checkNotNull(this[ViewModelProvider.AndroidViewModelFactory.APPLICATION_KEY])) }
+        }
+    }
+
     private val graph = app.graph
     /** Templates only; everything of the reminders is read through [repo] (Review-Lauf 5, E21). */
     private val dao = graph.db.dao()
