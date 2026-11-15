@@ -154,7 +154,7 @@ class AlarmGlueTest {
         )
         ShadowLooper.idleMainLooper()
         // The receiver works asynchronously; wait until the engine has written the result.
-        repeat(100) {
+        repeat(500) { // at most ten seconds
             if (graph.repository.occurrence(occurrenceId)?.state == OccurrenceState.DONE) return@runBlocking
             Thread.sleep(20)
             ShadowLooper.idleMainLooper()

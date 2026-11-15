@@ -20,6 +20,7 @@ import org.junit.runner.RunWith
 import java.io.File
 import java.time.Duration
 import java.time.Instant
+import kotlin.time.Duration.Companion.minutes
 
 /**
  * Kevin's real data, pseudonymized (testdata/real-*.json, made by tools/testdata/export_testdata.py):
@@ -37,15 +38,29 @@ class RealDataTest {
     private val data: JSONObject? = File("../testdata").listFiles { f -> f.name.startsWith("real-") && f.name.endsWith(".json") }
         ?.maxByOrNull { it.name }?.let { JSONObject(it.readText()) }
 
+    private companion object {
+        /** Simulating days of all real reminders takes ~30 s alone, more on a busy machine. */
+        val SLOW = 5.minutes
+    }
+
     @After
     fun tearDown() {
         db?.close()
     }
 
-    private fun load(): AvlDatabase {
+    /**
+     * The export, or the test is skipped: testdata/real-*.json is not in the repo (.gitignore),
+     * so the CI has none. Every test reaches the data only through here.
+     */
+    private fun real(): JSONObject {
         val data = data
         assumeTrue("no testdata/real-*.json", data != null)
-        val tables = data!!.getJSONObject("tables")
+        return data!!
+    }
+
+    private fun load(): AvlDatabase {
+        val data = real()
+        val tables = data.getJSONObject("tables")
         SchemaDatabases.create(file, data.getInt("schemaVersion")) { sql ->
             for (table in tables.keys()) {
                 val rows = tables.getJSONArray(table)
@@ -70,16 +85,16 @@ class RealDataTest {
         }
     }
 
-    private fun count(table: String) = data!!.getJSONObject("tables").getJSONArray(table).length()
+    private fun count(table: String) = real().getJSONObject("tables").getJSONArray(table).length()
 
     /** Shortly after the export: the newest thing that happened. */
     private fun exportedAt(): Instant {
-        val events = data!!.getJSONObject("tables").getJSONArray("event")
+        val events = real().getJSONObject("tables").getJSONArray("event")
         return Instant.ofEpochMilli((0 until events.length()).maxOf { events.getJSONObject(it).getLong("at") }).plusSeconds(60)
     }
 
     @Test
-    fun theRealDataMigratesAndEveryRowReadsAsModel() = runTest {
+    fun theRealDataMigratesAndEveryRowReadsAsModel() = runTest(timeout = SLOW) {
         val repo = RoomReminderRepository(load())
         val reminders = repo.reminders()
         assertEquals(count("reminder"), reminders.size)
@@ -99,7 +114,7 @@ class RealDataTest {
      * does not know (Review-Lauf 5, E22): the other form tests only use reminders made by the form.
      */
     @Test
-    fun everyRealReminderSurvivesTheForm() = runTest {
+    fun everyRealReminderSurvivesTheForm() = runTest(timeout = SLOW) {
         val today = exportedAt().atZone(java.time.ZoneId.of("Europe/Berlin")).toLocalDate()
         for (r in RoomReminderRepository(load()).reminders()) {
             val expected = r.copy(archivedAt = null, hintQuietUntil = null)
@@ -108,7 +123,7 @@ class RealDataTest {
     }
 
     @Test
-    fun theAlarmScreenCanBeBuiltForEveryOpenOccurrence() = runTest {
+    fun theAlarmScreenCanBeBuiltForEveryOpenOccurrence() = runTest(timeout = SLOW) {
         val sim = Simulation(exportedAt(), RoomReminderRepository(load()))
         for (o in sim.repo.openOccurrences()) assertNotNull("occurrence ${o.id}", sim.engine.alarmView(o.id))
     }
@@ -118,7 +133,7 @@ class RealDataTest {
      * of [Simulation.checkInvariants] hold after every alarm, and each day ends cleanly.
      */
     @Test
-    fun aWeekWithAllRemindersKeepsTheRules() = runTest {
+    fun aWeekWithAllRemindersKeepsTheRules() = runTest(timeout = SLOW) {
         val start = exportedAt()
         val sim = Simulation(start, RoomReminderRepository(load()))
         sim.engine.sync()
@@ -134,7 +149,7 @@ class RealDataTest {
 
     /** The phone is off for two days in the middle of the week; on start everything is planned again. */
     @Test
-    fun twoDaysWithThePhoneOffAreCaughtUp() = runTest {
+    fun twoDaysWithThePhoneOffAreCaughtUp() = runTest(timeout = SLOW) {
         val start = exportedAt()
         val sim = Simulation(start, RoomReminderRepository(load()))
         sim.engine.sync()

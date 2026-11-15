@@ -143,7 +143,7 @@ class SessionGlueTest {
     )
 
     private fun waitFor(what: String, done: suspend () -> Boolean) = runBlocking {
-        repeat(100) {
+        repeat(500) { // at most ten seconds
             if (done()) return@runBlocking
             Thread.sleep(20)
             ShadowLooper.idleMainLooper()

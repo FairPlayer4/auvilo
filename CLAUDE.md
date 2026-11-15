@@ -75,7 +75,9 @@ Strenge und invasive Mechanismen sind gewollt. Kommunikation auf **Deutsch, mit 
 
 ## Git
 - Remote `origin`: GitHub `FairPlayer4/avlreminder` (privat). `develop` ist der
-  Hauptarbeitsbranch, dazu Feature-Branches (`feature/v1.x`); dort nach eigenem Ermessen committen und pushen.
+  Arbeitsbranch; dort nach eigenem Ermessen committen und pushen.
+- **Feature-Branches nur nach Kevins Bestätigung anlegen** (sonst kommt er durcheinander,
+  2026-11-15); ohne Bestätigung direkt auf `develop` arbeiten.
 - `main` nur per Pull Request, nie direkt pushen. Nach einer abgeschlossenen Etappe
   einen PR anbieten (`gh pr create`, Basis `main`; ohne `gh` die Compare-URL
   `https://github.com/FairPlayer4/avlreminder/compare/main...<branch>` nennen).

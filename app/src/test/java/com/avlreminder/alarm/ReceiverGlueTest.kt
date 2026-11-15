@@ -93,9 +93,9 @@ class ReceiverGlueTest {
     private fun alarmFor(occurrenceId: Long) = Intent(context, AlarmReceiver::class.java)
         .putExtra(AndroidAlarmPort.EXTRA_OCCURRENCE, occurrenceId)
 
-    /** The receivers work asynchronously: waits until [done] holds, at most two seconds. */
+    /** The receivers work asynchronously: waits until [done] holds, at most ten seconds (the CI runner is slower). */
     private fun waitFor(what: String, done: suspend () -> Boolean) = runBlocking {
-        repeat(100) {
+        repeat(500) {
             if (done()) return@runBlocking
             Thread.sleep(20)
             ShadowLooper.idleMainLooper()
