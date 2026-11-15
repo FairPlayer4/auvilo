@@ -16,6 +16,7 @@ import org.junit.Test
 import org.junit.runner.RunWith
 import org.robolectric.Robolectric
 import org.robolectric.Shadows.shadowOf
+import org.robolectric.annotation.Config
 import org.robolectric.shadows.ShadowAlarmManager
 import org.robolectric.shadows.ShadowLooper
 import java.util.concurrent.TimeUnit
@@ -24,6 +25,9 @@ import java.util.concurrent.TimeUnit
  * Der Vordergrunddienst, der laut klingelt: Er übernimmt die Knöpfe des Alarms in seine
  * Benachrichtigungen (auch die Kopie für die Uhr) und klingelt eine Runde lang.
  */
+// Auch unter Android 14, dem niedrigsten unterstützten Stand (minSdk 34, playstore.md 3),
+// und unter Android 17, für das die App gebaut ist.
+@Config(sdk = [34, 37])
 @RunWith(AndroidJUnit4::class)
 class AlarmServiceTest {
     private val app = ApplicationProvider.getApplicationContext<Application>()

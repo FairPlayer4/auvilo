@@ -92,7 +92,9 @@
   Engine; die Cloud-Verdrahtung baut `cloud/CloudWiring` (E19).
 
 **Tech:** AGP 9.4.1, Kotlin 2.4.21, Gradle 9.8.1, Compose BOM 2026.09, Room 2.8 + KSP,
-DataStore, Glance, CameraX, Play-Services-Location, Kover. minSdk = targetSdk = 37.
+DataStore, Glance, CameraX, Play-Services-Location, Kover. targetSdk = 37, minSdk = 34
+(Anf. 8.1): keine API über Stufe 34 ohne Versionsweiche, Lint (NewApi) bricht sonst ab;
+die Alarm-Tests (`alarm/*GlueTest`, `AlarmServiceTest`) laufen mit `@Config(sdk = [34, 37])`.
 Paket `com.avlreminder`.
 
 ## 2. Datenmodell

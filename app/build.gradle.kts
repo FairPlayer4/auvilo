@@ -37,7 +37,7 @@ android {
 
     defaultConfig {
         applicationId = "com.avlreminder"
-        minSdk = 37
+        minSdk = 34
         targetSdk = 37
         versionCode = 29
         versionName = "1.3c9-backup5"

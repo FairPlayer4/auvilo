@@ -876,7 +876,8 @@ dazugekommen; Kevin sammelt jetzt erst einmal mit aktiver Nutzung.
 Ziel ist, einmal den kompletten Weg zu gehen: eine offizielle App im Play Store mit
 sehr kleiner Zielgruppe, mit Backend und vollem EU-Datenschutz. Lernen steht im
 Vordergrund, nicht Reichweite.
-- PS1 **Play Store** statt nur Sideload. **Android 17 bleibt Minimum** (8.1).
+- PS1 **Play Store** statt nur Sideload. Minimum ist **Android 14** (8.1; bis 2026-11-15
+  Android 17).
 - PS2 **Backend** entsteht parallel in einem eigenen Repository (Entscheidung vom
   2026-11-01) und dient später als **Backup** und **Sync** mit anderen (7.18).
 - PS3 **EU-Datenschutz (DSGVO)** vollständig: Datenschutzerklärung, Hosting in der EU,
@@ -1279,8 +1280,12 @@ kurz davor.
 ### 8.1 Zielgerät
 - **Samsung Galaxy S24 Ultra, Android 17** (API 37), nur Privatgeräte
 - Galaxy Watch vorhanden → Integration in V1.3 über Benachrichtigungen, eigene Watch-App in V1.4 (siehe 7.14)
-- **Entscheidung:** minSdk = targetSdk = 37. Kein Rückwärts-Support nötig, da
-  absehbar nur ein Nutzer. Moderne APIs und Energiespar-Mechanismen nutzen.
+- **Entscheidung:** targetSdk = 37, **minSdk = 34** (Android 14, seit 2026-11-15; vorher 37).
+  Für den geschlossenen Test mit Freunden (7.28 PS1) reichen damit fast alle Handys, die
+  noch Updates bekommen. Die App nutzt keine API über Stufe 34; Lint (NewApi) hält das
+  fest, die Alarm-Tests laufen unter Robolectric mit Android 14 und 17. Tiefer nicht: Unter
+  34 bräuchten Alarm, Vollbild, Vordergrunddienst und WLAN Versionsweichen
+  (playstore.md 3). Moderne APIs und Energiespar-Mechanismen nutzen.
 
 ### 8.2 Technische Machbarkeit
 
@@ -1352,6 +1357,7 @@ Neueste zuerst. Kap. 7 enthält immer den gültigen Stand; diese Tabelle ist die
 
 | Datum | Entscheidung |
 |---|---|
+| 2026-11-15 | **minSdk 34 statt 37** (Kevin: „Ja, auf 34 senken“): Mit Android 17 als Minimum fänden sich kaum 12 Tester für den geschlossenen Test. Mit minSdk 34 laufen Lint, Bau und alle Tests ohne Codeänderung; darunter bräuchte es Versionsweichen. Ersetzt „Android 17 bleibt Minimum“ vom 2026-11-02 (8.1, 7.28 PS1, playstore.md 3). Umgesetzt in V1.3c9 |
 | 2026-11-15 | **Kontaktadresse ist die Gmail-Adresse** (Kevin: „Da läuft GCP drüber und ich versuche die für alles mit der App zu verwenden.“): `kevin.bartik@gmail.com` für App, Store-Eintrag und Datenschutzerklärung; sie steht ohnehin als Autor im öffentlichen Repo (OV5). Konto mit Passkey bzw. Sicherheitsschlüssel schützen, da auch GCP und Play Console daran hängen (7.28 PS15). Umgesetzt in V1.3c9 |
 | 2026-11-15 | **Einstieg für Tester, wiederholbar** (Kevin: „Du kannst einen Vorschlag machen und ich spiele es nach Umsetzung am Handy durch. Am besten mit Knopf zum Triggern (Wiederholbarkeit).“): vier Seiten mit Erklärung, Berechtigungen der Reihe nach, Probealarm und erstem Reminder; von selbst nur ohne Reminder, sonst über *Einstellungen → Hilfe* (7.28 PS15, playstore.md N3). Umgesetzt in V1.3c9 |
 | 2026-11-15 | **Sicherungsdatei mit Passwort, ohne Fotos und Audio** (Kevin wählte „Mit Passwort“ und „Erstmal ohne“): Export und Import als Datei in den lokalen Kopien; AES-256-GCM mit einem Schlüssel aus dem Passwort (PBKDF2, 600 000 Runden), mindestens 12 Zeichen; Import wie jedes Wiederherstellen (7.28 PS14, playstore.md N4). Umgesetzt in V1.3c8 |
@@ -1446,7 +1452,7 @@ Neueste zuerst. Kap. 7 enthält immer den gültigen Stand; diese Tabelle ist die
 | V1.3c1 | 2026-11-13 | Verschiebe-Limit pro Termin, Woche oder Monat (Z2b): Formular, Alarm mit „noch 1× diese Woche“ und „wieder ab …“, Vorlagen, Schnittstelle für Claude; Schema 11 |
 | V1.3c2–c7 | 2026-11-15 | Konto löschen und Displaysperre (R-3, SE5), Passwortmanager als Hauptweg, exakte Alarme mit `SCHEDULE_EXACT_ALARM`, Name „AuViLo-Reminder“ (7.28 PS11), Akku nur empfohlen (PS12), Hinweis vor dem Standort-Dialog (PS13) |
 | V1.3c8 | – | Sicherungsdatei: Export und Import mit Passwort, ohne Fotos und Audio (7.28 PS14) |
-| V1.3c9 | – | Einstieg für Tester mit Probealarm, wiederholbar in den Einstellungen (7.28 PS15) |
+| V1.3c9 | – | Einstieg für Tester mit Probealarm, wiederholbar in den Einstellungen (7.28 PS15); minSdk 34 (8.1) |
 
 Details zum Verhalten: [design.md](design.md), Gerätetests: [geraetetest.md](geraetetest.md).
 

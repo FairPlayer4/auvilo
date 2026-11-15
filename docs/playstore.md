@@ -69,32 +69,29 @@ betrifft P4.
   Als Händler würden Anschrift und Telefon öffentlich.
 - **Geschlossener Test**: Private Konten, die nach dem 13.11.2023 angelegt wurden, brauchen
   vor der Produktion **12 Tester, 14 Tage am Stück** im geschlossenen Test.
-  **Größter praktischer Engpass:** Mit `minSdk = 37` brauchen alle 12 Tester ein Gerät
-  mit Android 17. Vorher klären, wie viele es im Umfeld gibt; sonst bleibt es beim internen
-  Test (bis 100 Tester, ohne Prüfpflicht für die Produktion, aber auch ohne öffentlichen
-  Eintrag). Der interne Test reicht für das Lernziel „kompletter Weg“ vermutlich nicht,
-  der geschlossene Test schon.
-- **Bewertung `minSdk` senken (2026-11-15, noch keine Entscheidung; 8.1/PS1 sagen weiter
-  Android 17):** Probeweise mit niedrigerem `minSdk` gebaut, nichts committet.
-  - **Mit `minSdk = 34` (Android 14) läuft schon heute alles:** Lint ohne neuen Fund, Bau
-    grün, alle 401 Tests grün, auch unter Robolectric mit Android 14 (`sdk=34`). Die App
-    ruft keine API über Stufe 34 auf. Codeänderung: nur die eine Zeile in
-    `app/build.gradle.kts`.
-  - **Darunter wird es teurer:** Mit `minSdk = 26` meldet Lint 34 NewApi- und 17
-    InlinedApi-Funde. Von Stufe 34 kommen Vordergrunddienst-Typ `systemExempted`,
-    `canUseFullScreenIntent`, die Einstellungsseite für Vollbild und
-    `LocalDate.ofInstant` (sonst Desugaring). Von 33 kommen Vibration mit Alarm-Attributen,
-    WLAN-SSID und `POST_NOTIFICATIONS`, von 31 exakte Alarme, `VibratorManager` und
-    WLAN-Standortinfo. Jede Stelle bräuchte eine Versionsweiche mit eigenem Verhalten
-    (z. B. sind exakte Alarme bis Android 13 von selbst erlaubt). Das lohnt sich nicht.
-  - **Was Lint und Robolectric nicht sehen:** das echte Verhalten von Alarm, Vollbild über
-    der Sperre und Vordergrunddienst auf Android 14 bis 16 und auf anderen Herstellern.
+  **Engpass Android-Version:** Bis 2026-11-15 war `minSdk = 37`, also hätten alle Tester
+  Android 17 gebraucht. Jetzt `minSdk = 34` (Android 14, Anf. 8.1), siehe unten. Ohne 12
+  Tester bliebe nur der interne Test (bis 100 Tester, ohne Prüfpflicht für die Produktion,
+  aber auch ohne öffentlichen Eintrag); der reicht für das Lernziel „kompletter Weg“
+  vermutlich nicht, der geschlossene Test schon.
+- **`minSdk` gesenkt auf 34 (2026-11-15, V1.3c9):**
+  - **Mit `minSdk = 34` (Android 14) lief schon alles:** Lint ohne neuen Fund, Bau grün,
+    alle Tests grün, auch unter Robolectric mit Android 14. Die App ruft keine API über
+    Stufe 34 auf. Geändert: die Zeile in `app/build.gradle.kts`; die Alarm-Tests laufen
+    seitdem unter Android 14 und 17.
+  - **Tiefer nicht:** Mit `minSdk = 26` meldet Lint 34 NewApi- und 17 InlinedApi-Funde.
+    Von Stufe 34 kommen Vordergrunddienst-Typ `systemExempted`, `canUseFullScreenIntent`,
+    die Einstellungsseite für Vollbild und `LocalDate.ofInstant` (sonst Desugaring). Von
+    33 kommen Vibration mit Alarm-Attributen, WLAN-SSID und `POST_NOTIFICATIONS`, von 31
+    exakte Alarme, `VibratorManager` und WLAN-Standortinfo. Jede Stelle bräuchte eine
+    Versionsweiche mit eigenem Verhalten (z. B. sind exakte Alarme bis Android 13 von selbst
+    erlaubt).
+  - **Offen, was Lint und Robolectric nicht sehen:** das echte Verhalten von Alarm, Vollbild
+    über der Sperre und Vordergrunddienst auf Android 14 bis 16 und auf anderen Herstellern.
     Das größere Risiko sind Hersteller mit aggressivem Energiesparen (Xiaomi, OnePlus,
     Huawei u. a.), nicht die Android-Version. Dafür vor dem Test ein Emulator-Abbild API 34
-    laden (heute nur 36 und 37 da) und die Kerntests zum Alarm dort und auf 36 laufen lassen;
-    im geschlossenen Test über die Rückmeldungen.
-  - **Empfehlung:** `minSdk = 34`. Dann reichen fast alle Handys, die noch Updates
-    bekommen, und der Aufwand ist klein.
+    laden (heute nur 36 und 37 da; Download nach Kevins Go) und die Kerntests zum Alarm dort
+    und auf 36 laufen lassen; im geschlossenen Test über die Rückmeldungen.
 - **Entwickler-Verifizierung** (Google, ab 2026 schrittweise, weltweit 2027): Mit einem
   verifizierten Play-Konto erledigt; betrifft dann auch die Sideload-APK auf dem S24
   (`adb install` bleibt laut Google möglich). Stand vor der Einführung in Deutschland prüfen.
@@ -173,4 +170,4 @@ betrifft P4.
    (Erlaubnis entziehen, Alarm kommt trotzdem bzw. Hinweis erscheint).
 3. Erledigt: N4 Export/Import (V1.3c8), N3 Einstieg (V1.3c9).
 4. Konto anlegen, Datenschutzerklärung, Store-Eintrag, interner Test, dann geschlossener
-   Test mit 12 Testern (Android 17 vorher klären).
+   Test mit 12 Testern (Android 14 oder neuer, minSdk 34).

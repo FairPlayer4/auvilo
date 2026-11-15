@@ -31,11 +31,15 @@ import org.junit.Before
 import org.junit.Test
 import org.junit.runner.RunWith
 import org.robolectric.Shadows.shadowOf
+import org.robolectric.annotation.Config
 import org.robolectric.shadows.ShadowAlarmManager
 import org.robolectric.shadows.ShadowLooper
 import java.time.Instant
 import java.time.LocalTime
 
+// Auch unter Android 14, dem niedrigsten unterstützten Stand (minSdk 34, playstore.md 3),
+// und unter Android 17, für das die App gebaut ist.
+@Config(sdk = [34, 37])
 @RunWith(AndroidJUnit4::class)
 class AlarmGlueTest {
     private val context = ApplicationProvider.getApplicationContext<Context>()

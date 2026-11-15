@@ -33,6 +33,7 @@ import com.google.android.gms.location.Geofence
 import com.google.android.gms.location.GeofenceStatusCodes
 import kotlinx.coroutines.flow.first
 import com.avlreminder.location.WifiReceiver
+import org.robolectric.annotation.Config
 import org.robolectric.shadows.ShadowNetwork
 import com.avlreminder.location.PlaceCheckReceiver
 import com.avlreminder.system.SystemReceiver
@@ -61,6 +62,9 @@ import java.time.LocalTime
  * notification, alarm service or planned alarm. The engine itself is tested in core; here only
  * the wiring counts, so the checks do not depend on how loud something rings.
  */
+// Auch unter Android 14, dem niedrigsten unterstützten Stand (minSdk 34, playstore.md 3),
+// und unter Android 17, für das die App gebaut ist.
+@Config(sdk = [34, 37])
 @RunWith(AndroidJUnit4::class)
 class ReceiverGlueTest {
     private val context = ApplicationProvider.getApplicationContext<Context>()

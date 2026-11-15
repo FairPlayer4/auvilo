@@ -6,7 +6,8 @@ anforderungen.md Kap. 10.1 und in den Review-Berichten (`.review/runs/`), nicht 
 ## Auf dem Gerät (S24)
 - **V1.3c9** (`versionCode` 29) gebaut, noch nicht installiert, mit V1.3c8: Einstieg für
   Tester mit Probealarm, wiederholbar unter *Einstellungen → Hilfe* (7.28 PS15, playstore.md
-  N3); Sicherungsdatei, Export und Import mit Passwort, ohne Fotos und Audio (7.28 PS14, N4).
+  N3); Sicherungsdatei, Export und Import mit Passwort, ohne Fotos und Audio (7.28 PS14, N4);
+  `minSdk` 34 statt 37 für Tester mit Android 14 bis 16 (Anf. 8.1).
   Keine Migration.
 - **V1.3c7** (`versionCode` 27), installiert am 2026-11-15: Hinweis vor Androids
   Standort-Dialog (7.28 PS13). Keine Migration. Start ohne Fehler, Alarme neu geplant,
