@@ -939,6 +939,17 @@ Vordergrund, nicht Reichweite.
   (`REQUEST_IGNORE_BATTERY_OPTIMIZATIONS` ist im Play Store für Wecker nicht zulässig); der
   Knopf öffnet die App-Info, dort *Akku → Nicht eingeschränkt*. In allen Builds, damit der
   Sideload den Store-Weg testet (playstore.md P4). Umgesetzt in V1.3c6.
+- PS13 **Standort im Hintergrund bleibt, mit Begründung (2026-11-15):** Die Orterkennung
+  läuft heute vor allem über das WLAN (7.29); der Geofence per Standort ist gut, aber nicht
+  unbedingt nötig und muss ohnehin noch überarbeitet werden (7.30). Die Play-Fassung behält
+  `ACCESS_BACKGROUND_LOCATION` und begründet ihn bei der Einreichung mit der Ankunft am Ort
+  (Entwurf: playstore-erklaerungen.md P5). Gestrichen wird erst bei einer Ablehnung.
+  - Achtung: Auch das WLAN braucht „Immer erlauben“. Android gibt BSSID und SSID nur mit
+    Standort-Berechtigung heraus, im Hintergrund nur mit „Immer erlauben“ (design.md 6,
+    WLAN). Streichen hieße deshalb: Ankunft am Ort im Play-Build ganz aus, nicht nur der
+    Geofence.
+  - Vor der Einreichung fehlt im Code die auffällige Offenlegung vor dem Systemdialog
+    (playstore.md P5).
 - Was für den Play Store noch fehlt (Prüfung 2026-11-15, Annahme: erste Fassung ohne
   Backend): [playstore.md](playstore.md).
 - Backend-Stand und was es für die App bedeutet: [backend.md](backend.md); Einbindung des
@@ -1308,6 +1319,7 @@ Neueste zuerst. Kap. 7 enthält immer den gültigen Stand; diese Tabelle ist die
 
 | Datum | Entscheidung |
 |---|---|
+| 2026-11-15 | **Standort im Hintergrund behalten und begründen** (Kevin: „Wir sollten es nur bei Ablehnung streichen und bei der Einreichung begründen.“): Ort per WLAN reicht heute, der Geofence muss ohnehin überarbeitet werden; da auch das WLAN „Immer erlauben“ braucht, hieße Streichen: Ankunft im Play-Build aus (7.28 PS13, playstore.md P5) |
 | 2026-11-15 | **Akku-Optimierung nur empfohlen, ohne direkten Dialog** (Kevin: „Theoretisch sollte die App auch mit Battery Optimizations funktionieren nur ohne Garantie.“): kein Pflichtpunkt mehr, keine Warnung auf *Heute*; der Knopf öffnet die App-Info statt Androids Dialog; `REQUEST_IGNORE_BATTERY_OPTIMIZATIONS` entfällt (7.28 PS12, playstore.md P4). Umgesetzt in V1.3c6 |
 | 2026-11-15 | **Name „AuViLo-Reminder“** (Kevin: „Erstmal nur Anzeigename ändern damit keine Neuinstallation nötig ist. Restliche Teile ändern wir vor einem Playstore Antrag.“): sichtbarer Name sofort, `applicationId`, Paket und Logo vor dem Antrag; Marke wahrscheinlich, falls der Play Store kommt (7.28 PS11, playstore.md N1). Anzeigename umgesetzt in V1.3c5 |
 | 2026-11-15 | **Umstieg auf `SCHEDULE_EXACT_ALARM`** in allen Builds (Kevin: „Es muss dem Nutzer klar kommuniziert werden, dass die App ohne die Berechtigung nicht richtig funktioniert“): Pflichtpunkt *Wecker und Erinnerungen*, ohne ihn ein eigener Hinweis auf *Heute* und eine Benachrichtigung; Alarme kommen dann ungenau statt gar nicht (7.28 PS10). Umgesetzt in V1.3c4 |
