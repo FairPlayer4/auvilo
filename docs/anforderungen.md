@@ -922,6 +922,16 @@ Vordergrund, nicht Reichweite.
     (Kernfunktion): auf *Heute* mit dem, was dann nicht geht (Alarme bis zu einer Stunde zu
     spät, kein Dauer-Alarm), ein Tippen führt direkt zum Schalter; plant die App ohne
     Erlaubnis, sagt es eine Benachrichtigung. Umgesetzt in V1.3c4.
+- PS11 **Name „AuViLo-Reminder“ (2026-11-15):** **Au**dio-**Vi**suell-**Lo**kation, die
+  Bedeutung von „AVL“ bleibt, das Zeichen der AVL List GmbH fällt weg (playstore.md N1).
+  Kevin hat geprüft, dass der Name in der EU nicht eingetragen ist.
+  - Jetzt nur der Anzeigename (App-Name im Launcher, Widget, Versionszeile in den
+    Einstellungen), damit die Sideload-App per `adb install -r` weiterläuft. Umgesetzt in
+    V1.3c5.
+  - Vor einem Play-Store-Antrag der Rest: `applicationId`, Namespace und Paket
+    `com.avlreminder`, Logo (zeigt „AVL“), Repo- und Dateinamen (playstore.md B7, N1).
+  - Eine Marke (Wortmarke „AuViLo“) meldet Kevin wahrscheinlich an, wenn der Play Store
+    wirklich kommt; die Namenssitzung empfiehlt dafür das DPMA, Klassen 9 und 42.
 - Was für den Play Store noch fehlt (Prüfung 2026-11-15, Annahme: erste Fassung ohne
   Backend): [playstore.md](playstore.md).
 - Backend-Stand und was es für die App bedeutet: [backend.md](backend.md); Einbindung des
@@ -1291,6 +1301,7 @@ Neueste zuerst. Kap. 7 enthält immer den gültigen Stand; diese Tabelle ist die
 
 | Datum | Entscheidung |
 |---|---|
+| 2026-11-15 | **Name „AuViLo-Reminder“** (Kevin: „Erstmal nur Anzeigename ändern damit keine Neuinstallation nötig ist. Restliche Teile ändern wir vor einem Playstore Antrag.“): sichtbarer Name sofort, `applicationId`, Paket und Logo vor dem Antrag; Marke wahrscheinlich, falls der Play Store kommt (7.28 PS11, playstore.md N1). Anzeigename umgesetzt in V1.3c5 |
 | 2026-11-15 | **Umstieg auf `SCHEDULE_EXACT_ALARM`** in allen Builds (Kevin: „Es muss dem Nutzer klar kommuniziert werden, dass die App ohne die Berechtigung nicht richtig funktioniert“): Pflichtpunkt *Wecker und Erinnerungen*, ohne ihn ein eigener Hinweis auf *Heute* und eine Benachrichtigung; Alarme kommen dann ungenau statt gar nicht (7.28 PS10). Umgesetzt in V1.3c4 |
 | 2026-11-15 | **Positionierung als Wecker und Timer**, später gemeinsamer Kalender (Kevin: „Die App ist prinzipiell als Wecker und Timer gedacht“); der Store-Eintrag beschreibt sie so. Ein zusätzlicher Schritt für exakte Alarme (`SCHEDULE_EXACT_ALARM`) ist in Ordnung, solange die Kernfunktion nicht leidet (7.28 PS10, playstore.md P1) |
 | 2026-11-15 | **A-15 neu: Passwortmanager als Hauptweg** (Kevin: „realistisch ist es sicherer wenn man es in einen (E2E) Passwortmanager packt“): Hauptknopf *Im Passwortmanager speichern*, davor ein Hinweis (Ende-zu-Ende-Verschlüsselung, beim Google Passwortmanager nur mit Geräteverschlüsselung, sonst reicht das Google-Konto; den Passwortmanager selbst mit seinem Wiederherstellungscode auf Papier schützen). Papier bleibt als Ausweg mit Rückfrage. Kein Speicher-Dialog mehr von selbst. Ändert den Eintrag vom 2026-11-12 (7.33 WS1, WS4). Umgesetzt in V1.3c3 |

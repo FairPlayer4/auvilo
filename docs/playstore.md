@@ -99,9 +99,15 @@ betrifft P4.
 
 ## 5. Name und Inhalt der App
 
-- N1 **Name „AVL-Reminder“**: „AVL“ ist ein eingetragenes Zeichen eines großen Unternehmens
-  (AVL List GmbH). Im Store kann das eine Markenbeschwerde auslösen. Empfehlung: vor dem
-  ersten Upload einen eigenen Namen wählen und `applicationId` dazu passend festlegen (B7).
+- N1 **Name**: „AVL“ ist ein eingetragenes Zeichen eines großen Unternehmens
+  (AVL List GmbH), im Store droht eine Markenbeschwerde. **Entschieden 2026-11-15:
+  „AuViLo-Reminder“** (Anf. 7.28 PS11). Der Anzeigename ist seit V1.3c5 umgestellt. Vor dem
+  ersten Upload noch offen:
+  - `applicationId` (B7), Namespace und Paket `com.avlreminder` passend umbenennen;
+  - Logo ohne „AVL“ (`ic_launcher_foreground.xml`), Store-Grafiken mit dem neuen Namen;
+  - Repo- und Dateinamen, Texte in der Doku; im Backend Paketname und Namen prüfen
+    (`backend.md`);
+  - Wortmarke „AuViLo“ anmelden, falls der Store kommt (Kevin entscheidet).
 - N2 **Texte im Code**: rund 300 feste Texte in Compose, `strings.xml` fast leer. Für eine
   deutsche Fassung kein Muss; für eine zweite Sprache später Pflicht.
 - N3 **Einstieg für Fremde**: Die App setzt Kevins Wissen voraus. Für Tester fehlt ein
@@ -112,7 +118,8 @@ betrifft P4.
   sich die `applicationId` ändert.
 
 ## Empfohlene Reihenfolge
-1. Entscheiden: Name und `applicationId` (N1, B7), Play-Fassung ohne Backend (Annahme oben).
+1. Entscheiden: `applicationId` zum Namen AuViLo-Reminder (N1, B7), Play-Fassung ohne Backend
+   (Annahme oben).
 2. Code, der auch der Sideload-App nicht schadet: P1, P3, P4, P5 (Offenlegung), B1, B4, B5.
    P1 und P4 ändern Kevins Alltag kaum, brauchen aber je einmal einen Gerätetest
    (Erlaubnis entziehen, Alarm kommt trotzdem bzw. Hinweis erscheint).

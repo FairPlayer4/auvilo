@@ -49,8 +49,9 @@ einer Fassung.
    Morgen; aus Review-Lauf 2 optional Paket `alarm` aufteilen.
 6. **Versionsname** je installiertem Stand `1.3b<n>-backup<Schritt>`, `versionCode` +1.
 7. **Play-Store-Release** ohne Eile, frühestens mit V2 (7.28 PS5–PS9). Branch-Regel für
-   `main` setzt Kevin. Lückenliste vom 2026-11-15: [playstore.md](playstore.md); zuerst
-   Name und `applicationId` entscheiden.
+   `main` setzt Kevin. Lückenliste vom 2026-11-15: [playstore.md](playstore.md). Name
+   „AuViLo-Reminder“ entschieden (7.28 PS11), Anzeigename in V1.3c5; `applicationId`, Paket
+   und Logo vor dem Antrag.
 8. **Vor der Sicherheitsphase** (Backend-Prüfung 2026-11-12; Liste „Vorher fertig“ in
    Backend `docs/b2b-entwurf.md`): Format v2 kommt über `client/`. *Konto löschen* und
    die Displaysperre (SE5) sind in V1.3c2 umgesetzt, A-15 neu in V1.3c3.

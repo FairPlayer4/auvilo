@@ -272,7 +272,7 @@ fun SettingsScreen(
                     }
                 }
             }
-            Text("AVL-Reminder $version", Modifier.padding(vertical = 24.dp, horizontal = 4.dp), color = c.muted, fontSize = 12.sp)
+            Text("AuViLo-Reminder $version", Modifier.padding(vertical = 24.dp, horizontal = 4.dp), color = c.muted, fontSize = 12.sp)
         }
     }
 }

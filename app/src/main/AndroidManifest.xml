@@ -33,7 +33,7 @@
 
     <application
         android:name=".AvlApp"
-        android:label="AVL-Reminder"
+        android:label="AuViLo-Reminder"
         android:icon="@mipmap/ic_launcher"
         android:allowBackup="false"
         android:dataExtractionRules="@xml/data_extraction_rules"
@@ -117,7 +117,7 @@
         <receiver
             android:name=".widget.AvlWidgetReceiver"
             android:exported="true"
-            android:label="AVL-Reminder">
+            android:label="AuViLo-Reminder">
             <intent-filter>
                 <action android:name="android.appwidget.action.APPWIDGET_UPDATE" />
             </intent-filter>

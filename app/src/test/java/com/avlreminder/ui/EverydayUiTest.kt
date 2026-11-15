@@ -185,7 +185,7 @@ class EverydayUiTest {
     @Test
     fun settingsShowTheVersionOfTheBuild() {
         compose.setContent { AvlTheme(dark = false) { AvlAppUi(state().copy(appVersion = "1.3b3-backup5"), FakeActions(), now, zone, startRoute = Routes.SETTINGS) } }
-        compose.onNodeWithText("AVL-Reminder 1.3b3-backup5").performScrollTo().assertExists()
+        compose.onNodeWithText("AuViLo-Reminder 1.3b3-backup5").performScrollTo().assertExists()
     }
 
     @Test
