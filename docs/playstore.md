@@ -14,13 +14,33 @@ für Serverdaten, App-Zugang für die Prüfer (keine Anmeldung). Die Datensicher
 
 | # | Thema | Stand heute | Problem im Play Store | Empfehlung |
 |---|---|---|---|---|
-| P1 | Exakte Alarme | `USE_EXACT_ALARM` (bei Installation erteilt) | Eingeschränkt auf Apps, deren Kern Wecker/Timer oder Kalender mit Termin-Benachrichtigungen ist. Ein Reminder ist dort nicht genannt; Ablehnung ist wahrscheinlich | Auf `SCHEDULE_EXACT_ALARM` umstellen (Nutzer erteilt es in den Einstellungen), Entzug abfangen (`ACTION_SCHEDULE_EXACT_ALARM_PERMISSION_STATE_CHANGED`, `canScheduleExactAlarms()`), in der Berechtigungsliste als Pflicht zeigen. Hängt mit P3 zusammen |
+| P1 | Exakte Alarme | `USE_EXACT_ALARM` (bei Installation erteilt) | Eingeschränkt auf Apps, deren Kern Wecker/Timer oder Kalender mit Termin-Benachrichtigungen ist; Erklärung und Prüfung. Mit der Positionierung als Wecker und Timer (anforderungen.md 7.28 PS10) vertretbar, aber nicht sicher | Auf `SCHEDULE_EXACT_ALARM` umstellen, in allen Builds (der Sideload testet so jeden Tag den Store-Weg); der zusätzliche Schritt ist in Ordnung (PS10). Mit Erlaubnis technisch identisch (`setAlarmClock`, `systemExempted`). Aufwand klein, siehe unten |
 | P2 | Vollbild-Alarm | `USE_FULL_SCREEN_INTENT`, Nutzer erteilt es schon heute | Erklärung in der Play Console nötig; automatisch erteilt nur für Wecker- und Anruf-Apps | Erklärung ausfüllen; die App fragt schon und fällt ohne Vollbild auf die Benachrichtigung zurück (prüfen, dass das sauber ist) |
-| P3 | Foreground-Service `systemExempted` | `AlarmService`, `SessionService` | Android erlaubt den Typ nur, solange die App exakte Alarme darf. Mit P1 kann der Nutzer das entziehen, dann wirft der Start `ForegroundServiceTypeNotAllowedException`. Außerdem Erklärung pro FGS-Typ in der Play Console | Vor dem Start prüfen und ohne Erlaubnis ohne FGS klingeln (nur Benachrichtigung). Für die Sitzung prüfen, ob ein anderer Typ passt (z. B. `specialUse` mit Begründung) |
+| P3 | Foreground-Service `systemExempted` | `AlarmService`, `SessionService`; beide fallen schon heute auf eine Benachrichtigung zurück, wenn der Start scheitert | Android erlaubt den Typ nur, solange die App exakte Alarme darf. Außerdem Erklärung pro FGS-Typ in der Play Console | Rückfall reicht; mit P1 wird er für den Fall des Entzugs wichtig. Im Play-Formular als Wecker/Timer begründen |
 | P4 | Akku-Optimierung | `REQUEST_IGNORE_BATTERY_OPTIMIZATIONS` + direkter Dialog | Play verbietet den direkten Antrag, außer der Kern der App bricht sonst; zugelassene Fälle: Sicherheit, Messenger, Begleit-Apps, „Task automation“ | Permission entfernen, stattdessen `ACTION_IGNORE_BATTERY_OPTIMIZATION_SETTINGS` öffnen (Liste, Nutzer sucht die App selbst). `setAlarmClock()` weckt auch aus Doze |
 | P5 | Standort im Hintergrund | `ACCESS_BACKGROUND_LOCATION` für Geofence und WLAN-Ort (7.29) | Erklärung mit Video (≤ 30 s), **auffällige Offenlegung in der App vor dem Systemdialog** (Wörter „Standort“ und „im Hintergrund“/„wenn die App geschlossen ist“, welche Funktion), Datenschutzerklärung. Prüfer fragen, ob es ohne geht | Eigener Hinweis-Bildschirm vor dem Dialog (heute nur eine Zeile in der Berechtigungsliste). Die Funktion „Ankunft am Ort“ im Store-Text als Kernfunktion beschreiben. Risiko bleibt: Ablehnung möglich; dann Ankunft im Play-Build abschaltbar machen |
 | P6 | Kamera, Mikrofon | Laufzeit-Berechtigungen | Unkritisch, aber in Datenschutzerklärung und Datensicherheit nennen (bleibt auf dem Gerät) | nichts am Code |
 | P7 | Strenge Mechanismen | Vollbild, Dauer-Alarm, DND-Ausnahme, Notaus (PS7) | Richtlinie „Missbrauch von Gerät und Netzwerk“/„irreführendes Verhalten“: Alarme dürfen das Gerät nicht unbenutzbar machen | Notaus ist da und gut. Künftige Ideen mit Overlay (W3), Apps sperren (P2) oder Bedienungshilfen (T5) brauchen eigene Erklärungen; Bedienungshilfen-API ist im Play Store sehr streng |
+
+**P1 im Detail: Umbau auf `SCHEDULE_EXACT_ALARM`** (Schätzung: ein halber Tag mit Tests)
+- Manifest: `USE_EXACT_ALARM` durch `SCHEDULE_EXACT_ALARM` ersetzen.
+- `AndroidAlarmPort` und die Prüfungen in `AndroidWifi` rufen `setAlarmClock` bzw.
+  `setExactAndAllowWhileIdle` auf. Ohne Erlaubnis wirft das eine `SecurityException`.
+  Davor `canScheduleExactAlarms()` prüfen und sonst `setAndAllowWhileIdle` nehmen
+  (kommt, kann aber einige Minuten zu spät sein), mit Eintrag im Diagnose-Log.
+- `SystemReceiver`: auf `ACTION_SCHEDULE_EXACT_ALARM_PERMISSION_STATE_CHANGED` hören und
+  alles neu planen (`graph.rebuild`). Beim Entzug beendet Android die App und löscht ihre
+  exakten Alarme; beim Erteilen kommt dieser Broadcast.
+- Berechtigungsliste: neuer Pflichtpunkt *Wecker & Erinnerungen*
+  (`ACTION_REQUEST_SCHEDULE_EXACT_ALARM`).
+- Tests mit Robolectric (`ShadowAlarmManager.setCanScheduleExactAlarms`): mit Erlaubnis wie
+  bisher, ohne Erlaubnis kein Absturz, Rückfall wird geplant.
+- Kernfunktion: Mit Erlaubnis ändert sich nichts. Nur wenn der Nutzer sie entzieht, kommen
+  Alarme ungenauer und ohne Dauer-Alarm; die Berechtigungsliste zeigt das dann rot.
+- Am S24: Nach dem Update ist die Erlaubnis vermutlich erst aus (Android 14+ erteilt sie bei
+  neu deklarierten Apps nicht von selbst). Direkt nach `adb install -r` erteilen
+  (`adb shell appops set com.avlreminder SCHEDULE_EXACT_ALARM allow` oder in der App), dann
+  prüfen, dass `exact=true` im Diagnose-Log steht.
 
 ## 2. Build und Release
 

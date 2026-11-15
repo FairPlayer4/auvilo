@@ -910,6 +910,14 @@ Vordergrund, nicht Reichweite.
   (2026-11-02)** – Android-Sandbox, dateibasierte Verschlüsselung und `allowBackup=false`
   reichen; der Play-Store-Release ist ein Release-Build (nicht debuggable, kein
   `run-as`). Kein SQLCipher, solange kein konkreter Fall übrig bleibt.
+- PS10 **Positionierung als Wecker und Timer (2026-11-15):** Die App ist im Kern ein
+  Wecker (klingelt über den Alarm-Kanal, im Vollbild, bis man reagiert) und mit den
+  Sitzungen (7.11) ein Timer; später kommt ein gemeinsamer Kalender dazu (7.18). So
+  beschreibt sie auch der Store-Eintrag, nicht als To-do-App mit Erinnerungen.
+  - Exakte Alarme: Ein zusätzlicher Einrichtungsschritt (`SCHEDULE_EXACT_ALARM`, vom
+    Nutzer in *Alarme & Erinnerungen* erteilt) stört weder Kevin noch die Zielgruppe,
+    solange die Kernfunktion nicht schlechter wird. Damit hängt der Store nicht an der
+    Prüfung von `USE_EXACT_ALARM` (playstore.md P1).
 - Was für den Play Store noch fehlt (Prüfung 2026-11-15, Annahme: erste Fassung ohne
   Backend): [playstore.md](playstore.md).
 - Backend-Stand und was es für die App bedeutet: [backend.md](backend.md); Einbindung des
@@ -1279,6 +1287,7 @@ Neueste zuerst. Kap. 7 enthält immer den gültigen Stand; diese Tabelle ist die
 
 | Datum | Entscheidung |
 |---|---|
+| 2026-11-15 | **Positionierung als Wecker und Timer**, später gemeinsamer Kalender (Kevin: „Die App ist prinzipiell als Wecker und Timer gedacht“); der Store-Eintrag beschreibt sie so. Ein zusätzlicher Schritt für exakte Alarme (`SCHEDULE_EXACT_ALARM`) ist in Ordnung, solange die Kernfunktion nicht leidet (7.28 PS10, playstore.md P1) |
 | 2026-11-15 | **A-15 neu: Passwortmanager als Hauptweg** (Kevin: „realistisch ist es sicherer wenn man es in einen (E2E) Passwortmanager packt“): Hauptknopf *Im Passwortmanager speichern*, davor ein Hinweis (Ende-zu-Ende-Verschlüsselung, beim Google Passwortmanager nur mit Geräteverschlüsselung, sonst reicht das Google-Konto; den Passwortmanager selbst mit seinem Wiederherstellungscode auf Papier schützen). Papier bleibt als Ausweg mit Rückfrage. Kein Speicher-Dialog mehr von selbst. Ändert den Eintrag vom 2026-11-12 (7.33 WS1, WS4). Umgesetzt in V1.3c3 |
 | 2026-11-15 | **Displaysperre vor dem Löschen** (Backend SE5, Kevin: „SE5 angehen“): *Konto löschen* und *Sicherung löschen* fragen nach dem eingetippten Wort die Displaysperre ab (BiometricPrompt, starke Biometrie oder Geräte-PIN), bevor etwas den Server erreicht. *Sicherung löschen* dazu, weil es wie *Konto löschen* alle Fassungen endgültig löscht (Empfehlung, Kevin kann widersprechen). Ohne Displaysperre geht es weiter und wird protokolliert: Es gibt nichts zum Bestätigen, und Löschen (Art. 17) muss möglich bleiben. Abbrechen, Fehlversuche oder fehlender Sensor heißen nein. *Gerät sperren* gibt es in der App nicht als eigene Aktion (nur *Dieses Gerät abmelden*, das nichts löscht). Umgesetzt in V1.3c2 |
 | 2026-11-14 | ***Konto löschen* ersetzt *Cloud-Daten löschen*** (R-3, Backend B1/K1, Kevin nach Vorschlag): freigeschaltet sofort, sonst Antrag mit 7 Tagen, in denen jedes freigeschaltete Gerät abbrechen kann; das Handy vergisst die Schlüssel erst nach der Bestätigung des Servers. Einen beantragten Termin zeigt die App mit Benachrichtigung; der stündliche Lauf fragt dafür spätestens nach 23 Stunden beim Server nach, auch bei unveränderten Daten. Neu anfangen heißt: Konto löschen und neu anmelden. Die Bestätigung mit der Displaysperre (SE5) gilt damit für *Konto löschen* und *Gerät sperren*. Außerdem zeigt *Cloud-Backup* die **Konto-ID** zum Kopieren: Nur mit ihr lässt sich eine Anfrage auf Auskunft (DSGVO Art. 15) zuordnen (Backend `docs/datenschutz/`). Umgesetzt in V1.3c2 |
