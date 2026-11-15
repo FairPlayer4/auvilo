@@ -46,6 +46,10 @@ einer Fassung.
    *Sicherung löschen* fragen die Displaysperre ab (SE5). Darauf **V1.3c3** (`versionCode` 23,
    `develop`, noch nicht installiert): A-15 neu, Passwortmanager als Hauptweg mit Hinweis
    davor (Ende-zu-Ende, Papiercode des Passwortmanagers), Papier als Ausweg. Am Gerät C19.
+   Darauf **V1.3c4** (`versionCode` 24, `develop`, noch nicht installiert): `SCHEDULE_EXACT_ALARM`
+   statt `USE_EXACT_ALARM` (7.28 PS10, playstore.md P1/P3), ohne Erlaubnis ungenaue Alarme
+   mit klarem Hinweis. **Nach der Installation sofort die Erlaubnis prüfen bzw. erteilen**
+   (K37), sonst kommen Alarme bis zur ersten Öffnung ungenau.
    Am Gerät nur auf dem Emulator mit Testkonto: C15–C18.
 1. **Gerätetests** aus [geraetetest.md](geraetetest.md): K15, K23–K26 (vorher *Zuhause* in
    *Orte* mit WLAN neu festlegen), K27–K30 (Sitzung, dabei: zeigt die Uhr den

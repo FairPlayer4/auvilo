@@ -32,6 +32,7 @@ import com.avlreminder.AndroidDeviceState
 import com.avlreminder.alarm.AlarmActivity
 import com.avlreminder.alarm.AudioPlayer
 import com.avlreminder.alarm.AudioRecorder
+import com.avlreminder.alarm.ExactAlarms
 import com.avlreminder.alarm.Notifications
 import com.avlreminder.core.model.PrepAnswer
 import com.avlreminder.core.model.Reminder
@@ -286,7 +287,15 @@ class MainActivity : ComponentActivity() {
         val blocked = Notifications.channelsBlockedByDnd(this)
         val dndNeeded = vm.reminders.value.orEmpty().any { it.active && it.ignoreDnd }
         val locationNeeded = vm.reminders.value.orEmpty().any { it.active && it.arrival != null }
+        ExactAlarms.refresh(this)
         permissions = listOfNotNull(
+            // The core (Anf. 7.28 PS10): without it alarms come late and do not keep ringing.
+            PermissionItem(
+                ExactAlarms.LABEL, "Kernfunktion: ohne sie klingeln Alarme nicht pünktlich", ExactAlarms.allowed(this),
+                warning = ExactAlarms.WARNING,
+            ) {
+                startActivity(ExactAlarms.settings(this))
+            },
             PermissionItem("Benachrichtigungen", "ohne sie gibt es keinen Alarm", granted(Manifest.permission.POST_NOTIFICATIONS)) {
                 requestPermission.launch(Manifest.permission.POST_NOTIFICATIONS)
             },

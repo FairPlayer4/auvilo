@@ -241,7 +241,14 @@ fun AvlAppUi(
         when {
             route == Routes.TODAY -> Box(m) {
                 Column {
-                    if (state.permissions.any { it.required && !it.granted }) PermissionBanner { go(Routes.SETTINGS) }
+                    val missing = state.permissions.filter { it.required && !it.granted }
+                    val core = missing.firstOrNull { it.warning != null }
+                    when {
+                        core != null -> PermissionBanner("${core.warning} Hier erlauben.", core.request)
+                        missing.isNotEmpty() -> PermissionBanner("Berechtigungen fehlen – ohne sie kann ein Alarm ausbleiben. Hier einrichten.") {
+                            go(Routes.SETTINGS)
+                        }
+                    }
                     state.today?.let { today ->
                         TodayScreen(
                             today = today, date = date, zone = zone, now = now,
@@ -408,10 +415,10 @@ fun AvlAppUi(
 }
 
 @Composable
-private fun PermissionBanner(onClick: () -> Unit) {
+private fun PermissionBanner(text: String, onClick: () -> Unit) {
     val c = Avl.colors
     Text(
-        "Berechtigungen fehlen – ohne sie kann ein Alarm ausbleiben. Hier einrichten.",
+        text,
         Modifier.fillMaxWidth().padding(start = 16.dp, end = 64.dp, top = 12.dp).clip(RoundedCornerShape(12.dp))
             .background(c.strict).clickable(onClick = onClick).padding(12.dp),
         color = c.onStrict, fontWeight = FontWeight.SemiBold,

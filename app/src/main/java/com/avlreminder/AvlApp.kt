@@ -12,6 +12,7 @@ import androidx.glance.appwidget.updateAll
 import com.avlreminder.alarm.AlarmPause
 import com.avlreminder.alarm.AlarmService
 import com.avlreminder.alarm.AndroidAlarmPort
+import com.avlreminder.alarm.ExactAlarms
 import com.avlreminder.alarm.Notifications
 import com.avlreminder.alarm.OverviewNotifications
 import com.avlreminder.alarm.PreNotices
@@ -74,6 +75,7 @@ open class AvlApp : Application() {
         OverviewNotifications.createChannel(this)
         PreNotices.createChannel(this)
         AlarmPause.createChannel(this)
+        ExactAlarms.createChannel(this)
         SessionService.createChannel(this)
         AndroidCloudNotices.createChannel(this)
         // Android reports WLAN connections from now on, also without a running process (7.29 OZ3).

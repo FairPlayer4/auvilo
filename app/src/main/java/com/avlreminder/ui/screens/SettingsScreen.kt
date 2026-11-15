@@ -64,6 +64,8 @@ data class PermissionItem(
     val granted: Boolean,
     /** Missing required permissions are shown as a warning on "Heute". */
     val required: Boolean = true,
+    /** For the app's core: shown on "Heute" instead of the general warning, a tap asks right away. */
+    val warning: String? = null,
     val request: () -> Unit,
 )
 

@@ -3,6 +3,7 @@ package com.avlreminder.alarm
 import com.avlreminder.TestClock
 import com.avlreminder.settle
 import android.app.AlarmManager
+import android.app.Notification
 import android.app.NotificationManager
 import android.content.Context
 import android.content.Intent
@@ -24,11 +25,13 @@ import kotlinx.coroutines.runBlocking
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertNotNull
 import org.junit.Assert.assertNull
+import org.junit.Assert.assertTrue
 import org.junit.After
 import org.junit.Before
 import org.junit.Test
 import org.junit.runner.RunWith
 import org.robolectric.Shadows.shadowOf
+import org.robolectric.shadows.ShadowAlarmManager
 import org.robolectric.shadows.ShadowLooper
 import java.time.Instant
 import java.time.LocalTime
@@ -73,6 +76,36 @@ class AlarmGlueTest {
         port.cancel(1)
         port.cancel(2)
         assertEquals(before, reminderAlarms().size)
+    }
+
+    private fun missingNotice() = shadowOf(notifications).allNotifications.firstOrNull {
+        it.extras.getString(Notification.EXTRA_TITLE)?.contains(ExactAlarms.LABEL) == true
+    }
+
+    // Anf. 7.28 PS10: without "Wecker und Erinnerungen" the alarm still comes, inexact, and the app says so.
+    @Test
+    fun withoutExactAlarmsTheAlarmComesInexactAndANotificationSaysWhy() {
+        ShadowAlarmManager.setCanScheduleExactAlarms(false)
+        val port = AndroidAlarmPort(context)
+        for ((id, kind) in listOf(1L to AlarmKind.ALARM_CLOCK, 2L to AlarmKind.EXACT)) {
+            port.set(id, at, kind)
+            val planned = shadowOf(alarmManager).scheduledAlarms.single { it.operation == AndroidAlarmPort.pending(context, id) }
+            assertEquals("$kind", at.toEpochMilli(), planned.triggerAtTime)
+            // Also in Doze, but not exact.
+            assertTrue("$kind", planned.isAllowWhileIdle)
+            assertTrue("$kind", planned.windowLengthMs != ShadowAlarmManager.WINDOW_EXACT)
+        }
+        assertNull(alarmManager.nextAlarmClock)
+        assertNotNull(missingNotice())
+
+        // Granted again: the notification goes (SystemReceiver and the app's start call refresh).
+        ShadowAlarmManager.setCanScheduleExactAlarms(true)
+        ExactAlarms.refresh(context)
+        assertNull(missingNotice())
+        port.set(1, at, AlarmKind.ALARM_CLOCK)
+        assertEquals(at.toEpochMilli(), alarmManager.nextAlarmClock?.triggerTime)
+        port.cancel(1)
+        port.cancel(2)
     }
 
     @Test

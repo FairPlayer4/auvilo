@@ -27,14 +27,17 @@ class AndroidAlarmPort(private val context: Context) : AlarmPort {
     override fun set(occurrenceId: Long, at: Instant, kind: AlarmKind) {
         Diag.log("alarm set occ=$occurrenceId at=$at kind=$kind")
         val pending = pending(context, occurrenceId, at)
-        when (kind) {
-            AlarmKind.ALARM_CLOCK -> {
-                val show = PendingIntent.getActivity(
-                    context, 0, Intent(context, MainActivity::class.java), PendingIntent.FLAG_IMMUTABLE,
-                )
-                alarmManager.setAlarmClock(AlarmManager.AlarmClockInfo(at.toEpochMilli(), show), pending)
+        // Without "Wecker und Erinnerungen" both come inexact (Anf. 7.28 PS10).
+        ExactAlarms.set(context, at, pending, "occ=$occurrenceId") {
+            when (kind) {
+                AlarmKind.ALARM_CLOCK -> {
+                    val show = PendingIntent.getActivity(
+                        context, 0, Intent(context, MainActivity::class.java), PendingIntent.FLAG_IMMUTABLE,
+                    )
+                    setAlarmClock(AlarmManager.AlarmClockInfo(at.toEpochMilli(), show), pending)
+                }
+                AlarmKind.EXACT -> setExactAndAllowWhileIdle(AlarmManager.RTC_WAKEUP, at.toEpochMilli(), pending)
             }
-            AlarmKind.EXACT -> alarmManager.setExactAndAllowWhileIdle(AlarmManager.RTC_WAKEUP, at.toEpochMilli(), pending)
         }
     }
 

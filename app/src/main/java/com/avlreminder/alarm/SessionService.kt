@@ -78,6 +78,12 @@ class SessionService : Service() {
                 if (running) context.startService(Intent(context, SessionService::class.java).setAction(ACTION_UPDATE))
                 return
             }
+            // Type systemExempted needs "Wecker und Erinnerungen" (Anf. 7.28 PS10).
+            if (!ExactAlarms.allowed(context)) {
+                if (running) context.startService(Intent(context, SessionService::class.java).setAction(ACTION_UPDATE))
+                sessions.forEach { manager.notify(id(it.occurrenceId), notification(context, it)) }
+                return
+            }
             try {
                 context.startForegroundService(Intent(context, SessionService::class.java).setAction(ACTION_UPDATE))
             } catch (e: Exception) {

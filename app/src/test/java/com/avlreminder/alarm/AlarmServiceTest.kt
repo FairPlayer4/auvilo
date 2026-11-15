@@ -8,12 +8,15 @@ import androidx.test.ext.junit.runners.AndroidJUnit4
 import com.avlreminder.core.model.ChecklistItem
 import com.avlreminder.core.rules.Escalation
 import org.junit.Assert.assertEquals
+import org.junit.Assert.assertNotNull
 import org.junit.Assert.assertNull
+import org.junit.Assert.assertTrue
 import org.junit.Before
 import org.junit.Test
 import org.junit.runner.RunWith
 import org.robolectric.Robolectric
 import org.robolectric.Shadows.shadowOf
+import org.robolectric.shadows.ShadowAlarmManager
 import org.robolectric.shadows.ShadowLooper
 import java.util.concurrent.TimeUnit
 
@@ -67,6 +70,18 @@ class AlarmServiceTest {
             assertEquals(f.name + " (still)", f.knopf, actions(Notifications.id(f.info.occurrenceId)).first())
             notifications.cancelAll()
         }
+    }
+
+    // Typ systemExempted braucht „Wecker und Erinnerungen“ (Anf. 7.28 PS10): ohne die Erlaubnis
+    // gar nicht erst starten, sondern laut benachrichtigen.
+    @Test
+    fun `ohne Wecker und Erinnerungen kommt eine Benachrichtigung statt des Dienstes`() {
+        ShadowAlarmManager.setCanScheduleExactAlarms(false)
+        AlarmService.start(app, AlarmInfo(43, "Ohne Erlaubnis", null, quickDone = true), loud = true)
+        val started = generateSequence { shadowOf(app).nextStartedService }.toList()
+        assertTrue(started.none { it.component?.className == AlarmService::class.java.name })
+        assertNotNull(shadowOf(notifications).getNotification(Notifications.id(43)))
+        notifications.cancelAll()
     }
 
     @Test

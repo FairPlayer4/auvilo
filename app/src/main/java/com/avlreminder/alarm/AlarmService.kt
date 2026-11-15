@@ -50,10 +50,17 @@ class AlarmService : Service() {
                 // des Dienstes; ohne nextItem schlösse "Erledigt" eine Checkliste ganz ab.
                 .putExtra(EXTRA_INFO, info.toBundle())
                 .putExtra(EXTRA_LOUD, loud)
+            // Type systemExempted needs "Wecker und Erinnerungen"; without it startForeground would
+            // fail after the start, too late to avoid Android's complaint (Anf. 7.28 PS10).
+            if (!ExactAlarms.allowed(context)) {
+                Diag.log("exact alarms not allowed, banner instead of the lasting alarm occ=${info.occurrenceId}")
+                Notifications.show(context, info, quiet = false)
+                return
+            }
             try {
                 context.startForegroundService(intent)
             } catch (e: Exception) {
-                // Spike finding: should not happen with USE_EXACT_ALARM, but never lose a reminder over it.
+                // Never lose a reminder over it.
                 Log.w(TAG, "foreground service not startable, falling back to banner", e)
                 Diag.log("service not startable, banner instead: ${e.message}")
                 Notifications.show(context, info, quiet = false)

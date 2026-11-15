@@ -630,12 +630,13 @@ umgesetzt / verworfen. Liste in den Einstellungen, *Teilen* als Markdown.
 | Thema | Lösung |
 |---|---|
 | Alarm | `setAlarmClock()` für normal/streng, `setExactAndAllowWhileIdle()` für locker; Übersicht und Vorab-Reminder mit `setWindow()`; Prüf-Alarme der Orte exakt bzw. `setWindow()` (6.) |
-| Dauer-Alarm, Sitzung | Foreground-Services Typ `systemExempted` (`AlarmService`, `SessionService`) |
+| Exakte Alarme | `SCHEDULE_EXACT_ALARM` (Anf. 7.28 PS10), vom Nutzer in *Wecker und Erinnerungen* erteilt und entziehbar. Alles Exakte läuft über `ExactAlarms.set`: ohne Erlaubnis `setAndAllowWhileIdle()` (kommt auch in Doze, bis zu einer Stunde zu spät), Eintrag im Diagnose-Log und eine Benachrichtigung „Erlaubnis fehlt“. Erteilen schickt `SCHEDULE_EXACT_ALARM_PERMISSION_STATE_CHANGED` an den `SystemReceiver` (Neuaufbau, Benachrichtigung weg); Entziehen beendet die App, und der nächste Start plant ungenau |
+| Dauer-Alarm, Sitzung | Foreground-Services Typ `systemExempted` (`AlarmService`, `SessionService`); der Typ braucht exakte Alarme, ohne Erlaubnis starten sie nicht, sondern zeigen eine Benachrichtigung |
 | Vollbild | Full-Screen-Intent + Activity mit `showWhenLocked`/`turnScreenOn` |
 | Was vom Alarm bleibt | Löschen, Pausieren, Archivieren und Verwerfen aus der App nehmen Klingeln und Benachrichtigung des offenen Termins weg, ebenso verpasst, Tagesende und Notaus-Skip; das macht die Engine (`RingPort.end`, Abschnitt 1), eine abgelehnte Änderung nicht. *Notaus* stoppt das Klingeln und lässt eine stille Benachrichtigung, wie nach einer Runde. Ein anderer Alarm, während ein Nachweis offen ist, beendet diesen Nachweis (N0) |
-| Neuaufbau | `sync` bei Änderung, Alarm, App-Start, `BOOT_COMPLETED`, `MY_PACKAGE_REPLACED`, Zeit-/Zonenänderung |
+| Neuaufbau | `sync` bei Änderung, Alarm, App-Start, `BOOT_COMPLETED`, `MY_PACKAGE_REPLACED`, Zeit-/Zonenänderung, Erlaubnis für exakte Alarme erteilt |
 | Ort | WLAN (`NetworkCallback` mit PendingIntent, letzte Suchergebnisse), Play-Services Geofencing (Dwell), Fused Location für die aktive Prüfung |
-| Berechtigungen | Seite in den Einstellungen, Warnung auf *Heute*: Benachrichtigungen, Vollbild, Akku, Kamera, Mikrofon; Standort „Immer“ und DND-Ausnahme nur, wenn ein Reminder sie braucht |
+| Berechtigungen | Seite in den Einstellungen, Warnung auf *Heute*: Wecker und Erinnerungen, Benachrichtigungen, Vollbild, Akku, Kamera, Mikrofon; Standort „Immer“ und DND-Ausnahme nur, wenn ein Reminder sie braucht. Fehlt *Wecker und Erinnerungen* (Kernfunktion), sagt *Heute* statt der allgemeinen Warnung, was dann nicht geht, und das Antippen öffnet direkt Androids Schalter |
 
 ## 13. Daten, Migration, Diagnose
 

@@ -17,6 +17,7 @@ import android.net.wifi.WifiInfo
 import android.net.wifi.WifiManager
 import android.os.SystemClock
 import androidx.core.content.edit
+import com.avlreminder.alarm.ExactAlarms
 import com.avlreminder.core.model.PlaceWifi
 import com.avlreminder.core.ports.PlaceAlarmPort
 import com.avlreminder.core.ports.WifiPort
@@ -180,12 +181,13 @@ class WifiConnections(context: Context) {
 class AndroidPlaceAlarms(private val context: Context) : PlaceAlarmPort {
     private val alarms get() = context.getSystemService(AlarmManager::class.java)
 
-    // USE_EXACT_ALARM is granted at install time (manifest); lint only knows SCHEDULE_EXACT_ALARM.
-    @SuppressLint("MissingPermission")
     override fun set(placeId: Long, at: Instant, exact: Boolean) {
         val pending = pending(placeId, at)
         if (exact) {
-            alarms.setExactAndAllowWhileIdle(AlarmManager.RTC_WAKEUP, at.toEpochMilli(), pending)
+            // Without "Wecker und Erinnerungen" inexact (Anf. 7.28 PS10).
+            ExactAlarms.set(context, at, pending, "place=$placeId") {
+                setExactAndAllowWhileIdle(AlarmManager.RTC_WAKEUP, at.toEpochMilli(), pending)
+            }
         } else {
             alarms.setWindow(AlarmManager.RTC_WAKEUP, at.toEpochMilli(), WINDOW_MS, pending)
         }

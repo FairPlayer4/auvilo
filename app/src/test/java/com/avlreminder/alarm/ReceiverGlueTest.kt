@@ -48,6 +48,7 @@ import org.junit.Before
 import org.junit.Test
 import org.junit.runner.RunWith
 import org.robolectric.Shadows.shadowOf
+import org.robolectric.shadows.ShadowAlarmManager
 import org.robolectric.shadows.ShadowLooper
 import java.io.File
 import java.time.Duration
@@ -443,9 +444,26 @@ class ReceiverGlueTest {
         assertEquals(today, overview().triggerAtTime)
     }
 
+    // Anf. 7.28 PS10: planned inexact without "Wecker und Erinnerungen", exact again once granted.
+    @Test
+    fun grantingExactAlarmsPlansThemExactAgain() = runBlocking {
+        ShadowAlarmManager.setCanScheduleExactAlarms(false)
+        val id = repo.saveReminder(reminder())
+        occurrence(id, OccurrenceState.PLANNED, Duration.ofMinutes(-60))
+        graph.rebuild("without permission")
+        assertNull(alarmManager.nextAlarmClock)
+
+        ShadowAlarmManager.setCanScheduleExactAlarms(true)
+        broadcast(Intent(AlarmManager.ACTION_SCHEDULE_EXACT_ALARM_PERMISSION_STATE_CHANGED).setClass(context, SystemReceiver::class.java))
+        waitFor("planned exact") { alarmManager.nextAlarmClock != null }
+    }
+
     @Test
     fun theManifestDeliversBootTimeAndTimeZoneChangesToTheSystemReceiver() {
-        for (action in listOf(Intent.ACTION_BOOT_COMPLETED, Intent.ACTION_TIME_CHANGED, Intent.ACTION_TIMEZONE_CHANGED, Intent.ACTION_MY_PACKAGE_REPLACED)) {
+        for (action in listOf(
+            Intent.ACTION_BOOT_COMPLETED, Intent.ACTION_TIME_CHANGED, Intent.ACTION_TIMEZONE_CHANGED, Intent.ACTION_MY_PACKAGE_REPLACED,
+            AlarmManager.ACTION_SCHEDULE_EXACT_ALARM_PERMISSION_STATE_CHANGED,
+        )) {
             val receivers = context.packageManager.queryBroadcastReceivers(Intent(action).setPackage(context.packageName), 0)
             // The widget library has its own receiver for app updates.
             assertTrue(action, SystemReceiver::class.java.name in receivers.map { it.activityInfo.name })

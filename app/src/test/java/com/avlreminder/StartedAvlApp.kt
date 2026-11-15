@@ -1,6 +1,7 @@
 package com.avlreminder
 
 import kotlinx.coroutines.runBlocking
+import org.robolectric.shadows.ShadowAlarmManager
 
 /**
  * The app for all Robolectric tests (robolectric.properties): it waits for the start job before a test
@@ -10,6 +11,9 @@ import kotlinx.coroutines.runBlocking
  */
 class StartedAvlApp : AvlApp() {
     override fun onCreate() {
+        // Like a set-up phone: "Wecker und Erinnerungen" is granted (Robolectric starts without it).
+        // Tests without it switch it off themselves.
+        ShadowAlarmManager.setCanScheduleExactAlarms(true)
         super.onCreate()
         runBlocking { started.join() }
     }

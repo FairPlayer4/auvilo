@@ -918,6 +918,10 @@ Vordergrund, nicht Reichweite.
     Nutzer in *Alarme & Erinnerungen* erteilt) stört weder Kevin noch die Zielgruppe,
     solange die Kernfunktion nicht schlechter wird. Damit hängt der Store nicht an der
     Prüfung von `USE_EXACT_ALARM` (playstore.md P1).
+  - Fehlt die Erlaubnis, muss die App klar sagen, dass sie dann nicht richtig funktioniert
+    (Kernfunktion): auf *Heute* mit dem, was dann nicht geht (Alarme bis zu einer Stunde zu
+    spät, kein Dauer-Alarm), ein Tippen führt direkt zum Schalter; plant die App ohne
+    Erlaubnis, sagt es eine Benachrichtigung. Umgesetzt in V1.3c4.
 - Was für den Play Store noch fehlt (Prüfung 2026-11-15, Annahme: erste Fassung ohne
   Backend): [playstore.md](playstore.md).
 - Backend-Stand und was es für die App bedeutet: [backend.md](backend.md); Einbindung des
@@ -1287,6 +1291,7 @@ Neueste zuerst. Kap. 7 enthält immer den gültigen Stand; diese Tabelle ist die
 
 | Datum | Entscheidung |
 |---|---|
+| 2026-11-15 | **Umstieg auf `SCHEDULE_EXACT_ALARM`** in allen Builds (Kevin: „Es muss dem Nutzer klar kommuniziert werden, dass die App ohne die Berechtigung nicht richtig funktioniert“): Pflichtpunkt *Wecker und Erinnerungen*, ohne ihn ein eigener Hinweis auf *Heute* und eine Benachrichtigung; Alarme kommen dann ungenau statt gar nicht (7.28 PS10). Umgesetzt in V1.3c4 |
 | 2026-11-15 | **Positionierung als Wecker und Timer**, später gemeinsamer Kalender (Kevin: „Die App ist prinzipiell als Wecker und Timer gedacht“); der Store-Eintrag beschreibt sie so. Ein zusätzlicher Schritt für exakte Alarme (`SCHEDULE_EXACT_ALARM`) ist in Ordnung, solange die Kernfunktion nicht leidet (7.28 PS10, playstore.md P1) |
 | 2026-11-15 | **A-15 neu: Passwortmanager als Hauptweg** (Kevin: „realistisch ist es sicherer wenn man es in einen (E2E) Passwortmanager packt“): Hauptknopf *Im Passwortmanager speichern*, davor ein Hinweis (Ende-zu-Ende-Verschlüsselung, beim Google Passwortmanager nur mit Geräteverschlüsselung, sonst reicht das Google-Konto; den Passwortmanager selbst mit seinem Wiederherstellungscode auf Papier schützen). Papier bleibt als Ausweg mit Rückfrage. Kein Speicher-Dialog mehr von selbst. Ändert den Eintrag vom 2026-11-12 (7.33 WS1, WS4). Umgesetzt in V1.3c3 |
 | 2026-11-15 | **Displaysperre vor dem Löschen** (Backend SE5, Kevin: „SE5 angehen“): *Konto löschen* und *Sicherung löschen* fragen nach dem eingetippten Wort die Displaysperre ab (BiometricPrompt, starke Biometrie oder Geräte-PIN), bevor etwas den Server erreicht. *Sicherung löschen* dazu, weil es wie *Konto löschen* alle Fassungen endgültig löscht (Empfehlung, Kevin kann widersprechen). Ohne Displaysperre geht es weiter und wird protokolliert: Es gibt nichts zum Bestätigen, und Löschen (Art. 17) muss möglich bleiben. Abbrechen, Fehlversuche oder fehlender Sensor heißen nein. *Gerät sperren* gibt es in der App nicht als eigene Aktion (nur *Dieses Gerät abmelden*, das nichts löscht). Umgesetzt in V1.3c2 |
