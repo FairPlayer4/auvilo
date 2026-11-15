@@ -948,6 +948,10 @@ Vordergrund, nicht Reichweite.
     Standort-Berechtigung heraus, im Hintergrund nur mit „Immer erlauben“ (design.md 6,
     WLAN). Streichen hieße deshalb: Ankunft am Ort im Play-Build ganz aus, nicht nur der
     Geofence.
+  - Die auffällige Offenlegung kommt vor Androids Dialog: Tippt man in der
+    Berechtigungsliste auf *Standort „Immer erlauben“*, erklärt erst ein eigener Hinweis
+    (Standort und WLAN, auch wenn die App geschlossen ist, bleibt auf dem Handy), dann fragt
+    Android; *Nicht jetzt* fragt nichts. Umgesetzt in V1.3c7.
 - PS14 **Sicherungsdatei: Export und Import (2026-11-15):** Daten und Einstellungen lassen
   sich als Datei exportieren und wieder importieren (*Einstellungen → Lokale Kopien →
   Sicherungsdatei*), ohne Backend. Gedacht für Tester ohne Cloud-Backup, als zusätzliche
@@ -960,10 +964,23 @@ Vordergrund, nicht Reichweite.
   - Importieren fragt wie jedes Wiederherstellen: Vergleich, Rückfrage, Tausch beim
     nächsten Start, vorher eine Tageskopie zum Rückgängigmachen (W-5, W-6).
   - Umgesetzt in V1.3c8.
-  - Die auffällige Offenlegung kommt vor Androids Dialog: Tippt man in der
-    Berechtigungsliste auf *Standort „Immer erlauben“*, erklärt erst ein eigener Hinweis
-    (Standort und WLAN, auch wenn die App geschlossen ist, bleibt auf dem Handy), dann fragt
-    Android; *Nicht jetzt* fragt nichts. Umgesetzt in V1.3c7.
+- PS15 **Einstieg für Tester (2026-11-15):** Nach einer frischen Installation zeigt die App
+  einen kurzen Einstieg in vier Seiten (playstore.md N3, passt zu PS6): was die App macht
+  (klingelt, bis man reagiert; Strenge pro Reminder; Notaus; Daten bleiben auf dem Handy),
+  die Berechtigungen der Reihe nach mit ihrem Zweck (nötige zuerst, die übrigen „später“),
+  ein Probealarm und der erste Reminder, dazu wohin Rückmeldungen gehen.
+  - Von selbst nur, solange es keinen Reminder gibt und der Einstieg nie beendet wurde; auf
+    Kevins Handy kommt er nach dem Update nicht. *Überspringen*, *Fertig*, Zurück und
+    *Ersten Reminder anlegen* beenden ihn.
+  - **Wiederholbar** (Kevin: „Am besten mit Knopf zum Triggern“): *Einstellungen → Hilfe →
+    Einstieg zeigen*, jederzeit.
+  - **Probealarm:** legt einen normalen Einmal-Reminder „Probealarm“ an (Art
+    *Dokumentieren*, also ohne Startklar-Fragen), zwei Minuten nach der nächsten vollen
+    Minute; er klingelt wie jeder Reminder und bleibt danach im Verlauf.
+  - **Rückmeldung:** über *Verbesserung vorschlagen* (Glühbirne, 7.24) und *Teilen*. Eine
+    Kontaktadresse in der App fehlt noch; sie kommt mit der Support-Adresse für den
+    Store-Eintrag (Kevin entscheidet).
+  - Umgesetzt in V1.3c9.
 - Was für den Play Store noch fehlt (Prüfung 2026-11-15, Annahme: erste Fassung ohne
   Backend): [playstore.md](playstore.md).
 - Backend-Stand und was es für die App bedeutet: [backend.md](backend.md); Einbindung des
@@ -1334,6 +1351,7 @@ Neueste zuerst. Kap. 7 enthält immer den gültigen Stand; diese Tabelle ist die
 
 | Datum | Entscheidung |
 |---|---|
+| 2026-11-15 | **Einstieg für Tester, wiederholbar** (Kevin: „Du kannst einen Vorschlag machen und ich spiele es nach Umsetzung am Handy durch. Am besten mit Knopf zum Triggern (Wiederholbarkeit).“): vier Seiten mit Erklärung, Berechtigungen der Reihe nach, Probealarm und erstem Reminder; von selbst nur ohne Reminder, sonst über *Einstellungen → Hilfe* (7.28 PS15, playstore.md N3). Umgesetzt in V1.3c9 |
 | 2026-11-15 | **Sicherungsdatei mit Passwort, ohne Fotos und Audio** (Kevin wählte „Mit Passwort“ und „Erstmal ohne“): Export und Import als Datei in den lokalen Kopien; AES-256-GCM mit einem Schlüssel aus dem Passwort (PBKDF2, 600 000 Runden), mindestens 12 Zeichen; Import wie jedes Wiederherstellen (7.28 PS14, playstore.md N4). Umgesetzt in V1.3c8 |
 | 2026-11-15 | **Standort im Hintergrund behalten und begründen** (Kevin: „Wir sollten es nur bei Ablehnung streichen und bei der Einreichung begründen.“): Ort per WLAN reicht heute, der Geofence muss ohnehin überarbeitet werden; da auch das WLAN „Immer erlauben“ braucht, hieße Streichen: Ankunft im Play-Build aus (7.28 PS13, playstore.md P5). Hinweis vor Androids Dialog umgesetzt in V1.3c7 |
 | 2026-11-15 | **Akku-Optimierung nur empfohlen, ohne direkten Dialog** (Kevin: „Theoretisch sollte die App auch mit Battery Optimizations funktionieren nur ohne Garantie.“): kein Pflichtpunkt mehr, keine Warnung auf *Heute*; der Knopf öffnet die App-Info statt Androids Dialog; `REQUEST_IGNORE_BATTERY_OPTIMIZATIONS` entfällt (7.28 PS12, playstore.md P4). Umgesetzt in V1.3c6 |
@@ -1426,6 +1444,7 @@ Neueste zuerst. Kap. 7 enthält immer den gültigen Stand; diese Tabelle ist die
 | V1.3c1 | 2026-11-13 | Verschiebe-Limit pro Termin, Woche oder Monat (Z2b): Formular, Alarm mit „noch 1× diese Woche“ und „wieder ab …“, Vorlagen, Schnittstelle für Claude; Schema 11 |
 | V1.3c2–c7 | 2026-11-15 | Konto löschen und Displaysperre (R-3, SE5), Passwortmanager als Hauptweg, exakte Alarme mit `SCHEDULE_EXACT_ALARM`, Name „AuViLo-Reminder“ (7.28 PS11), Akku nur empfohlen (PS12), Hinweis vor dem Standort-Dialog (PS13) |
 | V1.3c8 | – | Sicherungsdatei: Export und Import mit Passwort, ohne Fotos und Audio (7.28 PS14) |
+| V1.3c9 | – | Einstieg für Tester mit Probealarm, wiederholbar in den Einstellungen (7.28 PS15) |
 
 Details zum Verhalten: [design.md](design.md), Gerätetests: [geraetetest.md](geraetetest.md).
 

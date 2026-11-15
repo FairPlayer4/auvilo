@@ -129,9 +129,11 @@ betrifft P4.
     dazu.
   - Empfehlung: jetzt nicht. Die erste Play-Fassung auf Deutsch (DE, AT, CH) braucht es nicht;
     vor einer englischen Fassung als eigene Etappe, zuerst `core` auf Kennungen.
-- N3 **Einstieg für Fremde**: Die App setzt Kevins Wissen voraus. Für Tester fehlt ein
-  kurzer Einstieg (erster Reminder, Berechtigungen der Reihe nach, wofür sie gut sind;
-  passt zu PS6) und eine Kontaktmöglichkeit für Rückmeldungen.
+- N3 **Einstieg für Fremde**: ~~fehlt~~ umgesetzt in V1.3c9 (Anf. 7.28 PS15): vier Seiten
+  nach einer frischen Installation (was die App macht, Berechtigungen der Reihe nach,
+  Probealarm, erster Reminder, Rückmeldung über *Verbesserung vorschlagen* und *Teilen*),
+  wieder über *Einstellungen → Hilfe → Einstieg zeigen*. Offen: eine Kontaktadresse in der App;
+  sie kommt mit der Support-Adresse des Store-Eintrags.
 - N4 **Daten-Export/Import als Datei**: ~~fehlt~~ umgesetzt in V1.3c8 (Anf. 7.28 PS14):
   *Sicherungsdatei* in den lokalen Kopien, mit eigenem Passwort verschlüsselt, ohne Fotos und
   Audio. Ohne Backend die einzige Sicherung für Tester und der Weg, Kevins Daten aus der
@@ -145,6 +147,6 @@ betrifft P4.
 2. Code, der auch der Sideload-App nicht schadet: P1, P3, P4, P5 (Offenlegung), B1, B4, B5.
    P1 und P4 ändern Kevins Alltag kaum, brauchen aber je einmal einen Gerätetest
    (Erlaubnis entziehen, Alarm kommt trotzdem bzw. Hinweis erscheint).
-3. N3 Einstieg (N4 Export/Import ist in V1.3c8 umgesetzt).
+3. Erledigt: N4 Export/Import (V1.3c8), N3 Einstieg (V1.3c9).
 4. Konto anlegen, Datenschutzerklärung, Store-Eintrag, interner Test, dann geschlossener
    Test mit 12 Testern (Android 17 vorher klären).

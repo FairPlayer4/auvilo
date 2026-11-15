@@ -154,7 +154,7 @@ eine Fälligkeit an `countedAt`: eine Sitzung an ihrem Start, sonst an `resolved
 | `place` | Orte (*Zuhause* und ein weiterer), Radius Standard 150 m |
 | `place_wifi` | Zugangspunkte eines Orts: `bssid`, `ssid` nur zur Anzeige; privat (6.) |
 | `template` | Vorlagen (11.3) |
-| `suggestion` | Verbesserungsvorschläge (11.5), ohne Fremdschlüssel |
+| `suggestion` | Verbesserungsvorschläge (11.6), ohne Fremdschlüssel |
 
 Globale Einstellungen liegen im DataStore: Darstellung, Alarmzeiten (`loudFrom` 18:00,
 `dayEnd` 23:00), Nachfrage-Schwelle, Verweildauer, Übersicht, Sortierung der Liste.
@@ -620,7 +620,20 @@ Strenge-Farben gleich bleiben. Alarm immer dunkel. Text-Kontrast ≥ 4,5 : 1.
 | Akzent (Fläche, weiße Schrift) | `#1F4FD1` | `#2F5FE0` |
 | Streng / verpasst | `#B4400A` | `#FF9A62` |
 
-### 11.5 Verbesserung vorschlagen
+### 11.5 Einstieg (Anf. 7.28 PS15)
+`ui/screens/Intro.kt`, Route `intro` ohne Tabs: vier Seiten (*Willkommen*,
+*Berechtigungen*, *Probealarm*, *Dein erster Reminder* mit *Rückmeldung*), oben
+*Überspringen* und „1 / 4“, unten *Zurück* und *Weiter* bzw. *Fertig*. Die Berechtigungen
+sind dieselbe Liste wie in den Einstellungen (`PermissionRow`), die nötigen zuerst, die
+übrigen unter „Später“; nach dem Erteilen in Androids Einstellungen aktualisiert
+`onResume` die Liste. Von selbst kommt der Einstieg, wenn `introSeen` in den Einstellungen
+fehlt und die Reminder geladen und leer sind (`AppState.intro`, in `MainActivity`); jedes
+Verlassen setzt `introSeen`. *Einstellungen → Hilfe → Einstieg zeigen* öffnet ihn immer.
+Der Probealarm (`AppViewModel.probeAlarm`) speichert über die Engine einen Einmal-Reminder
+„Probealarm“ (normal, *Dokumentieren*) zwei Minuten nach der nächsten vollen Minute; lehnt
+die Engine ab, sagt es der Hinweis unten wie bei anderen abgelehnten Aktionen.
+
+### 11.6 Verbesserung vorschlagen
 Glühbirne oben rechts auf jedem Bildschirm, im Alarm ein Textknopf ganz unten (der Alarm
 läuft weiter). Gespeichert mit Bildschirm, Reminder, App-Version; Status offen /
 umgesetzt / verworfen. Liste in den Einstellungen, *Teilen* als Markdown.

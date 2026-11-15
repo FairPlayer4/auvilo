@@ -8,6 +8,7 @@ import androidx.test.ext.junit.runners.AndroidJUnit4
 import com.avlreminder.TestClock
 import com.avlreminder.alarm.AlarmInfo
 import com.avlreminder.alarm.Notifications
+import com.avlreminder.core.model.Character
 import com.avlreminder.core.model.Occurrence
 import com.avlreminder.core.model.OccurrenceState
 import com.avlreminder.core.model.Reminder
@@ -27,7 +28,11 @@ import org.junit.runner.RunWith
 import org.robolectric.Shadows.shadowOf
 import org.robolectric.shadows.ShadowLooper
 import org.robolectric.shadows.ShadowToast
+import com.avlreminder.ui.screens.Intro
+import kotlinx.coroutines.flow.first
+import java.time.LocalDateTime
 import java.time.LocalTime
+import java.time.ZoneId
 
 /**
  * What the view model does around the engine: says why something was rejected (Review-Lauf 1) and
@@ -130,5 +135,27 @@ class AppViewModelTest {
     fun `Pausieren eines unbekannten Reminders sagt nicht, dass er läuft`() {
         AppViewModel(app).setActive(999, false)
         assertEquals("Nicht möglich: Reminder nicht gefunden", latestToast())
+    }
+
+    // The test alarm of the introduction (Anf. 7.28 PS15): one minute or two ahead, rings like any reminder.
+    @Test
+    fun `der Probealarm klingelt in ein bis zwei Minuten`() {
+        TestClock.at(LocalTime.of(14, 29, 40))
+        var at: LocalDateTime? = null
+        AppViewModel(app).probeAlarm { at = it }
+        waitFor { at != null }
+        assertEquals(TestClock.now().atZone(ZoneId.systemDefault()).toLocalDate().atTime(14, 31), at)
+        val probe = runBlocking { repo.reminders() }.single { it.title == Intro.PROBE_TITLE }
+        assertEquals(Schedule.Once(checkNotNull(at)), probe.schedule)
+        assertEquals("no \"Startklar\" questions", Character.DOCUMENT, probe.character)
+        val due = runBlocking { repo.openOccurrence(probe.id) }?.dueAt
+        assertEquals(at!!.atZone(ZoneId.systemDefault()).toInstant(), due)
+    }
+
+    @Test
+    fun `der Einstieg merkt sich, dass er gesehen wurde`() {
+        val vm = AppViewModel(app)
+        vm.introDone()
+        waitFor { runBlocking { graph.settings.introSeen.first() } }
     }
 }

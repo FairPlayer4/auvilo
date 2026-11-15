@@ -14,6 +14,8 @@ import androidx.compose.ui.test.junit4.v2.createEmptyComposeRule
 import androidx.compose.ui.test.performTextReplacement
 import androidx.lifecycle.Lifecycle
 import androidx.lifecycle.ViewModelProvider
+import androidx.compose.ui.test.onAllNodesWithTag
+import androidx.compose.ui.test.onAllNodesWithText
 import androidx.test.core.app.ActivityScenario
 import androidx.test.core.app.ApplicationProvider
 import androidx.test.ext.junit.runners.AndroidJUnit4
@@ -53,6 +55,8 @@ class MainActivityTest {
         // application it saw in a static singleton. The activity must not get a view model on that
         // application's database (AppViewModel.Factory).
         ViewModelProvider.AndroidViewModelFactory.getInstance(Application())
+        // The other tests start on "Heute" as before; the introduction has its own test.
+        runBlocking { context.graph.settings.setIntroSeen() }
         ShadowLooper.idleMainLooper()
     }
 
@@ -64,6 +68,25 @@ class MainActivityTest {
      * font size (Kap. 9, 2026-11-12 (6)): the activity is rebuilt with the same, already handled
      * intent, and must come back on the same screen (Review-Lauf 6).
      */
+    // KRITISCH (Anf. 7.28 PS15): the introduction comes by itself only on a fresh install, never in
+    // front of existing reminders (Kevin's phone after the update).
+    @Test
+    fun theIntroductionComesByItselfOnlyWithoutReminders() {
+        runBlocking { context.graph.settings.setIntroSeen(false) }
+        ActivityScenario.launch(MainActivity::class.java).use {
+            compose.waitUntil(5_000) { compose.onAllNodesWithTag("intro").fetchSemanticsNodes().isNotEmpty() }
+        }
+        runBlocking {
+            context.graph.repository.saveReminder(
+                Reminder(title = "Katzenbrunnen", schedule = Schedule.Daily(LocalTime.of(18, 0)), createdAt = TestClock.now()),
+            )
+        }
+        ActivityScenario.launch(MainActivity::class.java).use {
+            compose.waitUntil(5_000) { compose.onAllNodesWithText("Katzenbrunnen").fetchSemanticsNodes().isNotEmpty() }
+            compose.onNodeWithTag("intro").assertDoesNotExist()
+        }
+    }
+
     @Test
     fun aDraftOpenedFromANotificationSurvivesTheActivityBeingRebuilt() {
         val id = runBlocking {

@@ -15,6 +15,11 @@ import com.avlreminder.core.model.Place
 import com.avlreminder.core.model.PrepAnswer
 import com.avlreminder.core.model.Proof
 import com.avlreminder.core.model.Reminder
+import com.avlreminder.core.model.Character
+import com.avlreminder.core.model.Schedule
+import com.avlreminder.core.rules.Presets
+import com.avlreminder.ui.screens.Intro
+import java.time.temporal.ChronoUnit
 import com.avlreminder.core.rules.Action
 import com.avlreminder.core.rules.AlertSettings
 import com.avlreminder.core.rules.Checklists
@@ -93,6 +98,8 @@ class AppViewModel(app: Application) : AndroidViewModel(app) {
     )
 
     val arrivalHintSeen: StateFlow<Boolean> = state(true, graph.settings.arrivalHintSeen)
+    /** True until read, so the introduction never flashes up for a moment. */
+    val introSeen: StateFlow<Boolean> = state(true, graph.settings.introSeen)
 
 
     val dwellMinutes: StateFlow<Int> = state(com.avlreminder.data.Settings.DEFAULT_DWELL, graph.settings.dwellMinutes)
@@ -224,6 +231,25 @@ class AppViewModel(app: Application) : AndroidViewModel(app) {
 
     fun dismissArrivalHint() {
         viewModelScope.launch { graph.settings.setArrivalHintSeen() }
+    }
+
+    fun introDone() {
+        viewModelScope.launch { graph.settings.setIntroSeen() }
+    }
+
+    /**
+     * The test alarm of the introduction (Anf. 7.28 PS15): a one-off "Probealarm", normal and
+     * "Dokumentieren" (no "Startklar" questions), [Intro.PROBE_MINUTES] after the next full minute.
+     */
+    fun probeAlarm(onResult: (LocalDateTime?) -> Unit) {
+        viewModelScope.launch {
+            val now = graph.now()
+            val at = LocalDateTime.ofInstant(now, zone).truncatedTo(ChronoUnit.MINUTES).plusMinutes(Intro.PROBE_MINUTES)
+            val probe = Presets.newReminder(Intro.PROBE_TITLE, Schedule.Once(at), now).copy(character = Character.DOCUMENT)
+            val result = graph.withEngine { it.save(probe, emptyList()) }
+            if (result is SaveResult.Invalid) rejected(result.problems)
+            onResult(at.takeIf { result is SaveResult.Saved })
+        }
     }
 
     /** The geofences are registered again with the new time. */

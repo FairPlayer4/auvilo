@@ -61,6 +61,7 @@ class Settings(private val context: Context) {
     private val pausedFromKey = longPreferencesKey("alarmsPausedFrom")
     /** The one-time hint about the arrival window (Anf. 7.29 OZ9) was dismissed; device only. */
     private val arrivalHintKey = intPreferencesKey("arrivalHintSeen")
+    private val introKey = intPreferencesKey("introSeen")
 
     /** What goes into the backup (B2b); the pause and the interface stay on the device. */
     private val backupInts = listOf(
@@ -158,6 +159,13 @@ class Settings(private val context: Context) {
 
     suspend fun setArrivalHintSeen() {
         context.dataStore.edit { it[arrivalHintKey] = 1 }
+    }
+
+    /** The introduction (Anf. 7.28 PS15) was finished or skipped once. */
+    val introSeen: Flow<Boolean> = context.dataStore.data.map { prefs -> prefs[introKey] == 1 }
+
+    suspend fun setIntroSeen(seen: Boolean = true) {
+        context.dataStore.edit { it[introKey] = if (seen) 1 else 0 }
     }
 
     suspend fun setDwellMinutes(minutes: Int) {

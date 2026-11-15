@@ -62,6 +62,7 @@ import com.avlreminder.data.ThemeMode
 import com.avlreminder.ui.screens.BlockerActions
 import com.avlreminder.ui.screens.EditScreen
 import com.avlreminder.ui.screens.HistoryScreen
+import com.avlreminder.ui.screens.IntroScreen
 import com.avlreminder.ui.screens.PermissionItem
 import com.avlreminder.ui.screens.ReminderForm
 import com.avlreminder.ui.screens.RemindersScreen
@@ -120,6 +121,8 @@ data class AppState(
     val formReady: Boolean = true,
     /** versionName of the build, for "Einstellungen". */
     val appVersion: String = "",
+    /** Show the introduction by itself (fresh install, Anf. 7.28 PS15). */
+    val intro: Boolean = false,
 )
 
 interface AppActions {
@@ -161,6 +164,10 @@ interface AppActions {
     fun setAlarmsPaused(until: Instant?) {}
     fun answerSnoozeHint(reminderId: Long, choice: SnoozeHintChoice) {}
     fun setClaudeAccess(on: Boolean) {}
+    /** The introduction was finished or skipped; it no longer comes by itself. */
+    fun introDone() {}
+    /** Sets the test alarm of the introduction; [onResult] gets its time, null if refused. */
+    fun probeAlarm(onResult: (LocalDateTime?) -> Unit) {}
     val cloud: CloudActions get() = object : CloudActions {}
     val local: com.avlreminder.ui.screens.LocalActions get() = object : com.avlreminder.ui.screens.LocalActions {}
 }
@@ -172,6 +179,8 @@ object Routes {
     const val REMINDERS = "reminders"
     const val SETTINGS = "settings"
     const val SUGGESTIONS = "suggestions"
+    /** The introduction (Anf. 7.28 PS15). */
+    const val INTRO = "intro"
     const val NEW = "edit:0"
     /** "Neuer Reminder": pick a template or start empty. */
     const val CHOOSE = "choose"
@@ -202,7 +211,14 @@ fun AvlAppUi(
         problems = emptyList()
         route = to
     }
-    BackHandler(enabled = route != Routes.TODAY) {
+    // Leaving the introduction in any way counts as seen, so it does not come back by itself.
+    fun leaveIntro(to: String) {
+        actions.introDone()
+        go(to)
+    }
+    LaunchedEffect(state.intro) { if (state.intro && route == Routes.TODAY) go(Routes.INTRO) }
+    BackHandler(enabled = route == Routes.INTRO) { leaveIntro(Routes.TODAY) }
+    BackHandler(enabled = route != Routes.TODAY && route != Routes.INTRO) {
         go(
             when {
                 route == Routes.SUGGESTIONS -> Routes.SETTINGS
@@ -301,11 +317,19 @@ fun AvlAppUi(
                     dwellMinutes = state.dwellMinutes, onDwell = actions::setDwellMinutes,
                     openSuggestions = state.suggestions.count { it.status == SuggestionStatus.OPEN },
                     onSuggestions = { go(Routes.SUGGESTIONS) },
+                    onIntro = { go(Routes.INTRO) },
                     overview = state.overview, onOverview = actions::setOverview,
                     templates = state.templates.orEmpty(), onRenameTemplate = actions::renameTemplate, onDeleteTemplate = actions::deleteTemplate,
                 )
                 SuggestButton({ suggestHere("Einstellungen") }, Modifier.align(Alignment.TopEnd).padding(4.dp))
             }
+            route == Routes.INTRO -> IntroScreen(
+                permissions = state.permissions,
+                onProbe = actions::probeAlarm,
+                onFirstReminder = { leaveIntro(if (state.templates?.isEmpty() == true) Routes.NEW else Routes.CHOOSE) },
+                onDone = { leaveIntro(Routes.TODAY) },
+                modifier = m,
+            )
             route == Routes.SUGGESTIONS -> Box(m) {
                 SuggestionsScreen(
                     state.suggestions, zone, onBack = { go(Routes.SETTINGS) },

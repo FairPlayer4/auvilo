@@ -145,6 +145,7 @@ class MainActivity : ComponentActivity() {
             val alert by vm.alert.collectAsStateWithLifecycle()
             val places by vm.places.collectAsStateWithLifecycle()
             val arrivalHintSeen by vm.arrivalHintSeen.collectAsStateWithLifecycle()
+            val introSeen by vm.introSeen.collectAsStateWithLifecycle()
             val dwell by vm.dwellMinutes.collectAsStateWithLifecycle()
             val itemsDone by vm.itemsDone.collectAsStateWithLifecycle()
             val reminderSort by vm.reminderSort.collectAsStateWithLifecycle()
@@ -178,6 +179,8 @@ class MainActivity : ComponentActivity() {
                             reminderSort = reminderSort, suggestions = suggestions, overview = overview,
                             blockers = blockers, templates = templates, snoozeHints = snoozeHints,
                             claudeAccess = claudeAccess, cloud = cloud.takeIf { CloudConfig.configured() }, local = local,
+                            // Only on a fresh install: never in front of existing reminders (Anf. 7.28 PS15).
+                            intro = !introSeen && reminders?.isEmpty() == true,
                         ),
                         actions = actions,
                         now = now,
@@ -318,6 +321,8 @@ class MainActivity : ComponentActivity() {
             startActivity(Intent.createChooser(send, "Vorschläge teilen"))
         }
         override fun dismissArrivalHint() = vm.dismissArrivalHint()
+        override fun introDone() = vm.introDone()
+        override fun probeAlarm(onResult: (java.time.LocalDateTime?) -> Unit) = vm.probeAlarm(onResult)
         override fun setPlaceHere(placeId: Long?, name: String, onResult: (PlaceSetResult) -> Unit) {
             if (hasLocation()) {
                 vm.setPlaceHere(placeId, name, onResult)

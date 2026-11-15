@@ -87,6 +87,8 @@ fun SettingsScreen(
     onDwell: (Int) -> Unit = {},
     openSuggestions: Int = 0,
     onSuggestions: () -> Unit = {},
+    /** "Einstieg zeigen" (Anf. 7.28 PS15). */
+    onIntro: () -> Unit = {},
     overview: OverviewTimes = OverviewTimes(),
     onOverview: (OverviewTimes) -> Unit = {},
     templates: List<TemplateEntity> = emptyList(),
@@ -117,6 +119,14 @@ fun SettingsScreen(
                 Column(Modifier.padding(16.dp)) {
                     Text(if (openSuggestions == 0) "Keine offenen Vorschläge" else "$openSuggestions offen", color = c.text, fontSize = 15.sp)
                     TextButton(onClick = onSuggestions) { Text("Vorschläge ansehen", color = c.accent) }
+                }
+            }
+
+            SectionTitle("Hilfe")
+            Card {
+                Column(Modifier.padding(16.dp)) {
+                    Text("Was die App kann, die Berechtigungen der Reihe nach und ein Probealarm.", color = c.muted, fontSize = 13.sp)
+                    TextButton(onClick = onIntro, Modifier.testTag("showIntro")) { Text("Einstieg zeigen", color = c.accent) }
                 }
             }
 
@@ -262,18 +272,25 @@ fun SettingsScreen(
             Card {
                 permissions.forEachIndexed { i, p ->
                     if (i > 0) HorizontalDivider(color = c.line)
-                    Row(Modifier.fillMaxWidth().heightIn(min = 56.dp).padding(horizontal = 16.dp, vertical = 8.dp), verticalAlignment = Alignment.CenterVertically) {
-                        Column(Modifier.weight(1f)) {
-                            Text(p.label, color = c.text, fontSize = 15.sp)
-                            Text(p.why, color = c.muted, fontSize = 13.sp)
-                        }
-                        if (p.granted) Text("erteilt", color = c.muted, fontSize = 14.sp)
-                        else TextButton(onClick = p.request, Modifier.testTag("grant:${p.label}")) { Text("Erteilen", color = c.accent, fontWeight = FontWeight.SemiBold) }
-                    }
+                    PermissionRow(p)
                 }
             }
             Text("AuViLo-Reminder $version", Modifier.padding(vertical = 24.dp, horizontal = 4.dp), color = c.muted, fontSize = 12.sp)
         }
+    }
+}
+
+/** One permission: what and what for, "erteilt" or a button; also in the introduction (PS15). */
+@Composable
+fun PermissionRow(p: PermissionItem) {
+    val c = Avl.colors
+    Row(Modifier.fillMaxWidth().heightIn(min = 56.dp).padding(horizontal = 16.dp, vertical = 8.dp), verticalAlignment = Alignment.CenterVertically) {
+        Column(Modifier.weight(1f)) {
+            Text(p.label, color = c.text, fontSize = 15.sp)
+            Text(p.why, color = c.muted, fontSize = 13.sp)
+        }
+        if (p.granted) Text("erteilt", color = c.muted, fontSize = 14.sp)
+        else TextButton(onClick = p.request, Modifier.testTag("grant:${p.label}")) { Text("Erteilen", color = c.accent, fontWeight = FontWeight.SemiBold) }
     }
 }
 
