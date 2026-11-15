@@ -5,7 +5,6 @@ import android.app.AlarmManager
 import android.app.NotificationManager
 import android.content.Context
 import android.content.pm.PackageManager
-import android.os.PowerManager
 import android.util.Log
 import com.avlreminder.alarm.Notifications
 import java.io.File
@@ -46,13 +45,12 @@ object Diag {
     /** What decides whether an alarm can come through; at start and after boot. */
     fun state(context: Context, reason: String) {
         val notifications = context.getSystemService(NotificationManager::class.java)
-        val power = context.getSystemService(PowerManager::class.java)
         fun granted(p: String) = context.checkSelfPermission(p) == PackageManager.PERMISSION_GRANTED
         log(
             "state $reason: notifications=${notifications.areNotificationsEnabled()} " +
                 "exact=${context.getSystemService(AlarmManager::class.java).canScheduleExactAlarms()} " +
                 "fullscreen=${notifications.canUseFullScreenIntent()} " +
-                "batteryExempt=${power.isIgnoringBatteryOptimizations(context.packageName)} " +
+                "batteryExempt=${Battery.exempt(context)} " +
                 "location=${granted(Manifest.permission.ACCESS_FINE_LOCATION)} " +
                 "background=${granted(Manifest.permission.ACCESS_BACKGROUND_LOCATION)} " +
                 // Same check as the settings screen: the alarm channels may bypass "Nicht stören".

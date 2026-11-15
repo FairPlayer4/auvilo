@@ -932,6 +932,13 @@ Vordergrund, nicht Reichweite.
     `com.avlreminder`, Logo (zeigt „AVL“), Repo- und Dateinamen (playstore.md B7, N1).
   - Eine Marke (Wortmarke „AuViLo“) meldet Kevin wahrscheinlich an, wenn der Play Store
     wirklich kommt; die Namenssitzung empfiehlt dafür das DPMA, Klassen 9 und 42.
+- PS12 **Akku-Optimierung nur empfohlen (2026-11-15):** Die App soll auch mit
+  Akku-Optimierung funktionieren, nur ohne Garantie (Alarme über `setAlarmClock` wecken auch
+  aus Doze). Deshalb kein Pflichtpunkt und keine Warnung auf *Heute*, sondern eine Empfehlung
+  in der Berechtigungsliste mit diesem Hinweis. Kein direkter Dialog mehr
+  (`REQUEST_IGNORE_BATTERY_OPTIMIZATIONS` ist im Play Store für Wecker nicht zulässig); der
+  Knopf öffnet die App-Info, dort *Akku → Nicht eingeschränkt*. In allen Builds, damit der
+  Sideload den Store-Weg testet (playstore.md P4). Umgesetzt in V1.3c6.
 - Was für den Play Store noch fehlt (Prüfung 2026-11-15, Annahme: erste Fassung ohne
   Backend): [playstore.md](playstore.md).
 - Backend-Stand und was es für die App bedeutet: [backend.md](backend.md); Einbindung des
@@ -1301,6 +1308,7 @@ Neueste zuerst. Kap. 7 enthält immer den gültigen Stand; diese Tabelle ist die
 
 | Datum | Entscheidung |
 |---|---|
+| 2026-11-15 | **Akku-Optimierung nur empfohlen, ohne direkten Dialog** (Kevin: „Theoretisch sollte die App auch mit Battery Optimizations funktionieren nur ohne Garantie.“): kein Pflichtpunkt mehr, keine Warnung auf *Heute*; der Knopf öffnet die App-Info statt Androids Dialog; `REQUEST_IGNORE_BATTERY_OPTIMIZATIONS` entfällt (7.28 PS12, playstore.md P4). Umgesetzt in V1.3c6 |
 | 2026-11-15 | **Name „AuViLo-Reminder“** (Kevin: „Erstmal nur Anzeigename ändern damit keine Neuinstallation nötig ist. Restliche Teile ändern wir vor einem Playstore Antrag.“): sichtbarer Name sofort, `applicationId`, Paket und Logo vor dem Antrag; Marke wahrscheinlich, falls der Play Store kommt (7.28 PS11, playstore.md N1). Anzeigename umgesetzt in V1.3c5 |
 | 2026-11-15 | **Umstieg auf `SCHEDULE_EXACT_ALARM`** in allen Builds (Kevin: „Es muss dem Nutzer klar kommuniziert werden, dass die App ohne die Berechtigung nicht richtig funktioniert“): Pflichtpunkt *Wecker und Erinnerungen*, ohne ihn ein eigener Hinweis auf *Heute* und eine Benachrichtigung; Alarme kommen dann ungenau statt gar nicht (7.28 PS10). Umgesetzt in V1.3c4 |
 | 2026-11-15 | **Positionierung als Wecker und Timer**, später gemeinsamer Kalender (Kevin: „Die App ist prinzipiell als Wecker und Timer gedacht“); der Store-Eintrag beschreibt sie so. Ein zusätzlicher Schritt für exakte Alarme (`SCHEDULE_EXACT_ALARM`) ist in Ordnung, solange die Kernfunktion nicht leidet (7.28 PS10, playstore.md P1) |

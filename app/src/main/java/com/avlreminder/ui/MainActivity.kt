@@ -12,7 +12,6 @@ import android.content.Intent
 import android.content.pm.PackageManager
 import androidx.core.net.toUri
 import android.os.Bundle
-import android.os.PowerManager
 import android.provider.Settings
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
@@ -41,6 +40,7 @@ import com.avlreminder.core.rules.SnoozeHintChoice
 import com.avlreminder.core.usecases.SaveResult
 import com.avlreminder.data.ThemeMode
 import com.avlreminder.location.hasBackgroundLocation
+import com.avlreminder.system.Battery
 import com.avlreminder.location.hasLocation
 import com.avlreminder.ui.screens.PermissionItem
 import com.avlreminder.ui.theme.AvlTheme
@@ -283,7 +283,6 @@ class MainActivity : ComponentActivity() {
 
     private fun refreshPermissions() {
         val notifications = getSystemService(NotificationManager::class.java)
-        val power = getSystemService(PowerManager::class.java)
         val blocked = Notifications.channelsBlockedByDnd(this)
         val dndNeeded = vm.reminders.value.orEmpty().any { it.active && it.ignoreDnd }
         val locationNeeded = vm.reminders.value.orEmpty().any { it.active && it.arrival != null }
@@ -302,8 +301,9 @@ class MainActivity : ComponentActivity() {
             PermissionItem("Vollbild-Alarm", "für strenge Reminder", notifications.canUseFullScreenIntent()) {
                 openSettings(Settings.ACTION_MANAGE_APP_USE_FULL_SCREEN_INTENT)
             },
-            PermissionItem("Akku nicht optimieren", "damit Android die App nicht schlafen legt", power.isIgnoringBatteryOptimizations(packageName)) {
-                openSettings(Settings.ACTION_REQUEST_IGNORE_BATTERY_OPTIMIZATIONS)
+            // Recommended only (Anf. 7.28 PS12): the app works without it, but without guarantee.
+            PermissionItem(Battery.LABEL, Battery.WHY, Battery.exempt(this), required = false) {
+                startActivity(Battery.settings(this))
             },
             PermissionItem("Kamera", "für Foto-Nachweise", granted(Manifest.permission.CAMERA), required = false) {
                 requestPermission.launch(Manifest.permission.CAMERA)
