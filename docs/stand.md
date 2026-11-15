@@ -4,7 +4,10 @@ Stand: 2026-11-15. Bei jedem größeren Schritt aktualisieren. Erledigtes steht 
 anforderungen.md Kap. 10.1 und in den Review-Berichten (`.review/runs/`), nicht hier.
 
 ## Auf dem Gerät (S24)
-- **V1.3c4** (`versionCode` 24), installiert am 2026-11-15: V1.3c2 bis V1.3c4 (Konto
+- **V1.3c5** (`versionCode` 25), installiert am 2026-11-15: nur der Anzeigename
+  „AuViLo-Reminder“ (7.28 PS11), `applicationId` unverändert, keine Migration. Start ohne
+  Fehler, alle Berechtigungen ok, Alarme neu geplant.
+- Davor **V1.3c4** (`versionCode` 24), installiert am 2026-11-15: V1.3c2 bis V1.3c4 (Konto
   löschen, Passwortmanager als Hauptweg, `SCHEDULE_EXACT_ALARM`). Keine Migration (Schema 11
   wie vorher). Start ohne Fehler, Alarme neu geplant; *Wecker und Erinnerungen* per
   `appops` erteilt, `exact=true`. Android hatte die Alarme auch vorher schon exakt geplant,
