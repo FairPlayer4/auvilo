@@ -37,6 +37,7 @@ class CloudWiring(
         keys = { account -> KeyFile(File(context.filesDir, "backend"), KeystoreSealer(), account) },
         google = CredentialManagerSignIn(),
         passwords = CredentialManagerSafe(),
+        screenLock = SystemScreenLock(),
         wipe = {
             File(context.filesDir, "backend").deleteRecursively()
             deleteBackendKeystoreEntries()

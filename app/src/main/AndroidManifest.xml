@@ -27,6 +27,8 @@
     <uses-permission android:name="android.permission.ACCESS_NETWORK_STATE" />
     <!-- Cloud-Backup, nur nach Einschalten (Anf. 7.28 PS8, 8.4; docs/cloud-entscheidungen.md A-3) -->
     <uses-permission android:name="android.permission.INTERNET" />
+    <!-- Destructive steps of the cloud backup ask for the screen lock (backend SE5). -->
+    <uses-permission android:name="android.permission.USE_BIOMETRIC" />
 
     <application
         android:name=".AvlApp"

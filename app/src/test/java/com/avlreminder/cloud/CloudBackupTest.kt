@@ -307,6 +307,7 @@ class CloudBackupTest {
             "id-token-for-$nonce"
         },
         passwords = safe,
+        screenLock = lock,
         wipe = {
             wiped++
             local.clear()
@@ -351,6 +352,19 @@ class CloudBackupTest {
         }
     }
     private val safe = FakeSafe()
+
+    /** The screen lock (backend SE5): its answer, what it was asked for, and how many servers existed then. */
+    private val lock = object : ScreenLock {
+        var answer = ScreenLockAnswer.CONFIRMED
+        val asked = mutableListOf<String>()
+        var serversWhenAsked = -1
+
+        override suspend fun confirm(activity: Activity, title: String, text: String): ScreenLockAnswer {
+            asked += title
+            serversWhenAsked = serversCreated
+            return answer
+        }
+    }
     private var wiped = 0
 
     /** A new account, set up on this phone. */
@@ -823,7 +837,7 @@ class CloudBackupTest {
         val cloud = cloud()
         val before = backedUpByHand(cloud)
         val stops = schedule.stops
-        blocking { cloud.deleteAccount().join() }
+        blocking { cloud.deleteAccount(activity).join() }
         assertEquals(CloudPhase.Off, cloud.status.value.phase)
         assertNull(cloud.status.value.error)
         assertTrue(server.accountDeleted)
@@ -846,7 +860,7 @@ class CloudBackupTest {
         val cloud = cloud()
         val before = backedUpByHand(cloud)
         server.unlockedHere = false
-        blocking { cloud.deleteAccount().join() }
+        blocking { cloud.deleteAccount(activity).join() }
         val status = cloud.status.value
         assertNull(status.error)
         assertFalse(server.accountDeleted)
@@ -866,7 +880,7 @@ class CloudBackupTest {
         val cloud = cloud()
         val before = backedUpByHand(cloud)
         server.deletionError = Serverfehler(ConnectException(Code.UNAVAILABLE), vomDienst = false)
-        blocking { cloud.deleteAccount().join() }
+        blocking { cloud.deleteAccount(activity).join() }
         assertEquals(before, cloud.status.value.phase)
         assertTrue(cloud.status.value.error.orEmpty().contains("nicht erreichbar"))
         assertEquals(0, wiped)
@@ -973,6 +987,65 @@ class CloudBackupTest {
         }
     }
 
+    // KRITISCH (backend SE5): deleting the account or the backup goes on only after the screen
+    // lock, asked before anything reaches the server; declined, nothing is deleted anywhere.
+    // Without a screen lock it goes on, logged (DSGVO Art. 17).
+    @Test
+    fun deletingNeedsTheScreenLockBeforeTheServer() {
+        val steps = listOf<Pair<String, (CloudBackup) -> Job>>(
+            "Konto löschen" to { it.deleteAccount(activity) },
+            "Sicherung löschen" to { it.deleteBackup(activity) },
+        )
+        for ((title, step) in steps) {
+            for (answer in ScreenLockAnswer.entries) {
+                val case = "$title, $answer"
+                blocking { store.clear() }
+                local.clear()
+                remembered.clear()
+                server.data = null
+                server.backup = null
+                server.accountDeleted = false
+                lock.answer = ScreenLockAnswer.CONFIRMED
+                val cloud = cloud()
+                backedUpByHand(cloud)
+                val data = server.data
+                val servers = serversCreated
+                val eventsBefore = events().size
+                lock.asked.clear()
+                lock.answer = answer
+                blocking { step(cloud).join() }
+
+                assertEquals(case, listOf(title), lock.asked)
+                assertEquals(case, servers, lock.serversWhenAsked)
+                val deleted = if (title == "Konto löschen") server.accountDeleted else server.data == null
+                assertEquals(case, answer != ScreenLockAnswer.DECLINED, deleted)
+                val logged = events().drop(eventsBefore).map { it.getString("ereignis") }
+                if (answer == ScreenLockAnswer.DECLINED) {
+                    assertEquals(case, servers, serversCreated)
+                    assertEquals(case, data, server.data)
+                    assertTrue(case, local.isNotEmpty())
+                    assertNull(case, cloud.status.value.error)
+                    assertTrue(case, cloud.status.value.notes.any { "Nicht mit der Displaysperre bestätigt" in it })
+                    assertEquals(case, listOf("nicht_bestaetigt"), logged)
+                }
+                assertEquals(case, answer == ScreenLockAnswer.NO_LOCK, "ohne_displaysperre" in logged)
+            }
+        }
+        lock.answer = ScreenLockAnswer.CONFIRMED
+    }
+
+    // Only the destructive steps ask; backing up, cancelling a deletion and signing out do not.
+    @Test
+    fun theOtherStepsAskForNoScreenLock() {
+        val cloud = cloud()
+        backedUpByHand(cloud)
+        payload = "neu".toByteArray()
+        blocking { cloud.backUp().join() }
+        blocking { cloud.cancelDeletion().join() }
+        blocking { cloud.signOut().join() }
+        assertEquals(emptyList<String>(), lock.asked)
+    }
+
     @Test
     fun signedOutAResetOnlyClearsThePhone() {
         val cloud = cloud()
@@ -988,7 +1061,7 @@ class CloudBackupTest {
     fun switchedOffNeitherResetNorDeletionDoAnything() {
         val cloud = cloud()
         blocking { cloud.resetPhone().join() }
-        blocking { cloud.deleteAccount().join() }
+        blocking { cloud.deleteAccount(activity).join() }
         blocking { cloud.cancelDeletion().join() }
         assertEquals(0, wiped)
         assertEquals(0, serversCreated)
@@ -1274,7 +1347,7 @@ class CloudBackupTest {
         backedUp(cloud)
         val keyBackup = server.backup
         val stops = schedule.stops
-        blocking { cloud.deleteBackup().join() }
+        blocking { cloud.deleteBackup(activity).join() }
         assertNull(server.data)
         assertEquals(keyBackup, server.backup)
         assertTrue(local.isNotEmpty())
@@ -1773,7 +1846,7 @@ class CloudBackupTest {
 
         blocking { cloud.setEnabled(true).join() }
         assertEquals(3, schedule.starts)
-        blocking { cloud.deleteAccount().join() }
+        blocking { cloud.deleteAccount(activity).join() }
         assertEquals(2, schedule.stops)
         assertEquals(CloudPhase.Off, cloud.status.value.phase)
         assertEquals(3, schedule.starts)

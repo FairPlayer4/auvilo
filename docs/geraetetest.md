@@ -57,11 +57,13 @@ löscht oder ein zweites Gerät braucht, läuft im **Emulator** mit einem eigene
 | C12 | Emulator | Fassung des anderen Geräts wiederherstellen, danach sichern | Rückfrage vor dem Ersetzen (W-7) |
 | C13 | Emulator | anderes Gerät sperrt dieses | nächster Aufruf: Hinweis „gesperrt“, keine automatische Sicherung mehr |
 | C14 | Emulator | mehr als 10 Reminder löschen, stündliche Sicherung abwarten | Bremse (R-2): nichts hochgeladen, Hinweis bis *Jetzt sichern* |
-| C15 | Emulator, Testkonto | *Konto löschen* auf einem freigeschalteten Gerät, „löschen“ eintippen | Hinweis „auf dem Server gelöscht“, Cloud-Backup aus, Reminder unverändert; im Test-Client ist das Konto weg; neu anmelden richtet ein neues Konto ein |
+| C15 | Emulator mit Displaysperre (PIN), Testkonto | *Konto löschen* auf einem freigeschalteten Gerät, „löschen“ eintippen, Abfrage der Displaysperre erst abbrechen, dann noch einmal und mit der PIN bestätigen | nach dem Abbrechen „Nicht mit der Displaysperre bestätigt, nichts gelöscht“; nach der PIN Hinweis „auf dem Server gelöscht“, Cloud-Backup aus, Reminder unverändert; im Test-Client ist das Konto weg; neu anmelden richtet ein neues Konto ein |
 | C16 | Emulator, Testkonto | zweites, nicht freigeschaltetes Gerät: *Konto löschen* | Dialog sagt „beantragt nur“; danach „Löschung des Kontos beantragt: Ab …“, keine Benachrichtigung auf diesem Gerät |
 | C17 | Emulator, Testkonto | nach C16 auf dem freigeschalteten Gerät den stündlichen Lauf abwarten (spätestens etwa 24 h nach der letzten Antwort des Servers; die Uhr nicht vorstellen, sonst lehnt der Server die Erneuerung ab), dann *Löschung abbrechen* | Benachrichtigung „Cloud-Konto wird gelöscht“ mit Termin; nach dem Abbrechen weg, auf beiden Geräten kein Termin mehr |
 
-**Nie auf dem S24:** C13–C17 und *Dieses Gerät abmelden* (sperrt das Gerät beim Server).
+| C18 | Emulator **ohne** Displaysperre, Testkonto | *Sicherung löschen* | keine Abfrage, Sicherung gelöscht; im Diagnose-Log `ohne_displaysperre` |
+
+**Nie auf dem S24:** C13–C18 und *Dieses Gerät abmelden* (sperrt das Gerät beim Server).
 
 ## D. Neu seit 1.3b0.6 (nach dem ersten bestandenen Test in B einsortieren)
 

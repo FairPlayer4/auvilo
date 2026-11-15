@@ -255,7 +255,7 @@ fun CloudBackupSetting(status: CloudStatus, actions: CloudActions) {
                 Text(
                     (last?.let { "Löscht die Sicherung vom ${shortTime(it)} auf dem Server. " } ?: "Löscht die Sicherung auf dem Server. ") +
                         "Auch die älteren Fassungen der letzten 7 Tage werden gelöscht, das lässt sich nicht rückgängig machen. " +
-                        "Der Schlüssel bleibt; automatisch gesichert wird erst wieder nach „Jetzt sichern“.",
+                        "Der Schlüssel bleibt; automatisch gesichert wird erst wieder nach „Jetzt sichern“. Danach mit der Displaysperre bestätigen.",
                 )
             },
             confirmButton = {
@@ -319,7 +319,7 @@ private fun DeleteAccount(unlocked: Boolean, onDone: () -> Unit, actions: CloudA
                         Modifier.padding(top = 8.dp).testTag("cloudDeleteRequestOnly"), color = c.text, fontSize = 14.sp,
                     )
                 }
-                Text("Zum Bestätigen „$DELETE_WORD“ eingeben.", Modifier.padding(top = 8.dp), color = c.text, fontSize = 14.sp)
+                Text("Zum Bestätigen „$DELETE_WORD“ eingeben, danach die Displaysperre.", Modifier.padding(top = 8.dp), color = c.text, fontSize = 14.sp)
                 OutlinedTextField(typed, { typed = it }, Modifier.fillMaxWidth().testTag("cloudDeleteWord"), singleLine = true)
             }
         },

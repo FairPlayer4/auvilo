@@ -228,9 +228,9 @@ class MainActivity : ComponentActivity() {
             override fun restore() { graph.cloud.restore() }
             override fun answerRestore(yes: Boolean) = graph.cloud.answerRestore(yes)
             override fun answerBrake(yes: Boolean) = graph.cloud.answerBrake(yes)
-            override fun deleteBackup() { graph.cloud.deleteBackup() }
+            override fun deleteBackup() { graph.cloud.deleteBackup(this@MainActivity) }
             override fun signOut() { graph.cloud.signOut() }
-            override fun deleteAccount() { graph.cloud.deleteAccount() }
+            override fun deleteAccount() { graph.cloud.deleteAccount(this@MainActivity) }
             override fun cancelDeletion() { graph.cloud.cancelDeletion() }
             override fun resetPhone() { graph.cloud.resetPhone() }
         }

@@ -34,6 +34,8 @@ enum class CloudEvent(val area: String, val id: String, val level: LogLevel) {
     DELETION_REQUESTED("konto", "loeschung_beantragt", LogLevel.INFO),
     DELETION_PENDING("konto", "loeschung_gemeldet", LogLevel.WARN),
     DELETION_CANCELLED("konto", "loeschung_abgebrochen", LogLevel.INFO),
+    NOT_CONFIRMED("cloud", "nicht_bestaetigt", LogLevel.INFO),
+    NO_SCREEN_LOCK("cloud", "ohne_displaysperre", LogLevel.WARN),
 }
 
 /**

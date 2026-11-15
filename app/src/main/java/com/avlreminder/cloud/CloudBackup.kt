@@ -60,6 +60,7 @@ class CloudBackup(
     private val keys: (account: String) -> LokaleAblage,
     private val google: GoogleSignIn,
     private val passwords: PasswordSafe,
+    private val screenLock: ScreenLock,
     private val wipe: () -> Unit,
     private val scope: CoroutineScope,
     private val backupState: (account: String) -> SicherungsStand,
@@ -378,11 +379,12 @@ class CloudBackup(
     /**
      * "Sicherung löschen" (W-8, DSGVO Art. 17): deletes the data backup on the server with all its
      * older versions. The key backup stays, so backing up again needs no new setup. The automatic
-     * backup stops until the person backs up by hand.
+     * backup stops until the person backs up by hand. Only after the screen lock ([confirmed]).
      */
-    fun deleteBackup(): Job = work(CloudStep.DELETE_BACKUP) {
+    fun deleteBackup(activity: Activity): Job = work(CloudStep.DELETE_BACKUP) {
         if (!store.enabled()) return@work
         val known = store.lesen() ?: return@work
+        if (!confirmed(activity, CloudStep.DELETE_BACKUP, "Sicherung löschen", "Die Sicherung auf dem Server mit allen älteren Fassungen.")) return@work
         busy("Sicherung löschen …")
         val server = connect()
         server.withSession { session ->
@@ -485,10 +487,12 @@ class CloudBackup(
      * KRITISCH: The phone forgets its keys only after the server confirmed the deletion
      * (`KontoLoeschen`). Not reachable, or only requested, the data on the server are still there,
      * and without the keys this phone could neither read them nor cancel.
+     * Only after the screen lock ([confirmed]).
      */
-    fun deleteAccount(): Job = work(CloudStep.DELETE_ACCOUNT) {
+    fun deleteAccount(activity: Activity): Job = work(CloudStep.DELETE_ACCOUNT) {
         if (!store.enabled()) return@work
         val known = store.lesen() ?: return@work
+        if (!confirmed(activity, CloudStep.DELETE_ACCOUNT, "Konto löschen", "Alles des Kontos auf dem Server, für alle Geräte.")) return@work
         busy("Konto löschen …")
         val server = connect()
         val result = server.withSession { session ->
@@ -519,6 +523,31 @@ class CloudBackup(
                     "Dieses Gerät ist nicht freigeschaltet, deshalb ist die Löschung nur beantragt. Bis zum Termin kann ein " +
                         "freigeschaltetes Gerät sie abbrechen. Die Schlüssel bleiben so lange auf diesem Handy.",
                 )
+            }
+        }
+    }
+
+    /**
+     * KRITISCH (backend SE5): A destructive step goes on only after the screen lock, before anything
+     * reaches the server; whoever gets hold of an unlocked phone must not delete for good. Without
+     * a screen lock it goes on (logged): there is nothing to confirm with, and the person must
+     * still be able to delete (DSGVO Art. 17). The typed word in the dialog stays either way.
+     * [step] names it in the log (an enum: the logger takes no free text).
+     */
+    private suspend fun confirmed(activity: Activity, step: CloudStep, title: String, text: String): Boolean {
+        busy("Mit der Displaysperre bestätigen …")
+        return when (screenLock.confirm(activity, title, text)) {
+            ScreenLockAnswer.CONFIRMED -> true
+            ScreenLockAnswer.NO_LOCK -> {
+                events.record(CloudEvent.NO_SCREEN_LOCK, mapOf("schritt" to step))
+                log("cloud: no screen lock, $step goes on")
+                true
+            }
+            ScreenLockAnswer.DECLINED -> {
+                events.record(CloudEvent.NOT_CONFIRMED, mapOf("schritt" to step))
+                log("cloud: $step not confirmed")
+                note("Nicht mit der Displaysperre bestätigt, nichts gelöscht.")
+                false
             }
         }
     }

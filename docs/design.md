@@ -793,7 +793,10 @@ Server bei Anmeldung und Erneuerung (`Anmeldung.loeschenAb`); `CloudBackup` lies
 nach jedem Schritt vom Server dieses Schritts (`deletionNews`, null = nicht gefragt) und
 meldet einen neuen Termin mit Benachrichtigung. Der stündliche Lauf erneuert die Sitzung,
 wenn die letzte Antwort älter als 23 Stunden ist (`askAboutDeletion`), auch bei
-unveränderten Daten. Ohne Sitzung setzt `resetPhone` nur das Handy zurück. Ein nicht
+unveränderten Daten. Vor *Konto löschen* und *Sicherung löschen* fragt `CloudBackup.confirmed` die Displaysperre ab
+(`ScreenLock`, im Gerät `SystemScreenLock` mit BiometricPrompt; Backend SE5), bevor ein
+Server entsteht; ohne Displaysperre geht es weiter (Ereignis `ohne_displaysperre`).
+Ohne Sitzung setzt `resetPhone` nur das Handy zurück. Ein nicht
 freigeschaltetes Gerät kann sich mit dem Wiederherstellungsschlüssel freischalten.
 
 **Diagnose.** Eigener Logger mit festen Ereignissen und typisierten Feldern, ohne Texte
