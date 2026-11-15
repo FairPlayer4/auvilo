@@ -4,9 +4,12 @@ Stand: 2026-11-15. Bei jedem größeren Schritt aktualisieren. Erledigtes steht 
 anforderungen.md Kap. 10.1 und in den Review-Berichten (`.review/runs/`), nicht hier.
 
 ## Auf dem Gerät (S24)
-- **V1.3c5** (`versionCode` 25), installiert am 2026-11-15: nur der Anzeigename
-  „AuViLo-Reminder“ (7.28 PS11), `applicationId` unverändert, keine Migration. Start ohne
-  Fehler, alle Berechtigungen ok, Alarme neu geplant.
+- **V1.3c6** (`versionCode` 26), installiert am 2026-11-15: Akku-Optimierung nur empfohlen,
+  ohne `REQUEST_IGNORE_BATTERY_OPTIMIZATIONS` (7.28 PS12). Keine Migration. Start ohne
+  Fehler, Alarme neu geplant; die Akku-Ausnahme blieb nach dem Update bestehen
+  (`deviceidle whitelist`, `batteryExempt=true`).
+- Davor V1.3c5 (2026-11-15): nur der Anzeigename „AuViLo-Reminder“ (7.28 PS11),
+  `applicationId` unverändert.
 - Davor **V1.3c4** (`versionCode` 24), installiert am 2026-11-15: V1.3c2 bis V1.3c4 (Konto
   löschen, Passwortmanager als Hauptweg, `SCHEDULE_EXACT_ALARM`). Keine Migration (Schema 11
   wie vorher). Start ohne Fehler, Alarme neu geplant; *Wecker und Erinnerungen* per
@@ -27,12 +30,12 @@ Kevins echte Daten; vor dem ersten weiteren Nutzer kommt die Sicherheitsphase (B
 einer Fassung.
 
 ## Offen
-0. **Gerätetests zu V1.3c0–V1.3c4** (alles installiert, siehe oben): ein verpasster Termin
+0. **Gerätetests zu V1.3c0–V1.3c6** (alles installiert, siehe oben): ein verpasster Termin
    und ein Notaus-Skip nehmen die Benachrichtigung mit; ein abgelehnter Knopf in der
    Benachrichtigung lässt sie stehen; die Morgenübersicht kommt, auch wenn die App kurz
    nach ihrer Zeit geöffnet wird; einen Punkt aus der Benachrichtigung eines klingelnden
    Vollbild-Alarms abhaken und im Vollbild den Nachweis starten: der nächste Punkt bzw.
-   „Nachweis läuft“ bleibt stehen (Lauf 6, E26); K33–K37, C19. Nur auf dem Emulator mit
+   „Nachweis läuft“ bleibt stehen (Lauf 6, E26); K33–K37, K38 (nur noch das Antippen), C19; ohne Vollbild-Erlaubnis ein Alarm (playstore-erklaerungen.md P2). Nur auf dem Emulator mit
    Testkonto: C15–C18.
 1. **Gerätetests** aus [geraetetest.md](geraetetest.md): K15, K23–K26 (vorher *Zuhause* in
    *Orte* mit WLAN neu festlegen), K27–K30 (Sitzung, dabei: zeigt die Uhr den
