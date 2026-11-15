@@ -54,6 +54,12 @@ Strenge und invasive Mechanismen sind gewollt. Kommunikation auf **Deutsch, mit 
 - Ohne Rückfrage erlaubt: lesende Geräteinfos, App installieren/deinstallieren, Logs
   lesen, App-Berechtigungen setzen. Alles andere vorher fragen, auch `logcat -c`.
 - Immer `adb install -r`, **nie vorher deinstallieren** (sonst sind Kevins Daten weg).
+- Vor der Installation die Version auf dem Handy prüfen (`adb shell dumpsys package com.avlreminder`)
+  und mit `stand.md` abgleichen; dort kann eine installierte Version fehlen (2026-11-15).
+- **Nach jeder Installation bzw. Gerätesitzung Kevin erinnern, USB-Debugging auszuschalten**
+  (*Einstellungen → Entwickleroptionen*; Kevin, 2026-11-15). Solange es an ist, kann ein
+  freigegebener Rechner per USB voll auf das Handy zugreifen. Für die nächste Installation
+  schaltet Kevin es wieder ein.
 - Starten mit `adb shell am start -n com.avlreminder/.ui.MainActivity`, **nie mit `adb shell monkey`** (schaltet die Auto-Rotation ein, 2026-11-08).
 - Bei Gerätetests genau sagen, wann Kevin sperren, entsperren oder etwas tun soll.
   Simulationen danach zurücksetzen.

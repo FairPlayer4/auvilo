@@ -23,7 +23,10 @@ für Serverdaten, App-Zugang für die Prüfer (keine Anmeldung). Die Datensicher
 | P7 | Strenge Mechanismen | Vollbild, Dauer-Alarm, DND-Ausnahme, Notaus (PS7) | Richtlinie „Missbrauch von Gerät und Netzwerk“/„irreführendes Verhalten“: Alarme dürfen das Gerät nicht unbenutzbar machen | Notaus ist da und gut. Künftige Ideen mit Overlay (W3), Apps sperren (P2) oder Bedienungshilfen (T5) brauchen eigene Erklärungen; Bedienungshilfen-API ist im Play Store sehr streng |
 
 **P1 im Detail: Umbau auf `SCHEDULE_EXACT_ALARM`** (umgesetzt in V1.3c4, wie geplant; Aufbau
-jetzt in design.md 12)
+jetzt in design.md 12). Am S24 beobachtet (2026-11-15): Ist die App von der Akku-Optimierung
+ausgenommen, plant Android exakte Alarme auch ohne die Erlaubnis (`dumpsys alarm`:
+`exactAllowReason=allow-listed`). Der Rückfall greift also erst, wenn beides fehlt; das
+betrifft P4.
 - Manifest: `USE_EXACT_ALARM` durch `SCHEDULE_EXACT_ALARM` ersetzen.
 - `AndroidAlarmPort` und die Prüfungen in `AndroidWifi` rufen `setAlarmClock` bzw.
   `setExactAndAllowWhileIdle` auf. Ohne Erlaubnis wirft das eine `SecurityException`.

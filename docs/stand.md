@@ -1,16 +1,19 @@
 # Stand und nächste Schritte
 
-Stand: 2026-11-14. Bei jedem größeren Schritt aktualisieren. Erledigtes steht in git, in
+Stand: 2026-11-15. Bei jedem größeren Schritt aktualisieren. Erledigtes steht in git, in
 anforderungen.md Kap. 10.1 und in den Review-Berichten (`.review/runs/`), nicht hier.
 
 ## Auf dem Gerät (S24)
-- **V1.3b3** (`versionCode` 19), installiert am 2026-11-13: Etappe A aus Review-Lauf 5
-  (Formular-Entwurf übersteht Neuaufbau, F2 auch für eine vorher geplante Prüfung,
-  geänderte Ankunftsregel entscheidet neu, Tests der UI-Verdrahtung). Start ohne Fehler,
-  Alarme neu geplant.
-- Davor V1.3b2 (2026-11-12, Antworten auf Review-Lauf 4), V1.3b1 (2026-11-11): Sitzung mit Timer und Uhr (7.11), davor 1.3b0.6 (Ankunft im Zeitraum mit WLAN, 7.29) und 1.3b0.5 (Cloud-Backup
-  Schritte 1–5). Nach dem Start jeweils: Berechtigungen ok, Alarme neu geplant, keine
-  Fehler im Diagnose-Log.
+- **V1.3c4** (`versionCode` 24), installiert am 2026-11-15: V1.3c2 bis V1.3c4 (Konto
+  löschen, Passwortmanager als Hauptweg, `SCHEDULE_EXACT_ALARM`). Keine Migration (Schema 11
+  wie vorher). Start ohne Fehler, Alarme neu geplant; *Wecker und Erinnerungen* per
+  `appops` erteilt, `exact=true`. Android hatte die Alarme auch vorher schon exakt geplant,
+  weil die App von der Akku-Optimierung ausgenommen ist (`exactAllowReason=allow-listed`).
+- Davor V1.3c1 (2026-11-14, mit V1.3c0; Migration auf Schema 11, Sicherung
+  `avlreminder-v10-20261114-172224.db`), V1.3b3 (2026-11-13), V1.3b2 (2026-11-12),
+  V1.3b1 (2026-11-11): Sitzung mit Timer und Uhr (7.11), davor 1.3b0.6 (Ankunft im Zeitraum
+  mit WLAN, 7.29) und 1.3b0.5 (Cloud-Backup Schritte 1–5). Nach dem Start jeweils:
+  Berechtigungen ok, Alarme neu geplant, keine Fehler im Diagnose-Log.
 
 ## Cloud-Backup
 Schritte 1–5 installiert (2026-11-07 bis 11-09), seit 2026-11-11 in `develop`.
@@ -21,36 +24,13 @@ Kevins echte Daten; vor dem ersten weiteren Nutzer kommt die Sicherheitsphase (B
 einer Fassung.
 
 ## Offen
-0. **V1.3c0** (`versionCode` 20, Etappe B aus Review-Lauf 5) auf `feature/v1.3c0`
-   umgesetzt, **noch nicht installiert**: Zeit-Regel und Lesen über das Repository (E21),
-   `Database.kt` geteilt (E23), die Engine beendet Alarme auch, wenn das System einen
-   Termin schließt (E17, Frage 3), Sitzungsantworten aus dem Core (E18), `AppGraph.rebuild`
-   und `CloudWiring` (E19), `Scheduler` mit `Arrivals` und `SessionTimer` (E20). Review-Lauf 6
-   (`.review/runs/2026-11-13.md`) mit 7 Fixes, u. a. Entwurf nach Start aus Widget oder
-   Benachrichtigung, Übersicht beim Öffnen der App nicht mehr auf morgen, „+x min“ auf
-   einer alten Benachrichtigung räumt sie ab. Am Gerät nach der Installation: ein
-   verpasster Termin und ein Notaus-Skip nehmen die Benachrichtigung mit; ein abgelehnter
-   Knopf in der Benachrichtigung lässt sie stehen; die Morgenübersicht kommt, auch wenn die
-   App kurz nach ihrer Zeit geöffnet wird; einen Punkt aus der Benachrichtigung eines
-   klingelnden Vollbild-Alarms abhaken und im Vollbild den Nachweis starten: der nächste
-   Punkt bzw. „Nachweis läuft“ bleibt stehen (Lauf 6, E26); K33 und K34. Die Antworten auf
-   Lauf 6 (Kap. 9, 2026-11-13) sind umgesetzt: Ein verschobener Termin wartet nach
-   geänderter Ankunftsregel wieder auf die Ankunft; *Teilschritt* ohne Bildschirm nur ohne
-   Nachweis-Pflicht. Darauf aufbauend **V1.3c1** (`versionCode` 21, `feature/v1.3c1`, noch
-   nicht installiert): Verschiebe-Limit pro Termin, Woche oder Monat (Z2b), Schema 11. Am
-   Gerät: einen Reminder auf „1× pro Woche“ stellen, verschieben; der nächste Termin zeigt
-   „wieder ab Mo …“ ausgegraut (K35). Darauf **V1.3c2** (`versionCode` 22,
-   `feature/konto-loeschen`, noch nicht installiert): *Konto löschen* ersetzt *Cloud-Daten
-   löschen* (R-3, Backend B1/K1), mit Antrag, *Löschung abbrechen* und Benachrichtigung bei
-   einem Antrag von anderswo; die Konto-ID wird zum Kopieren angezeigt (Auskunft, Art. 15); *Konto löschen* und
-   *Sicherung löschen* fragen die Displaysperre ab (SE5). Darauf **V1.3c3** (`versionCode` 23,
-   `develop`, noch nicht installiert): A-15 neu, Passwortmanager als Hauptweg mit Hinweis
-   davor (Ende-zu-Ende, Papiercode des Passwortmanagers), Papier als Ausweg. Am Gerät C19.
-   Darauf **V1.3c4** (`versionCode` 24, `develop`, noch nicht installiert): `SCHEDULE_EXACT_ALARM`
-   statt `USE_EXACT_ALARM` (7.28 PS10, playstore.md P1/P3), ohne Erlaubnis ungenaue Alarme
-   mit klarem Hinweis. **Nach der Installation sofort die Erlaubnis prüfen bzw. erteilen**
-   (K37), sonst kommen Alarme bis zur ersten Öffnung ungenau.
-   Am Gerät nur auf dem Emulator mit Testkonto: C15–C18.
+0. **Gerätetests zu V1.3c0–V1.3c4** (alles installiert, siehe oben): ein verpasster Termin
+   und ein Notaus-Skip nehmen die Benachrichtigung mit; ein abgelehnter Knopf in der
+   Benachrichtigung lässt sie stehen; die Morgenübersicht kommt, auch wenn die App kurz
+   nach ihrer Zeit geöffnet wird; einen Punkt aus der Benachrichtigung eines klingelnden
+   Vollbild-Alarms abhaken und im Vollbild den Nachweis starten: der nächste Punkt bzw.
+   „Nachweis läuft“ bleibt stehen (Lauf 6, E26); K33–K37, C19. Nur auf dem Emulator mit
+   Testkonto: C15–C18.
 1. **Gerätetests** aus [geraetetest.md](geraetetest.md): K15, K23–K26 (vorher *Zuhause* in
    *Orte* mit WLAN neu festlegen), K27–K30 (Sitzung, dabei: zeigt die Uhr den
    Chronometer?), K31, K32. In den nächsten Tagen im `diag.log` prüfen, dass keine Ankunft mehr direkt nach
