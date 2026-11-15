@@ -74,6 +74,27 @@ betrifft P4.
   Test (bis 100 Tester, ohne Prüfpflicht für die Produktion, aber auch ohne öffentlichen
   Eintrag). Der interne Test reicht für das Lernziel „kompletter Weg“ vermutlich nicht,
   der geschlossene Test schon.
+- **Bewertung `minSdk` senken (2026-11-15, noch keine Entscheidung; 8.1/PS1 sagen weiter
+  Android 17):** Probeweise mit niedrigerem `minSdk` gebaut, nichts committet.
+  - **Mit `minSdk = 34` (Android 14) läuft schon heute alles:** Lint ohne neuen Fund, Bau
+    grün, alle 401 Tests grün, auch unter Robolectric mit Android 14 (`sdk=34`). Die App
+    ruft keine API über Stufe 34 auf. Codeänderung: nur die eine Zeile in
+    `app/build.gradle.kts`.
+  - **Darunter wird es teurer:** Mit `minSdk = 26` meldet Lint 34 NewApi- und 17
+    InlinedApi-Funde. Von Stufe 34 kommen Vordergrunddienst-Typ `systemExempted`,
+    `canUseFullScreenIntent`, die Einstellungsseite für Vollbild und
+    `LocalDate.ofInstant` (sonst Desugaring). Von 33 kommen Vibration mit Alarm-Attributen,
+    WLAN-SSID und `POST_NOTIFICATIONS`, von 31 exakte Alarme, `VibratorManager` und
+    WLAN-Standortinfo. Jede Stelle bräuchte eine Versionsweiche mit eigenem Verhalten
+    (z. B. sind exakte Alarme bis Android 13 von selbst erlaubt). Das lohnt sich nicht.
+  - **Was Lint und Robolectric nicht sehen:** das echte Verhalten von Alarm, Vollbild über
+    der Sperre und Vordergrunddienst auf Android 14 bis 16 und auf anderen Herstellern.
+    Das größere Risiko sind Hersteller mit aggressivem Energiesparen (Xiaomi, OnePlus,
+    Huawei u. a.), nicht die Android-Version. Dafür vor dem Test ein Emulator-Abbild API 34
+    laden (heute nur 36 und 37 da) und die Kerntests zum Alarm dort und auf 36 laufen lassen;
+    im geschlossenen Test über die Rückmeldungen.
+  - **Empfehlung:** `minSdk = 34`. Dann reichen fast alle Handys, die noch Updates
+    bekommen, und der Aufwand ist klein.
 - **Entwickler-Verifizierung** (Google, ab 2026 schrittweise, weltweit 2027): Mit einem
   verifizierten Play-Konto erledigt; betrifft dann auch die Sideload-APK auf dem S24
   (`adb install` bleibt laut Google möglich). Stand vor der Einführung in Deutschland prüfen.
