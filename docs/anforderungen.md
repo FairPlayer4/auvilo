@@ -332,7 +332,8 @@ Erster Satz, wird mit der Nutzung angepasst: **[V1]**
 - O2 Rückblick ist Teil der Übersicht (Tag; Woche/Monat in der Statistik) **[V1]**
 
 ### 7.9 Bedienung
-- **Widget**: ein Klick → direkt in die Reminder-Erstellung **[V1]**
+- **Widget**: ein Klick → direkt in die Reminder-Erstellung **[V1]**; dazu die
+  Schnellerinnerung mit *+5 / +20 / +60* und Sprache (7.35)
 - **Vorlagen / Strenge-Stufen**, die Eskalation, Nachweis und Limits bündeln
   (Startwerte, Refinement mit der Nutzung): **[V1]**
   - *locker*: Banner + Vibration, alle 10 min wiederholt, Quittieren, Verschieben unbegrenzt
@@ -1275,6 +1276,37 @@ Reihenfolge (Kevin, 2026-11-14): OV2, OV3, OV8 jetzt in App und Backend; OV1 Res
 (konfigurierbarer Server) vorher, erledigt; OV5 kurz vorher prüfen (für die App nötig); OV6, OV7
 kurz davor.
 
+### 7.35 Schnellerinnerung per Widget und Sprache (2026-11-15) [Version offen]
+Anlass: Man bekommt etwas gesagt, kann es nicht sofort tun und hat es ein paar Minuten
+später vergessen. Festhalten muss in Sekunden gehen, mit einem Tipp.
+- SR1 **Widget mit Zeitknöpfen *+5 / +20 / +60 min***: Ein Tipp legt die Zeit fest und
+  startet die Spracheingabe nur für den Text. Daneben ein Knopf *Sprache*, bei dem auch
+  die Zeit aus dem Satz kommt („in 20 Minuten Anna zurückrufen“).
+- SR2 **Spracherkennung über Android** (`RecognizerIntent` bzw. `SpeechRecognizer`),
+  möglichst auf dem Gerät (offline). Das Widget öffnet dafür eine durchsichtige Activity.
+- SR3 **Lokaler Parser in `core`** trennt Zeitangabe und Text: „in 5 Minuten“, „in 20 min“,
+  „in einer Viertelstunde / halben Stunde / Stunde“, „um 15 Uhr“. Tabellengetriebene
+  Tests mit deutschen Sätzen, auch Ablehnungsfälle (keine Zeit, Zeit außerhalb von SR6).
+- SR4 **Festhalten scheitert nie**: Die Erinnerung entsteht sofort lokal, ohne Rückfrage
+  vorher und ohne Netz. Findet der Parser keine Zeit, gilt eine Standardzeit (Vorschlag
+  10 min) mit dem ganzen Satz als Text. Kommt bei einem Zeitknopf kein Text an (Abbruch,
+  nichts erkannt), entsteht die Erinnerung trotzdem mit einem Platzhaltertext; der Text
+  lässt sich über *Ändern* nachtragen.
+- SR5 **Bestätigung als Benachrichtigung**: „Erinnerung in 5 min: Müll rausbringen“ mit
+  *Rückgängig* und *Ändern*.
+- SR6 **Grenzen**: Zeit zwischen 1 min und 7 Tagen; sonst Standardzeit wie in SR4.
+- SR7 **Cloud-KI als Rückfall, nur nach Bestätigung**: Hat der Parser keine Zeit
+  gefunden, bietet die Benachrichtigung zusätzlich *Mit Cloud-KI auswerten*. Ein Tipp
+  zeigt den Satz, der gesendet wird, mit dem Hinweis auf Cloud-KI (Modell, EU-Region),
+  und sendet erst nach Bestätigung, jedes Mal neu (Backend K3, K7). Die Antwort ersetzt
+  Zeit und Text der schon angelegten Erinnerung. Die App prüft sie selbst noch einmal
+  (SR6) und rechnet die Uhrzeit selbst aus. Nur mit eingeschaltetem Backend; ohne Netz
+  oder bei einem Fehler bleibt die lokale Erinnerung, wie sie ist. Kommt mit der
+  Backend-Etappe B5.
+- SR8 Lokale KI (N8, z. B. Gemini Nano) erst, wenn der Parser im Alltag oft scheitert.
+- Offen: welche Strenge-Stufe eine Schnellerinnerung bekommt (Vorschlag: *normal*,
+  einmalig, ohne Nachweis).
+
 ## 8. Zielplattform und Technik
 
 ### 8.1 Zielgerät
@@ -1357,6 +1389,7 @@ Neueste zuerst. Kap. 7 enthält immer den gültigen Stand; diese Tabelle ist die
 
 | Datum | Entscheidung |
 |---|---|
+| 2026-11-15 | **Schnellerinnerung per Widget und Sprache** (Kevin: „Ja alle Punkte passen, erst lokal, dann per Bestätigung mit Hinweis Cloud KI und auch die Option mit Widget +5 / +20 / +60 mit Text über Sprache ist auch passend.“): Widget mit *+5 / +20 / +60 min* und Spracheingabe für den Text, dazu ein Knopf nur mit Sprache. Spracherkennung und Zeitangabe lokal, die Erinnerung entsteht sofort und scheitert nie (Standardzeit, Rückgängig in der Benachrichtigung). Cloud-KI nur als Rückfall nach Bestätigung je Anfrage (Backend K7). Version offen (7.35) |
 | 2026-11-15 | **minSdk 34 statt 37** (Kevin: „Ja, auf 34 senken“): Mit Android 17 als Minimum fänden sich kaum 12 Tester für den geschlossenen Test. Mit minSdk 34 laufen Lint, Bau und alle Tests ohne Codeänderung; darunter bräuchte es Versionsweichen. Ersetzt „Android 17 bleibt Minimum“ vom 2026-11-02 (8.1, 7.28 PS1, playstore.md 3). Umgesetzt in V1.3c9 |
 | 2026-11-15 | **Kontaktadresse ist die Gmail-Adresse** (Kevin: „Da läuft GCP drüber und ich versuche die für alles mit der App zu verwenden.“): `kevin.bartik@gmail.com` für App, Store-Eintrag und Datenschutzerklärung; sie steht ohnehin als Autor im öffentlichen Repo (OV5). Konto mit Passkey bzw. Sicherheitsschlüssel schützen, da auch GCP und Play Console daran hängen (7.28 PS15). Umgesetzt in V1.3c9 |
 | 2026-11-15 | **Einstieg für Tester, wiederholbar** (Kevin: „Du kannst einen Vorschlag machen und ich spiele es nach Umsetzung am Handy durch. Am besten mit Knopf zum Triggern (Wiederholbarkeit).“): vier Seiten mit Erklärung, Berechtigungen der Reihe nach, Probealarm und erstem Reminder; von selbst nur ohne Reminder, sonst über *Einstellungen → Hilfe* (7.28 PS15, playstore.md N3). Umgesetzt in V1.3c9 |
@@ -1473,6 +1506,8 @@ Was schon umgesetzt ist, steht in 10.1.
 4. GPS für die Ortsprüfung (7.30), wenn WLAN im Alltag nicht reicht.
    - Unabhängig davon: **Repo veröffentlichen** (7.34), in den nächsten Wochen oder
      Monaten; OV1–OV3 schon vorher.
+   - Kandidat zum Vorziehen: **Schnellerinnerung** (7.35 SR1–SR6), klein und rein
+     lokal; die Cloud-KI (SR7) erst mit Backend-Etappe B5.
 5. **V2** (Kap. 4), vorher Testsession und Nutzung zählen (NT4); danach erst der
    **Play-Store-Release** mit Backend für Backup und Sync, EU-Datenschutz (7.28 PS5).
 6. Weitere Anforderungen ergeben sich aus der Nutzung.
