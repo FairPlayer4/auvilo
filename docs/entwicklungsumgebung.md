@@ -7,7 +7,7 @@ Kevins privater Rechner (Windows 11 Pro), eingerichtet am 2026-10-31.
 | JDK 21 (Microsoft OpenJDK) | `C:\Program Files\Microsoft\jdk-21.0.13.21-hotspot`, `JAVA_HOME` systemweit gesetzt |
 | Android SDK | `%USERPROFILE%\Android\Sdk`, `ANDROID_HOME`/`ANDROID_SDK_ROOT` als Benutzervariablen |
 | SDK-Pakete | `platforms/android-37.0`, `build-tools/37.0.0` (Gradle zieht `36.0.0` selbst nach), `platform-tools` (adb 37.0.1), Emulator |
-| Emulator | AVD `Pixel_API37` |
+| Emulator | AVD `Pixel_API37`; `Pixel_API34` (Android 14, Google-Play-Abbild, seit 2026-11-15) für minSdk 34 |
 | Android Studio | installiert |
 | Gradle | nur über den Wrapper im Projekt (`./gradlew`) |
 | Gradle-Cache | `GRADLE_USER_HOME=E:\caches\gradle` (Dev Drive) |
@@ -45,3 +45,7 @@ Kevins privater Rechner (Windows 11 Pro), eingerichtet am 2026-10-31.
 - adb im Emulator: Der Dialog „USB-Debugging zulassen“ lässt sich nur per
   Touch-Ereignis der Konsole bestätigen (Koordinaten auf 0–32767 skaliert);
   `-skip-adb-auth` wirkt bei Play-Abbildern nicht.
+- Abbilder laden: `sdkmanager` ist nur noch eine Hülle um die neue Android CLI und zerlegt
+  Paketnamen an Semikolons. Deshalb mit Schrägstrichen angeben, z. B.
+  `sdkmanager "system-images/android-34/google_apis_playstore/x86_64"`; `avdmanager`
+  nimmt weiter die Schreibweise mit Semikolons.

@@ -89,9 +89,9 @@ betrifft P4.
   - **Offen, was Lint und Robolectric nicht sehen:** das echte Verhalten von Alarm, Vollbild
     über der Sperre und Vordergrunddienst auf Android 14 bis 16 und auf anderen Herstellern.
     Das größere Risiko sind Hersteller mit aggressivem Energiesparen (Xiaomi, OnePlus,
-    Huawei u. a.), nicht die Android-Version. Dafür vor dem Test ein Emulator-Abbild API 34
-    laden (heute nur 36 und 37 da; Download nach Kevins Go) und die Kerntests zum Alarm dort
-    und auf 36 laufen lassen; im geschlossenen Test über die Rückmeldungen.
+    Huawei u. a.), nicht die Android-Version. Dafür vor dem Test die Kerntests zum Alarm im
+    Emulator `Pixel_API34` (Android 14, angelegt am 2026-11-15) laufen lassen; im
+    geschlossenen Test kommt der Rest über die Rückmeldungen.
 - **Entwickler-Verifizierung** (Google, ab 2026 schrittweise, weltweit 2027): Mit einem
   verifizierten Play-Konto erledigt; betrifft dann auch die Sideload-APK auf dem S24
   (`adb install` bleibt laut Google möglich). Stand vor der Einführung in Deutschland prüfen.
