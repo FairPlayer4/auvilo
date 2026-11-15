@@ -28,6 +28,7 @@ import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import com.avlreminder.system.Contact
 import com.avlreminder.ui.theme.Avl
 import java.time.LocalDateTime
 import java.time.format.DateTimeFormatter
@@ -61,7 +62,8 @@ object Intro {
         "wie streng: Locker erinnert, Normal lässt dich nur begrenzt verschieben, Streng will einen Nachweis, " +
         "z. B. ein Foto. Fang locker an und zieh später an."
     const val FEEDBACK = "Ideen und Fehler: Die Glühbirne oben rechts öffnet auf jeder Seite ein Notizfeld. Unter " +
-        "Einstellungen → Verbesserungen sammelt die App deine Notizen; mit Teilen schickst du sie z. B. per Mail."
+        "Einstellungen → Verbesserungen sammelt die App deine Notizen; mit Teilen schickst du sie weiter. Oder schreib " +
+        "direkt eine Mail an ${Contact.EMAIL}; der Knopf steht auch unter Einstellungen → Hilfe."
 
     private val TIME = DateTimeFormatter.ofPattern("HH:mm")
     fun probeAt(at: LocalDateTime) = "Klingelt um ${TIME.format(at)}."
@@ -72,6 +74,8 @@ fun IntroScreen(
     permissions: List<PermissionItem>,
     onProbe: (onResult: (LocalDateTime?) -> Unit) -> Unit,
     onFirstReminder: () -> Unit,
+    /** Opens a mail app for feedback ([Contact]). */
+    onMail: () -> Unit,
     onDone: () -> Unit,
     modifier: Modifier = Modifier,
 ) {
@@ -124,6 +128,7 @@ fun IntroScreen(
                     ) { Text("Ersten Reminder anlegen") }
                     Title("Rückmeldung")
                     Body(Intro.FEEDBACK)
+                    OutlinedButton(onClick = onMail, Modifier.padding(top = 12.dp).testTag("introMail")) { Text("Rückmeldung per E-Mail") }
                 }
             }
         }

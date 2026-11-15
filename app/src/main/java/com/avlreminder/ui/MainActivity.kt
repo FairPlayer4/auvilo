@@ -42,6 +42,7 @@ import com.avlreminder.core.usecases.SaveResult
 import com.avlreminder.data.ThemeMode
 import com.avlreminder.location.hasBackgroundLocation
 import com.avlreminder.restore.ExportFile
+import com.avlreminder.system.Contact
 import com.avlreminder.system.Battery
 import com.avlreminder.location.hasLocation
 import com.avlreminder.ui.screens.LocationDisclosureDialog
@@ -322,6 +323,13 @@ class MainActivity : ComponentActivity() {
         }
         override fun dismissArrivalHint() = vm.dismissArrivalHint()
         override fun introDone() = vm.introDone()
+        override fun mailFeedback() {
+            try {
+                startActivity(Contact.mail(graph.appVersion))
+            } catch (_: android.content.ActivityNotFoundException) {
+                android.widget.Toast.makeText(this@MainActivity, Contact.NO_MAIL_APP, android.widget.Toast.LENGTH_LONG).show()
+            }
+        }
         override fun probeAlarm(onResult: (java.time.LocalDateTime?) -> Unit) = vm.probeAlarm(onResult)
         override fun setPlaceHere(placeId: Long?, name: String, onResult: (PlaceSetResult) -> Unit) {
             if (hasLocation()) {

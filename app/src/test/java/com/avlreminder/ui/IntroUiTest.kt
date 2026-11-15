@@ -39,6 +39,7 @@ class IntroUiTest {
     private class Recorder : AppActions {
         var introDone = 0
         var probes = 0
+        var mails = 0
         var probeAt: LocalDateTime? = LocalDateTime.of(2026, 11, 15, 14, 32)
         override fun save(reminder: Reminder, prep: List<PrepAnswer>, onResult: (SaveResult) -> Unit) {}
         override fun delete(reminderId: Long) {}
@@ -49,6 +50,7 @@ class IntroUiTest {
         override fun completeEarly(occurrenceId: Long) {}
         override fun play(path: String) {}
         override fun introDone() { introDone++ }
+        override fun mailFeedback() { mails++ }
         override fun probeAlarm(onResult: (LocalDateTime?) -> Unit) { probes++; onResult(probeAt) }
     }
 
@@ -152,5 +154,19 @@ class IntroUiTest {
         compose.onNodeWithTag("introDone").performClick()
         assertEquals(1, actions.introDone)
         compose.onNodeWithTag("intro").assertDoesNotExist()
+    }
+
+    @Test
+    fun feedbackByMailFromTheIntroductionAndTheSettings() {
+        val actions = show(state(intro = true))
+        next(); next(); next()
+        compose.onNodeWithText("kevin.bartik@gmail.com", substring = true).assertExists()
+        compose.onNodeWithTag("introMail").performScrollTo().performClick()
+        assertEquals(1, actions.mails)
+        compose.onNodeWithTag("introSkip").performClick()
+        compose.onNodeWithContentDescription("Einstellungen").performClick()
+        compose.onNodeWithTag("mailFeedback").performScrollTo().performClick()
+        assertEquals(2, actions.mails)
+        assertEquals("the introduction stays where it was", 1, actions.introDone)
     }
 }

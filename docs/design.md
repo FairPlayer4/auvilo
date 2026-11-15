@@ -632,6 +632,9 @@ Verlassen setzt `introSeen`. *Einstellungen → Hilfe → Einstieg zeigen* öffn
 Der Probealarm (`AppViewModel.probeAlarm`) speichert über die Engine einen Einmal-Reminder
 „Probealarm“ (normal, *Dokumentieren*) zwei Minuten nach der nächsten vollen Minute; lehnt
 die Engine ab, sagt es der Hinweis unten wie bei anderen abgelehnten Aktionen.
+*Rückmeldung per E-Mail* (Seite 4 und *Einstellungen → Hilfe*) öffnet über `Contact.mail`
+eine Mail-App (`ACTION_SENDTO`, `mailto:`) mit der öffentlichen Adresse und dem Betreff
+„AuViLo-Reminder: Rückmeldung (Version …)“; ohne Mail-App nennt ein Hinweis die Adresse.
 
 ### 11.6 Verbesserung vorschlagen
 Glühbirne oben rechts auf jedem Bildschirm, im Alarm ein Textknopf ganz unten (der Alarm

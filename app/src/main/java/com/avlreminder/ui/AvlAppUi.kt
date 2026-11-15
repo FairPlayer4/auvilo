@@ -168,6 +168,8 @@ interface AppActions {
     fun introDone() {}
     /** Sets the test alarm of the introduction; [onResult] gets its time, null if refused. */
     fun probeAlarm(onResult: (LocalDateTime?) -> Unit) {}
+    /** "Rückmeldung per E-Mail": a mail app with address and subject (Anf. 7.28 PS15). */
+    fun mailFeedback() {}
     val cloud: CloudActions get() = object : CloudActions {}
     val local: com.avlreminder.ui.screens.LocalActions get() = object : com.avlreminder.ui.screens.LocalActions {}
 }
@@ -318,6 +320,7 @@ fun AvlAppUi(
                     openSuggestions = state.suggestions.count { it.status == SuggestionStatus.OPEN },
                     onSuggestions = { go(Routes.SUGGESTIONS) },
                     onIntro = { go(Routes.INTRO) },
+                    onMail = actions::mailFeedback,
                     overview = state.overview, onOverview = actions::setOverview,
                     templates = state.templates.orEmpty(), onRenameTemplate = actions::renameTemplate, onDeleteTemplate = actions::deleteTemplate,
                 )
@@ -328,6 +331,7 @@ fun AvlAppUi(
                 onProbe = actions::probeAlarm,
                 onFirstReminder = { leaveIntro(if (state.templates?.isEmpty() == true) Routes.NEW else Routes.CHOOSE) },
                 onDone = { leaveIntro(Routes.TODAY) },
+                onMail = actions::mailFeedback,
                 modifier = m,
             )
             route == Routes.SUGGESTIONS -> Box(m) {

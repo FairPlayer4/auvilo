@@ -977,9 +977,10 @@ Vordergrund, nicht Reichweite.
   - **Probealarm:** legt einen normalen Einmal-Reminder „Probealarm“ an (Art
     *Dokumentieren*, also ohne Startklar-Fragen), zwei Minuten nach der nächsten vollen
     Minute; er klingelt wie jeder Reminder und bleibt danach im Verlauf.
-  - **Rückmeldung:** über *Verbesserung vorschlagen* (Glühbirne, 7.24) und *Teilen*. Eine
-    Kontaktadresse in der App fehlt noch; sie kommt mit der Support-Adresse für den
-    Store-Eintrag (Kevin entscheidet).
+  - **Rückmeldung:** über *Verbesserung vorschlagen* (Glühbirne, 7.24) und *Teilen*, dazu
+    *Rückmeldung per E-Mail* (Seite 4 und *Einstellungen → Hilfe*) an die öffentliche
+    Kontaktadresse `kevin.bartik@gmail.com`, mit festem Betreff samt Version zum Filtern.
+    Dieselbe Adresse gilt für Store-Eintrag und Datenschutzerklärung (Kevin, 2026-11-15).
   - Umgesetzt in V1.3c9.
 - Was für den Play Store noch fehlt (Prüfung 2026-11-15, Annahme: erste Fassung ohne
   Backend): [playstore.md](playstore.md).
@@ -1351,6 +1352,7 @@ Neueste zuerst. Kap. 7 enthält immer den gültigen Stand; diese Tabelle ist die
 
 | Datum | Entscheidung |
 |---|---|
+| 2026-11-15 | **Kontaktadresse ist die Gmail-Adresse** (Kevin: „Da läuft GCP drüber und ich versuche die für alles mit der App zu verwenden.“): `kevin.bartik@gmail.com` für App, Store-Eintrag und Datenschutzerklärung; sie steht ohnehin als Autor im öffentlichen Repo (OV5). Konto mit Passkey bzw. Sicherheitsschlüssel schützen, da auch GCP und Play Console daran hängen (7.28 PS15). Umgesetzt in V1.3c9 |
 | 2026-11-15 | **Einstieg für Tester, wiederholbar** (Kevin: „Du kannst einen Vorschlag machen und ich spiele es nach Umsetzung am Handy durch. Am besten mit Knopf zum Triggern (Wiederholbarkeit).“): vier Seiten mit Erklärung, Berechtigungen der Reihe nach, Probealarm und erstem Reminder; von selbst nur ohne Reminder, sonst über *Einstellungen → Hilfe* (7.28 PS15, playstore.md N3). Umgesetzt in V1.3c9 |
 | 2026-11-15 | **Sicherungsdatei mit Passwort, ohne Fotos und Audio** (Kevin wählte „Mit Passwort“ und „Erstmal ohne“): Export und Import als Datei in den lokalen Kopien; AES-256-GCM mit einem Schlüssel aus dem Passwort (PBKDF2, 600 000 Runden), mindestens 12 Zeichen; Import wie jedes Wiederherstellen (7.28 PS14, playstore.md N4). Umgesetzt in V1.3c8 |
 | 2026-11-15 | **Standort im Hintergrund behalten und begründen** (Kevin: „Wir sollten es nur bei Ablehnung streichen und bei der Einreichung begründen.“): Ort per WLAN reicht heute, der Geofence muss ohnehin überarbeitet werden; da auch das WLAN „Immer erlauben“ braucht, hieße Streichen: Ankunft im Play-Build aus (7.28 PS13, playstore.md P5). Hinweis vor Androids Dialog umgesetzt in V1.3c7 |

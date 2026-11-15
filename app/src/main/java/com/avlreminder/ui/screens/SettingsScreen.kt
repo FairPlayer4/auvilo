@@ -48,6 +48,7 @@ import com.avlreminder.data.TemplateEntity
 import com.avlreminder.data.ThemeMode
 import com.avlreminder.ui.AvlIcons
 import com.avlreminder.ui.Format
+import com.avlreminder.system.Contact
 import com.avlreminder.ui.SectionTitle
 import com.avlreminder.ui.TimeDialog
 import com.avlreminder.ui.theme.Avl
@@ -89,6 +90,8 @@ fun SettingsScreen(
     onSuggestions: () -> Unit = {},
     /** "Einstieg zeigen" (Anf. 7.28 PS15). */
     onIntro: () -> Unit = {},
+    /** "Rückmeldung per E-Mail" (PS15). */
+    onMail: () -> Unit = {},
     overview: OverviewTimes = OverviewTimes(),
     onOverview: (OverviewTimes) -> Unit = {},
     templates: List<TemplateEntity> = emptyList(),
@@ -127,6 +130,8 @@ fun SettingsScreen(
                 Column(Modifier.padding(16.dp)) {
                     Text("Was die App kann, die Berechtigungen der Reihe nach und ein Probealarm.", color = c.muted, fontSize = 13.sp)
                     TextButton(onClick = onIntro, Modifier.testTag("showIntro")) { Text("Einstieg zeigen", color = c.accent) }
+                    Text("Fragen, Ideen, Fehler: ${Contact.EMAIL}", Modifier.padding(top = 8.dp), color = c.muted, fontSize = 13.sp)
+                    TextButton(onClick = onMail, Modifier.testTag("mailFeedback")) { Text("Rückmeldung per E-Mail", color = c.accent) }
                 }
             }
 

@@ -132,8 +132,11 @@ betrifft P4.
 - N3 **Einstieg für Fremde**: ~~fehlt~~ umgesetzt in V1.3c9 (Anf. 7.28 PS15): vier Seiten
   nach einer frischen Installation (was die App macht, Berechtigungen der Reihe nach,
   Probealarm, erster Reminder, Rückmeldung über *Verbesserung vorschlagen* und *Teilen*),
-  wieder über *Einstellungen → Hilfe → Einstieg zeigen*. Offen: eine Kontaktadresse in der App;
-  sie kommt mit der Support-Adresse des Store-Eintrags.
+  wieder über *Einstellungen → Hilfe → Einstieg zeigen*. Kontakt: *Rückmeldung per E-Mail* an
+  `kevin.bartik@gmail.com`, dieselbe Adresse wie im Store-Eintrag und in der
+  Datenschutzerklärung. Händlerstatus (EU-Gesetz über digitale Dienste): als Privatperson ohne Einnahmen
+  „kein Händler“, dann wird nur die E-Mail gezeigt; ob die Datenschutzerklärung eine
+  Postanschrift braucht, vor dem Antrag prüfen.
 - N4 **Daten-Export/Import als Datei**: ~~fehlt~~ umgesetzt in V1.3c8 (Anf. 7.28 PS14):
   *Sicherungsdatei* in den lokalen Kopien, mit eigenem Passwort verschlüsselt, ohne Fotos und
   Audio. Ohne Backend die einzige Sicherung für Tester und der Weg, Kevins Daten aus der
