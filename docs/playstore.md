@@ -1,0 +1,97 @@
+# Play Store: was fehlt
+
+Prüfung vom 2026-11-15 gegen den Stand V1.3c3 (`develop`). Zugehörige Anforderungen:
+anforderungen.md 7.28 (PS1–PS9). Noch keine Entscheidungen, nur Bestandsaufnahme und
+Empfehlung. Richtlinien ändern sich; vor dem Einreichen jeden Punkt gegen die
+aktuelle Play-Console-Hilfe prüfen.
+
+**Annahme:** Die erste Play-Fassung kommt **ohne Backend**. Dann fallen weg: Konto-Löschung
+im Store-Eintrag (Pflicht nur bei Konten), Hosting in der EU, Auskunft und Export nach DSGVO
+für Serverdaten, App-Zugang für die Prüfer (keine Anmeldung). Die Datensicherheit wird
+„keine Daten erfasst, keine geteilt“, solange nichts das Gerät verlässt.
+
+## 1. Blocker: Berechtigungen und Richtlinien
+
+| # | Thema | Stand heute | Problem im Play Store | Empfehlung |
+|---|---|---|---|---|
+| P1 | Exakte Alarme | `USE_EXACT_ALARM` (bei Installation erteilt) | Eingeschränkt auf Apps, deren Kern Wecker/Timer oder Kalender mit Termin-Benachrichtigungen ist. Ein Reminder ist dort nicht genannt; Ablehnung ist wahrscheinlich | Auf `SCHEDULE_EXACT_ALARM` umstellen (Nutzer erteilt es in den Einstellungen), Entzug abfangen (`ACTION_SCHEDULE_EXACT_ALARM_PERMISSION_STATE_CHANGED`, `canScheduleExactAlarms()`), in der Berechtigungsliste als Pflicht zeigen. Hängt mit P3 zusammen |
+| P2 | Vollbild-Alarm | `USE_FULL_SCREEN_INTENT`, Nutzer erteilt es schon heute | Erklärung in der Play Console nötig; automatisch erteilt nur für Wecker- und Anruf-Apps | Erklärung ausfüllen; die App fragt schon und fällt ohne Vollbild auf die Benachrichtigung zurück (prüfen, dass das sauber ist) |
+| P3 | Foreground-Service `systemExempted` | `AlarmService`, `SessionService` | Android erlaubt den Typ nur, solange die App exakte Alarme darf. Mit P1 kann der Nutzer das entziehen, dann wirft der Start `ForegroundServiceTypeNotAllowedException`. Außerdem Erklärung pro FGS-Typ in der Play Console | Vor dem Start prüfen und ohne Erlaubnis ohne FGS klingeln (nur Benachrichtigung). Für die Sitzung prüfen, ob ein anderer Typ passt (z. B. `specialUse` mit Begründung) |
+| P4 | Akku-Optimierung | `REQUEST_IGNORE_BATTERY_OPTIMIZATIONS` + direkter Dialog | Play verbietet den direkten Antrag, außer der Kern der App bricht sonst; zugelassene Fälle: Sicherheit, Messenger, Begleit-Apps, „Task automation“ | Permission entfernen, stattdessen `ACTION_IGNORE_BATTERY_OPTIMIZATION_SETTINGS` öffnen (Liste, Nutzer sucht die App selbst). `setAlarmClock()` weckt auch aus Doze |
+| P5 | Standort im Hintergrund | `ACCESS_BACKGROUND_LOCATION` für Geofence und WLAN-Ort (7.29) | Erklärung mit Video (≤ 30 s), **auffällige Offenlegung in der App vor dem Systemdialog** (Wörter „Standort“ und „im Hintergrund“/„wenn die App geschlossen ist“, welche Funktion), Datenschutzerklärung. Prüfer fragen, ob es ohne geht | Eigener Hinweis-Bildschirm vor dem Dialog (heute nur eine Zeile in der Berechtigungsliste). Die Funktion „Ankunft am Ort“ im Store-Text als Kernfunktion beschreiben. Risiko bleibt: Ablehnung möglich; dann Ankunft im Play-Build abschaltbar machen |
+| P6 | Kamera, Mikrofon | Laufzeit-Berechtigungen | Unkritisch, aber in Datenschutzerklärung und Datensicherheit nennen (bleibt auf dem Gerät) | nichts am Code |
+| P7 | Strenge Mechanismen | Vollbild, Dauer-Alarm, DND-Ausnahme, Notaus (PS7) | Richtlinie „Missbrauch von Gerät und Netzwerk“/„irreführendes Verhalten“: Alarme dürfen das Gerät nicht unbenutzbar machen | Notaus ist da und gut. Künftige Ideen mit Overlay (W3), Apps sperren (P2) oder Bedienungshilfen (T5) brauchen eigene Erklärungen; Bedienungshilfen-API ist im Play Store sehr streng |
+
+## 2. Build und Release
+
+| # | Thema | Stand heute | Fehlt |
+|---|---|---|---|
+| B1 | Release-Build | kein `buildTypes`-Block, nur Debug wird gebaut und installiert | Release-Typ mit R8 (`isMinifyEnabled`, `isShrinkResources`), ProGuard-Regeln (Room, Glance, Credentials), Release-Tests auf dem Gerät |
+| B2 | Signatur | Debug-Schlüssel | Upload-Schlüssel erzeugen und sicher verwahren (nicht im Repo; Passwortmanager), Play App Signing, Signatur über Gradle-Properties/CI-Secrets |
+| B3 | Format | APK | Android App Bundle (`bundleRelease`) |
+| B4 | Variante ohne Backend | Backend-Client fest eingebunden (Composite Build), Cloud-Code in `cloud/` plus 8 Stellen außerhalb | Produkt-Flavor `play` ohne `cloud/`, ohne `verbindung`, Credentials und `googleid`, **ohne `INTERNET`**. Dann baut der Play-Build auch ohne `../avlreminder-backend`. Der heutige Weg (Ausblenden ohne Server-Werte) reicht nicht: Permission und Bibliotheken blieben drin |
+| B5 | Diagnose-Log | schreibt Titel nach `files/diag` (design.md 13, Ausnahme Entwicklungsphase) | Im Release ohne Titel; Abruf ohne `run-as` (Teilen-Knopf o. ä.), sonst ist es für Fehlersuche bei Testern wertlos |
+| B6 | Schnittstelle für Claude | nur im Debug-Manifest | ok, im Release nicht vorhanden; im Flavor-Aufbau so lassen |
+| B7 | `applicationId` | `com.avlreminder` | **Nach dem ersten Hochladen nicht mehr änderbar.** Vorher entscheiden (siehe N1). Ein Wechsel heißt: neue App neben der Sideload-App, Daten über Export/Backup übertragen |
+| B8 | Versionen | `versionName` „1.3c3-backup5“ | Für den Store ein lesbares Schema; `versionCode` muss über alle Tracks steigen (bleibt wie heute) |
+| B9 | CI | baut Debug nach Merge auf `main` | Release-AAB signiert bauen und optional per Play Developer API in den internen Test hochladen |
+| B10 | 16-KB-Seiten | nicht geprüft | CameraX bringt native Bibliotheken mit; mit APK-Analyzer bzw. Lint prüfen, dass sie 16 KB ausgerichtet sind |
+
+## 3. Konto und Testpflicht
+
+- **Entwicklerkonto** (25 USD einmalig, Identitätsprüfung mit Ausweis). Privates Konto:
+  Name ist öffentlich, eine Kontakt-E-Mail auch; dafür eine eigene Adresse anlegen.
+- **Händlerstatus nach DSA** (EU): als Nicht-Händler angeben, solange kein Geld fließt.
+  Als Händler würden Anschrift und Telefon öffentlich.
+- **Geschlossener Test**: Private Konten, die nach dem 13.11.2023 angelegt wurden, brauchen
+  vor der Produktion **12 Tester, 14 Tage am Stück** im geschlossenen Test.
+  **Größter praktischer Engpass:** Mit `minSdk = 37` brauchen alle 12 Tester ein Gerät
+  mit Android 17. Vorher klären, wie viele es im Umfeld gibt; sonst bleibt es beim internen
+  Test (bis 100 Tester, ohne Prüfpflicht für die Produktion, aber auch ohne öffentlichen
+  Eintrag). Der interne Test reicht für das Lernziel „kompletter Weg“ vermutlich nicht,
+  der geschlossene Test schon.
+- **Entwickler-Verifizierung** (Google, ab 2026 schrittweise, weltweit 2027): Mit einem
+  verifizierten Play-Konto erledigt; betrifft dann auch die Sideload-APK auf dem S24
+  (`adb install` bleibt laut Google möglich). Stand vor der Einführung in Deutschland prüfen.
+
+## 4. Store-Eintrag und App-Inhalte (Play Console)
+
+- **Datenschutzerklärung** als öffentliche URL (z. B. GitHub Pages) und in der App verlinkt.
+  Pflicht wegen Kamera, Mikrofon und Standort, auch wenn nichts das Gerät verlässt. Inhalt:
+  wer verantwortlich ist, welche Daten lokal liegen, dass nichts übertragen wird,
+  Hintergrund-Standort und WLAN-Kennungen, Löschen durch Deinstallieren bzw. in der App.
+- **Datensicherheit**: ohne Backend „keine Daten erfasst“. Achtung: Daten, die nur auf dem
+  Gerät verarbeitet werden, gelten nicht als erfasst; Play-Services-Bibliotheken
+  (`play-services-location`) dabei prüfen.
+- **Fragebögen**: Inhaltseinstufung (IARC), Zielgruppe (18+ empfohlen, keine Kinder),
+  Werbung (keine), Gesundheits-Apps (nein bzw. „Gewohnheiten“ prüfen), Finanzfunktionen
+  (nein), Behörden-App (nein), Nachrichten-App (nein).
+- **Erklärungen zu Berechtigungen**: P1 (falls doch `USE_EXACT_ALARM`), P2, P3 je FGS-Typ, P5,
+  jeweils mit Video. Die Videos lassen sich am S24 aufnehmen.
+- **Grafiken**: Symbol 512×512, Feature-Grafik 1024×500, mindestens 2 Screenshots
+  (Handy), Kurzbeschreibung (80 Zeichen), Beschreibung (4000). Deutsch reicht.
+- **Lizenzen**: Apache-2.0-Bibliotheken; eine Seite *Open-Source-Lizenzen* in den
+  Einstellungen ist üblich (nicht von Play gefordert).
+
+## 5. Name und Inhalt der App
+
+- N1 **Name „AVL-Reminder“**: „AVL“ ist ein eingetragenes Zeichen eines großen Unternehmens
+  (AVL List GmbH). Im Store kann das eine Markenbeschwerde auslösen. Empfehlung: vor dem
+  ersten Upload einen eigenen Namen wählen und `applicationId` dazu passend festlegen (B7).
+- N2 **Texte im Code**: rund 300 feste Texte in Compose, `strings.xml` fast leer. Für eine
+  deutsche Fassung kein Muss; für eine zweite Sprache später Pflicht.
+- N3 **Einstieg für Fremde**: Die App setzt Kevins Wissen voraus. Für Tester fehlt ein
+  kurzer Einstieg (erster Reminder, Berechtigungen der Reihe nach, wofür sie gut sind;
+  passt zu PS6) und eine Kontaktmöglichkeit für Rückmeldungen.
+- N4 **Daten-Export/Import als Datei** (8.4 „später nachrüstbar“): Ohne Backend die einzige
+  Sicherung für Tester und der Weg, Kevins Daten aus der Sideload-App zu übernehmen, falls
+  sich die `applicationId` ändert.
+
+## Empfohlene Reihenfolge
+1. Entscheiden: Name und `applicationId` (N1, B7), Play-Fassung ohne Backend (Annahme oben).
+2. Code, der auch der Sideload-App nicht schadet: P1, P3, P4, P5 (Offenlegung), B1, B4, B5.
+   P1 und P4 ändern Kevins Alltag kaum, brauchen aber je einmal einen Gerätetest
+   (Erlaubnis entziehen, Alarm kommt trotzdem bzw. Hinweis erscheint).
+3. N4 Export/Import, N3 Einstieg.
+4. Konto anlegen, Datenschutzerklärung, Store-Eintrag, interner Test, dann geschlossener
+   Test mit 12 Testern (Android 17 vorher klären).

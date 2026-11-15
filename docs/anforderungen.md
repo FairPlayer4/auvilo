@@ -910,6 +910,8 @@ Vordergrund, nicht Reichweite.
   (2026-11-02)** – Android-Sandbox, dateibasierte Verschlüsselung und `allowBackup=false`
   reichen; der Play-Store-Release ist ein Release-Build (nicht debuggable, kein
   `run-as`). Kein SQLCipher, solange kein konkreter Fall übrig bleibt.
+- Was für den Play Store noch fehlt (Prüfung 2026-11-15, Annahme: erste Fassung ohne
+  Backend): [playstore.md](playstore.md).
 - Backend-Stand und was es für die App bedeutet: [backend.md](backend.md); Einbindung des
   Cloud-Backups: [cloud-entscheidungen.md](cloud-entscheidungen.md) (bestätigt 2026-11-07).
 
