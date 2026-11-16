@@ -4,6 +4,7 @@ import androidx.annotation.VisibleForTesting
 import android.content.Context
 import android.content.Intent
 import android.os.Bundle
+import android.view.KeyEvent
 import android.widget.Toast
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
@@ -56,6 +57,13 @@ class AlarmActivity : ComponentActivity() {
     private var proofRunning = false
     /** The proof was paused because the app went to the background; resumes on return. */
     private var proofLeft = false
+    /** Volume keys as shutter while the proof camera is on screen (N2a). */
+    @VisibleForTesting
+    internal val shutterKeys = ShutterKeys()
+
+    override fun onKeyDown(keyCode: Int, event: KeyEvent): Boolean = shutterKeys.onKey(event) || super.onKeyDown(keyCode, event)
+
+    override fun onKeyUp(keyCode: Int, event: KeyEvent): Boolean = shutterKeys.onKey(event) || super.onKeyUp(keyCode, event)
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
@@ -155,7 +163,7 @@ class AlarmActivity : ComponentActivity() {
                 onStillOn = { act(id, Action.StillOn) },
                 onAbort = { act(id, Action.Abort) },
                 devices = AlarmDevices(
-                    camera = { onPhoto -> ProofCamera(id, onPhoto) },
+                    camera = { onPhoto -> ProofCamera(id, shutterKeys, onPhoto) },
                     recorder = { onRecorded -> AudioRecorder("occ-$id", "● Aufnahme starten", onRecorded) },
                     play = { AudioPlayer.play(this, it) },
                 ),

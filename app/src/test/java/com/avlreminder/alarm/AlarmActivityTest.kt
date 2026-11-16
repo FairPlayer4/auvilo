@@ -1,6 +1,7 @@
 package com.avlreminder.alarm
 
 import android.content.Context
+import android.view.KeyEvent
 import androidx.compose.ui.test.junit4.v2.createEmptyComposeRule
 import androidx.compose.ui.test.onAllNodesWithText
 import androidx.compose.ui.test.onNodeWithText
@@ -21,6 +22,7 @@ import com.avlreminder.graph
 import com.avlreminder.settle
 import kotlinx.coroutines.runBlocking
 import org.junit.After
+import org.junit.Assert.assertEquals
 import org.junit.Assert.assertTrue
 import org.junit.Before
 import org.junit.Rule
@@ -108,6 +110,24 @@ class AlarmActivityTest {
 
             val until = quietUntil()!!
             assertTrue("$until", until <= TestClock.now().plus(Escalation.PROOF_GRACE).plusSeconds(5))
+        }
+    }
+
+    /** N2a: the alarm screen hands the volume keys to the proof camera's shutter. */
+    @Test
+    fun theVolumeKeyReachesTheShutter() {
+        val o = runBlocking {
+            val id = repo.saveReminder(Reminder(title = "Katzenbrunnen", schedule = Schedule.Daily(LocalTime.of(18, 0)), createdAt = TestClock.now()))
+            repo.saveOccurrence(Occurrence(reminderId = id, dueAt = TestClock.now().minusSeconds(60), state = OccurrenceState.DUE))
+        }
+        ActivityScenario.launch<AlarmActivity>(AlarmActivity.intent(context, o)).use { scenario ->
+            var photos = 0
+            scenario.onActivity {
+                it.shutterKeys.shutter = { photos++ }
+                assertTrue(it.dispatchKeyEvent(KeyEvent(KeyEvent.ACTION_DOWN, KeyEvent.KEYCODE_VOLUME_DOWN)))
+                assertTrue(it.dispatchKeyEvent(KeyEvent(KeyEvent.ACTION_UP, KeyEvent.KEYCODE_VOLUME_DOWN)))
+            }
+            assertEquals(1, photos)
         }
     }
 

@@ -255,6 +255,10 @@ Erster Satz, wird mit der Nutzung angepasst: **[V1]**
 - N1 Einfaches Quittieren – für reine Erinnerungen **[V1]**
 - N2 **Foto-Nachweis**, nur mit der App-Kamera aufgenommen (nicht aus der Galerie),
   mit Zeitstempel **[V1]**
+  - N2a **Auslösen mit den Lautstärketasten** wie in der Kamera-App (2026-11-16):
+    Leiser und Lauter lösen aus, solange die Kamera des Nachweises zu sehen ist;
+    Gedrückthalten gibt ein Foto. Die Lautstärke ändert sich dabei nicht, auch nicht
+    die des Alarmtons. Ohne Kamera wirken die Tasten wie gewohnt. Umgesetzt in V1.3c10.
 - N4 **Ortsnachweis**: Standort beim Nachweis wird gespeichert und optional gegen
   einen erwarteten Ort geprüft (kombinierbar mit Foto) **[später]** (2026-11-05: in
   V1 nicht umgesetzt und nicht vermisst; kommt frühestens mit den Orten aus 7.29)
@@ -1389,6 +1393,7 @@ Neueste zuerst. Kap. 7 enthält immer den gültigen Stand; diese Tabelle ist die
 
 | Datum | Entscheidung |
 |---|---|
+| 2026-11-16 | **Foto-Nachweis mit den Lautstärketasten auslösen** (Kevin: „Können wir das Nachweis Foto mit dem Leiser Button auslösen lassen so wie bei der Kamera App“): beide Tasten, nur solange die Kamera zu sehen ist; die Tasten ändern dann keine Lautstärke (7.5 N2a). Umgesetzt in V1.3c10 |
 | 2026-11-15 | **Schnellerinnerung per Widget und Sprache** (Kevin: „Ja alle Punkte passen, erst lokal, dann per Bestätigung mit Hinweis Cloud KI und auch die Option mit Widget +5 / +20 / +60 mit Text über Sprache ist auch passend.“): Widget mit *+5 / +20 / +60 min* und Spracheingabe für den Text, dazu ein Knopf nur mit Sprache. Spracherkennung und Zeitangabe lokal, die Erinnerung entsteht sofort und scheitert nie (Standardzeit, Rückgängig in der Benachrichtigung). Cloud-KI nur als Rückfall nach Bestätigung je Anfrage (Backend K7). Version offen (7.35) |
 | 2026-11-15 | **minSdk 34 statt 37** (Kevin: „Ja, auf 34 senken“): Mit Android 17 als Minimum fänden sich kaum 12 Tester für den geschlossenen Test. Mit minSdk 34 laufen Lint, Bau und alle Tests ohne Codeänderung; darunter bräuchte es Versionsweichen. Ersetzt „Android 17 bleibt Minimum“ vom 2026-11-02 (8.1, 7.28 PS1, playstore.md 3). Umgesetzt in V1.3c9 |
 | 2026-11-15 | **Kontaktadresse ist die Gmail-Adresse** (Kevin: „Da läuft GCP drüber und ich versuche die für alles mit der App zu verwenden.“): `kevin.bartik@gmail.com` für App, Store-Eintrag und Datenschutzerklärung; sie steht ohnehin als Autor im öffentlichen Repo (OV5). Konto mit Passkey bzw. Sicherheitsschlüssel schützen, da auch GCP und Play Console daran hängen (7.28 PS15). Umgesetzt in V1.3c9 |
@@ -1486,6 +1491,7 @@ Neueste zuerst. Kap. 7 enthält immer den gültigen Stand; diese Tabelle ist die
 | V1.3c2–c7 | 2026-11-15 | Konto löschen und Displaysperre (R-3, SE5), Passwortmanager als Hauptweg, exakte Alarme mit `SCHEDULE_EXACT_ALARM`, Name „AuViLo-Reminder“ (7.28 PS11), Akku nur empfohlen (PS12), Hinweis vor dem Standort-Dialog (PS13) |
 | V1.3c8 | – | Sicherungsdatei: Export und Import mit Passwort, ohne Fotos und Audio (7.28 PS14) |
 | V1.3c9 | – | Einstieg für Tester mit Probealarm, wiederholbar in den Einstellungen (7.28 PS15); minSdk 34 (8.1) |
+| V1.3c10 | – | Foto-Nachweis mit den Lautstärketasten auslösen (7.5 N2a) |
 
 Details zum Verhalten: [design.md](design.md), Gerätetests: [geraetetest.md](geraetetest.md).
 

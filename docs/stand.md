@@ -1,10 +1,12 @@
 # Stand und nächste Schritte
 
-Stand: 2026-11-15. Bei jedem größeren Schritt aktualisieren. Erledigtes steht in git, in
+Stand: 2026-11-16. Bei jedem größeren Schritt aktualisieren. Erledigtes steht in git, in
 anforderungen.md Kap. 10.1 und in den Review-Berichten (`.review/runs/`), nicht hier.
 
 ## Auf dem Gerät (S24)
-- **V1.3c9** (`versionCode` 29) gebaut, noch nicht installiert, mit V1.3c8: Einstieg für
+- **V1.3c10** (`versionCode` 30) gebaut, noch nicht installiert: Foto-Nachweis mit den
+  Lautstärketasten auslösen (7.5 N2a). Keine Migration. Enthält V1.3c9 und V1.3c8:
+- **V1.3c9** (`versionCode` 29), mit V1.3c8: Einstieg für
   Tester mit Probealarm, wiederholbar unter *Einstellungen → Hilfe* (7.28 PS15, playstore.md
   N3); Sicherungsdatei, Export und Import mit Passwort, ohne Fotos und Audio (7.28 PS14, N4);
   `minSdk` 34 statt 37 für Tester mit Android 14 bis 16 (Anf. 8.1).
@@ -38,12 +40,12 @@ Kevins echte Daten; vor dem ersten weiteren Nutzer kommt die Sicherheitsphase (B
 einer Fassung.
 
 ## Offen
-0. **Gerätetests zu V1.3c0–V1.3c9** (bis V1.3c7 installiert, siehe oben): ein verpasster Termin
+0. **Gerätetests zu V1.3c0–V1.3c10** (bis V1.3c7 installiert, siehe oben): ein verpasster Termin
    und ein Notaus-Skip nehmen die Benachrichtigung mit; ein abgelehnter Knopf in der
    Benachrichtigung lässt sie stehen; die Morgenübersicht kommt, auch wenn die App kurz
    nach ihrer Zeit geöffnet wird; einen Punkt aus der Benachrichtigung eines klingelnden
    Vollbild-Alarms abhaken und im Vollbild den Nachweis starten: der nächste Punkt bzw.
-   „Nachweis läuft“ bleibt stehen (Lauf 6, E26); K33–K37, K38 (nur noch das Antippen), K39 (nur, falls die Erlaubnis einmal fehlt), K40, K41, C19; ohne Vollbild-Erlaubnis ein Alarm (playstore-erklaerungen.md P2). Nur auf dem Emulator mit
+   „Nachweis läuft“ bleibt stehen (Lauf 6, E26); K33–K37, K38 (nur noch das Antippen), K39 (nur, falls die Erlaubnis einmal fehlt), K40, K41, K42, C19; ohne Vollbild-Erlaubnis ein Alarm (playstore-erklaerungen.md P2). Nur auf dem Emulator mit
    Testkonto: C15–C18.
 1. **Gerätetests** aus [geraetetest.md](geraetetest.md): K15, K23–K26 (vorher *Zuhause* in
    *Orte* mit WLAN neu festlegen), K27–K30 (Sitzung, dabei: zeigt die Uhr den
