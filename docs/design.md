@@ -12,7 +12,8 @@
 ```
 ┌──────────────────────────── :app (Android) ────────────────────────────┐
 │  ui/        Compose-Screens, AppViewModel, MainActivity                 │
-│  widget/    Glance-Widget                                               │
+│  widget/    Glance-Widgets (Übersicht, Sprach-Reminder)                 │
+│  voice/     Schnellerinnerung per Sprache: Activity, Spracherkennung    │
 │  alarm/     AlarmPort, AlarmService, SessionService, AlarmActivity,     │
 │             Benachrichtigungen, Übersicht, Vorab-Reminder, Kamera, Audio│
 │  location/  Geofence, WLAN, Prüf-Alarme der Orte, Standortprüfung       │
@@ -26,7 +27,8 @@
 │  model/     Reminder, Schedule, Occurrence, SessionSpec, Arrival, …     │
 │  rules/     ScheduleRules, Lifecycle, Escalation, Presets/Validation,   │
 │             Proofs, WeeklyGoals, Stats, Deadlines, Blockers, Sessions,  │
-│             ArrivalWindow, PlaceChecks, Checklists, Snoozing            │
+│             ArrivalWindow, PlaceChecks, Checklists, Snoozing,           │
+│             VoiceReminders                                              │
 │  ports/     ReminderRepository, AlarmPort, PlaceAlarmPort, GeofencePort,│
 │             LocationPort, WifiPort, DeviceStatePort, PreNoticePort      │
 │  usecases/  ReminderEngine (Fassade) mit Scheduler (+ Arrivals,         │
@@ -598,6 +600,20 @@ https://claude.ai/artifact/PXA9YgWi8XoHupYnN7Z3cS
 - **Sitzung:** laufende Benachrichtigung des `SessionService` und eine spiegelbare für die
   Uhr (3.1).
 - **Widget** (Glance, folgt dem System-Modus): *+ Reminder* und nächste Fälligkeit.
+- **Sprach-Reminder** (Anf. 7.35, einfachste Fassung seit V1.3c11): eigenes 1×1-Widget,
+  ein Tipp öffnet `VoiceActivity`. Sie hört sofort zu und zeigt das Muster
+  „Zeit: in 5 Minuten. Name: Tee machen“. Androids Erkennung beendet ein Stück nach einer
+  Pause; `VoiceSession` startet sie neu und sammelt die Stücke bis *Fertig* (nach 8
+  leeren Neustarts endet sie von selbst). Erkennung zuerst auf dem Gerät
+  (`createOnDeviceSpeechRecognizer`); fehlt dort Deutsch, Androids Dienst mit
+  `EXTRA_PREFER_OFFLINE` (die Zusammenfassung sagt, welcher). `VoiceReminders.parse` (core)
+  sucht die Zeit überall im Satz („in 5 Minuten“, Zahlwörter, Viertel-/halbe/Dreiviertelstunde,
+  Stunden, Tage; 1 min bis 7 Tage) und nimmt den Namen nach „Name“, sonst den Rest. Was
+  fehlt, bekommt den Standard (10 min, „Schnellerinnerung“) und einen Hinweis. Die
+  Zusammenfassung bietet *Anlegen*, *Nochmal*, *Abbrechen*; angelegt wird wie *Meeting*:
+  einmalig, *normal*, ohne Nachweis. Aufnahme und Text werden nicht gespeichert, ins
+  Diagnose-Log gehen nur Fehlercodes. Noch nicht: Zeitknöpfe *+5/+20/+60* (SR1),
+  Bestätigung als Benachrichtigung (SR5), Cloud-KI (SR7).
 
 ### 11.3 Vorlagen
 Übernehmen Charakter, Strenge, Nachweis, Minimum mit Limit, Später-Knöpfe,

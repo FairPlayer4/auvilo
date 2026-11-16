@@ -142,8 +142,11 @@ object Weeks {
 /** One-tap reminders from the widget. */
 object QuickReminders {
     /** Normal, but without even a confirmation. */
-    fun meeting(minutes: Long, now: Instant, zone: ZoneId): Reminder = Presets.newReminder(
-        title = "Meeting",
+    fun meeting(minutes: Long, now: Instant, zone: ZoneId): Reminder = inMinutes("Meeting", minutes, now, zone)
+
+    /** One-off reminder [minutes] from [now], normal, no proof (meeting buttons, voice, Anf. 7.35). */
+    fun inMinutes(title: String, minutes: Long, now: Instant, zone: ZoneId): Reminder = Presets.newReminder(
+        title = title,
         schedule = Schedule.Once(now.plusSeconds(minutes * 60).atZone(zone).toLocalDateTime().withNano(0)),
         createdAt = now,
     ).copy(proof = ProofSpec.NONE)

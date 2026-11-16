@@ -1,4 +1,5 @@
 <?xml version="1.0" encoding="utf-8"?>
 <resources>
+    <string name="voice_widget_description">Ein Tipp: Erinnerung per Sprache anlegen</string>
     <string name="widget_description">Nächster Reminder, neuer Reminder und Meeting-Knöpfe</string>
 </resources>

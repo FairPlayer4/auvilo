@@ -32,6 +32,13 @@ anforderungen.md Kap. 10.1 und in den Review-Berichten (`.review/runs/`), nicht 
   mit WLAN, 7.29) und 1.3b0.5 (Cloud-Backup Schritte 1–5). Nach dem Start jeweils:
   Berechtigungen ok, Alarme neu geplant, keine Fehler im Diagnose-Log.
 
+## Gebaut, nicht installiert
+- **V1.3c11** (`versionCode` 31, 2026-11-16): Schnellerinnerung per Sprache, einfachste
+  Fassung (Anf. 7.35, design.md 11.2): Widget *Sprach-Reminder* hinzufügen, Tipp, Muster
+  sprechen, *Fertig*, *Anlegen*. Keine Migration. Im Alltag testen: Trifft die Erkennung
+  das Muster? Erkennt sie auf dem Gerät oder über den Android-Dienst? Reicht die Pause,
+  bevor sie ein Stück beendet? Gerätetest K43.
+
 ## Cloud-Backup
 Schritte 1–5 installiert (2026-11-07 bis 11-09), seit 2026-11-11 in `develop`.
 Entscheidungen: [cloud-entscheidungen.md](cloud-entscheidungen.md), Aufbau: design.md 16,

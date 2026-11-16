@@ -1310,6 +1310,13 @@ später vergessen. Festhalten muss in Sekunden gehen, mit einem Tipp.
 - SR8 Lokale KI (N8, z. B. Gemini Nano) erst, wenn der Parser im Alltag oft scheitert.
 - Offen: welche Strenge-Stufe eine Schnellerinnerung bekommt (Vorschlag: *normal*,
   einmalig, ohne Nachweis).
+- **Einfachste Fassung zum Ausprobieren (V1.3c11, 2026-11-16):** eigenes Widget, ein
+  Tipp startet die Aufnahme, *Fertig* beendet sie, dann eine Zusammenfassung mit
+  *Anlegen*, *Nochmal* oder *Abbrechen*. Festes Muster auf dem Bildschirm: „Zeit: in 5
+  Minuten. Name: Tee machen“. Umgesetzt sind SR2, SR3, SR6 und SR4 in der Form „Standard
+  mit Hinweis in der Zusammenfassung“; vorläufig *normal*, einmalig, ohne Nachweis.
+  Abweichend von SR4 bestätigt Kevin vor dem Anlegen (sein Wunsch für den Alltagstest).
+  Danach je nach Erfahrung SR1, SR5, SR7 (design.md 11.2).
 
 ## 8. Zielplattform und Technik
 
@@ -1393,6 +1400,7 @@ Neueste zuerst. Kap. 7 enthält immer den gültigen Stand; diese Tabelle ist die
 
 | Datum | Entscheidung |
 |---|---|
+| 2026-11-16 | **Schnellerinnerung zuerst in der einfachsten Fassung** (Kevin: „Können wir die einfachste Version versuchen umzusetzen? Ich würde gerne im Alltag testen, vielleicht reicht lokal erstmal.“): ein Widget-Tipp startet die Aufnahme, *Fertig* beendet sie, Zusammenfassung mit Bestätigung, *Nochmal* oder *Abbrechen*; festes Muster „Zeit: … Name: …“ auf dem Bildschirm; nur lokal. Umgesetzt in V1.3c11 (7.35) |
 | 2026-11-16 | **Foto-Nachweis mit den Lautstärketasten auslösen** (Kevin: „Können wir das Nachweis Foto mit dem Leiser Button auslösen lassen so wie bei der Kamera App“): beide Tasten, nur solange die Kamera zu sehen ist; die Tasten ändern dann keine Lautstärke (7.5 N2a). Umgesetzt in V1.3c10 |
 | 2026-11-15 | **Schnellerinnerung per Widget und Sprache** (Kevin: „Ja alle Punkte passen, erst lokal, dann per Bestätigung mit Hinweis Cloud KI und auch die Option mit Widget +5 / +20 / +60 mit Text über Sprache ist auch passend.“): Widget mit *+5 / +20 / +60 min* und Spracheingabe für den Text, dazu ein Knopf nur mit Sprache. Spracherkennung und Zeitangabe lokal, die Erinnerung entsteht sofort und scheitert nie (Standardzeit, Rückgängig in der Benachrichtigung). Cloud-KI nur als Rückfall nach Bestätigung je Anfrage (Backend K7). Version offen (7.35) |
 | 2026-11-15 | **minSdk 34 statt 37** (Kevin: „Ja, auf 34 senken“): Mit Android 17 als Minimum fänden sich kaum 12 Tester für den geschlossenen Test. Mit minSdk 34 laufen Lint, Bau und alle Tests ohne Codeänderung; darunter bräuchte es Versionsweichen. Ersetzt „Android 17 bleibt Minimum“ vom 2026-11-02 (8.1, 7.28 PS1, playstore.md 3). Umgesetzt in V1.3c9 |
@@ -1492,6 +1500,7 @@ Neueste zuerst. Kap. 7 enthält immer den gültigen Stand; diese Tabelle ist die
 | V1.3c8 | – | Sicherungsdatei: Export und Import mit Passwort, ohne Fotos und Audio (7.28 PS14) |
 | V1.3c9 | – | Einstieg für Tester mit Probealarm, wiederholbar in den Einstellungen (7.28 PS15); minSdk 34 (8.1) |
 | V1.3c10 | – | Foto-Nachweis mit den Lautstärketasten auslösen (7.5 N2a) |
+| V1.3c11 | – | Schnellerinnerung per Sprache, einfachste Fassung: eigenes Widget, Aufnahme bis *Fertig*, Zusammenfassung mit Bestätigung (7.35) |
 
 Details zum Verhalten: [design.md](design.md), Gerätetests: [geraetetest.md](geraetetest.md).
 
