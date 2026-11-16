@@ -4,8 +4,9 @@ Stand: 2026-11-16. Bei jedem größeren Schritt aktualisieren. Erledigtes steht 
 anforderungen.md Kap. 10.1 und in den Review-Berichten (`.review/runs/`), nicht hier.
 
 ## Auf dem Gerät (S24)
-- **V1.3c10** (`versionCode` 30) gebaut, noch nicht installiert: Foto-Nachweis mit den
-  Lautstärketasten auslösen (7.5 N2a). Keine Migration. Enthält V1.3c9 und V1.3c8:
+- **V1.3c10** (`versionCode` 30), installiert am 2026-11-16 über V1.3c7: Foto-Nachweis mit
+  den Lautstärketasten auslösen (7.5 N2a). Keine Migration. Start ohne Fehler, Alarme neu
+  geplant, alle Berechtigungen weiter erteilt. Enthält V1.3c9 und V1.3c8:
 - **V1.3c9** (`versionCode` 29), mit V1.3c8: Einstieg für
   Tester mit Probealarm, wiederholbar unter *Einstellungen → Hilfe* (7.28 PS15, playstore.md
   N3); Sicherungsdatei, Export und Import mit Passwort, ohne Fotos und Audio (7.28 PS14, N4);
@@ -40,7 +41,7 @@ Kevins echte Daten; vor dem ersten weiteren Nutzer kommt die Sicherheitsphase (B
 einer Fassung.
 
 ## Offen
-0. **Gerätetests zu V1.3c0–V1.3c10** (bis V1.3c7 installiert, siehe oben): ein verpasster Termin
+0. **Gerätetests zu V1.3c0–V1.3c10** (alle installiert, siehe oben): ein verpasster Termin
    und ein Notaus-Skip nehmen die Benachrichtigung mit; ein abgelehnter Knopf in der
    Benachrichtigung lässt sie stehen; die Morgenübersicht kommt, auch wenn die App kurz
    nach ihrer Zeit geöffnet wird; einen Punkt aus der Benachrichtigung eines klingelnden
