@@ -4,6 +4,12 @@ Stand: 2026-11-16. Bei jedem größeren Schritt aktualisieren. Erledigtes steht 
 anforderungen.md Kap. 10.1 und in den Review-Berichten (`.review/runs/`), nicht hier.
 
 ## Auf dem Gerät (S24)
+- **V1.3c11** (`versionCode` 31), installiert am 2026-11-16 über V1.3c10: Schnellerinnerung
+  per Sprache, einfachste Fassung (Anf. 7.35, design.md 11.2). Keine Migration. Start ohne
+  Fehler, Alarme neu geplant, Mikrofon schon erlaubt. Auf dem S24 gibt es zwei
+  Erkennungsdienste: Android System Intelligence (auf dem Gerät) und Google (Standard).
+  Im Alltag testen (Gerätetest K43): Trifft die Erkennung das Muster, welche Erkennung
+  läuft, reicht die Pause, bevor sie ein Stück beendet?
 - **V1.3c10** (`versionCode` 30), installiert am 2026-11-16 über V1.3c7: Foto-Nachweis mit
   den Lautstärketasten auslösen (7.5 N2a). Keine Migration. Start ohne Fehler, Alarme neu
   geplant, alle Berechtigungen weiter erteilt. Enthält V1.3c9 und V1.3c8:
@@ -32,13 +38,6 @@ anforderungen.md Kap. 10.1 und in den Review-Berichten (`.review/runs/`), nicht 
   mit WLAN, 7.29) und 1.3b0.5 (Cloud-Backup Schritte 1–5). Nach dem Start jeweils:
   Berechtigungen ok, Alarme neu geplant, keine Fehler im Diagnose-Log.
 
-## Gebaut, nicht installiert
-- **V1.3c11** (`versionCode` 31, 2026-11-16): Schnellerinnerung per Sprache, einfachste
-  Fassung (Anf. 7.35, design.md 11.2): Widget *Sprach-Reminder* hinzufügen, Tipp, Muster
-  sprechen, *Fertig*, *Anlegen*. Keine Migration. Im Alltag testen: Trifft die Erkennung
-  das Muster? Erkennt sie auf dem Gerät oder über den Android-Dienst? Reicht die Pause,
-  bevor sie ein Stück beendet? Gerätetest K43.
-
 ## Cloud-Backup
 Schritte 1–5 installiert (2026-11-07 bis 11-09), seit 2026-11-11 in `develop`.
 Entscheidungen: [cloud-entscheidungen.md](cloud-entscheidungen.md), Aufbau: design.md 16,
@@ -48,7 +47,7 @@ Kevins echte Daten; vor dem ersten weiteren Nutzer kommt die Sicherheitsphase (B
 einer Fassung.
 
 ## Offen
-0. **Gerätetests zu V1.3c0–V1.3c10** (alle installiert, siehe oben): ein verpasster Termin
+0. **Gerätetests zu V1.3c0–V1.3c11** (alle installiert, siehe oben): ein verpasster Termin
    und ein Notaus-Skip nehmen die Benachrichtigung mit; ein abgelehnter Knopf in der
    Benachrichtigung lässt sie stehen; die Morgenübersicht kommt, auch wenn die App kurz
    nach ihrer Zeit geöffnet wird; einen Punkt aus der Benachrichtigung eines klingelnden
