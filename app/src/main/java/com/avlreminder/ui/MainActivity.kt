@@ -308,6 +308,7 @@ class MainActivity : ComponentActivity() {
             }
             override fun answer(yes: Boolean) = graph.local.answer(yes)
             override fun dismiss() = graph.local.dismiss()
+            override fun dismissExported() = graph.local.dismissExported()
         }
         override fun answerSnoozeHint(reminderId: Long, choice: SnoozeHintChoice) = vm.answerSnoozeHint(reminderId, choice)
         override fun setArchived(reminderId: Long, archived: Boolean) = vm.setArchived(reminderId, archived)

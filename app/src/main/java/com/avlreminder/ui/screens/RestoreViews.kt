@@ -118,6 +118,8 @@ interface LocalActions {
     fun importFile(password: CharArray) {}
     fun answer(yes: Boolean) {}
     fun dismiss() {}
+    /** Only the confirmation of a written export file. */
+    fun dismissExported() {}
 }
 
 private val DAY = DateTimeFormatter.ofPattern("dd.MM.yyyy")

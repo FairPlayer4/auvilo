@@ -28,9 +28,11 @@ class ExportFileUiTest {
         val exported = mutableListOf<String>()
         val imported = mutableListOf<String>()
         var dismissed = 0
+        var dismissedExport = 0
         override fun exportFile(password: CharArray) { exported += String(password) }
         override fun importFile(password: CharArray) { imported += String(password) }
         override fun dismiss() { dismissed++ }
+        override fun dismissExported() { dismissedExport++ }
     }
 
     private fun show(status: LocalStatus = LocalStatus()): Recorder {
@@ -84,6 +86,7 @@ class ExportFileUiTest {
         val actions = show(LocalStatus(exported = "AuViLo-Sicherung-2026-11-15.auvilo"))
         compose.onNodeWithTag("fileExported").assertExists()
         compose.onNodeWithText("OK").performClick()
-        assertEquals(1, actions.dismissed)
+        assertEquals(1, actions.dismissedExport)
+        assertEquals("a failed swap is not confirmed on the side", 0, actions.dismissed)
     }
 }

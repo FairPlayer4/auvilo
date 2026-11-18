@@ -847,9 +847,11 @@ falsches Passwort und eine veränderte Datei sehen gleich aus („Passwort falsc
 verändert“). *Importieren …* fragt das Passwort einmal, öffnet die Datei (`OpenDocument`) und
 läuft dann wie jedes Wiederherstellen (`LocalRestore.fromFile`, Art `FILE`): Vergleich,
 Rückfrage, Tausch beim nächsten Start, Tageskopie zum Rückgängigmachen; danach vergisst die
-App den Stand der letzten Cloud-Sicherung wie bei einer Tageskopie. Das Passwort liegt nur
-als `CharArray` im Speicher und wird nach dem Lauf überschrieben; es kommt in keine Datei
-und kein Log.
+App den Stand der letzten Cloud-Sicherung wie bei einer Tageskopie. Eine Datei mit neuerer
+Formatversion meldet „stammt von einer neueren App-Version“ (`NewerExport`). Das Passwort
+kommt in keine Datei, keinen gespeicherten Zustand und kein Log; die Kopie, mit der
+`LocalRestore` arbeitet, wird nach dem Lauf überschrieben. Das Textfeld hält es als `String`
+im Compose-Zustand, bis der Dialog schließt; das lässt sich nicht löschen (Review 2026-11-18).
 
 **Abmelden und Löschen.** *Dieses Gerät abmelden* sperrt das Gerät beim Server.
 *Konto löschen* (`deleteAccount`, R-3) löscht über `KontoLoeschen` das ganze Konto auf

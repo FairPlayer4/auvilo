@@ -35,7 +35,7 @@ class ExportFileTest {
         assertThrows(NotAnExport::class.java) { ExportFile.decrypt("PK\u0003\u0004 ein ZIP".toByteArray(), password.toCharArray()) }
         assertThrows(NotAnExport::class.java) { ExportFile.decrypt(ByteArray(0), password.toCharArray()) }
         val newer = encrypt().also { it[16] = 2 }
-        assertThrows(NotAnExport::class.java) { ExportFile.decrypt(newer, password.toCharArray()) }
+        assertThrows(NewerExport::class.java) { ExportFile.decrypt(newer, password.toCharArray()) }
     }
 
     // KRITISCH: a fresh salt and nonce for every file, so two exports never share a key stream.

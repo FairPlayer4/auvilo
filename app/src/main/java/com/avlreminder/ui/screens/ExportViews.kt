@@ -49,7 +49,7 @@ fun ExportFileSetting(status: LocalStatus, actions: LocalActions) {
                 "Gespeichert: $name. Ohne das Passwort lässt sich die Datei nicht öffnen.",
                 Modifier.padding(top = 4.dp).testTag("fileExported"), color = c.text, fontSize = 14.sp,
             )
-            TextButton(onClick = actions::dismiss) { Text("OK") }
+            TextButton(onClick = actions::dismissExported) { Text("OK") }
         }
         Row(Modifier.padding(top = 4.dp)) {
             OutlinedButton(onClick = { ask = FileAsk.EXPORT }, Modifier.testTag("fileExport")) { Text("Exportieren …") }

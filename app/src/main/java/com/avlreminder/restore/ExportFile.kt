@@ -11,10 +11,13 @@ import javax.crypto.spec.PBEKeySpec
 import javax.crypto.spec.SecretKeySpec
 
 /** The file is not one of this app's export files, or from a newer format. */
-class NotAnExport(why: String) : Exception("Keine Sicherungsdatei: $why")
+open class NotAnExport(why: String) : Exception("Keine Sicherungsdatei: $why")
 
 /** The password does not open the file, or the file was changed. GCM cannot tell the two apart. */
 class WrongPassword : Exception("Passwort falsch oder Datei verändert")
+
+/** An export file of a later format version, written by a newer app. */
+class NewerExport(version: Int) : NotAnExport("Version $version")
 
 /**
  * The export file (Anf. 7.28 PS14, playstore.md N4): the backup ZIP ([com.avlreminder.cloud.BackupZip],
@@ -69,6 +72,7 @@ object ExportFile {
         val header = ByteBuffer.wrap(file, 0, HEADER)
         header.position(MAGIC.size)
         val version = header.get()
+        if (version > VERSION) throw NewerExport(version.toInt())
         if (version != VERSION) throw NotAnExport("Version $version")
         val iterations = header.int
         // A changed header must not make the phone work for hours; the tag would fail anyway.

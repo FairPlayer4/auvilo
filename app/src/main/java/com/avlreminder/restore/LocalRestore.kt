@@ -149,6 +149,11 @@ class LocalRestore(
         answer?.complete(yes)
     }
 
+    /** Takes only the export confirmation away; a failed swap stays until "Verstanden" (Review 2026-11-18). */
+    fun dismissExported() {
+        state.update { it.copy(exported = null) }
+    }
+
     fun dismiss() {
         files.failed.delete()
         state.update { it.copy(restored = null, failed = null, error = null, exported = null) }
@@ -223,6 +228,7 @@ class LocalRestore(
         fun describe(e: Throwable): String = when (e) {
             is NewerDatabase -> "Die Kopie stammt von einer neueren App-Version."
             is WrongPassword -> "Passwort falsch oder Datei verändert. Nichts geändert."
+            is NewerExport -> "Die Datei stammt von einer neueren App-Version. Nichts geändert."
             is NotAnExport -> "Das ist keine Sicherungsdatei von AuViLo-Reminder. Nichts geändert."
             is DamagedBackup -> "Die Sicherungsdatei ist beschädigt. Nichts geändert."
             is DamagedDatabase -> "Die Kopie ist beschädigt oder passt nicht zur App. Nichts geändert."

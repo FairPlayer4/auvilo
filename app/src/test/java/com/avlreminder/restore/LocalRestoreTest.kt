@@ -214,6 +214,22 @@ class LocalRestoreTest {
         assertNull(local.status.value.failed)
     }
 
+    // "OK" under the export confirmation must not confirm a failed swap on the side (Review 2026-11-18).
+    @Test
+    fun confirmingTheExportLeavesAFailedSwapStanding() {
+        DatabaseSwap.writeAtomically(files.failed, JSONObject().put("grund", SwapFailure.FILE_CHANGED.name).toString())
+        val local = local()
+        local.started(SwapOutcome.Failed(SwapFailure.FILE_CHANGED))
+        blocking { local.load().join() }
+        blocking { local.export("datei", password.toCharArray()) { }.join() }
+        assertEquals("datei", local.status.value.exported)
+
+        local.dismissExported()
+        assertNull(local.status.value.exported)
+        assertEquals(SwapFailure.FILE_CHANGED, local.status.value.failed)
+        assertTrue("the automatic backup keeps resting", files.failed.exists())
+    }
+
     @Test
     fun aSwapAtTheStartIsShownAndLogged() {
         val local = local()
@@ -273,6 +289,18 @@ class LocalRestoreTest {
         }
         assertTrue(target.compared.isEmpty())
         assertTrue(target.staged.isEmpty())
+    }
+
+    // A file of a newer format is one, from a newer app; it must not be called "no export file".
+    @Test
+    fun aFileOfANewerFormatSaysSo() {
+        val local = local()
+        var written: ByteArray? = null
+        blocking { local.export("datei", password.toCharArray()) { written = it }.join() }
+        val newer = checkNotNull(written).copyOf().also { it[16]++ /* version byte */ }
+        blocking { local.fromFile("datei", password.toCharArray()) { newer }.join() }
+        assertEquals("Die Datei stammt von einer neueren App-Version. Nichts geändert.", local.status.value.error)
+        assertTrue(target.compared.isEmpty())
     }
 
     @Test
