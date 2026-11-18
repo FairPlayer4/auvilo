@@ -1,6 +1,7 @@
 # Review-Gedächtnis
-Letzter Lauf: 2026-11-13 @ 71a2508 (Lauf 6: V1.3c0 E17–E21 und V1.3b3; review/2026-11-13, Fixes bis fff1ba6)   Laufzähler: 6
+Letzter Lauf: 2026-11-18 @ 7950cdf (Lauf 7: Play-Store-Arbeiten V1.3c4–c12 und Z2b; review/2026-11-18, Fixes bis 08d61ad)   Laufzähler: 7
 Letztes Architektur-Review: Lauf 5 (2026-11-12, Bericht `runs/2026-11-12-2.md`); nächstes in Lauf 9
+Nächster Lauf: Schnellerinnerung per Sprache (88f8d7c, `voice/`, `VoiceReminders`) ist noch nie reviewt.
 
 ## Beabsichtigte Architektur
 - **Schichten:** `:core` ist reines Kotlin (model, rules, ports, usecases) und kennt kein Android. `:app` ist Android (ui, alarm, data, location, system, widget, claude) und hängt von `:core` ab, nie umgekehrt. Regeln gehören nach `:core`, `:app` setzt sie nur um.
@@ -21,16 +22,18 @@ Das Cloud-Backup (`app/…/cloud`, `restore`) prüft der review-loop des Backend
 ## Bereiche
 | Bereich | Pfade | Anforderungen/Doku | Tests | Zuletzt reviewt | Zustand |
 |---|---|---|---|---|---|
-| core-Regeln | core/…/rules | design.md 2–10, 3.1, 6 | core/src/test/…/rules (Kover ≥ 90 %, 98,7 %) | 2026-11-12 (Sessions, ArrivalWindow, PlaceChecks) | gut, Mutanten entdeckt; Sitzung zählt seit V1.3b2 in der Woche ihres Starts (`countedAt`) |
+| core-Regeln | core/…/rules | design.md 2–10, 3.1, 6 | core/src/test/…/rules (Kover ≥ 90 %, 98,6 %) | 2026-11-18 (Lauf 7: Z2b `Lifecycle`, `PostponePeriods`) | Z2b gut, Mutanten M1/M2 entdeckt; Limit 0 gefixt 7113b2a. Davor 2026-11-12 (Sessions, ArrivalWindow, PlaceChecks): gut, Mutanten entdeckt; Sitzung zählt seit V1.3b2 in der Woche ihres Starts (`countedAt`) |
 | core-Engine | core/…/usecases | design.md 1, 3, 4 | core/src/test/…/usecases, scenarios | 2026-11-13 (Lauf 6: E17–E20, 59efad5) | Ende als Effekt (E17), Teilung (E20) ohne Verhaltensänderung; Snooze auf Termin von gestern gefixt f235e62; Frage 5 nicht für verschobene Termine (Frage 1 Lauf 6). Davor: Runden bei sync behoben aabd19f; `arrivedAt` beim Bearbeiten gefixt 7248e01; F2 über die geplante erste Prüfung (3f49b58), am Gerät noch prüfen; F2 bei zwei Remindern an einem Ort entschieden und umgesetzt (59efad5), `arrivedAt` bei geänderter Ankunftsregel (59efad5); `hintQuietUntil` beim Speichern behalten gefixt 22a5480 |
 | core-Modell/Ports | core/…/model, ports | design.md 2 | indirekt | – | – |
-| app-Alarm | app/…/alarm, system | design.md 3.1, 4, 5, 11.2, 12 | AlarmGlueTest, ReceiverGlueTest, SessionGlueTest, AlarmServiceTest | 2026-11-13 (Lauf 6: E17, E18) | Ende eines Alarms jetzt Engine-Effekt (E17); Nachfrage-Text bei aufgebrauchtem Minimum gefixt 498e365, Rückgängig nach Maximum gefixt fff1ba6; offen: Folge-Benachrichtigung mit gleicher ID (E26, Gerätetest), Regeln „ohne Bildschirm“ in `:app` (E25), Nebenläufigkeit (E27); stille Benachrichtigung nach Notaus am Gerät prüfen |
-| app-Daten | app/…/data | design.md 13 | MigrationTest, RoomReminderRepositoryTest, RoomRepositoryCasesTest | 2026-11-03 (nur Migration 6→7) | gut |
-| app-UI | app/…/ui | design.md 11 | ui-Tests (Robolectric) | 2026-11-13 (Lauf 6: 3baee36, E21) | Entwurf nach Start aus Widget/Benachrichtigung ging beim Neuaufbau verloren, gefixt aee3952 (`MainActivityTest`); `AlarmActivity` über das Repository cd2e2b4. Davor: Nachweis-Frist gefixt b483ea9; Formular-Funde in V1.3b3 |
+| app-Alarm | app/…/alarm, system | design.md 3.1, 4, 5, 11.2, 12 | AlarmGlueTest, ReceiverGlueTest, SessionGlueTest, AlarmServiceTest (SDK 34 und 37), ShutterKeysTest | 2026-11-18 (Lauf 7: exakte Alarme, Akku, minSdk 34, Lautstärketasten) | Lauf 7: Sitzungsdienst nach Erteilen gefixt bffc5a5, gehaltene Taste gefixt 17bbd0f; offen: Neustart vor dem Entsperren (Frage 1), kein Vollbild ohne Erlaubnis (Frage 3), Verhalten unter API 34 nur am Emulator (E33). Lauf 6: Ende eines Alarms jetzt Engine-Effekt (E17); Nachfrage-Text bei aufgebrauchtem Minimum gefixt 498e365, Rückgängig nach Maximum gefixt fff1ba6; offen: Folge-Benachrichtigung mit gleicher ID (E26, Gerätetest), Regeln „ohne Bildschirm“ in `:app` (E25), Nebenläufigkeit (E27); stille Benachrichtigung nach Notaus am Gerät prüfen |
+| app-Daten | app/…/data | design.md 13 | MigrationTest, RoomReminderRepositoryTest, RoomRepositoryCasesTest | 2026-11-18 (Lauf 7: Schema 11, `countPostponed`) | gut; `countPostponed` nicht in `RepositoryCases` (E32), Markierung „zählt“ als Textsuffix |
+| app-UI | app/…/ui | design.md 11 | ui-Tests (Robolectric) | 2026-11-18 (Lauf 7: Einstieg, Standort-Hinweis, Sicherungsdatei, Verschiebe-Limit) | Lauf 7: Passwort der Sicherungsdatei beim Neuaufbau weg (Frage 2), Probealarm doppelt/Notaus (Frage 6, E31), Standort zweistufig (Frage 4); „OK“ beim Export gefixt 45c4b45. Lauf 6: Entwurf nach Start aus Widget/Benachrichtigung ging beim Neuaufbau verloren, gefixt aee3952 (`MainActivityTest`); `AlarmActivity` über das Repository cd2e2b4. Davor: Nachweis-Frist gefixt b483ea9; Formular-Funde in V1.3b3 |
 | app-Claude | app/…/claude, app/src/debug | anforderungen.md 7.26 AG11, design.md 15 | ClaudeApiTest | 2026-11-03 | AG5-Frage offen; Freigabe-Prüfung ungetestet |
+| app-Restore/Export | app/…/restore (`ExportFile`, `LocalRestore`) | Anf. 7.28 PS14, design.md 16 | ExportFileTest, LocalRestoreTest, ExportFileUiTest | 2026-11-18 (Lauf 7) | Krypto gut; neuere Formatversion gefixt 45c4b45; offen: Frage 2, Format-KAT (E29) |
+| app-Voice | app/…/voice, core/…/rules/VoiceReminders | Anf. 7.35, design.md 11.2 | VoiceSessionTest, VoiceScreenTest, VoiceRemindersTest | – | noch nie reviewt, Lauf 8 |
 | app-Ort/Widget | app/…/location, widget | design.md 6, 11.2 | ReceiverGlueTest (PlaceCheck über echten PendingIntent) | 2026-11-13 (Lauf 6: `rebuild`, `setPlaceHere`) | Übersicht wurde bei jedem Vordergrund neu geplant (Regression E19), gefixt 5b0b6e3; doppeltes „Hier festlegen“ legt zwei Orte an (E28). Davor: wiederholte WLAN-Meldung keine Ankunft (3f49b58); Geofence-Test in 5f2c6a2; Widget ohne Test |
 | Doku | CLAUDE.md, README, docs/*.md | – | – | 2026-11-12 (Lauf 4, alle Dokumente) | nach Lauf 4 umgebaut: design.md nach Themen (3.1 Sitzung, 6 Ankunft), Cloud-Entwürfe → cloud-entscheidungen.md, Kap.-9-Archiv, testsession.md gelöscht |
-| Tests gesamt | core/src/test, testFixtures, app/src/test | design.md 14 | – | 2026-11-12 (Lauf 4) | core sehr gut; E13–E16 umgesetzt (5f2c6a2, 247b44b, Testdaten Schema 10 am 2026-11-12); Mutationslauf: 21/21 entdeckt nach cc337b4; Lauf 5: 3/4, UI-Verdrahtung `withoutAlarm` unentdeckt (E22), seit 3baee36 von `AppViewModelTest` entdeckt; Lauf 6: 1/3 (M1 `endDay` jetzt abgedeckt f235e62, M2 Filter in `commit` → E24) |
+| Tests gesamt | core/src/test, testFixtures, app/src/test | design.md 14 | – | 2026-11-12 (Lauf 4); Lauf 7: 3/3 Mutanten entdeckt | core sehr gut; E13–E16 umgesetzt (5f2c6a2, 247b44b, Testdaten Schema 10 am 2026-11-12); Mutationslauf: 21/21 entdeckt nach cc337b4; Lauf 5: 3/4, UI-Verdrahtung `withoutAlarm` unentdeckt (E22), seit 3baee36 von `AppViewModelTest` entdeckt; Lauf 6: 1/3 (M1 `endDay` jetzt abgedeckt f235e62, M2 Filter in `commit` → E24) |
 
 ## Bekannte Schulden und beobachtete Drift
 - 2026-11-03: Regel-Logik in `:app`: `AlarmActivity.canDeferRest`, das Anbieten des nächsten Punkts in `ActionReceiver`. Beginnende Drift. **Trend (Lauf 2):** Die Alarm-Ansicht gibt es viermal (`Ring`, `AlarmUi`, `AlarmInfo`, `ActionReceiver`); `ActionReceiver` nutzt `Checklists.round` nicht. Empfehlung E1.
@@ -70,8 +73,16 @@ Das Cloud-Backup (`app/…/cloud`, `restore`) prüft der review-loop des Backend
 - 2026-11-13, **Trend (Lauf 1 → 2 → 4 → 5 → 6): Android-Schicht dünn getestet**, jetzt beim Weg über `MainActivity` (Entwurf beim Neuaufbau, aee3952) und gleichen Benachrichtigungs-IDs (E26). Mit `MainActivityTest` gibt es den ersten Test durch die echte Activity.
 - 2026-11-13: Schutzcode ohne Fall: Filter „was wieder klingelt“ in `EngineContext.commit` (M2). E24.
 
+## Bekannte Schulden und beobachtete Drift (Lauf 7)
+- 2026-11-18: Neustart vor dem ersten Entsperren: keine Alarme bis zum Entsperren (nicht `directBootAware`), undokumentiert. Frage 1. Besteht schon lange.
+- 2026-11-18, **Trend (Lauf 2 → 5 → 6 → 7): Regeln in `:app`**, jetzt der Probealarm (`AppViewModel.probeAlarm`); Doku und Code widersprechen sich beim Zeitpunkt. E30.
+- 2026-11-18, **zweite Beobachtung: Doppeltes Tippen** auf Knöpfe mit Engine-Aufruf (Lauf 6 „Hier festlegen“, Lauf 7 Probealarm). E31.
+- 2026-11-18, **Trend (Lauf 1 → … → 7): Android-Schicht dünn getestet**, jetzt Verdrahtung in `MainActivity` (Passwort bis zum Dateidialog), Auslöser der Kamera, Zurück im Einstieg.
+- 2026-11-18: Semantik als Textsuffix (`Lifecycle.COUNTED` in `event.detail`) an drei Stellen (Room, Fake, Exportskript); im Skript schon verloren (08d61ad). E32.
+- 2026-11-18: Verhalten unter Android 14 durch Robolectric nicht belegt (Vordergrunddienst-Typen, Startsperren, Vollbild). E33.
+
 ## Offene Fragen an den Entwickler
-Keine aus Lauf 6 (beide am 2026-11-13 nach Vorschlag beantwortet).
+Aus Lauf 7 (Bericht `runs/2026-11-18.md`): 1 Neustart vor dem Entsperren, 2 Reihenfolge Datei/Passwort beim Export, 3 Vollbild ohne Erlaubnis, 4 Standort in einem Rutsch, 5 Lautstärketasten nur bei sichtbarer Vorschau, 6 Probealarm-Zeit und Notaus.
 
 Kleine offene Unklarheiten (Sommerzeit, Handy aus im Zeitraum, *Auslassen* bei mehrmals täglich, Begriff „Pause“) stehen in anforderungen.md Kap. 11.
 
