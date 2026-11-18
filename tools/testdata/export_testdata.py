@@ -77,6 +77,9 @@ def is_system_detail(text):
         return True
     if text.endswith(" min") and text[:-4].isdigit():
         return True
+    # A "Rest auf morgen" that counted as a postponement (Lifecycle.COUNTED, Z2b).
+    if text.endswith(" counted"):
+        text = text[: -len(" counted")]
     # ISO instants like 2026-11-04T19:30:00Z
     return len(text) >= 20 and text[4] == "-" and text[10] == "T" and text.endswith("Z")
 
