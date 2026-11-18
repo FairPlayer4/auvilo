@@ -65,10 +65,12 @@ class SessionService : Service() {
 
         /**
          * Shows exactly [sessions]; called after every use case. Without any the service stops.
-         * Unchanged, nothing happens.
+         * Unchanged, nothing happens, unless the service should run and does not: shown as plain
+         * notifications without "Wecker und Erinnerungen", granted since (Review 2026-11-18).
          */
         fun show(context: Context, sessions: List<SessionNote>) {
-            if (sessions == notes && sessions.map { it.occurrenceId }.toSet() == shown) return
+            val unchanged = sessions == notes && sessions.map { it.occurrenceId }.toSet() == shown
+            if (unchanged && (sessions.isEmpty() || running || !ExactAlarms.allowed(context))) return
             notes = sessions
             val manager = context.getSystemService(NotificationManager::class.java)
             (shown - sessions.map { it.occurrenceId }.toSet()).forEach { manager.cancel(id(it)) }

@@ -31,6 +31,7 @@ import org.junit.runner.RunWith
 import org.robolectric.Robolectric
 import org.robolectric.Shadows.shadowOf
 import org.robolectric.annotation.Config
+import org.robolectric.shadows.ShadowAlarmManager
 import org.robolectric.shadows.ShadowLooper
 import java.time.Duration
 import java.time.Instant
@@ -215,6 +216,28 @@ class SessionGlueTest {
         SessionService.show(context, emptyList())
         service.onStartCommand(shadowOf(context).nextStartedService, 0, 2)
         assertTrue(shadowOf(service).isStoppedBySelf)
+    }
+
+    // Ohne "Wecker und Erinnerungen" nur eine einfache Benachrichtigung; nach dem Erteilen übernimmt beim
+    // nächsten Neuaufbau der Dienst, auch wenn sich die Sitzung nicht geändert hat (Review 2026-11-18).
+    @Test
+    fun `nach dem Erteilen der Erlaubnis uebernimmt der Sitzungsdienst`() {
+        Robolectric.buildService(SessionService::class.java).create().destroy() // kein Dienst läuft
+        SessionService.show(context, emptyList())
+        val app = shadowOf(context as Application)
+        generateSequence { app.nextStartedService }.count()
+        val note = SessionNote(41, "Training", start, quickDone = true, minimum = true)
+        try {
+            ShadowAlarmManager.setCanScheduleExactAlarms(false)
+            SessionService.show(context, listOf(note))
+            assertEquals(null, app.nextStartedService)
+            ShadowAlarmManager.setCanScheduleExactAlarms(true)
+            SessionService.show(context, listOf(note))
+            assertEquals(SessionService::class.java.name, app.nextStartedService?.component?.className)
+        } finally {
+            ShadowAlarmManager.setCanScheduleExactAlarms(true)
+            SessionService.show(context, emptyList())
+        }
     }
 
     // Die laufende Benachrichtigung bietet mit Nachweis weder Fertig noch Teilschritt (Review-Lauf 6, Antwort 2).
