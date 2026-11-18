@@ -34,6 +34,20 @@ class ShutterKeysTest {
         assertEquals(1, photos)
     }
 
+    // The photo is saved and the camera goes while the key is still held: the rest of that press
+    // must not change the volume either (N2a, Review 2026-11-18).
+    @Test
+    fun aKeyHeldPastThePhotoStaysTakenUntilReleased() {
+        assertTrue(keys.onKey(down(KeyEvent.KEYCODE_VOLUME_DOWN)))
+        keys.shutter = null
+        assertTrue(keys.onKey(down(KeyEvent.KEYCODE_VOLUME_DOWN, repeat = 1)))
+        assertTrue(keys.onKey(up(KeyEvent.KEYCODE_VOLUME_DOWN)))
+        assertEquals(1, photos)
+        // The next press works as usual again.
+        assertFalse(keys.onKey(down(KeyEvent.KEYCODE_VOLUME_DOWN)))
+        assertFalse(keys.onKey(up(KeyEvent.KEYCODE_VOLUME_DOWN)))
+    }
+
     @Test
     fun withoutCameraTheKeysChangeTheVolume() {
         keys.shutter = null
