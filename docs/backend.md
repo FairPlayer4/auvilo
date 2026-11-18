@@ -64,7 +64,9 @@
   keine freien Texte), nicht `diag.log` (cloud-entscheidungen.md A-12).
 - **Rückmeldung (geplant, Anf. 7.36):** Diagnose und Vorschläge auf Einladung, mit
   Erlaubnis je Konto in Firestore, Löschen je Sendung und später Verschlüsselung mit
-  KMS (Diagnose) bzw. Kevins Offline-Schlüssel (Vorschläge). Was das Backend dafür
+  KMS (Diagnose) bzw. Kevins Offline-Schlüssel (Vorschläge). Tester-Daten wertet Claude
+  nur über Vertex AI in der EU aus, nie in einer Claude-Code-Sitzung (RM8; statt des
+  Auftragsverarbeitungsvertrags mit Anthropic, Backend P9). Was das Backend dafür
   bräuchte: [rueckmeldung-entwurf.md](rueckmeldung-entwurf.md).
 
 ## Regeln für Claude in diesem Repo

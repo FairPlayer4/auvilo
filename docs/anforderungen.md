@@ -1344,7 +1344,8 @@ Entwickler schicken können, transparent und nur auf Einladung. Entwurf:
 - RM2 **Genaue Vorschau** dessen, was rausgeht, erzeugt aus derselben Nutzlast.
 - RM3 **Ehrlicher Hinweis auf jedem Sende-Bildschirm:** nicht Ende-zu-Ende verschlüsselt
   wie das Cloud-Backup, der Entwickler kann lesen; die Daten werden teilweise von einer KI
-  ausgewertet (Claude von Anthropic, USA), daher nur begrenzter Datenschutz; die
+  ausgewertet (Claude, betrieben von Google Cloud in der EU, RM8), daher nur begrenzter
+  Datenschutz; die
   Verschlüsselung (RM7) ist nur ein einfacher Schutz; keine privaten oder sensiblen
   Angaben schicken.
 - RM4 **Gesendet-Liste** mit Löschen je Sendung (auch auf dem Server).
@@ -1360,8 +1361,17 @@ Entwickler schicken können, transparent und nur auf Einladung. Entwurf:
   ihn zu sehen (Cloud KMS). Den **Vorschlags-Schlüssel** kennt zunächst nur Kevin (offline,
   im Passwortmanager), nicht in KMS unter seiner gcloud-Anmeldung, die Claude mitbenutzt.
   Gegen Claude schützt das organisatorisch, solange Kevin auf diesem PC entschlüsselt.
-- Offen: Auftragsverarbeitungsvertrag mit Anthropic vor Stufe 2 (Backend P9, playstore.md
-  S12), Datensicherheit in der Play Console (S5), Datenschutzerklärung (S7).
+- RM8 **KI-Auswertung von Tester-Daten nur über Vertex AI in der EU** (2026-11-18): Ein
+  Skript entschlüsselt die Sendungen (KMS) und gibt sie an Claude über Vertex AI, Region
+  `eu`, aus Kevins GCP-Projekt. Es gilt Googles Auftragsverarbeitungsvertrag, den das
+  Projekt schon hat; kein Prompt-Logging, kein Caching, kein Search-Grounding. Zurück kommt
+  nur eine Auswertung ohne Personenbezug. Tester-Daten kommen **nie** in eine
+  Claude-Code-Sitzung; Kevins eigene Diagnosen darf Claude dort weiter direkt lesen.
+  Ersetzt die Voraussetzung „Auftragsverarbeitungsvertrag mit Anthropic“ (Backend P9).
+- Offen: vor dem Einrichten Googles aktuelle Bedingungen für das gewählte Modell prüfen
+  (Prompt-Logging aus, keine Weitergabe an Anthropic, EU verfügbar); Datensicherheit in
+  der Play Console (S5), Datenschutzerklärung (S7), Prüfung durch jemanden mit
+  Datenschutzerfahrung (S10).
 
 ## 8. Zielplattform und Technik
 
@@ -1445,6 +1455,7 @@ Neueste zuerst. Kap. 7 enthält immer den gültigen Stand; diese Tabelle ist die
 
 | Datum | Entscheidung |
 |---|---|
+| 2026-11-18 | **Tester-Daten nur über Vertex AI in der EU auswerten** (Kevin: „Idealerweise würde ich für solche Auswertungen ZDR API Token benutzen. Wenn Anthropic das nicht anbietet, könnte man das bestimmt über GCP hinbekommen“; nach Empfehlung „Ja, festhalten“): Anthropics Auftragsverarbeitungsvertrag gilt zwar für API-Konten, nicht aber für Claude Code mit Abo; ZDR gibt es bei Anthropic nur auf Antrag. Claude über Vertex AI, Region `eu`, fällt unter Googles Vertrag des bestehenden GCP-Projekts. Auswertung per Skript, Tester-Daten nie in einer Claude-Code-Sitzung; der Hinweis nennt „Claude, betrieben von Google Cloud in der EU“ (7.36 RM3, RM8). Ersetzt die Voraussetzung „Auftragsverarbeitungsvertrag mit Anthropic“ (Backend P9) |
 | 2026-11-18 | **Rückmeldung senden mit aktiver Wahl und ehrlichem Hinweis** (Kevin: „Deine Vorschläge sind gut, der Nutzer soll aktiv wählen“; „es soll transparent sein, dass der Nutzer weiß, dass diese Daten (Diagnose/Vorschläge) nicht den E2E Schutz wie das Backend haben“; „soll immer dran stehen, dass die Daten teilweise von KI ausgewertet werden“): Zustimmung je Sendung ohne vorgesetzte Haken, Vorschau, Gesendet-Liste, Einladung getrennt vom Backup, fester Hinweis auf jedem Sende-Bildschirm (7.36 RM1–RM6) |
 | 2026-11-18 | **Verschlüsselung der Rückmeldung als Zukunft** (Kevin: „Können wir das so einrichten, dass du die Diagnose Daten entschlüsseln kannst … aber die Vorschläge erstmal nicht (nur ich kenne den Schlüssel)?“; „klar sein, dass dies nur ein wackliger Schutz ist“): Umschlag-Verschlüsselung mit öffentlichen Schlüsseln in der App; Diagnose-Schlüssel in Cloud KMS, von Claude per Skript benutzbar, ohne ihn zu sehen; Vorschlags-Schlüssel offline bei Kevin, nicht in KMS, weil Claude Kevins gcloud-Anmeldung mitbenutzt (7.36 RM7, rueckmeldung-entwurf.md) |
 | 2026-11-18 | **Play-Fassung mit Cloud-Backup** (Kevin: „Kannst du die Anforderungen vom Playstore ergänzen, mit Annahme, dass das Backend mitkommt?“): ersetzt die Annahme „ohne Backend“; Variante ohne Backend (B4) entfällt; neue Punkte S1–S12 in playstore.md 6. Offen: eigene Domain (S4) (7.28 PS16) |

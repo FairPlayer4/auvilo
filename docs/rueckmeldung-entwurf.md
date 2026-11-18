@@ -19,8 +19,9 @@ Entwickler kann sie lesen, und eine KI wertet sie teilweise aus.
   wird (kein zweiter Weg, der abweichen kann). Ein Test hält das fest.
 - **Fester Hinweis auf jedem Sende-Bildschirm** (nicht wegklickbar, nicht kürzbar):
   > Nicht Ende-zu-Ende verschlüsselt wie das Cloud-Backup: Der Entwickler kann lesen, was
-  > du schickst. Die Daten werden teilweise von einer KI ausgewertet (Claude von
-  > Anthropic, USA), der Datenschutz ist deshalb nur begrenzt. Die Verschlüsselung ist
+  > du schickst. Die Daten werden teilweise von einer KI ausgewertet (Claude, betrieben
+  > von Google Cloud in der EU), der Datenschutz ist deshalb nur begrenzt. Die
+  > Verschlüsselung ist
   > nur ein einfacher Schutz. Schick keine privaten oder sensiblen Angaben (Gesundheit,
   > Namen, Adressen, Passwörter).
 - **Gesendet-Liste.** Jede Sendung mit Zeit, Art und Inhalt der Vorschau bleibt lokal
@@ -53,8 +54,7 @@ können). Mehrere Vorschläge in einer Sendung gehen, jeder einzeln ab- oder anw
    Mail liegt im Postausgang).
 2. **Diagnose für Tester** über das Backend: Logger um die wählbaren Kategorien erweitern,
    Einladung getrennt vom Backup, Gesendet-Liste mit Löschen. Erst mit
-   Auftragsverarbeitungsvertrag mit Anthropic (Backend P9, playstore.md S12), weil Claude
-   die Diagnosen liest.
+   KI-Auswertung über Vertex AI in der EU (unten), weil Claude die Diagnosen liest.
 3. **Vorschläge über das Backend**: eigener Präfix, gleiche Limits und Frist wie die
    Diagnose, Löschen je Sendung.
 4. **Verschlüsselung** (unten), frühestens mit Stufe 2 bzw. 3.
@@ -104,21 +104,47 @@ ein; Claude startet es nicht.
   Server unlesbar; sie laufen ohnehin nach der Frist ab. Neue Schlüssel brauchen einen
   neuen Build.
 
+## KI-Auswertung von Tester-Daten (Vertex AI, EU)
+**Warum nicht direkt bei Anthropic:** Der Auftragsverarbeitungsvertrag von Anthropic gilt
+für API-Konten (kommerzielle Bedingungen), nicht für Claude Code mit Pro- oder Max-Abo
+(Verbraucherbedingungen). Zero Data Retention gibt es bei Anthropic nur auf Antrag beim
+Vertrieb. Über Vertex AI fällt Claude unter Googles Bedingungen und Googles
+Auftragsverarbeitungsvertrag, den das GCP-Projekt des Backends schon hat; mit der Region
+`eu` bleibt die Verarbeitung in der EU.
+
+**Ablauf:** `werkzeuge/rueckmeldung-auswerten` (Name offen) holt die Sendungen von Testern,
+entschlüsselt sie mit KMS und schickt sie an Claude über Vertex AI (`AnthropicVertex`,
+Region `eu`, Projekt des Backends). Ausgabe ist nur die Auswertung ohne Personenbezug
+(z. B. „3 Geräte: Alarm kam 2–6 Minuten zu spät, alle mit Akku-Optimierung an“). Mit dieser
+Auswertung arbeitet Claude Code weiter; die Rohdaten kommen nie in eine
+Claude-Code-Sitzung. Kevins eigene Diagnosen liest Claude wie bisher direkt (E-D-7).
+
+**Einstellungen:** kein Prompt-Logging für Missbrauchs-Monitoring (bei Partner-Modellen laut
+Google standardmäßig aus, sonst Ausnahme beantragen), kein Caching, kein Grounding mit
+Google Search. Die von Anthropic betriebene Fassung auf Google Cloud passt nicht: Sie läuft
+nur `global`, und ihr ZDR braucht wieder den Antrag bei Anthropic.
+
+**Vor dem Einrichten prüfen:** Googles aktuelle Seite zur Datenverwaltung für das gewählte
+Modell (Prompt-Logging, ob Daten an Anthropic gehen; laut einer unbestätigten Quelle
+verlangen manche neue Modelle das), Verfügbarkeit in `eu`. Kosten: pro Token, bei
+einzelnen Sendungen Cent-Beträge.
+
 ## Was das Backend bräuchte
 - Erlaubnis zum Senden je Konto in Firestore statt `DIAGNOSE_KONTEN` (Einladung ohne
   Neustart), getrennt nach Diagnose und Vorschlag.
 - `DiagnoseSenden` um die Art (Diagnose/Vorschlag) und *Löschen je Sendung* erweitern;
   Antwort mit einer Sendungs-ID für die Gesendet-Liste.
+- Vertex AI im Projekt einschalten (Region `eu`), Rechte nur für Kevin.
 - Für die Verschlüsselung: KMS-Schlüssel per Terraform, Recht nur für Kevin;
   `diagnose-holen.sh` entschlüsselt; ein eigenes Werkzeug für Vorschläge, das Claude nicht
   aufruft. Das Backend bleibt dabei blind für den Inhalt.
 
 ## Rechtliches (offen)
-- Auftragsverarbeitungsvertrag mit Anthropic, bevor Claude Diagnosen oder Vorschläge
-  anderer liest (Backend P9). Auch Vorschläge, die Kevin entschlüsselt und an Claude
-  weitergibt, fallen darunter.
+- KI-Auswertung von Tester-Daten nur über Vertex AI in der EU (oben, Anf. 7.36 RM8),
+  statt eines Auftragsverarbeitungsvertrags mit Anthropic (Backend P9). Auch Vorschläge,
+  die Kevin entschlüsselt, gibt er nicht an Claude Code, sondern nur über diesen Weg.
 - Datensicherheit in der Play Console: *App-Aktivität / Diagnose* und *Nutzerinhalte /
   Sonstiges* (Vorschläge) als erhoben, optional, verschlüsselt übertragen, löschbar
   (playstore.md S5).
-- Datenschutzerklärung und Testerinformation: was, wozu, Frist, KI-Auswertung durch
-  Anthropic in den USA (Drittland, Art. 44 ff.).
+- Datenschutzerklärung und Testerinformation: was, wozu, Frist, KI-Auswertung über
+  Google Cloud in der EU (Google als Auftragsverarbeiter).
