@@ -5,10 +5,11 @@ anforderungen.md 7.28 (PS1–PS9). Noch keine Entscheidungen, nur Bestandsaufnah
 Empfehlung. Richtlinien ändern sich; vor dem Einreichen jeden Punkt gegen die
 aktuelle Play-Console-Hilfe prüfen.
 
-**Annahme:** Die erste Play-Fassung kommt **ohne Backend**. Dann fallen weg: Konto-Löschung
-im Store-Eintrag (Pflicht nur bei Konten), Hosting in der EU, Auskunft und Export nach DSGVO
-für Serverdaten, App-Zugang für die Prüfer (keine Anmeldung). Die Datensicherheit wird
-„keine Daten erfasst, keine geteilt“, solange nichts das Gerät verlässt.
+**Annahme (seit 2026-11-18, Anf. 7.28 PS16):** Die erste Play-Fassung kommt **mit dem
+Cloud-Backup**. Bis dahin hieß die Annahme „ohne Backend“. Damit kommen dazu: Löschseite im
+Web, Datenschutzerklärung für App und Server, App-Zugang für die Prüfer, Freigabe der
+Anmeldung, Release-Konfiguration für „Mit Google anmelden“ und eine Datensicherheit mit
+erhobenen Metadaten. Alles dazu in Abschnitt 6.
 
 ## 1. Blocker: Berechtigungen und Richtlinien
 
@@ -53,7 +54,7 @@ betrifft P4.
 | B1 | Release-Build | kein `buildTypes`-Block, nur Debug wird gebaut und installiert | Release-Typ mit R8 (`isMinifyEnabled`, `isShrinkResources`), ProGuard-Regeln (Room, Glance, Credentials), Release-Tests auf dem Gerät |
 | B2 | Signatur | Debug-Schlüssel | Upload-Schlüssel erzeugen und sicher verwahren (nicht im Repo; Passwortmanager), Play App Signing, Signatur über Gradle-Properties/CI-Secrets |
 | B3 | Format | APK | Android App Bundle (`bundleRelease`) |
-| B4 | Variante ohne Backend | Backend-Client fest eingebunden (Composite Build), Cloud-Code in `cloud/` plus 8 Stellen außerhalb | Produkt-Flavor `play` ohne `cloud/`, ohne `verbindung`, Credentials und `googleid`, **ohne `INTERNET`**. Dann baut der Play-Build auch ohne `../avlreminder-backend`. Der heutige Weg (Ausblenden ohne Server-Werte) reicht nicht: Permission und Bibliotheken blieben drin |
+| B4 | Variante ohne Backend | Backend-Client fest eingebunden (Composite Build), Cloud-Code in `cloud/` plus 8 Stellen außerhalb | **Entfällt seit 2026-11-18** (Play-Fassung mit Backend, Abschnitt 6). Der Play-Build braucht `../avlreminder-backend` auf dem festen Commit, wie heute die CI. Was für das Backend im Release dazukommt: S3 |
 | B5 | Diagnose-Log | schreibt Titel nach `files/diag` (design.md 13, Ausnahme Entwicklungsphase) | Im Release ohne Titel; Abruf ohne `run-as` (Teilen-Knopf o. ä.), sonst ist es für Fehlersuche bei Testern wertlos |
 | B6 | Schnittstelle für Claude | nur im Debug-Manifest | ok, im Release nicht vorhanden; im Flavor-Aufbau so lassen |
 | B7 | `applicationId` | `com.avlreminder` | **Nach dem ersten Hochladen nicht mehr änderbar.** Vorher entscheiden (siehe N1). Ein Wechsel heißt: neue App neben der Sideload-App, Daten über Export/Backup übertragen |
@@ -98,13 +99,14 @@ betrifft P4.
 
 ## 4. Store-Eintrag und App-Inhalte (Play Console)
 
-- **Datenschutzerklärung** als öffentliche URL (z. B. GitHub Pages) und in der App verlinkt.
-  Pflicht wegen Kamera, Mikrofon und Standort, auch wenn nichts das Gerät verlässt. Inhalt:
-  wer verantwortlich ist, welche Daten lokal liegen, dass nichts übertragen wird,
-  Hintergrund-Standort und WLAN-Kennungen, Löschen durch Deinstallieren bzw. in der App.
-- **Datensicherheit**: ohne Backend „keine Daten erfasst“. Achtung: Daten, die nur auf dem
-  Gerät verarbeitet werden, gelten nicht als erfasst; Play-Services-Bibliotheken
-  (`play-services-location`) dabei prüfen.
+- **Datenschutzerklärung** als öffentliche URL und in der App verlinkt; mit Backend eine
+  gemeinsame Erklärung für App und Server (S7). Inhalt für den App-Teil: wer verantwortlich
+  ist, welche Daten lokal liegen, Hintergrund-Standort und WLAN-Kennungen, Löschen durch
+  Deinstallieren bzw. in der App.
+- **Datensicherheit**: mit Backend erhobene Metadaten (Konto- und Geräte-IDs), siehe S5.
+  Daten, die nur auf dem Gerät verarbeitet werden, gelten nicht als erhoben;
+  Play-Services-Bibliotheken (`play-services-location`) dabei prüfen.
+- **Löschen des Kontos**: Adresse der Löschseite im Formular zur Datensicherheit (S6).
 - **Fragebögen**: Inhaltseinstufung (IARC), Zielgruppe (18+ empfohlen, keine Kinder),
   Werbung (keine), Gesundheits-Apps (nein bzw. „Gewohnheiten“ prüfen), Finanzfunktionen
   (nein), Behörden-App (nein), Nachrichten-App (nein).
@@ -162,12 +164,57 @@ betrifft P4.
   Angaben: Die Datei geht nur dorthin, wo der Nutzer sie im Dateidialog ablegt; die App
   sendet nichts.
 
+## 6. Mit Backend (Cloud-Backup)
+
+Ergänzt am 2026-11-18 (Anf. 7.28 PS16): Die erste Play-Fassung bringt das Cloud-Backup mit.
+Das Backend (`../avlreminder-backend`) ist schon auf DSGVO und Ende-zu-Ende-Verschlüsselung
+ausgelegt; seine Datenschutz-Unterlagen liegen dort in `docs/datenschutz/` (Entwürfe), die
+Play-Punkte des Backends in dessen `anforderungen.md` 4.4 (P1–P10) und Etappe B6. Hier steht,
+was davon die App und die Play Console betrifft.
+
+| # | Thema | Stand heute | Fehlt für Play |
+|---|---|---|---|
+| S1 | Sicherheitsphase (backend.md) | Eigenbetrieb: Claude darf Schlüssel und Token kennen | **Vor dem ersten Tester gegen die Cloud:** Claude kündigt sie an, das Backend wird zurückgesetzt, Kevin richtet die App mit neuen Schlüsseln ein, Claude sieht sie nicht mehr. A-15 (Schlüssel im Passwortmanager) ist dafür umgesetzt |
+| S2 | Wer darf sich anmelden? | Freigabeliste im Backend (`freigegebene_kennungen`), nur Kevin | **Entscheidung nötig.** Geschlossener Test: Freigabeliste mit den Testern reicht. Produktion: entweder offen (dann Play Integrity, Limits pro Konto, Budget mit Kill-Switch gegen Missbrauch; S9) oder weiter „auf Einladung“; dann muss die App bei einer nicht freigegebenen Kennung klar sagen, dass das Backup nur auf Einladung geht, statt eines Fehlers. Empfehlung: zuerst „auf Einladung“, offen erst nach B6 mit Play Integrity |
+| S3 | Release-Konfiguration | Server-Werte in `gradle.properties`; Android-OAuth-Client nur mit dem Debug-Schlüssel (cloud-entscheidungen.md, Einrichtung) | Android-Client im GCP-Projekt zusätzlich mit dem **SHA-1 des Play-App-Signaturschlüssels** und des Upload-Schlüssels (B2), sonst scheitert „Mit Google anmelden“ in der Store-Fassung. Nach der Umbenennung (N1, B7) ein Client für die neue `applicationId`. Release-Build aus dem festen Backend-Commit (`-PbackendStreng=true`). R8-Regeln für Tink, Protobuf, Credential Manager und `googleid` (B1) |
+| S4 | OAuth-Zustimmungsbildschirm | vermutlich Status *Testen* | Im Status *Testen* können sich nur eingetragene Testnutzer (höchstens 100) anmelden; für den geschlossenen Test reicht das. Für die Produktion auf *In Produktion* stellen, mit Startseite und Datenschutzerklärung; dafür verlangt Google wahrscheinlich eine eigene, bestätigte Domain (Backend P10, offene Frage Domain). Nur `openid`-Bereiche, also keine aufwendige Prüfung sensibler Bereiche |
+| S5 | Datensicherheit (Play Console) | geplant „keine Daten erfasst“ | Neu ausfüllen, siehe unten |
+| S6 | Konto löschen | in der App umgesetzt (*Konto löschen*, R-3, V1.3c2) | **Löschseite im Web** (Backend P10/K7, Etappe B6) und ihre Adresse im Formular zur Datensicherheit. Play verlangt beides, sobald man in der App ein Konto anlegen kann; die Google-Anmeldung legt eins an |
+| S7 | Datenschutzerklärung | Entwurf im Backend (`docs/datenschutz/datenschutzerklaerung.md`) | **Eine** Erklärung für App und Backend: den App-Teil ergänzen (lokale Daten, Kamera, Mikrofon, Standort im Hintergrund, WLAN-Kennungen, Sicherungsdatei, Löschen durch Deinstallieren), öffentliche Adresse auf dem Dienst `web` (P10), verlinkt im Store-Eintrag, im OAuth-Bildschirm und in der App (*Einstellungen → Hilfe* und beim Einschalten des Cloud-Backups). Ob ein Impressum nötig ist, mit der Prüfung klären |
+| S8 | App-Zugang für die Prüfer | – | Alles außer dem Cloud-Backup geht ohne Anmeldung; das in *App-Zugang* so angeben. Für das Backup ein **eigenes Google-Testkonto** für die Prüfer (Kevin legt es an, Zugangsdaten nur in der Play Console, nie im Repo oder bei Claude), auf der Freigabeliste und als OAuth-Testnutzer; dazu kurze Schritte (einschalten, anmelden, Schlüssel im Passwortmanager oder *auf Papier aufgeschrieben*, *Jetzt sichern*). Ohne Zugang lehnen Prüfer erfahrungsgemäß mit „Need login credentials“ ab |
+| S9 | Missbrauch und Kosten | Limits pro Konto, Budget 20 €/Monat mit Kill-Switch | Play Integrity (Backend ID5, B6) vor einer offenen Anmeldung. Der Kill-Switch trifft dann alle Nutzer; das passt zu „Kosten vor Verfügbarkeit“, muss aber im Store-Text und in der App stehen (S11) |
+| S10 | DSGVO-Unterlagen | Entwürfe im Backend: VVT, TOMs, DSFA, Betroffenenrechte, Datenpannen | Abschließen und prüfen lassen (Backend `docs/datenschutz/README.md`, „Was noch zu tun ist“): Testerinformation vor dem geschlossenen Test, DSFA (Erinnerungen können Gesundheitsdaten sein, Art. 9), Aufsichtsbehörde eintragen, Prüfung durch jemanden mit Datenschutzerfahrung. Mindestalter 16 (Backend P8) passt zur Zielgruppe 18+ in der Play Console |
+| S11 | Store-Text und Einstieg | Cloud-Backup heißt in der App „(experimentell)“ | Im Store-Text: freiwillig, Ende-zu-Ende verschlüsselt, Server in der EU, kein verlässliches Backup (Kosten vor Verfügbarkeit), ohne Wiederherstellungsschlüssel sind die Daten weg. Die Sicherungsdatei (N4) als Weg ohne Cloud nennen |
+| S12 | Diagnosen von Testern | nur Kevins Konto darf senden (Backend P9, E-D-3) | So lassen, bis es einen Auftragsverarbeitungsvertrag mit Anthropic gibt; bei Testern *Diagnose senden* ausblenden oder ohne Erlaubnis klar ablehnen |
+
+**Datensicherheit mit Backend (S5).** Laut Play-Console-Hilfe gelten Daten, die
+Ende-zu-Ende verschlüsselt übertragen werden und nur für Sender und Empfänger lesbar sind,
+nicht als erhoben. Die Sicherung selbst (Reminder, Nachweise, Einstellungen) und das
+Schlüssel-Backup zählen deshalb nicht. Erhoben werden aber Metadaten:
+- **Nutzer-IDs:** die pseudonyme Konto-ID bzw. Google-Kennung (`sub`); Zweck
+  Kontoverwaltung und Funktion der App.
+- **Geräte- oder andere IDs:** Geräte-ID und öffentlicher Geräteschlüssel.
+- **Server-Logs** mit IP-Adresse bis 30 Tage (Backend K4): prüfen, ob Google das als
+  erhoben verlangt; im Zweifel angeben.
+- **App-Aktivität/Diagnose:** nur, wenn *Diagnose senden* für Tester offen ist (S12);
+  sonst nicht.
+
+Dazu: alles **optional** (das Backup ist ausgeschaltet, bis man es einschaltet),
+**verschlüsselt übertragen** (HTTPS), **Löschen möglich** (in der App und über die
+Löschseite, S6), **nicht geteilt** (Google Cloud ist Auftragsverarbeiter; die Google-Anmeldung
+verantwortet Google selbst, Backend P3). Kamera, Mikrofon, Standort und WLAN bleiben auf
+dem Gerät und zählen nicht. Vor dem Ausfüllen gegen die aktuelle Hilfe prüfen.
+
 ## Empfohlene Reihenfolge
-1. Entscheiden: `applicationId` zum Namen AuViLo-Reminder (N1, B7), Play-Fassung ohne Backend
-   (Annahme oben).
-2. Code, der auch der Sideload-App nicht schadet: P1, P3, P4, P5 (Offenlegung), B1, B4, B5.
+1. Entscheiden: `applicationId` zum Namen AuViLo-Reminder (N1, B7), Anmeldung offen oder auf
+   Einladung (S2), eigene Domain (S4).
+2. Code, der auch der Sideload-App nicht schadet: P1, P3, P4, P5 (Offenlegung), B1, B5 (B4 entfällt).
    P1 und P4 ändern Kevins Alltag kaum, brauchen aber je einmal einen Gerätetest
    (Erlaubnis entziehen, Alarm kommt trotzdem bzw. Hinweis erscheint).
 3. Erledigt: N4 Export/Import (V1.3c8), N3 Einstieg (V1.3c9).
-4. Konto anlegen, Datenschutzerklärung, Store-Eintrag, interner Test, dann geschlossener
-   Test mit 12 Testern (Android 14 oder neuer, minSdk 34).
+4. Backend B6 im Backend-Repo: Löschseite und Datenschutzerklärung auf dem Dienst `web`
+   (S6, S7), Play Integrity, DSGVO-Unterlagen abschließen (S10). Release-Konfiguration für die
+   Anmeldung (S3), sobald Upload- und Signaturschlüssel feststehen.
+5. Sicherheitsphase (S1), dann Konto anlegen, Store-Eintrag, Datensicherheit (S5), interner
+   Test, dann geschlossener Test mit 12 Testern (Android 14 oder neuer, minSdk 34), Tester
+   auf der Freigabeliste und als OAuth-Testnutzer.

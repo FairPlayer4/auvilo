@@ -988,7 +988,15 @@ Vordergrund, nicht Reichweite.
     Kontaktadresse `kevin.bartik@gmail.com`, mit festem Betreff samt Version zum Filtern.
     Dieselbe Adresse gilt für Store-Eintrag und Datenschutzerklärung (Kevin, 2026-11-15).
   - Umgesetzt in V1.3c9.
-- Was für den Play Store noch fehlt (Prüfung 2026-11-15, Annahme: erste Fassung ohne
+- PS16 **Play-Fassung mit Cloud-Backup (2026-11-18):** Die erste Play-Fassung bringt das
+  Backend mit; es ist schon auf DSGVO und Ende-zu-Ende-Verschlüsselung ausgelegt (Kevin:
+  „Playstore wird eh noch dauern und daher würde ich das gerne gleich mitnehmen.“).
+  Ersetzt die Annahme „ohne Backend“ in playstore.md; die Variante ohne Backend (B4)
+  entfällt. Was dazukommt, steht in playstore.md Abschnitt 6 (S1–S12): Sicherheitsphase,
+  Freigabe der Anmeldung (offen oder auf Einladung, noch zu entscheiden), Release-Client für
+  „Mit Google anmelden“, Löschseite im Web, gemeinsame Datenschutzerklärung,
+  Prüferzugang, Datensicherheit mit Metadaten.
+- Was für den Play Store noch fehlt (Prüfung 2026-11-15, ergänzt 2026-11-18 um das
   Backend): [playstore.md](playstore.md).
 - Backend-Stand und was es für die App bedeutet: [backend.md](backend.md); Einbindung des
   Cloud-Backups: [cloud-entscheidungen.md](cloud-entscheidungen.md) (bestätigt 2026-11-07).
@@ -1400,6 +1408,7 @@ Neueste zuerst. Kap. 7 enthält immer den gültigen Stand; diese Tabelle ist die
 
 | Datum | Entscheidung |
 |---|---|
+| 2026-11-18 | **Play-Fassung mit Cloud-Backup** (Kevin: „Kannst du die Anforderungen vom Playstore ergänzen, mit Annahme, dass das Backend mitkommt?“): ersetzt die Annahme „ohne Backend“; Variante ohne Backend (B4) entfällt; neue Punkte S1–S12 in playstore.md 6. Offen: Anmeldung offen oder auf Einladung (S2), eigene Domain (S4) (7.28 PS16) |
 | 2026-11-16 | **Schnellerinnerung zuerst in der einfachsten Fassung** (Kevin: „Können wir die einfachste Version versuchen umzusetzen? Ich würde gerne im Alltag testen, vielleicht reicht lokal erstmal.“): ein Widget-Tipp startet die Aufnahme, *Fertig* beendet sie, Zusammenfassung mit Bestätigung, *Nochmal* oder *Abbrechen*; festes Muster „Zeit: … Name: …“ auf dem Bildschirm; nur lokal. Umgesetzt in V1.3c11 (7.35) |
 | 2026-11-16 | **Foto-Nachweis mit den Lautstärketasten auslösen** (Kevin: „Können wir das Nachweis Foto mit dem Leiser Button auslösen lassen so wie bei der Kamera App“): beide Tasten, nur solange die Kamera zu sehen ist; die Tasten ändern dann keine Lautstärke (7.5 N2a). Umgesetzt in V1.3c10 |
 | 2026-11-15 | **Schnellerinnerung per Widget und Sprache** (Kevin: „Ja alle Punkte passen, erst lokal, dann per Bestätigung mit Hinweis Cloud KI und auch die Option mit Widget +5 / +20 / +60 mit Text über Sprache ist auch passend.“): Widget mit *+5 / +20 / +60 min* und Spracheingabe für den Text, dazu ein Knopf nur mit Sprache. Spracherkennung und Zeitangabe lokal, die Erinnerung entsteht sofort und scheitert nie (Standardzeit, Rückgängig in der Benachrichtigung). Cloud-KI nur als Rückfall nach Bestätigung je Anfrage (Backend K7). Version offen (7.35) |
