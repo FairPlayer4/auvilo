@@ -90,12 +90,14 @@ object CloudErrors {
     }
 
     /**
-     * The server lets in only the Google accounts on its list (backend ID7). The identifier is a
-     * pseudonym of the Google account (no address, no name), so it may be shown and passed on.
+     * The server lets in only the Google accounts on its list (backend ID7): the cloud backup is
+     * by invitation (Anf. 7.28 PS16). The identifier is a pseudonym of the Google account (no
+     * address, no name), so it may be shown and passed on.
      */
     fun notAllowed(kennung: String?): String =
-        "Dieses Google-Konto ist für den Server nicht freigegeben." +
-            (kennung?.let { " Zum Freigeben diese Kennung an den Betreiber geben: $it" } ?: "")
+        "Das Cloud-Backup gibt es nur auf Einladung; dieses Google-Konto ist noch nicht freigegeben. " +
+            "Die App funktioniert ohne Cloud-Backup genauso." +
+            (kennung?.let { " Zum Freischalten diese Kennung schicken: $it" } ?: "")
 }
 
 /** The kind of error, for [CloudEvent.FAILED]; the same split as [CloudErrors.describe]. */

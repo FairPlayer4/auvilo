@@ -803,11 +803,18 @@ Commit fest in `gradle/backend-commit.txt` (A-2). In der App (`app/…/cloud/`):
 | `CloudServer.kt` | Schnittstelle zum Server; `ConnectCloudServer` über `Anmeldung`, `withSession` erneuert eine abgelehnte Sitzung einmal; Zeitplan (WorkManager) und Hinweise |
 | `CloudUpload.kt` | ein Hochladen über `Sicherungsablauf`, Hash und Bremse (R-2) |
 | `AutomaticBackup.kt` | stündliches Sichern (A-9, A-10), 3-Tage-Hinweis (A-13) |
-| `CloudErrors.kt` | Fehler → Text und Diagnose-Art (gesperrt, neu anmelden, Limit, Netz) |
+| `CloudErrors.kt` | Fehler → Text und Diagnose-Art (gesperrt, neu anmelden, Limit, Netz, nicht freigegeben) |
 | `Question.kt` | eine offene Rückfrage an die Person (Schlüssel, Ersetzen, Bremse) |
 | `CloudPhase.kt` | Zustände und Berichte der Oberfläche |
 | `PasswordSafe.kt` | Wiederherstellungsschlüssel im Passwortdienst (A-15) |
 | übrige | `CloudStore` (Merker), `CloudLog` (Logger), `CloudWorker` (WorkManager), `GoogleSignIn` (A-4), `Keystore`/`KeyFile` (A-5, A-6), `BackupPayload` (A-8), `BackupStateFile`, `CloudConfig` |
+
+**Auf Einladung** (Anf. 7.28 PS16). Der Server lässt nur Konten auf seiner Freigabeliste
+an (`KontoNichtFreigegeben`, Backend ID7). Scheitert ein Schritt daran, setzt `work` neben
+dem Text ein `Invitation` mit der Kennung in `CloudStatus`; die Einstellungen zeigen dann
+*Einladung per E-Mail anfragen* (`Contact.invitation`: Betreff „Einladung zum Cloud-Backup“,
+Kennung im Text). Jeder weitere Schritt und `dismissNotes` nehmen es wieder weg. Ein später
+entzogenes Einverständnis beendet die Sitzung wie eine abgelehnte Anmeldung.
 
 **Schlüssel.** Geräteschlüssel ECDSA P-256 im Android Keystore (A-5); Keysets mit einem
 Keystore-AES-Schlüssel verschlüsselt (A-6); Sitzung und Sicherungsstand in einem eigenen

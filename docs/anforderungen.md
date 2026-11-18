@@ -1000,6 +1000,9 @@ Vordergrund, nicht Reichweite.
     Freigabeliste des Backends steht, im geschlossenen Test und in der Produktion. Alle
     anderen nutzen die App ohne Cloud; die App sagt ihnen das und bietet an, die Kennung per
     E-Mail zu schicken. Offen frühestens nach Backend B6 mit Play Integrity (playstore.md S2).
+    In der App umgesetzt in V1.3c12: Text „nur auf Einladung“ statt eines Fehlers, Knopf
+    *Einladung per E-Mail anfragen* (Betreff „Einladung zum Cloud-Backup“, Kennung im Text),
+    Hinweis unter dem Schalter und im Einschalt-Dialog.
 - Was für den Play Store noch fehlt (Prüfung 2026-11-15, ergänzt 2026-11-18 um das
   Backend): [playstore.md](playstore.md).
 - Backend-Stand und was es für die App bedeutet: [backend.md](backend.md); Einbindung des
@@ -1515,6 +1518,7 @@ Neueste zuerst. Kap. 7 enthält immer den gültigen Stand; diese Tabelle ist die
 | V1.3c9 | – | Einstieg für Tester mit Probealarm, wiederholbar in den Einstellungen (7.28 PS15); minSdk 34 (8.1) |
 | V1.3c10 | – | Foto-Nachweis mit den Lautstärketasten auslösen (7.5 N2a) |
 | V1.3c11 | 2026-11-16 | Schnellerinnerung per Sprache, einfachste Fassung: eigenes Widget, Aufnahme bis *Fertig*, Zusammenfassung mit Bestätigung (7.35) |
+| V1.3c12 | – | Cloud-Backup nur auf Einladung: Text und *Einladung per E-Mail anfragen* mit Kennung (7.28 PS16) |
 
 Details zum Verhalten: [design.md](design.md), Gerätetests: [geraetetest.md](geraetetest.md).
 

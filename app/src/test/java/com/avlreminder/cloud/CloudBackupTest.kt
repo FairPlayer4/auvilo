@@ -1786,6 +1786,25 @@ class CloudBackupTest {
         assertEquals(CloudPhase.SignedOut, cloud.status.value.phase)
         assertTrue(notices.shown.isEmpty())
         assertEquals(FailureKind.NOT_ALLOWED, FailureKind.of(KontoNichtFreigegeben(identifier)))
+        // By invitation (Anf. 7.28 PS16): the settings offer a mail with the identifier.
+        assertEquals(Invitation(identifier), cloud.status.value.invitation)
+        assertTrue(error, error.contains("nur auf Einladung"))
+        cloud.dismissNotes()
+        assertNull(cloud.status.value.invitation)
+    }
+
+    // Counter-check: another failure offers no invitation, and a later step clears an old one.
+    @Test
+    fun onlyAnAccountNotLetInIsOfferedAnInvitation() {
+        val cloud = cloud()
+        blocking { cloud.setEnabled(true).join() }
+        server.signInError = KontoNichtFreigegeben(identifier)
+        blocking { cloud.signIn(activity).join() }
+        assertEquals(Invitation(identifier), cloud.status.value.invitation)
+        server.signInError = AnmeldungAbgelehnt()
+        blocking { cloud.signIn(activity).join() }
+        assertNull(cloud.status.value.invitation)
+        assertFalse(cloud.status.value.error.orEmpty().contains("Einladung"))
     }
 
     // KRITISCH: an approval withdrawn later ends the session like a rejection: the hourly backup

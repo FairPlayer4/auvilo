@@ -63,6 +63,9 @@ interface CloudActions {
     fun deleteAccount() {}
     fun cancelDeletion() {}
     fun resetPhone() {}
+
+    /** A mail asking for an invitation, with the account's identifier (Anf. 7.28 PS16). */
+    fun askInvitation(identifier: String?) {}
 }
 
 /**
@@ -89,7 +92,7 @@ fun CloudBackupSetting(status: CloudStatus, actions: CloudActions) {
         Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
             Column(Modifier.weight(1f)) {
                 Text(headline(phase), color = c.text, fontSize = 15.sp, fontWeight = if (phase is CloudPhase.Ready) FontWeight.SemiBold else null)
-                Text("Ende-zu-Ende verschlüsselt, Server in der EU", color = c.muted, fontSize = 13.sp)
+                Text("Ende-zu-Ende verschlüsselt, Server in der EU, nur auf Einladung", color = c.muted, fontSize = 13.sp)
             }
             Switch(
                 phase != CloudPhase.Off, { on -> if (on) asking = true else actions.setEnabled(false) },
@@ -197,6 +200,12 @@ fun CloudBackupSetting(status: CloudStatus, actions: CloudActions) {
         status.error?.let {
             SelectionContainer { Text(it, Modifier.padding(top = 6.dp).testTag("cloudError"), color = c.strict, fontSize = 14.sp) }
         }
+        status.invitation?.let { invitation ->
+            OutlinedButton(
+                onClick = { actions.askInvitation(invitation.identifier) },
+                Modifier.padding(top = 8.dp).testTag("cloudAskInvitation"),
+            ) { Text("Einladung per E-Mail anfragen") }
+        }
     }
     if (asking) {
         AlertDialog(
@@ -206,7 +215,8 @@ fun CloudBackupSetting(status: CloudStatus, actions: CloudActions) {
                 Text(
                     "Experimentell. Nach der Anmeldung mit Google entstehen Schlüssel auf diesem Handy; Reminder und " +
                         "Einstellungen verlassen es nur verschlüsselt. Ohne Netz oder bei Ausfall des Servers läuft die " +
-                        "App normal weiter.",
+                        "App normal weiter.\n\nDas Cloud-Backup gibt es nur auf Einladung. Ist dein Google-Konto noch " +
+                        "nicht freigegeben, kannst du nach der Anmeldung per E-Mail darum bitten.",
                 )
             },
             confirmButton = { TextButton(onClick = { actions.setEnabled(true); asking = false }, Modifier.testTag("cloudOk")) { Text("Einschalten") } },

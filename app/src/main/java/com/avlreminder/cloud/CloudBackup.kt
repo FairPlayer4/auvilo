@@ -172,7 +172,7 @@ class CloudBackup(
         brakeAnswer.answer(yes)
     }
 
-    fun dismissNotes() = state.update { it.copy(notes = emptyList(), error = null, report = null) }
+    fun dismissNotes() = state.update { it.copy(notes = emptyList(), error = null, report = null, invitation = null) }
 
     /**
      * Backs up now, by hand (cloud-entscheidungen.md A-9): the app's data, encrypted with the
@@ -698,6 +698,7 @@ class CloudBackup(
             // gone, and the next step would wait for an answer for ever.
             try {
                 var error: String? = null
+                var invitation: Invitation? = null
                 try {
                     block()
                 } catch (e: CancellationException) {
@@ -711,6 +712,8 @@ class CloudBackup(
                         // must learn it at once, not only from the notice after 3 days (A-13).
                         if (step != CloudStep.SIGN_IN) notices.signInAgain()
                     }
+                    // Only on the server's list can the account use the backup (Anf. 7.28 PS16).
+                    if (e is KontoNichtFreigegeben) invitation = Invitation(e.kennung)
                     error = CloudErrors.describe(e)
                     events.record(CloudEvent.FAILED, CloudErrors.failure(step, e), e)
                     log("cloud: failed (${CloudErrors.logDetail(e)})")
@@ -725,7 +728,7 @@ class CloudBackup(
                     if (runCatching { store.enabled() }.getOrDefault(false)) CloudPhase.NotSetUp else CloudPhase.Off
                 }
                 val deletion = runCatching { store.deletion() }.getOrNull()
-                state.update { it.copy(phase = phase, error = error, deletion = deletion) }
+                state.update { it.copy(phase = phase, error = error, deletion = deletion, invitation = invitation) }
                 // KRITISCH: The hourly backup runs only while it may (switched on, set up, unlocked,
                 // backed up by hand once); switching off and resetting stop it.
                 if (phase is CloudPhase.Ready && phase.automatic) schedule.start()

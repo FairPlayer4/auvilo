@@ -62,7 +62,8 @@ sealed interface CloudPhase {
 /**
  * [notes]: what the setup told the person; [error]: why the last step failed; [report]: the result
  * of the last "Sicherung prüfen"; [deletion]: when the server deletes the account (backend B1),
- * null = no deletion requested.
+ * null = no deletion requested; [invitation]: the last step failed because the account is not on
+ * the server's list, so the person may ask for an invitation (Anf. 7.28 PS16).
  */
 data class CloudStatus(
     val phase: CloudPhase,
@@ -70,7 +71,11 @@ data class CloudStatus(
     val error: String? = null,
     val report: BackupReport? = null,
     val deletion: Instant? = null,
+    val invitation: Invitation? = null,
 )
+
+/** Not let in by the server (backend ID7); [identifier] is what the operator needs, if the server sent it. */
+data class Invitation(val identifier: String?)
 
 /**
  * The result of "Sicherung prüfen" (W-1, W-2): the backup made at [created], from this device or

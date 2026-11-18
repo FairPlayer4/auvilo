@@ -21,6 +21,7 @@ import androidx.test.ext.junit.runners.AndroidJUnit4
 import com.avlreminder.cloud.BackupReport
 import com.avlreminder.cloud.CloudPhase
 import com.avlreminder.cloud.CloudStatus
+import com.avlreminder.cloud.Invitation
 import com.avlreminder.restore.oneReminderChanged
 import com.avlreminder.restore.sameEverywhere
 import com.avlreminder.ui.screens.CloudActions
@@ -60,6 +61,7 @@ class CloudBackupUiTest {
         override fun deleteAccount() { calls += "deleteAccount" }
         override fun cancelDeletion() { calls += "cancelDeletion" }
         override fun resetPhone() { calls += "resetPhone" }
+        override fun askInvitation(identifier: String?) { calls += "invite $identifier" }
     }
 
     private fun show(status: CloudStatus): Recorder {
@@ -449,4 +451,20 @@ class CloudBackupUiTest {
             }
         }
     }
+
+    // By invitation (Anf. 7.28 PS16): an account not on the server's list can ask by mail.
+    @Test
+    fun anAccountNotLetInCanAskForAnInvitationByMail() {
+        val actions = show(CloudStatus(CloudPhase.SignedOut, error = "nur auf Einladung", invitation = Invitation("49b0c816")))
+        compose.onNodeWithTag("cloudAskInvitation").performScrollTo().performClick()
+        assertEquals(listOf("invite 49b0c816"), actions.calls)
+    }
+
+    @Test
+    fun otherErrorsOfferNoInvitation() {
+        show(CloudStatus(CloudPhase.SignedOut, error = "Kein Netz"))
+        compose.onNodeWithTag("cloudError").assertExists()
+        compose.onNodeWithTag("cloudAskInvitation").assertDoesNotExist()
+    }
+
 }

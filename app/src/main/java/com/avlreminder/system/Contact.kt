@@ -11,12 +11,25 @@ import androidx.core.net.toUri
 object Contact {
     const val EMAIL = "kevin.bartik@gmail.com"
 
-    fun subject(version: String) = "AuViLo-Reminder: Rückmeldung (Version $version)"
+    fun subject(version: String, topic: String = "Rückmeldung") = "AuViLo-Reminder: $topic (Version $version)"
 
     /** Opens a mail app with address and subject; nothing is sent without the person. */
-    fun mail(version: String): Intent = Intent(Intent.ACTION_SENDTO, "mailto:".toUri())
-        .putExtra(Intent.EXTRA_EMAIL, arrayOf(EMAIL))
-        .putExtra(Intent.EXTRA_SUBJECT, subject(version))
+    fun mail(version: String, topic: String = "Rückmeldung", body: String? = null): Intent =
+        Intent(Intent.ACTION_SENDTO, "mailto:".toUri())
+            .putExtra(Intent.EXTRA_EMAIL, arrayOf(EMAIL))
+            .putExtra(Intent.EXTRA_SUBJECT, subject(version, topic))
+            .apply { body?.let { putExtra(Intent.EXTRA_TEXT, it) } }
+
+    const val INVITATION_TOPIC = "Einladung zum Cloud-Backup"
+
+    /**
+     * Asking for access to the cloud backup (Anf. 7.28 PS16, playstore.md S2): the server lets in
+     * only the accounts on its list, by their identifier (a pseudonym, no address, no name).
+     */
+    fun invitation(version: String, identifier: String?): Intent = mail(
+        version, INVITATION_TOPIC,
+        "Bitte schalte mein Google-Konto für das Cloud-Backup frei." + (identifier?.let { "\n\nKennung: $it" } ?: ""),
+    )
 
     /** Without a mail app the address is at least shown. */
     const val NO_MAIL_APP = "Keine Mail-App gefunden. Schreib an $EMAIL"

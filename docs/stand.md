@@ -4,6 +4,9 @@ Stand: 2026-11-16. Bei jedem größeren Schritt aktualisieren. Erledigtes steht 
 anforderungen.md Kap. 10.1 und in den Review-Berichten (`.review/runs/`), nicht hier.
 
 ## Auf dem Gerät (S24)
+- **V1.3c12** (`versionCode` 32) gebaut, noch nicht installiert: Cloud-Backup nur auf
+  Einladung, Text und *Einladung per E-Mail anfragen* mit Kennung (7.28 PS16, playstore.md
+  S2). Keine Migration. Auf dem S24 ändert sich nur der Text unter dem Schalter.
 - **V1.3c11** (`versionCode` 31), installiert am 2026-11-16 über V1.3c10: Schnellerinnerung
   per Sprache, einfachste Fassung (Anf. 7.35, design.md 11.2). Keine Migration. Start ohne
   Fehler, Alarme neu geplant, Mikrofon schon erlaubt. Auf dem S24 gibt es zwei
@@ -52,7 +55,7 @@ einer Fassung.
    Benachrichtigung lässt sie stehen; die Morgenübersicht kommt, auch wenn die App kurz
    nach ihrer Zeit geöffnet wird; einen Punkt aus der Benachrichtigung eines klingelnden
    Vollbild-Alarms abhaken und im Vollbild den Nachweis starten: der nächste Punkt bzw.
-   „Nachweis läuft“ bleibt stehen (Lauf 6, E26); K33–K37, K38 (nur noch das Antippen), K39 (nur, falls die Erlaubnis einmal fehlt), K40, K41, K42, C19; ohne Vollbild-Erlaubnis ein Alarm (playstore-erklaerungen.md P2). Nur auf dem Emulator mit
+   „Nachweis läuft“ bleibt stehen (Lauf 6, E26); K33–K37, K38 (nur noch das Antippen), K39 (nur, falls die Erlaubnis einmal fehlt), K40, K41, K42, C19, C20 (Emulator); ohne Vollbild-Erlaubnis ein Alarm (playstore-erklaerungen.md P2). Nur auf dem Emulator mit
    Testkonto: C15–C18.
 1. **Gerätetests** aus [geraetetest.md](geraetetest.md): K15, K23–K26 (vorher *Zuhause* in
    *Orte* mit WLAN neu festlegen), K27–K30 (Sitzung, dabei: zeigt die Uhr den

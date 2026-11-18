@@ -39,8 +39,8 @@ android {
         applicationId = "com.avlreminder"
         minSdk = 34
         targetSdk = 37
-        versionCode = 31
-        versionName = "1.3c11-backup5"
+        versionCode = 32
+        versionName = "1.3c12-backup5"
         buildConfigField("String", "CLOUD_SERVER_URL", "\"$cloudServerUrl\"")
         buildConfigField("String", "CLOUD_WEB_CLIENT_ID", "\"$cloudWebClientId\"")
     }

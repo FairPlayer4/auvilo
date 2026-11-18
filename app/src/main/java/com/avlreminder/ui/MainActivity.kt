@@ -221,6 +221,15 @@ class MainActivity : ComponentActivity() {
         AudioPlayer.stop()
     }
 
+    /** A mail app with address, subject and maybe a text; without one the address is shown. */
+    private fun openMail(mail: android.content.Intent) {
+        try {
+            startActivity(mail)
+        } catch (_: android.content.ActivityNotFoundException) {
+            android.widget.Toast.makeText(this, Contact.NO_MAIL_APP, android.widget.Toast.LENGTH_LONG).show()
+        }
+    }
+
     override fun onResume() {
         super.onResume()
         refreshPermissions()
@@ -283,6 +292,7 @@ class MainActivity : ComponentActivity() {
             override fun deleteAccount() { graph.cloud.deleteAccount(this@MainActivity) }
             override fun cancelDeletion() { graph.cloud.cancelDeletion() }
             override fun resetPhone() { graph.cloud.resetPhone() }
+            override fun askInvitation(identifier: String?) = openMail(Contact.invitation(graph.appVersion, identifier))
         }
         override val local = object : com.avlreminder.ui.screens.LocalActions {
             override fun fromSnapshot(date: java.time.LocalDate) { graph.local.fromSnapshot(date) }
@@ -323,13 +333,7 @@ class MainActivity : ComponentActivity() {
         }
         override fun dismissArrivalHint() = vm.dismissArrivalHint()
         override fun introDone() = vm.introDone()
-        override fun mailFeedback() {
-            try {
-                startActivity(Contact.mail(graph.appVersion))
-            } catch (_: android.content.ActivityNotFoundException) {
-                android.widget.Toast.makeText(this@MainActivity, Contact.NO_MAIL_APP, android.widget.Toast.LENGTH_LONG).show()
-            }
-        }
+        override fun mailFeedback() = openMail(Contact.mail(graph.appVersion))
         override fun probeAlarm(onResult: (java.time.LocalDateTime?) -> Unit) = vm.probeAlarm(onResult)
         override fun setPlaceHere(placeId: Long?, name: String, onResult: (PlaceSetResult) -> Unit) {
             if (hasLocation()) {

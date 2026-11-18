@@ -64,6 +64,7 @@ löscht oder ein zweites Gerät braucht, läuft im **Emulator** mit einem eigene
 | C18 | Emulator **ohne** Displaysperre, Testkonto | *Sicherung löschen* | keine Abfrage, Sicherung gelöscht; im Diagnose-Log `ohne_displaysperre` |
 
 | C19 | Emulator, Testkonto (V1.3c3) | neu einrichten: *Im Passwortmanager speichern*, im Hinweis erst *Zurück*, dann *Speichern* | kein Speicher-Dialog von selbst; Hinweis nennt Ende-zu-Ende und den Papiercode des Passwortmanagers; *Zurück* öffnet nichts; nach dem Speichern *Fertig*, Hinweis auf den Papiercode bleibt |
+| C20 | Emulator, ein Google-Konto **nicht** auf der Freigabeliste (V1.3c12) | Cloud-Backup einschalten (Dialog nennt „nur auf Einladung“), *Mit Google anmelden*, dann *Einladung per E-Mail anfragen* | Text „Das Cloud-Backup gibt es nur auf Einladung …“ mit der Kennung, kein Absturz, Phase wieder *Mit Google anmelden*; die Mail-App öffnet sich an die Kontaktadresse mit Betreff „AuViLo-Reminder: Einladung zum Cloud-Backup (Version …)“ und der Kennung im Text (fehlt der Text in der Mail-App, lässt sich die Kennung aus der Meldung kopieren). Nicht senden |
 
 **Nie auf dem S24:** C13–C19 und *Dieses Gerät abmelden* (sperrt das Gerät beim Server).
 
