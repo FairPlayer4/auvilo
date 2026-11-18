@@ -67,6 +67,19 @@ class PostponePeriodEngineTest {
         assertNull(again.postponeAgainAt)
     }
 
+    // Never allowed is never allowed again: no "wieder ab Mo …" that Monday would not keep (Review 2026-11-18).
+    @Test
+    fun `with a limit of zero per week the alarm promises no date`() = runTest {
+        val id = create(
+            reminder(Schedule.Once(LocalDateTime.of(2026, 10, 26, 18, 0)), created = at(26, 7))
+                .copy(postponeLimit = 0, postponePeriod = PostponePeriod.WEEK),
+        )
+        val view = engine.alarmView(open(id).id, early = true)!!
+        assertFalse(view.canPostpone)
+        assertEquals(0, view.postponesLeft)
+        assertNull(view.postponeAgainAt)
+    }
+
     @Test
     fun `per month it counts over the occurrences until the first of the next month`() = runTest {
         clock.now = at(30, 9)

@@ -166,7 +166,8 @@ internal class AlarmViews(private val c: EngineContext) {
             canPostpone = Lifecycle.canPostpone(reminder, occurrence, limits),
             postponesLeft = Lifecycle.postponesLeft(reminder, occurrence, limits),
             postponeAgainAt = PostponePeriods.range(reminder.postponePeriod, now(), zone)
-                ?.takeIf { !Lifecycle.canPostpone(reminder, occurrence, limits) }?.second,
+                // With a limit of 0 a new period brings nothing back (Review 2026-11-18).
+                ?.takeIf { reminder.postponeLimit != 0 && !Lifecycle.canPostpone(reminder, occurrence, limits) }?.second,
             snooze = snoozeOptions(reminder, occurrence),
             prep = prep(reminder.id),
             lastProofText = limits.lastProofText,
