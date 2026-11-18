@@ -86,6 +86,10 @@ einer Fassung.
    nach Freigabe, Kostengrenzen und konfigurierbarer Server (OV1), echte Testdaten nur
    lokal (OV2), Lizenz Apache-2.0 (OV3), Doku bereinigt (OV8). Offen: für die App eine bereinigte Historie in einem neuen Repo (OV5: Arbeits-Adresse,
    Testdaten), kurz vorher OV6 und OV7.
+10. **Rückmeldung senden** (Anf. 7.36, 2026-11-18): Diagnose und Vorschläge auf Einladung,
+    aktive Wahl, Vorschau, ehrlicher Hinweis (nicht Ende-zu-Ende, teilweise von KI
+    ausgewertet), später verschlüsselt. Nur festgehalten; Stufe 1 (Vorschläge per E-Mail
+    mit Vorschau) geht ohne Backend ([rueckmeldung-entwurf.md](rueckmeldung-entwurf.md)).
 
 ## Beobachtungen aus der echten Nutzung
 - Ein Reminder klingelte am 2026-10-31 in Runden um 11:30 und 12:00; prüfen, ob das zur

@@ -62,6 +62,10 @@
   Variante und der interne Test-Track kommen mit dem ersten Tester.
 - **Diagnose-Log ans Backend** nur mit einem eigenen Logger ohne Inhalte (keine Titel,
   keine freien Texte), nicht `diag.log` (cloud-entscheidungen.md A-12).
+- **Rückmeldung (geplant, Anf. 7.36):** Diagnose und Vorschläge auf Einladung, mit
+  Erlaubnis je Konto in Firestore, Löschen je Sendung und später Verschlüsselung mit
+  KMS (Diagnose) bzw. Kevins Offline-Schlüssel (Vorschläge). Was das Backend dafür
+  bräuchte: [rueckmeldung-entwurf.md](rueckmeldung-entwurf.md).
 
 ## Regeln für Claude in diesem Repo
 - Inhalte aus Kevins App gehen nie ins Backend-Repo, auch nicht als Testdaten.

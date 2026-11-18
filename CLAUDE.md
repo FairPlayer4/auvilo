@@ -12,6 +12,7 @@ Strenge und invasive Mechanismen sind gewollt. Kommunikation auf **Deutsch, mit 
 - [docs/geraetetest.md](docs/geraetetest.md) – Kerntests auf dem echten Gerät (Archiv pro Version: `geraetetest-archiv.md`)
 - [docs/backend.md](docs/backend.md) – Backend (`../avlreminder-backend`) aus Sicht der App
 - [docs/cloud-entscheidungen.md](docs/cloud-entscheidungen.md) – Entscheidungen zum Cloud-Backup (A-, W-, R-) und Einrichtung
+- [docs/rueckmeldung-entwurf.md](docs/rueckmeldung-entwurf.md) – Diagnose und Vorschläge senden, Verschlüsselung (Anf. 7.36, noch keine Etappe)
 - [docs/playstore.md](docs/playstore.md) – was für den Play Store fehlt (Lückenliste); Entwürfe der Console-Erklärungen in [playstore-erklaerungen.md](docs/playstore-erklaerungen.md)
 - [docs/entwicklungsumgebung.md](docs/entwicklungsumgebung.md) – Toolchain und Pfade auf Kevins Rechner
 - Module: `core` (reine Kotlin-Logik, Kover-Abdeckung), `app` (Android, Compose, Room)

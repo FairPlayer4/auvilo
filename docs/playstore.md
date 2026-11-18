@@ -185,7 +185,7 @@ was davon die App und die Play Console betrifft.
 | S9 | Missbrauch und Kosten | Limits pro Konto, Budget 20 €/Monat mit Kill-Switch | Play Integrity (Backend ID5, B6) vor einer offenen Anmeldung. Der Kill-Switch trifft dann alle Nutzer; das passt zu „Kosten vor Verfügbarkeit“, muss aber im Store-Text und in der App stehen (S11) |
 | S10 | DSGVO-Unterlagen | Entwürfe im Backend: VVT, TOMs, DSFA, Betroffenenrechte, Datenpannen | Abschließen und prüfen lassen (Backend `docs/datenschutz/README.md`, „Was noch zu tun ist“): Testerinformation vor dem geschlossenen Test, DSFA (Erinnerungen können Gesundheitsdaten sein, Art. 9), Aufsichtsbehörde eintragen, Prüfung durch jemanden mit Datenschutzerfahrung. Mindestalter 16 (Backend P8) passt zur Zielgruppe 18+ in der Play Console |
 | S11 | Store-Text und Einstieg | Cloud-Backup heißt in der App „(experimentell)“ | Im Store-Text: freiwillig, Ende-zu-Ende verschlüsselt, Server in der EU, kein verlässliches Backup (Kosten vor Verfügbarkeit), ohne Wiederherstellungsschlüssel sind die Daten weg. Die Sicherungsdatei (N4) als Weg ohne Cloud nennen |
-| S12 | Diagnosen von Testern | nur Kevins Konto darf senden (Backend P9, E-D-3) | So lassen, bis es einen Auftragsverarbeitungsvertrag mit Anthropic gibt; bei Testern *Diagnose senden* ausblenden oder ohne Erlaubnis klar ablehnen |
+| S12 | Diagnosen und Vorschläge von Testern | nur Kevins Konto darf senden (Backend P9, E-D-3) | So lassen, bis es einen Auftragsverarbeitungsvertrag mit Anthropic gibt; bei Testern *Diagnose senden* ausblenden oder ohne Erlaubnis klar ablehnen. Geplant (Anf. 7.36, [rueckmeldung-entwurf.md](rueckmeldung-entwurf.md)): Senden auf Einladung mit aktiver Wahl, Vorschau und dem Hinweis „nicht Ende-zu-Ende verschlüsselt, teilweise von KI ausgewertet“ |
 
 **Datensicherheit mit Backend (S5).** Laut Play-Console-Hilfe gelten Daten, die
 Ende-zu-Ende verschlüsselt übertragen werden und nur für Sender und Empfänger lesbar sind,
@@ -196,7 +196,9 @@ Schlüssel-Backup zählen deshalb nicht. Erhoben werden aber Metadaten:
 - **Geräte- oder andere IDs:** Geräte-ID und öffentlicher Geräteschlüssel.
 - **Server-Logs** mit IP-Adresse bis 30 Tage (Backend K4): prüfen, ob Google das als
   erhoben verlangt; im Zweifel angeben.
-- **App-Aktivität/Diagnose:** nur, wenn *Diagnose senden* für Tester offen ist (S12);
+- **App-Aktivität/Diagnose** und **Nutzerinhalte/Sonstiges** (Vorschläge): nur, wenn das
+  Senden für Tester offen ist (S12, Anf. 7.36); die Verschlüsselung dort zählt nicht als
+  Ende-zu-Ende, weil der Entwickler lesen kann;
   sonst nicht.
 
 Dazu: alles **optional** (das Backup ist ausgeschaltet, bis man es einschaltet),

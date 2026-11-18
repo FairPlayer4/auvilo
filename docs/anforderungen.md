@@ -765,7 +765,8 @@ deshalb dort festhalten, wo sie auffallen. **[V1.2]**
   einfacher Text (Markdown-Liste mit Kontext). Kevin entscheidet selbst, wohin der
   Text geht.
 - VV6 Die Vorschläge bleiben **lokal** in der App-Datenbank (wie 8.4) und sind im
-  Backup vor Migrationen enthalten. Es gibt keinen automatischen Versand.
+  Backup vor Migrationen enthalten. Es gibt keinen automatischen Versand. Senden an den
+  Entwickler kommt mit 7.36 (2026-11-18), nur mit Zustimmung je Sendung.
 
 ### 7.25 Aus den Vorschlägen (2026-10-31)
 Kevins erste Vorschläge aus der App. Sofort umgesetzt (V1.2b): Uhrzeiten in den
@@ -1333,6 +1334,35 @@ später vergessen. Festhalten muss in Sekunden gehen, mit einem Tipp.
   Abweichend von SR4 bestätigt Kevin vor dem Anlegen (sein Wunsch für den Alltagstest).
   Danach je nach Erfahrung SR1, SR5, SR7 (design.md 11.2).
 
+### 7.36 Rückmeldung: Diagnose und Vorschläge senden (2026-11-18) [Version offen]
+Nutzer sollen aus der App Vorschläge (7.24, heute nur lokal) und Diagnosedaten an den
+Entwickler schicken können, transparent und nur auf Einladung. Entwurf:
+[rueckmeldung-entwurf.md](rueckmeldung-entwurf.md).
+- RM1 **Aktiv wählen:** Zustimmung je Sendung, kein Haken vorab gesetzt. Fester
+  Mindestumfang plus wählbare Kategorien, jede mit einem Satz, was sie enthält; der
+  Titel eines Reminders nur auf eigenen Wunsch.
+- RM2 **Genaue Vorschau** dessen, was rausgeht, erzeugt aus derselben Nutzlast.
+- RM3 **Ehrlicher Hinweis auf jedem Sende-Bildschirm:** nicht Ende-zu-Ende verschlüsselt
+  wie das Cloud-Backup, der Entwickler kann lesen; die Daten werden teilweise von einer KI
+  ausgewertet (Claude von Anthropic, USA), daher nur begrenzter Datenschutz; die
+  Verschlüsselung (RM7) ist nur ein einfacher Schutz; keine privaten oder sensiblen
+  Angaben schicken.
+- RM4 **Gesendet-Liste** mit Löschen je Sendung (auch auf dem Server).
+- RM5 **Auf Einladung** wie das Cloud-Backup (7.28 PS16), aber getrennt davon: Die
+  Google-Anmeldung reicht, ohne Backup und Wiederherstellungsschlüssel.
+- RM6 **Stufen:** (1) Vorschläge per E-Mail mit Auswahl, Vorschau und Hinweis; (2) Diagnose
+  für Tester über das Backend, Logger mit wählbaren Kategorien (Alarm, Berechtigungen,
+  Energiesparen, Absturz), weiter ohne Inhalte (Backend E-D-1); (3) Vorschläge über das
+  Backend.
+- RM7 **Verschlüsselung (Zukunft):** Die App verschlüsselt jede Sendung mit einem
+  öffentlichen Schlüssel; wer die gespeicherten Daten sieht, kann ohne Schlüssel nichts
+  damit anfangen. Den **Diagnose-Schlüssel** kann Claude über ein Skript benutzen, ohne
+  ihn zu sehen (Cloud KMS). Den **Vorschlags-Schlüssel** kennt zunächst nur Kevin (offline,
+  im Passwortmanager), nicht in KMS unter seiner gcloud-Anmeldung, die Claude mitbenutzt.
+  Gegen Claude schützt das organisatorisch, solange Kevin auf diesem PC entschlüsselt.
+- Offen: Auftragsverarbeitungsvertrag mit Anthropic vor Stufe 2 (Backend P9, playstore.md
+  S12), Datensicherheit in der Play Console (S5), Datenschutzerklärung (S7).
+
 ## 8. Zielplattform und Technik
 
 ### 8.1 Zielgerät
@@ -1415,6 +1445,8 @@ Neueste zuerst. Kap. 7 enthält immer den gültigen Stand; diese Tabelle ist die
 
 | Datum | Entscheidung |
 |---|---|
+| 2026-11-18 | **Rückmeldung senden mit aktiver Wahl und ehrlichem Hinweis** (Kevin: „Deine Vorschläge sind gut, der Nutzer soll aktiv wählen“; „es soll transparent sein, dass der Nutzer weiß, dass diese Daten (Diagnose/Vorschläge) nicht den E2E Schutz wie das Backend haben“; „soll immer dran stehen, dass die Daten teilweise von KI ausgewertet werden“): Zustimmung je Sendung ohne vorgesetzte Haken, Vorschau, Gesendet-Liste, Einladung getrennt vom Backup, fester Hinweis auf jedem Sende-Bildschirm (7.36 RM1–RM6) |
+| 2026-11-18 | **Verschlüsselung der Rückmeldung als Zukunft** (Kevin: „Können wir das so einrichten, dass du die Diagnose Daten entschlüsseln kannst … aber die Vorschläge erstmal nicht (nur ich kenne den Schlüssel)?“; „klar sein, dass dies nur ein wackliger Schutz ist“): Umschlag-Verschlüsselung mit öffentlichen Schlüsseln in der App; Diagnose-Schlüssel in Cloud KMS, von Claude per Skript benutzbar, ohne ihn zu sehen; Vorschlags-Schlüssel offline bei Kevin, nicht in KMS, weil Claude Kevins gcloud-Anmeldung mitbenutzt (7.36 RM7, rueckmeldung-entwurf.md) |
 | 2026-11-18 | **Play-Fassung mit Cloud-Backup** (Kevin: „Kannst du die Anforderungen vom Playstore ergänzen, mit Annahme, dass das Backend mitkommt?“): ersetzt die Annahme „ohne Backend“; Variante ohne Backend (B4) entfällt; neue Punkte S1–S12 in playstore.md 6. Offen: eigene Domain (S4) (7.28 PS16) |
 | 2026-11-18 | **Cloud-Backup nur auf Einladung** (Kevin: „Ja, auf Einladung“, nach Empfehlung): Freigabeliste im geschlossenen Test und in der Produktion; offen frühestens nach B6 mit Play Integrity, weil sonst neue Konten das Budget leeren und der Kill-Switch das Backup für alle abschaltet (7.28 PS16, playstore.md S2) |
 | 2026-11-16 | **Schnellerinnerung zuerst in der einfachsten Fassung** (Kevin: „Können wir die einfachste Version versuchen umzusetzen? Ich würde gerne im Alltag testen, vielleicht reicht lokal erstmal.“): ein Widget-Tipp startet die Aufnahme, *Fertig* beendet sie, Zusammenfassung mit Bestätigung, *Nochmal* oder *Abbrechen*; festes Muster „Zeit: … Name: …“ auf dem Bildschirm; nur lokal. Umgesetzt in V1.3c11 (7.35) |
