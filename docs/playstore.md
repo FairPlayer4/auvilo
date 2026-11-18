@@ -175,7 +175,7 @@ was davon die App und die Play Console betrifft.
 | # | Thema | Stand heute | Fehlt für Play |
 |---|---|---|---|
 | S1 | Sicherheitsphase (backend.md) | Eigenbetrieb: Claude darf Schlüssel und Token kennen | **Vor dem ersten Tester gegen die Cloud:** Claude kündigt sie an, das Backend wird zurückgesetzt, Kevin richtet die App mit neuen Schlüsseln ein, Claude sieht sie nicht mehr. A-15 (Schlüssel im Passwortmanager) ist dafür umgesetzt |
-| S2 | Wer darf sich anmelden? | Freigabeliste im Backend (`freigegebene_kennungen`), nur Kevin | **Entscheidung nötig.** Geschlossener Test: Freigabeliste mit den Testern reicht. Produktion: entweder offen (dann Play Integrity, Limits pro Konto, Budget mit Kill-Switch gegen Missbrauch; S9) oder weiter „auf Einladung“; dann muss die App bei einer nicht freigegebenen Kennung klar sagen, dass das Backup nur auf Einladung geht, statt eines Fehlers. Empfehlung: zuerst „auf Einladung“, offen erst nach B6 mit Play Integrity |
+| S2 | Wer darf sich anmelden? | Freigabeliste im Backend (`freigegebene_kennungen`), nur Kevin | **Entschieden 2026-11-18: auf Einladung** (Anf. 7.28 PS16), im geschlossenen Test und in der Produktion; offen frühestens nach B6 mit Play Integrity (S9), neu entscheiden. Die App meldet eine nicht freigegebene Kennung schon (`CloudErrors.notAllowed`: „nicht freigegeben“, Kennung zum Weitergeben). Fehlt für Play: der Text sagt „Das Cloud-Backup gibt es nur auf Einladung“ und bietet *Rückmeldung per E-Mail* mit der Kennung an; der Rest der App geht ohne. Auch der Store-Text und der Schalter nennen „auf Einladung“ (S11) |
 | S3 | Release-Konfiguration | Server-Werte in `gradle.properties`; Android-OAuth-Client nur mit dem Debug-Schlüssel (cloud-entscheidungen.md, Einrichtung) | Android-Client im GCP-Projekt zusätzlich mit dem **SHA-1 des Play-App-Signaturschlüssels** und des Upload-Schlüssels (B2), sonst scheitert „Mit Google anmelden“ in der Store-Fassung. Nach der Umbenennung (N1, B7) ein Client für die neue `applicationId`. Release-Build aus dem festen Backend-Commit (`-PbackendStreng=true`). R8-Regeln für Tink, Protobuf, Credential Manager und `googleid` (B1) |
 | S4 | OAuth-Zustimmungsbildschirm | vermutlich Status *Testen* | Im Status *Testen* können sich nur eingetragene Testnutzer (höchstens 100) anmelden; für den geschlossenen Test reicht das. Für die Produktion auf *In Produktion* stellen, mit Startseite und Datenschutzerklärung; dafür verlangt Google wahrscheinlich eine eigene, bestätigte Domain (Backend P10, offene Frage Domain). Nur `openid`-Bereiche, also keine aufwendige Prüfung sensibler Bereiche |
 | S5 | Datensicherheit (Play Console) | geplant „keine Daten erfasst“ | Neu ausfüllen, siehe unten |
@@ -206,8 +206,8 @@ verantwortet Google selbst, Backend P3). Kamera, Mikrofon, Standort und WLAN ble
 dem Gerät und zählen nicht. Vor dem Ausfüllen gegen die aktuelle Hilfe prüfen.
 
 ## Empfohlene Reihenfolge
-1. Entscheiden: `applicationId` zum Namen AuViLo-Reminder (N1, B7), Anmeldung offen oder auf
-   Einladung (S2), eigene Domain (S4).
+1. Entscheiden: `applicationId` zum Namen AuViLo-Reminder (N1, B7), eigene Domain (S4).
+   Entschieden: Anmeldung auf Einladung (S2).
 2. Code, der auch der Sideload-App nicht schadet: P1, P3, P4, P5 (Offenlegung), B1, B5 (B4 entfällt).
    P1 und P4 ändern Kevins Alltag kaum, brauchen aber je einmal einen Gerätetest
    (Erlaubnis entziehen, Alarm kommt trotzdem bzw. Hinweis erscheint).
