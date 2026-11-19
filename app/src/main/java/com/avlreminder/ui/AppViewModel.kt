@@ -239,7 +239,7 @@ class AppViewModel(app: Application) : AndroidViewModel(app) {
 
     /**
      * The test alarm of the introduction (Anf. 7.28 PS15): a one-off "Probealarm", normal and
-     * "Dokumentieren" (no "Startklar" questions), [Intro.PROBE_MINUTES] after the next full minute.
+     * "Dokumentieren" (no "Startklar" questions), one to two minutes ahead ([Intro.PROBE_MINUTES]).
      */
     fun probeAlarm(onResult: (LocalDateTime?) -> Unit) {
         viewModelScope.launch {

@@ -20,7 +20,8 @@ object LocationDisclosure {
         "einem gespeicherten Ort ankommst – auch wenn die App geschlossen ist oder nicht benutzt wird. Nur dann " +
         "klingeln Reminder mit „Bei Ankunft“ beim Ankommen statt erst zur spätesten Uhrzeit.\n\n" +
         "Standort und WLAN bleiben auf dem Handy und werden nicht weitergegeben.\n\n" +
-        "Im nächsten Schritt fragt Android nach dem Standort; wähle dort „Immer erlauben“."
+        "Danach fragt Android in zwei Schritten: zuerst nach dem Standort während der Nutzung der App, gleich " +
+        "danach öffnet sich eine Seite, auf der du „Immer erlauben“ wählst."
     const val CONTINUE = "Weiter"
     const val LATER = "Nicht jetzt"
 }

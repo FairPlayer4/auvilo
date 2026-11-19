@@ -26,10 +26,12 @@ import com.avlreminder.core.model.Place
 import com.avlreminder.core.model.Reminder
 import com.avlreminder.core.model.Schedule
 import com.avlreminder.graph
+import com.avlreminder.location.hasLocation
 import com.avlreminder.ui.screens.LocationDisclosure
 import kotlinx.coroutines.runBlocking
 import org.junit.After
 import org.junit.Assert.assertEquals
+import org.junit.Assert.assertFalse
 import org.junit.Assert.assertNull
 import org.junit.Before
 import org.junit.Rule
@@ -149,7 +151,8 @@ class MainActivityTest {
 
     /**
      * Anf. 7.28 PS13, playstore.md P5: Google Play wants the app's own words on the location in the
-     * background before Android's dialog; "Weiter" asks Android, precise position first.
+     * background before Android's dialog; "Weiter" asks Android, precise position first and the
+     * background right after.
      */
     @Test
     fun theDisclosureComesBeforeAndroidAsksForTheLocation() {
@@ -160,9 +163,16 @@ class MainActivityTest {
             compose.onNodeWithText("auch wenn die App geschlossen ist", substring = true).assertExists()
             assertNull("nothing asked before the disclosure", lastRequested(scenario))
 
+            // Robolectric answers Android's dialog by itself; refused, the precise position stays the last question.
+            assertFalse("no position yet: Android must ask for it first", context.hasLocation())
+
             compose.onNodeWithText(LocationDisclosure.CONTINUE).performClick()
+            ShadowLooper.idleMainLooper()
             compose.waitForIdle()
-            assertEquals(listOf(Manifest.permission.ACCESS_FINE_LOCATION, Manifest.permission.ACCESS_COARSE_LOCATION), lastRequested(scenario))
+            // Robolectric answers the request for the precise position by itself, as granted. Android's
+            // first dialog has no "Immer erlauben", so the app asks for the background right after
+            // (Review 2026-11-18, Frage 4); it can only get here through the request for the position.
+            assertEquals(listOf(Manifest.permission.ACCESS_BACKGROUND_LOCATION), lastRequested(scenario))
             assertEquals(0, compose.onAllNodes(hasText(LocationDisclosure.TITLE)).fetchSemanticsNodes().size)
         }
     }

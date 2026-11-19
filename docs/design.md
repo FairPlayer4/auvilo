@@ -648,8 +648,10 @@ sind dieselbe Liste wie in den Einstellungen (`PermissionRow`), die nötigen zue
 fehlt und die Reminder geladen und leer sind (`AppState.intro`, in `MainActivity`); jedes
 Verlassen setzt `introSeen`. *Einstellungen → Hilfe → Einstieg zeigen* öffnet ihn immer.
 Der Probealarm (`AppViewModel.probeAlarm`) speichert über die Engine einen Einmal-Reminder
-„Probealarm“ (normal, *Dokumentieren*) zwei Minuten nach der nächsten vollen Minute; lehnt
-die Engine ab, sagt es der Hinweis unten wie bei anderen abgelehnten Aktionen.
+„Probealarm“ (normal, *Dokumentieren*) zwei Minuten nach Beginn der laufenden Minute, also
+in ein bis zwei Minuten (14:29:40 → 14:31, `Intro.PROBE_MINUTES`); lehnt die Engine ab, sagt
+es der Hinweis unten wie bei anderen abgelehnten Aktionen. Ist *Notaus* an, sagt die Seite,
+dass auch der Probealarm stumm bliebe, mit *Wieder einschalten* (Review 2026-11-18).
 *Rückmeldung per E-Mail* (Seite 4 und *Einstellungen → Hilfe*) öffnet über `Contact.mail`
 eine Mail-App (`ACTION_SENDTO`, `mailto:`) mit der öffentlichen Adresse und dem Betreff
 „AuViLo-Reminder: Rückmeldung (Version …)“; ohne Mail-App nennt ein Hinweis die Adresse.
@@ -666,12 +668,12 @@ umgesetzt / verworfen. Liste in den Einstellungen, *Teilen* als Markdown.
 | Alarm | `setAlarmClock()` für normal/streng, `setExactAndAllowWhileIdle()` für locker; Übersicht und Vorab-Reminder mit `setWindow()`; Prüf-Alarme der Orte exakt bzw. `setWindow()` (6.) |
 | Exakte Alarme | `SCHEDULE_EXACT_ALARM` (Anf. 7.28 PS10), vom Nutzer in *Wecker und Erinnerungen* erteilt und entziehbar. Alles Exakte läuft über `ExactAlarms.set`: ohne Erlaubnis `setAndAllowWhileIdle()` (kommt auch in Doze, bis zu einer Stunde zu spät), Eintrag im Diagnose-Log und eine Benachrichtigung „Erlaubnis fehlt“. Erteilen schickt `SCHEDULE_EXACT_ALARM_PERMISSION_STATE_CHANGED` an den `SystemReceiver` (Neuaufbau, Benachrichtigung weg); Entziehen beendet die App, und der nächste Start plant ungenau |
 | Dauer-Alarm, Sitzung | Foreground-Services Typ `systemExempted` (`AlarmService`, `SessionService`); der Typ braucht exakte Alarme, ohne Erlaubnis starten sie nicht, sondern zeigen eine Benachrichtigung |
-| Vollbild | Full-Screen-Intent + Activity mit `showWhenLocked`/`turnScreenOn` |
-| Foto-Nachweis | CameraX in der `AlarmActivity` (`ProofCamera`), Foto nur nach `filesDir/proofs/`. Solange die Vorschau zu sehen ist, setzt sie `ShutterKeys.shutter`; `AlarmActivity.onKeyDown`/`onKeyUp` geben beide Lautstärketasten dorthin und verbraucht sie (auch das Loslassen), Wiederholungen beim Gedrückthalten lösen nicht aus (Anf. 7.5 N2a) |
+| Vollbild | Full-Screen-Intent + Activity mit `showWhenLocked`/`turnScreenOn`. **Bekannte Grenze** (Kevin, 2026-11-19): Ohne *Wecker und Erinnerungen* gibt es kein Vollbild; der Dauer-Alarm startet nicht, strenge Alarme kommen nur als Banner. Die Erlaubnis ist Kernfunktion (PS10), die App muss ohne sie nicht gut funktionieren |
+| Foto-Nachweis | CameraX in der `AlarmActivity` (`ProofCamera`), Foto nur nach `filesDir/proofs/`. Solange mindestens die Hälfte der Vorschau zu sehen ist (`onMostlyVisible`, nicht weggescrollt), setzt sie `ShutterKeys.shutter`; `AlarmActivity.onKeyDown`/`onKeyUp` geben beide Lautstärketasten dorthin und verbraucht sie (auch das Loslassen), Wiederholungen beim Gedrückthalten lösen nicht aus (Anf. 7.5 N2a) |
 | Was vom Alarm bleibt | Löschen, Pausieren, Archivieren und Verwerfen aus der App nehmen Klingeln und Benachrichtigung des offenen Termins weg, ebenso verpasst, Tagesende und Notaus-Skip; das macht die Engine (`RingPort.end`, Abschnitt 1), eine abgelehnte Änderung nicht. *Notaus* stoppt das Klingeln und lässt eine stille Benachrichtigung, wie nach einer Runde. Ein anderer Alarm, während ein Nachweis offen ist, beendet diesen Nachweis (N0) |
-| Neuaufbau | `sync` bei Änderung, Alarm, App-Start, `BOOT_COMPLETED`, `MY_PACKAGE_REPLACED`, Zeit-/Zonenänderung, Erlaubnis für exakte Alarme erteilt |
+| Neuaufbau | `sync` bei Änderung, Alarm, App-Start, `BOOT_COMPLETED`, `MY_PACKAGE_REPLACED`, Zeit-/Zonenänderung, Erlaubnis für exakte Alarme erteilt. **Bekannte Grenze** (Kevin, 2026-11-19): Nach einem Neustart klingelt nichts, bis das Handy einmal entsperrt ist. Android löscht beim Neustart alle Alarme, `BOOT_COMPLETED` kommt erst nach dem Entsperren, und die App ist bewusst nicht `directBootAware` (die Datenbank liegt im CE-Speicher). Danach gilt dasselbe wie nach „Handy aus“ |
 | Ort | WLAN (`NetworkCallback` mit PendingIntent, letzte Suchergebnisse), Play-Services Geofencing (Dwell), Fused Location für die aktive Prüfung |
-| Berechtigungen | Seite in den Einstellungen, Warnung auf *Heute*: Wecker und Erinnerungen, Benachrichtigungen, Vollbild; ohne Warnung (empfohlen bzw. bei Bedarf): Akku, Kamera, Mikrofon; Standort „Immer“ und DND-Ausnahme nur, wenn ein Reminder sie braucht. *Akku „Nicht eingeschränkt“* öffnet die App-Info, nicht Androids direkten Dialog (`Battery`, Anf. 7.28 PS12; ohne `REQUEST_IGNORE_BATTERY_OPTIMIZATIONS`). *Standort „Immer erlauben“* zeigt erst den eigenen Hinweis (`LocationDisclosure`, Anf. 7.28 PS13); erst *Weiter* fragt Android, ohne Standort zuerst den genauen, sonst den im Hintergrund. Fehlt *Wecker und Erinnerungen* (Kernfunktion), sagt *Heute* statt der allgemeinen Warnung, was dann nicht geht, und das Antippen öffnet direkt Androids Schalter |
+| Berechtigungen | Seite in den Einstellungen, Warnung auf *Heute*: Wecker und Erinnerungen, Benachrichtigungen, Vollbild; ohne Warnung (empfohlen bzw. bei Bedarf): Akku, Kamera, Mikrofon; Standort „Immer“ und DND-Ausnahme nur, wenn ein Reminder sie braucht. *Akku „Nicht eingeschränkt“* öffnet die App-Info, nicht Androids direkten Dialog (`Battery`, Anf. 7.28 PS12; ohne `REQUEST_IGNORE_BATTERY_OPTIMIZATIONS`). *Standort „Immer erlauben“* zeigt erst den eigenen Hinweis (`LocationDisclosure`, Anf. 7.28 PS13); erst *Weiter* fragt Android, ohne Standort zuerst den genauen und nach der Zusage gleich den im Hintergrund, sonst nur den im Hintergrund (Review 2026-11-18). Fehlt *Wecker und Erinnerungen* (Kernfunktion), sagt *Heute* statt der allgemeinen Warnung, was dann nicht geht, und das Antippen öffnet direkt Androids Schalter |
 
 ## 13. Daten, Migration, Diagnose
 
@@ -835,16 +837,20 @@ Fassung eines anderen Geräts fragt die nächste Sicherung vor dem Ersetzen (W-7
 `SicherungHolen` mit Version (R-4).
 
 **Sicherungsdatei** (Anf. 7.28 PS14, `restore/ExportFile.kt`, `ui/screens/ExportViews.kt`).
-In den lokalen Kopien, also auch ohne Cloud-Backup. *Exportieren …* fragt zuerst ein
-Passwort (mindestens 12 Zeichen, zweimal), dann wählt Androids Dateidialog den Ort
-(`CreateDocument`, Name `AuViLo-Sicherung-<Datum>.auvilo`). Inhalt ist dieselbe Nutzlast wie
+In den lokalen Kopien, also auch ohne Cloud-Backup. *Exportieren …* öffnet zuerst Androids
+Dateidialog (`CreateDocument`, Name `AuViLo-Sicherung-<Datum>.auvilo`), dann fragt die App das
+Passwort (mindestens 12 Zeichen, zweimal). Die Wahl liegt in `LocalRestore` (`ChosenFile`,
+`LocalStatus.waiting`) und übersteht einen Neuaufbau der Activity; nach einem Prozessende
+bietet `MainActivity` dieselbe Datei wieder an. Bricht man ab oder scheitert das Schreiben,
+löscht die App die angelegte Datei (`DocumentsContract.deleteDocument`), es bleibt also
+keine leere oder halbe Datei liegen (Review 2026-11-18). Inhalt ist dieselbe Nutzlast wie
 beim Cloud-Backup (`AppBackupSource`, eigene Kopie `export.db` im Cache, damit sich Export
 und stündliche Sicherung nicht in die Quere kommen), verschlüsselt mit AES-256-GCM; der
 Schlüssel kommt per PBKDF2-HMAC-SHA256 aus dem Passwort (600 000 Runden, 16 Byte Salt,
 12 Byte Nonce, beide je Datei neu). Kopf: Kennung `AUVILO-SICHERUNG`, Version 1, Runden,
 Salt, Nonce; er ist Zusatzdaten der Verschlüsselung, Änderungen fallen also auf. Ein
 falsches Passwort und eine veränderte Datei sehen gleich aus („Passwort falsch oder Datei
-verändert“). *Importieren …* fragt das Passwort einmal, öffnet die Datei (`OpenDocument`) und
+verändert“). *Importieren …* wählt die Datei (`OpenDocument`), fragt das Passwort einmal und
 läuft dann wie jedes Wiederherstellen (`LocalRestore.fromFile`, Art `FILE`): Vergleich,
 Rückfrage, Tausch beim nächsten Start, Tageskopie zum Rückgängigmachen; danach vergisst die
 App den Stand der letzten Cloud-Sicherung wie bei einer Tageskopie. Eine Datei mit neuerer

@@ -130,7 +130,7 @@ sobald ein Reminder *Bei Ankunft* hat). Text:
 > einem gespeicherten Ort ankommst – auch wenn die App geschlossen ist oder nicht benutzt wird.
 > Nur dann klingeln Reminder mit „Bei Ankunft“ beim Ankommen statt erst zur spätesten Uhrzeit.
 > Standort und WLAN bleiben auf dem Handy und werden nicht weitergegeben.
-> Im nächsten Schritt fragt Android nach dem Standort; wähle dort „Immer erlauben“.
+> Danach fragt Android in zwei Schritten: zuerst nach dem Standort während der Nutzung der App, gleich danach öffnet sich eine Seite, auf der du „Immer erlauben“ wählst.
 > [Weiter] [Nicht jetzt]
 
 „Nicht jetzt“ lässt alles wie ohne Erlaubnis (Reminder klingeln zur spätesten Uhrzeit).
@@ -139,7 +139,7 @@ sobald ein Reminder *Bei Ankunft* hat). Text:
 1. App öffnen, *Einstellungen → Orte*, *Hier festlegen* für „Zuhause“ (mit Testort).
 2. Einen Reminder mit *Bei Ankunft* anlegen; *Einstellungen → Berechtigungen → Standort
    „Immer erlauben“ → Erteilen*; der Hinweis erscheint, *Weiter*.
-3. Androids Dialog, *Immer erlauben* wählen.
+3. Androids Dialog, *Bei Nutzung der App*; gleich danach die Seite mit *Immer erlauben*.
 4. Mit geschlossener App am Ort ankommen bzw. das WLAN verbinden: der Reminder klingelt.
 
 **Risiko und Ausweg:** Prüfer fragen, ob es ohne geht; für einen Wecker ist die Ankunft keine

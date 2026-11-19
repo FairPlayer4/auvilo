@@ -52,16 +52,18 @@ class IntroUiTest {
         override fun introDone() { introDone++ }
         override fun mailFeedback() { mails++ }
         override fun probeAlarm(onResult: (LocalDateTime?) -> Unit) { probes++; onResult(probeAt) }
+        val paused = mutableListOf<Instant?>()
+        override fun setAlarmsPaused(until: Instant?) { paused += until }
     }
 
     private val asked = mutableListOf<String>()
     private fun permission(label: String, granted: Boolean, required: Boolean = true) =
         PermissionItem(label, "wofür $label", granted, required) { asked += label }
 
-    private fun state(intro: Boolean, permissions: List<PermissionItem> = emptyList()) = AppState(
+    private fun state(intro: Boolean, permissions: List<PermissionItem> = emptyList(), alert: AlertSettings = AlertSettings()) = AppState(
         today = Today(emptyList(), emptyList(), emptyList(), emptyList()),
         reminders = emptyList(), openByReminder = emptyMap(), history = emptyList(), proofs = emptyMap(),
-        theme = ThemeMode.SYSTEM, permissions = permissions, intro = intro,
+        theme = ThemeMode.SYSTEM, permissions = permissions, intro = intro, alert = alert,
     )
 
     private fun show(state: AppState, actions: Recorder = Recorder()): Recorder {
@@ -131,6 +133,24 @@ class IntroUiTest {
         actions.probeAt = null
         compose.onNodeWithTag("introProbe").performClick()
         compose.onNodeWithText("Das hat nicht geklappt; der Grund steht unten im Hinweis.").assertExists()
+    }
+
+    // Review 2026-11-18, Frage 6: under *Notaus* the test alarm stays silent; the page says so.
+    @Test
+    fun underNotausTheTestAlarmPageSaysItStaysSilent() {
+        val actions = show(state(intro = true, alert = AlertSettings(alarmsPausedUntil = now.plusSeconds(3_600))))
+        next(); next()
+        compose.onNodeWithTag("introPaused").assertExists()
+        compose.onNodeWithTag("introResume").performClick()
+        assertEquals(listOf<Instant?>(null), actions.paused)
+    }
+
+    @Test
+    fun withoutNotausThereIsNoHint() {
+        show(state(intro = true))
+        next(); next()
+        compose.onNodeWithTag("introProbe").assertExists()
+        compose.onNodeWithTag("introPaused").assertDoesNotExist()
     }
 
     @Test

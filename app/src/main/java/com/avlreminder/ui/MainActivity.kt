@@ -41,6 +41,7 @@ import com.avlreminder.core.rules.SnoozeHintChoice
 import com.avlreminder.core.usecases.SaveResult
 import com.avlreminder.data.ThemeMode
 import com.avlreminder.location.hasBackgroundLocation
+import com.avlreminder.restore.ChosenFile
 import com.avlreminder.restore.ExportFile
 import com.avlreminder.system.Contact
 import com.avlreminder.system.Battery
@@ -69,6 +70,9 @@ class MainActivity : ComponentActivity() {
 
         private const val STATE_LAUNCH = "launch"
         private const val STATE_ROUTE = "startRoute"
+        private const val STATE_FILE = "chosenFile"
+        private const val STATE_THEN_BACKGROUND = "thenBackground"
+        private const val STATE_FILE_EXPORT = "chosenExport"
 
         /** Opens the settings (tap on a notification of the cloud backup). */
         fun openSettings(context: Context): Intent =
@@ -87,23 +91,39 @@ class MainActivity : ComponentActivity() {
     private var startRoute by mutableStateOf(Routes.TODAY)
     private var launch by mutableIntStateOf(0)
 
-    /** The password for the export file while Android's file dialog is open (Anf. 7.28 PS14). */
-    private var filePassword: CharArray? = null
+    /**
+     * The file Android's dialog chose for the export file (Anf. 7.28 PS14); the password comes
+     * afterwards in the app ([LocalRestore.choose], Review 2026-11-18). Kept over a process death:
+     * the choice is offered again instead of leaving an empty file behind.
+     */
+    private var chosenFile: android.net.Uri? = null
+    private var chosenExport = false
 
     private val createExport = registerForActivityResult(ActivityResultContracts.CreateDocument(ExportFile.MIME)) { uri ->
-        val password = filePassword.also { filePassword = null } ?: return@registerForActivityResult
-        if (uri == null) return@registerForActivityResult password.fill(' ')
-        graph.local.export(displayName(uri), password) { bytes ->
-            checkNotNull(contentResolver.openOutputStream(uri, "wt")) { "no output stream" }.use { it.write(bytes) }
-        }
+        if (uri != null) choose(uri, export = true)
     }
 
     private val openImport = registerForActivityResult(ActivityResultContracts.OpenDocument()) { uri ->
-        val password = filePassword.also { filePassword = null } ?: return@registerForActivityResult
-        if (uri == null) return@registerForActivityResult password.fill(' ')
-        graph.local.fromFile(displayName(uri), password) {
-            checkNotNull(contentResolver.openInputStream(uri)) { "no input stream" }.use { it.readBytes() }
-        }
+        if (uri != null) choose(uri, export = false)
+    }
+
+    /** Hands the chosen file to [LocalRestore]; app context only, the choice outlives this activity. */
+    private fun choose(uri: android.net.Uri, export: Boolean) {
+        chosenFile = uri
+        chosenExport = export
+        val resolver = applicationContext.contentResolver
+        val name = displayName(uri)
+        graph.local.choose(
+            if (export) {
+                ChosenFile.Export(
+                    name,
+                    write = { bytes -> checkNotNull(resolver.openOutputStream(uri, "wt")) { "no output stream" }.use { it.write(bytes) } },
+                    delete = { android.provider.DocumentsContract.deleteDocument(resolver, uri) },
+                )
+            } else {
+                ChosenFile.Import(name) { checkNotNull(resolver.openInputStream(uri)) { "no input stream" }.use { it.readBytes() } }
+            },
+        )
     }
 
     /** The file's name as Android's file dialog shows it. */
@@ -117,8 +137,19 @@ class MainActivity : ComponentActivity() {
     /** Google Play's prominent disclosure before Android's location dialog (Anf. 7.28 PS13). */
     private var locationDisclosure by mutableStateOf(false)
 
+    /** After the disclosure: once the position is granted, "Immer erlauben" is asked right after (Review 2026-11-18). */
+    private var thenBackground = false
+
     /** Precise position first; "Immer erlauben" can only be asked for afterwards. */
-    private val requestLocation = registerForActivityResult(ActivityResultContracts.RequestMultiplePermissions()) { refreshPermissions() }
+    private val requestLocation = registerForActivityResult(ActivityResultContracts.RequestMultiplePermissions()) { result ->
+        // An empty result is a cancelled request, not an answer: the plan to ask for the background stays.
+        if (result.isNotEmpty()) {
+            val next = thenBackground && result[Manifest.permission.ACCESS_FINE_LOCATION] == true
+            thenBackground = false
+            if (next) return@registerForActivityResult requestPermission.launch(Manifest.permission.ACCESS_BACKGROUND_LOCATION)
+        }
+        refreshPermissions()
+    }
 
     private val requestPermission = registerForActivityResult(ActivityResultContracts.RequestPermission()) {
         refreshPermissions()
@@ -133,7 +164,14 @@ class MainActivity : ComponentActivity() {
             handle(intent)
         } else {
             launch = savedInstanceState.getInt(STATE_LAUNCH)
+            thenBackground = savedInstanceState.getBoolean(STATE_THEN_BACKGROUND)
             startRoute = savedInstanceState.getString(STATE_ROUTE) ?: Routes.TODAY
+            // The process ended while the password was asked: ask again for the same file.
+            savedInstanceState.getParcelable(STATE_FILE, android.net.Uri::class.java)?.let { file ->
+                chosenFile = file
+                chosenExport = savedInstanceState.getBoolean(STATE_FILE_EXPORT)
+                if (graph.local.status.value.waiting == null) choose(file, chosenExport)
+            }
         }
         setContent {
             val theme by vm.theme.collectAsStateWithLifecycle()
@@ -207,6 +245,11 @@ class MainActivity : ComponentActivity() {
         super.onSaveInstanceState(outState)
         outState.putInt(STATE_LAUNCH, launch)
         outState.putString(STATE_ROUTE, startRoute)
+        outState.putBoolean(STATE_THEN_BACKGROUND, thenBackground)
+        if (graph.local.status.value.waiting != null) {
+            outState.putParcelable(STATE_FILE, chosenFile)
+            outState.putBoolean(STATE_FILE_EXPORT, chosenExport)
+        }
     }
 
     override fun onNewIntent(intent: Intent) {
@@ -297,15 +340,15 @@ class MainActivity : ComponentActivity() {
         override val local = object : com.avlreminder.ui.screens.LocalActions {
             override fun fromSnapshot(date: java.time.LocalDate) { graph.local.fromSnapshot(date) }
             override fun undo() { graph.local.undo() }
-            override fun exportFile(password: CharArray) {
-                filePassword = password
+            override fun exportFile() {
                 createExport.launch(ExportFile.fileName(java.time.LocalDate.now(graph.clock)))
             }
-            override fun importFile(password: CharArray) {
-                filePassword = password
+            override fun importFile() {
                 // The file has no type Android knows; any file can be chosen, the app checks it.
                 openImport.launch(arrayOf("*/*"))
             }
+            override fun filePassword(password: CharArray) { graph.local.withPassword(password) }
+            override fun cancelFile() { graph.local.cancelChosen() }
             override fun answer(yes: Boolean) = graph.local.answer(yes)
             override fun dismiss() = graph.local.dismiss()
             override fun dismissExported() = graph.local.dismissExported()
@@ -347,9 +390,10 @@ class MainActivity : ComponentActivity() {
         }
     }
 
-    /** Precise position first; "Immer erlauben" can only be asked for once it is granted. */
+    /** Precise position first; "Immer erlauben" follows in one go once it is granted. */
     private fun requestBackgroundLocation() {
         if (!hasLocation()) {
+            thenBackground = true
             requestLocation.launch(arrayOf(Manifest.permission.ACCESS_FINE_LOCATION, Manifest.permission.ACCESS_COARSE_LOCATION))
         } else {
             requestPermission.launch(Manifest.permission.ACCESS_BACKGROUND_LOCATION)

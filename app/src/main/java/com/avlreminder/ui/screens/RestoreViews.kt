@@ -112,10 +112,14 @@ fun RestoreQuestion(title: String, comparison: Comparison, onAnswer: (Boolean) -
 interface LocalActions {
     fun fromSnapshot(date: LocalDate) {}
     fun undo() {}
-    /** Chooses where with Android's file dialog, then writes the export file with [password]. */
-    fun exportFile(password: CharArray) {}
-    /** Chooses an export file with Android's file dialog and restores from it. */
-    fun importFile(password: CharArray) {}
+    /** Chooses where with Android's file dialog; the password follows ([LocalStatus.waiting]). */
+    fun exportFile() {}
+    /** Chooses an export file with Android's file dialog; the password follows. */
+    fun importFile() {}
+    /** The password for the chosen file: writes it or restores from it. */
+    fun filePassword(password: CharArray) {}
+    /** No password after all; a new, still empty export file is deleted. */
+    fun cancelFile() {}
     fun answer(yes: Boolean) {}
     fun dismiss() {}
     /** Only the confirmation of a written export file. */

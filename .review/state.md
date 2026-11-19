@@ -74,7 +74,7 @@ Das Cloud-Backup (`app/…/cloud`, `restore`) prüft der review-loop des Backend
 - 2026-11-13: Schutzcode ohne Fall: Filter „was wieder klingelt“ in `EngineContext.commit` (M2). E24.
 
 ## Bekannte Schulden und beobachtete Drift (Lauf 7)
-- 2026-11-18: Neustart vor dem ersten Entsperren: keine Alarme bis zum Entsperren (nicht `directBootAware`), undokumentiert. Frage 1. Besteht schon lange.
+- 2026-11-18: Neustart vor dem ersten Entsperren: keine Alarme bis zum Entsperren (nicht `directBootAware`), undokumentiert. Frage 1. **Bekannte Grenze seit 2026-11-19** (design.md 12), kein Fund mehr.
 - 2026-11-18, **Trend (Lauf 2 → 5 → 6 → 7): Regeln in `:app`**, jetzt der Probealarm (`AppViewModel.probeAlarm`); Doku und Code widersprechen sich beim Zeitpunkt. E30.
 - 2026-11-18, **zweite Beobachtung: Doppeltes Tippen** auf Knöpfe mit Engine-Aufruf (Lauf 6 „Hier festlegen“, Lauf 7 Probealarm). E31.
 - 2026-11-18, **Trend (Lauf 1 → … → 7): Android-Schicht dünn getestet**, jetzt Verdrahtung in `MainActivity` (Passwort bis zum Dateidialog), Auslöser der Kamera, Zurück im Einstieg.
@@ -82,7 +82,7 @@ Das Cloud-Backup (`app/…/cloud`, `restore`) prüft der review-loop des Backend
 - 2026-11-18: Verhalten unter Android 14 durch Robolectric nicht belegt (Vordergrunddienst-Typen, Startsperren, Vollbild). E33.
 
 ## Offene Fragen an den Entwickler
-Aus Lauf 7 (Bericht `runs/2026-11-18.md`): 1 Neustart vor dem Entsperren, 2 Reihenfolge Datei/Passwort beim Export, 3 Vollbild ohne Erlaubnis, 4 Standort in einem Rutsch, 5 Lautstärketasten nur bei sichtbarer Vorschau, 6 Probealarm-Zeit und Notaus.
+Keine aus Lauf 7 (beantwortet am 2026-11-19, siehe unten).
 
 Kleine offene Unklarheiten (Sommerzeit, Handy aus im Zeitraum, *Auslassen* bei mehrmals täglich, Begriff „Pause“) stehen in anforderungen.md Kap. 11.
 
@@ -104,3 +104,4 @@ Kleine offene Unklarheiten (Sommerzeit, Handy aus im Zeitraum, *Auslassen* bei m
 - 2026-11-12 (Lauf 4, Fragen 1–8, alle nach Vorschlag): Vollbild/*+1 wartet*/*Rest später* → V1.3c; *Abgebrochen* 60 s zurücknehmbar; F2 über die geplante erste Prüfung, wiederholte WLAN-Meldung keine Ankunft; Sitzung zählt in der Woche ihres Starts; Doku zusammengelegt und gekürzt; *Teilschritt* nach aufgebrauchtem Limit ausgeblendet. Umgesetzt in V1.3b2 (anforderungen.md Kap. 9, 2026-11-12).
 - 2026-11-12 (Lauf 5, Fragen 1–6, alle nach Vorschlag): Umbau-Etappe V1.3c0 (E17–E21, E23) vor V1.3c; Architekturbild: Room + DataStore, Gerätezustand eigene Kategorie, Zeitregel in `:app`, Effekte inkl. beenden; vom System geschlossene Termine räumen auf; F2 `plannedCheck <= start`; `arrivedAt` bei jeder Änderung der Ankunftsregel leeren; Formular-Entwurf retten, Limit für Sitzungs-Minimum, Startklar nicht leerbar (anforderungen.md Kap. 9). Offene Funde und E22 in V1.3b3.
 - 2026-11-13 (Lauf 6, Fragen 1–2, nach Vorschlag): verschobener, angekommener Termin wartet nach geänderter Ankunftsregel wieder auf die Ankunft; *Teilschritt* ohne Bildschirm nur ohne Nachweis-Pflicht, wie *Erledigt* (anforderungen.md Kap. 9, 2026-11-13).
+- 2026-11-19 (Lauf 7, Fragen 1–6): 1 Neustart vor dem Entsperren und 3 kein Vollbild ohne *Wecker und Erinnerungen* sind **bekannte Grenzen** (design.md 12, Anf. 7.28 PS10), nicht wieder als Fund melden. 2, 4, 5, 6 nach Vorschlag, umgesetzt in V1.3c13: Sicherungsdatei erst Datei, dann Passwort, Datei bei Abbruch/Fehler löschen; Standort im Hintergrund gleich nach der Zusage; Lautstärketasten nur bei mindestens halb sichtbarer Vorschau; Probealarm-Doku an den Code (1–2 Minuten), Hinweis im Notaus.

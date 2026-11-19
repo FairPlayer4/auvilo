@@ -333,6 +333,8 @@ fun AvlAppUi(
                 onDone = { leaveIntro(Routes.TODAY) },
                 onMail = actions::mailFeedback,
                 modifier = m,
+                paused = state.alert.alarmsPaused(now),
+                onResume = { actions.setAlarmsPaused(null) },
             )
             route == Routes.SUGGESTIONS -> Box(m) {
                 SuggestionsScreen(

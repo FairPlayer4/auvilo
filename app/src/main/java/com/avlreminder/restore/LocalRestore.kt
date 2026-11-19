@@ -11,6 +11,7 @@ import kotlinx.coroutines.CompletableDeferred
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.Job
+import kotlinx.coroutines.NonCancellable
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
@@ -39,7 +40,8 @@ sealed interface LocalPhase {
 /**
  * [snapshots]: the daily copies (R-1); [undoUntil]: until when the last restore can be undone
  * (W-6), null = not; [restored]: this start swapped data in; [failed]: the last swap failed;
- * [exported]: name of the export file just written (PS14).
+ * [exported]: name of the export file just written (PS14); [waiting]: a file chosen in Android's
+ * dialog that waits for its password.
  */
 data class LocalStatus(
     val phase: LocalPhase = LocalPhase.Idle,
@@ -49,7 +51,24 @@ data class LocalStatus(
     val failed: SwapFailure? = null,
     val error: String? = null,
     val exported: String? = null,
+    val waiting: WaitingFile? = null,
 )
+
+/** A file chosen in Android's dialog, waiting for its password: [export] (new file) or import. */
+data class WaitingFile(val name: String, val export: Boolean)
+
+/**
+ * A file chosen in Android's file dialog (Anf. 7.28 PS14). The file comes first, the password
+ * second: a rebuilt activity keeps the choice, and no password has to wait in it (Review 2026-11-18).
+ */
+sealed interface ChosenFile {
+    val name: String
+
+    /** A new, empty file; [delete] removes it again if nothing gets written (cancelled, failed). */
+    class Export(override val name: String, val write: suspend (ByteArray) -> Unit, val delete: suspend () -> Unit) : ChosenFile
+
+    class Import(override val name: String, val read: suspend () -> ByteArray) : ChosenFile
+}
 
 /**
  * Restoring from a daily copy (R-1) or an export file (Anf. 7.28 PS14) and undoing a restore
@@ -76,6 +95,7 @@ class LocalRestore(
     val status: StateFlow<LocalStatus> = state.asStateFlow()
     private val running = Mutex()
     @Volatile private var answer: CompletableDeferred<Boolean>? = null
+    @Volatile private var chosen: ChosenFile? = null
 
     /** What this start did with a pending order ([DatabaseSwap.applyPending]), for the status. */
     fun started(outcome: SwapOutcome) {
@@ -120,16 +140,59 @@ class LocalRestore(
     }
 
     /**
-     * Writes the export file: the backup ZIP, encrypted with [password] ([ExportFile]). [write]
-     * puts the bytes where the person chose (Android's file dialog).
+     * Android's file dialog chose [file]; the app asks for the password next ([LocalStatus.waiting]).
+     * An export file chosen before and still waiting is removed.
      */
-    fun export(name: String, password: CharArray, write: suspend (ByteArray) -> Unit): Job = work {
+    fun choose(file: ChosenFile) {
+        val before = chosen
+        chosen = file
+        state.update { it.copy(waiting = WaitingFile(file.name, file is ChosenFile.Export), exported = null, error = null) }
+        if (before is ChosenFile.Export && before !== file) discard(before)
+    }
+
+    /** The password for the waiting file: writes the export file or restores from the chosen one. */
+    fun withPassword(password: CharArray): Job {
+        val file = chosen
+        if (file == null || running.isLocked) {
+            password.fill(' ')
+            return Job().apply { complete() }
+        }
+        chosen = null
+        state.update { it.copy(waiting = null) }
+        return when (file) {
+            is ChosenFile.Export -> export(file.name, password, file.delete, file.write)
+            is ChosenFile.Import -> fromFile(file.name, password, file.read)
+        }
+    }
+
+    /** No password after all: a new export file is removed again, so no empty file stays behind. */
+    fun cancelChosen(): Job {
+        val file = chosen
+        chosen = null
+        state.update { it.copy(waiting = null) }
+        return if (file is ChosenFile.Export) discard(file) else Job().apply { complete() }
+    }
+
+    private fun discard(file: ChosenFile.Export): Job = scope.launch(Dispatchers.IO) {
+        runCatching { file.delete() }.onFailure { log("export: could not delete (${it::class.simpleName})") }
+        log("export: not written, file deleted")
+    }
+
+    /**
+     * Writes the export file: the backup ZIP, encrypted with [password] ([ExportFile]). [write]
+     * puts the bytes where the person chose (Android's file dialog); if that fails, [delete] removes
+     * the file, so no empty or half file stays behind (Review 2026-11-18).
+     */
+    fun export(name: String, password: CharArray, delete: suspend () -> Unit = {}, write: suspend (ByteArray) -> Unit): Job = work {
         state.update { it.copy(phase = LocalPhase.Busy("Verschlüsseln …"), exported = null) }
         try {
             val bytes = withContext(Dispatchers.IO) { ExportFile.encrypt(source.payload(), password, iterations) }
             withContext(Dispatchers.IO) { write(bytes) }
             log("export: written (${bytes.size} bytes)")
             state.update { it.copy(exported = name) }
+        } catch (e: Throwable) {
+            withContext(NonCancellable + Dispatchers.IO) { runCatching { delete() } }
+            throw e
         } finally {
             password.fill(' ')
         }

@@ -9,6 +9,7 @@ import androidx.compose.ui.test.performClick
 import androidx.compose.ui.test.performTextInput
 import androidx.test.ext.junit.runners.AndroidJUnit4
 import com.avlreminder.restore.LocalStatus
+import com.avlreminder.restore.WaitingFile
 import com.avlreminder.ui.screens.ExportFileSetting
 import com.avlreminder.ui.screens.LocalActions
 import com.avlreminder.ui.theme.AvlTheme
@@ -18,19 +19,23 @@ import org.junit.Rule
 import org.junit.Test
 import org.junit.runner.RunWith
 
-/** "Sicherungsdatei" (Anf. 7.28 PS14): the password comes first, then Android's file dialog. */
+/** "Sicherungsdatei" (Anf. 7.28 PS14): Android's file dialog first, then the password (Review 2026-11-18). */
 @RunWith(AndroidJUnit4::class)
 class ExportFileUiTest {
     @get:Rule
     val compose = createComposeRule()
 
     private class Recorder : LocalActions {
-        val exported = mutableListOf<String>()
-        val imported = mutableListOf<String>()
+        val passwords = mutableListOf<String>()
+        var chooseExport = 0
+        var chooseImport = 0
+        var cancelled = 0
         var dismissed = 0
         var dismissedExport = 0
-        override fun exportFile(password: CharArray) { exported += String(password) }
-        override fun importFile(password: CharArray) { imported += String(password) }
+        override fun exportFile() { chooseExport++ }
+        override fun importFile() { chooseImport++ }
+        override fun filePassword(password: CharArray) { passwords += String(password) }
+        override fun cancelFile() { cancelled++ }
         override fun dismiss() { dismissed++ }
         override fun dismissExported() { dismissedExport++ }
     }
@@ -41,11 +46,21 @@ class ExportFileUiTest {
         return actions
     }
 
+    @Test
+    fun theButtonsOpenAndroidsFileDialogFirst() {
+        val actions = show()
+        compose.onNodeWithTag("fileExport").performClick()
+        compose.onNodeWithTag("fileImport").performClick()
+        assertEquals(1, actions.chooseExport)
+        assertEquals(1, actions.chooseImport)
+        compose.onNodeWithTag("filePassword").assertDoesNotExist()
+    }
+
     // KRITISCH: a new file needs a password of 12 characters, typed twice the same.
     @Test
     fun exportingNeedsALongPasswordTypedTwice() {
-        val actions = show()
-        compose.onNodeWithTag("fileExport").performClick()
+        val actions = show(LocalStatus(waiting = WaitingFile("AuViLo-Sicherung.auvilo", export = true)))
+        compose.onNodeWithText("Datei: AuViLo-Sicherung.auvilo").assertExists()
         val ok = compose.onNodeWithTag("filePasswordOk")
         ok.assertIsNotEnabled()
         compose.onNodeWithTag("filePassword1").performTextInput("zu-kurz")
@@ -56,29 +71,25 @@ class ExportFileUiTest {
         ok.assertIsNotEnabled()
         compose.onNodeWithTag("filePassword2").performTextInput("zu-kurz-und-jetzt-lang")
         ok.assertIsEnabled().performClick()
-        assertEquals(listOf("zu-kurz-und-jetzt-lang"), actions.exported)
-        compose.onNodeWithTag("filePassword").assertDoesNotExist()
+        assertEquals(listOf("zu-kurz-und-jetzt-lang"), actions.passwords)
     }
 
     @Test
     fun importingAsksThePasswordOnce() {
-        val actions = show()
-        compose.onNodeWithTag("fileImport").performClick()
+        val actions = show(LocalStatus(waiting = WaitingFile("alt.auvilo", export = false)))
         compose.onNodeWithTag("filePassword2").assertDoesNotExist()
         compose.onNodeWithTag("filePasswordOk").assertIsNotEnabled()
         compose.onNodeWithTag("filePassword1").performTextInput("altes")
         compose.onNodeWithTag("filePasswordOk").assertIsEnabled().performClick()
-        assertEquals(listOf("altes"), actions.imported)
-        assertTrue(actions.exported.isEmpty())
+        assertEquals(listOf("altes"), actions.passwords)
     }
 
     @Test
-    fun cancellingDoesNothing() {
-        val actions = show()
-        compose.onNodeWithTag("fileExport").performClick()
+    fun cancellingGivesNoPassword() {
+        val actions = show(LocalStatus(waiting = WaitingFile("neu.auvilo", export = true)))
         compose.onNodeWithText("Abbrechen").performClick()
-        compose.onNodeWithTag("filePassword").assertDoesNotExist()
-        assertTrue(actions.exported.isEmpty() && actions.imported.isEmpty())
+        assertEquals(1, actions.cancelled)
+        assertTrue(actions.passwords.isEmpty())
     }
 
     @Test

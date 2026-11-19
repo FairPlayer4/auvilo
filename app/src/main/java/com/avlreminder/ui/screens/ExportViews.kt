@@ -12,6 +12,7 @@ import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.key
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
@@ -23,20 +24,18 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.avlreminder.restore.ExportFile
 import com.avlreminder.restore.LocalStatus
+import com.avlreminder.restore.WaitingFile
 import com.avlreminder.ui.theme.Avl
-
-/** Which password dialog is open: before exporting (twice) or before importing (once). */
-private enum class FileAsk { EXPORT, IMPORT }
 
 /**
  * "Sicherungsdatei" (Anf. 7.28 PS14, playstore.md N4): data and settings as a file of the person's
- * own, encrypted with a password, without photos and audio. The password comes first; then
- * Android's file dialog chooses where. Importing asks like any restore ([RestoreQuestion]).
+ * own, encrypted with a password, without photos and audio. Android's file dialog chooses the file
+ * first, then the app asks for the password (twice for a new file); a rebuilt activity keeps the
+ * choice (Review 2026-11-18). Importing asks like any restore ([RestoreQuestion]).
  */
 @Composable
 fun ExportFileSetting(status: LocalStatus, actions: LocalActions) {
     val c = Avl.colors
-    var ask by remember { mutableStateOf<FileAsk?>(null) }
     Column(Modifier.padding(top = 12.dp)) {
         Text("Sicherungsdatei", color = c.text, fontSize = 15.sp)
         Text(
@@ -52,21 +51,23 @@ fun ExportFileSetting(status: LocalStatus, actions: LocalActions) {
             TextButton(onClick = actions::dismissExported) { Text("OK") }
         }
         Row(Modifier.padding(top = 4.dp)) {
-            OutlinedButton(onClick = { ask = FileAsk.EXPORT }, Modifier.testTag("fileExport")) { Text("Exportieren …") }
-            TextButton(onClick = { ask = FileAsk.IMPORT }, Modifier.padding(start = 8.dp).testTag("fileImport")) { Text("Importieren …") }
+            OutlinedButton(onClick = actions::exportFile, Modifier.testTag("fileExport")) { Text("Exportieren …") }
+            TextButton(onClick = actions::importFile, Modifier.padding(start = 8.dp).testTag("fileImport")) { Text("Importieren …") }
         }
     }
-    when (ask) {
-        FileAsk.EXPORT -> FilePasswordDialog(twice = true, onCancel = { ask = null }) { ask = null; actions.exportFile(it) }
-        FileAsk.IMPORT -> FilePasswordDialog(twice = false, onCancel = { ask = null }) { ask = null; actions.importFile(it) }
-        null -> Unit
+    status.waiting?.let { file ->
+        // Keyed by the file: a new choice starts with empty fields.
+        key(file) {
+            FilePasswordDialog(file, onCancel = actions::cancelFile, onOk = actions::filePassword)
+        }
     }
 }
 
-/** The password for an export file; [twice] for a new one, which must be typed again. */
+/** The password for the chosen [file]; a new export file needs it typed twice. */
 @Composable
-private fun FilePasswordDialog(twice: Boolean, onCancel: () -> Unit, onOk: (CharArray) -> Unit) {
+private fun FilePasswordDialog(file: WaitingFile, onCancel: () -> Unit, onOk: (CharArray) -> Unit) {
     val c = Avl.colors
+    val twice = file.export
     var first by remember { mutableStateOf("") }
     var second by remember { mutableStateOf("") }
     val problem = when {
@@ -81,6 +82,7 @@ private fun FilePasswordDialog(twice: Boolean, onCancel: () -> Unit, onOk: (Char
         title = { Text(if (twice) "Passwort für die Datei" else "Passwort der Datei") },
         text = {
             Column {
+                Text("Datei: ${file.name}", Modifier.testTag("filePasswordName"), color = c.text, fontSize = 14.sp)
                 if (twice) {
                     Text(
                         "Mindestens ${ExportFile.MIN_PASSWORD} Zeichen. Speichere es im Passwortmanager: Ohne das Passwort " +
@@ -98,7 +100,7 @@ private fun FilePasswordDialog(twice: Boolean, onCancel: () -> Unit, onOk: (Char
                 onClick = { onOk(first.toCharArray()) },
                 enabled = problem == null,
                 modifier = Modifier.testTag("filePasswordOk"),
-            ) { Text("Datei wählen …") }
+            ) { Text(if (twice) "Speichern" else "Öffnen") }
         },
         dismissButton = { TextButton(onClick = onCancel) { Text("Abbrechen") } },
     )

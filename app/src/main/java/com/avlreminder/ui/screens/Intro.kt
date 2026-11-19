@@ -43,7 +43,10 @@ object Intro {
     const val PAGES = 4
     const val PROBE_TITLE = "Probealarm"
 
-    /** The test alarm rings this many minutes after the next full minute (at least one minute ahead). */
+    /**
+     * The test alarm rings this many minutes after the start of the current minute, so one to two
+     * minutes ahead (14:29:40 → 14:31).
+     */
     const val PROBE_MINUTES = 2L
 
     const val WELCOME = "AuViLo-Reminder ist ein Wecker für Vorhaben, die dir wichtig sind. Zur Uhrzeit klingelt er " +
@@ -65,6 +68,9 @@ object Intro {
         "Einstellungen → Verbesserungen sammelt die App deine Notizen; mit Teilen schickst du sie weiter. Oder schreib " +
         "direkt eine Mail an ${Contact.EMAIL}; der Knopf steht auch unter Einstellungen → Hilfe."
 
+    /** On the test alarm's page while *Notaus* is on: the test alarm would stay silent (Review 2026-11-18). */
+    const val PAUSED = "Notaus ist an: Alle Alarme sind pausiert, auch der Probealarm bliebe stumm."
+
     private val TIME = DateTimeFormatter.ofPattern("HH:mm")
     fun probeAt(at: LocalDateTime) = "Klingelt um ${TIME.format(at)}."
 }
@@ -78,6 +84,9 @@ fun IntroScreen(
     onMail: () -> Unit,
     onDone: () -> Unit,
     modifier: Modifier = Modifier,
+    /** *Notaus* is on (the test alarm would stay silent); [onResume] switches the alarms on again. */
+    paused: Boolean = false,
+    onResume: () -> Unit = {},
 ) {
     val c = Avl.colors
     var page by rememberSaveable { mutableIntStateOf(0) }
@@ -108,6 +117,10 @@ fun IntroScreen(
                 2 -> {
                     Title("Probealarm")
                     Body(Intro.PROBE)
+                    if (paused) {
+                        Text(Intro.PAUSED, Modifier.padding(top = 12.dp).testTag("introPaused"), color = c.strict, fontSize = 15.sp)
+                        TextButton(onClick = onResume, Modifier.testTag("introResume")) { Text("Wieder einschalten", color = c.accent) }
+                    }
                     OutlinedButton(
                         onClick = {
                             probeFailed = false

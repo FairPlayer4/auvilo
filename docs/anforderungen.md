@@ -256,7 +256,8 @@ Erster Satz, wird mit der Nutzung angepasst: **[V1]**
 - N2 **Foto-Nachweis**, nur mit der App-Kamera aufgenommen (nicht aus der Galerie),
   mit Zeitstempel **[V1]**
   - N2a **Auslösen mit den Lautstärketasten** wie in der Kamera-App (2026-11-16):
-    Leiser und Lauter lösen aus, solange die Kamera des Nachweises zu sehen ist;
+    Leiser und Lauter lösen aus, solange die Kamera des Nachweises zu sehen ist
+    (mindestens zur Hälfte, nicht weggescrollt; Review-Lauf 7, 2026-11-19);
     Gedrückthalten gibt ein Foto. Die Lautstärke ändert sich dabei nicht, auch nicht
     die des Alarmtons. Ohne Kamera wirken die Tasten wie gewohnt. Umgesetzt in V1.3c10.
 - N4 **Ortsnachweis**: Standort beim Nachweis wird gespeichert und optional gegen
@@ -929,6 +930,11 @@ Vordergrund, nicht Reichweite.
     (Kernfunktion): auf *Heute* mit dem, was dann nicht geht (Alarme bis zu einer Stunde zu
     spät, kein Dauer-Alarm), ein Tippen führt direkt zum Schalter; plant die App ohne
     Erlaubnis, sagt es eine Benachrichtigung. Umgesetzt in V1.3c4.
+  - **Bekannte Grenzen** (Kevin, 2026-11-19, Review-Lauf 7): Ohne die Erlaubnis gibt es
+    kein Vollbild, strenge Alarme kommen nur als Banner („Das ist ein Kernfeature und wir
+    müssen nicht dafür sorgen, dass die App gut funktioniert, wenn es ausgeschaltet ist“).
+    Nach einem Neustart klingelt nichts, bis das Handy einmal entsperrt ist („Das ist eh
+    kein guter Zustand“); danach gilt dasselbe wie nach „Handy aus“ (design.md 12).
 - PS11 **Name „AuViLo-Reminder“ (2026-11-15):** **Au**dio-**Vi**suell-**Lo**kation, die
   Bedeutung von „AVL“ bleibt, das Zeichen der AVL List GmbH fällt weg (playstore.md N1).
   Kevin hat geprüft, dass der Name in der EU nicht eingetragen ist.
@@ -959,6 +965,9 @@ Vordergrund, nicht Reichweite.
     Berechtigungsliste auf *Standort „Immer erlauben“*, erklärt erst ein eigener Hinweis
     (Standort und WLAN, auch wenn die App geschlossen ist, bleibt auf dem Handy), dann fragt
     Android; *Nicht jetzt* fragt nichts. Umgesetzt in V1.3c7.
+  - Androids erster Dialog bietet kein „Immer erlauben“. Nach der Zusage zum Standort fragt
+    die App deshalb gleich nach dem im Hintergrund, und der Hinweis nennt beide Schritte
+    (Review-Lauf 7, 2026-11-19). Umgesetzt in V1.3c13.
 - PS14 **Sicherungsdatei: Export und Import (2026-11-15):** Daten und Einstellungen lassen
   sich als Datei exportieren und wieder importieren (*Einstellungen → Lokale Kopien →
   Sicherungsdatei*), ohne Backend. Gedacht für Tester ohne Cloud-Backup, als zusätzliche
@@ -966,6 +975,9 @@ Vordergrund, nicht Reichweite.
   - Die Datei ist mit einem **eigenen Passwort** verschlüsselt (mindestens 12 Zeichen,
     zweimal eingeben), weil sie das Handy verlässt (8.4). Ohne Passwort ist sie nicht zu
     öffnen; die App merkt sich das Passwort nicht.
+  - Erst wählt man die Datei in Androids Dateidialog, dann das Passwort in der App. So geht
+    beim Neuaufbau der App nichts verloren. Bei Abbruch oder Fehler löscht die App die
+    angelegte Datei (Review-Lauf 7, 2026-11-19). Umgesetzt in V1.3c13.
   - **Ohne Fotos und Audio** (wie das Cloud-Backup); ob sie später dazukommen, entscheidet
     Kevin nach dem Gerätetest.
   - Importieren fragt wie jedes Wiederherstellen: Vergleich, Rückfrage, Tausch beim
@@ -982,8 +994,9 @@ Vordergrund, nicht Reichweite.
   - **Wiederholbar** (Kevin: „Am besten mit Knopf zum Triggern“): *Einstellungen → Hilfe →
     Einstieg zeigen*, jederzeit.
   - **Probealarm:** legt einen normalen Einmal-Reminder „Probealarm“ an (Art
-    *Dokumentieren*, also ohne Startklar-Fragen), zwei Minuten nach der nächsten vollen
-    Minute; er klingelt wie jeder Reminder und bleibt danach im Verlauf.
+    *Dokumentieren*, also ohne Startklar-Fragen), in ein bis zwei Minuten (zwei Minuten
+    nach Beginn der laufenden Minute); er klingelt wie jeder Reminder und bleibt danach im
+    Verlauf. Ist *Notaus* an, sagt die Seite, dass er stumm bliebe (Review-Lauf 7).
   - **Rückmeldung:** über *Verbesserung vorschlagen* (Glühbirne, 7.24) und *Teilen*, dazu
     *Rückmeldung per E-Mail* (Seite 4 und *Einstellungen → Hilfe*) an die öffentliche
     Kontaktadresse `kevin.bartik@gmail.com`, mit festem Betreff samt Version zum Filtern.
@@ -1455,6 +1468,7 @@ Neueste zuerst. Kap. 7 enthält immer den gültigen Stand; diese Tabelle ist die
 
 | Datum | Entscheidung |
 |---|---|
+| 2026-11-19 | **Antworten auf Review-Lauf 7** (Kevin, Fragen 1–6): Nach einem Neustart keine Reminder bis zum ersten Entsperren, als bekannte Grenze („Das ist eh kein guter Zustand“); ohne *Wecker und Erinnerungen* kein Vollbild, ebenfalls bekannte Grenze („Das ist ein Kernfeature“) (7.28 PS10, design.md 12). Nach Vorschlag: Sicherungsdatei erst Datei, dann Passwort, bei Abbruch oder Fehler Datei löschen (PS14); Standort „Immer erlauben“ gleich nach der Zusage (PS13); Lautstärketasten nur bei sichtbarer Vorschau (7.5 N2a); Probealarm in ein bis zwei Minuten, im Notaus mit Hinweis (PS15). Umgesetzt in V1.3c13 |
 | 2026-11-18 | **Tester-Daten nur über Vertex AI in der EU auswerten** (Kevin: „Idealerweise würde ich für solche Auswertungen ZDR API Token benutzen. Wenn Anthropic das nicht anbietet, könnte man das bestimmt über GCP hinbekommen“; nach Empfehlung „Ja, festhalten“): Anthropics Auftragsverarbeitungsvertrag gilt zwar für API-Konten, nicht aber für Claude Code mit Abo; ZDR gibt es bei Anthropic nur auf Antrag. Claude über Vertex AI, Region `eu`, fällt unter Googles Vertrag des bestehenden GCP-Projekts. Auswertung per Skript, Tester-Daten nie in einer Claude-Code-Sitzung; der Hinweis nennt „Claude, betrieben von Google Cloud in der EU“ (7.36 RM3, RM8). Ersetzt die Voraussetzung „Auftragsverarbeitungsvertrag mit Anthropic“ (Backend P9) |
 | 2026-11-18 | **Rückmeldung senden mit aktiver Wahl und ehrlichem Hinweis** (Kevin: „Deine Vorschläge sind gut, der Nutzer soll aktiv wählen“; „es soll transparent sein, dass der Nutzer weiß, dass diese Daten (Diagnose/Vorschläge) nicht den E2E Schutz wie das Backend haben“; „soll immer dran stehen, dass die Daten teilweise von KI ausgewertet werden“): Zustimmung je Sendung ohne vorgesetzte Haken, Vorschau, Gesendet-Liste, Einladung getrennt vom Backup, fester Hinweis auf jedem Sende-Bildschirm (7.36 RM1–RM6) |
 | 2026-11-18 | **Verschlüsselung der Rückmeldung als Zukunft** (Kevin: „Können wir das so einrichten, dass du die Diagnose Daten entschlüsseln kannst … aber die Vorschläge erstmal nicht (nur ich kenne den Schlüssel)?“; „klar sein, dass dies nur ein wackliger Schutz ist“): Umschlag-Verschlüsselung mit öffentlichen Schlüsseln in der App; Diagnose-Schlüssel in Cloud KMS, von Claude per Skript benutzbar, ohne ihn zu sehen; Vorschlags-Schlüssel offline bei Kevin, nicht in KMS, weil Claude Kevins gcloud-Anmeldung mitbenutzt (7.36 RM7, rueckmeldung-entwurf.md) |
@@ -1562,6 +1576,7 @@ Neueste zuerst. Kap. 7 enthält immer den gültigen Stand; diese Tabelle ist die
 | V1.3c10 | – | Foto-Nachweis mit den Lautstärketasten auslösen (7.5 N2a) |
 | V1.3c11 | 2026-11-16 | Schnellerinnerung per Sprache, einfachste Fassung: eigenes Widget, Aufnahme bis *Fertig*, Zusammenfassung mit Bestätigung (7.35) |
 | V1.3c12 | – | Cloud-Backup nur auf Einladung: Text und *Einladung per E-Mail anfragen* mit Kennung (7.28 PS16) |
+| V1.3c13 | – | Fixes und Antworten aus Review-Lauf 7: Sicherungsdatei erst Datei, dann Passwort, ohne liegengebliebene Datei; Standort in einem Zug; Lautstärketasten nur bei sichtbarer Vorschau; Probealarm im Notaus; Sitzungsdienst nach dem Erteilen; Verschiebe-Limit 0 pro Woche/Monat; bekannte Grenzen Neustart und Vollbild dokumentiert |
 
 Details zum Verhalten: [design.md](design.md), Gerätetests: [geraetetest.md](geraetetest.md).
 

@@ -1,9 +1,14 @@
 # Stand und nächste Schritte
 
-Stand: 2026-11-16. Bei jedem größeren Schritt aktualisieren. Erledigtes steht in git, in
+Stand: 2026-11-19. Bei jedem größeren Schritt aktualisieren. Erledigtes steht in git, in
 anforderungen.md Kap. 10.1 und in den Review-Berichten (`.review/runs/`), nicht hier.
 
 ## Auf dem Gerät (S24)
+- **V1.3c13** (`versionCode` 33) gebaut, noch nicht installiert: Fixes und Antworten aus
+  Review-Lauf 7 (anforderungen.md Kap. 9, 2026-11-19). Keine Migration. Vor dem Installieren
+  `gradle/backend-commit.txt` auf den Backend-Stand nachziehen (der Build warnt sonst).
+  Am Gerät prüfen: Sicherungsdatei exportieren (erst Datei, dann Passwort; *Abbrechen*
+  lässt keine Datei liegen), Probealarm im Notaus, Foto-Nachweis mit weggescrollter Kamera.
 - **V1.3c12** (`versionCode` 32) gebaut, noch nicht installiert: Cloud-Backup nur auf
   Einladung, Text und *Einladung per E-Mail anfragen* mit Kennung (7.28 PS16, playstore.md
   S2). Keine Migration. Auf dem S24 ändert sich nur der Text unter dem Schalter.

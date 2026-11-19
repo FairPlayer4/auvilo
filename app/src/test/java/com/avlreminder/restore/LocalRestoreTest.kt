@@ -303,11 +303,59 @@ class LocalRestoreTest {
         assertTrue(target.compared.isEmpty())
     }
 
+    // A failed write must not leave an empty or half file that later reads as "Passwort falsch" (Review 2026-11-18).
     @Test
-    fun aFailedWriteIsShownAndNothingCountsAsExported() {
+    fun aFailedWriteIsShownDeletesTheFileAndNothingCountsAsExported() {
         val local = local()
-        blocking { local.export("datei", password.toCharArray()) { throw java.io.IOException("voll") }.join() }
+        var deleted = 0
+        blocking { local.export("datei", password.toCharArray(), delete = { deleted++ }) { throw java.io.IOException("voll") }.join() }
         assertNull(local.status.value.exported)
         assertEquals(LocalRestore.describe(java.io.IOException("voll")), local.status.value.error)
+        assertEquals(1, deleted)
+    }
+
+    // KRITISCH (Review 2026-11-18, Frage 2): the file is chosen first, the password asked afterwards,
+    // so a rebuilt activity loses nothing; the password is wiped after writing.
+    @Test
+    fun theFileComesFirstAndThePasswordAfterwards() {
+        val local = local()
+        var written: ByteArray? = null
+        var deleted = 0
+        local.choose(ChosenFile.Export("AuViLo-Sicherung.auvilo", { written = it }) { deleted++ })
+        assertEquals(WaitingFile("AuViLo-Sicherung.auvilo", export = true), local.status.value.waiting)
+        assertNull("nothing written before the password", written)
+
+        val exportPassword = password.toCharArray()
+        blocking { local.withPassword(exportPassword).join() }
+        assertNull(local.status.value.waiting)
+        assertEquals("AuViLo-Sicherung.auvilo", local.status.value.exported)
+        assertTrue("password wiped", exportPassword.all { it == ' ' })
+        assertEquals(0, deleted)
+
+        local.choose(ChosenFile.Import("AuViLo-Sicherung.auvilo") { checkNotNull(written) })
+        assertEquals(WaitingFile("AuViLo-Sicherung.auvilo", export = false), local.status.value.waiting)
+        local.withPassword(password.toCharArray())
+        assertEquals(RestoreKind.FILE, local.awaitAsk().kind)
+        local.answer(false)
+    }
+
+    // Cancelling the password, or choosing another file, removes the new and still empty file.
+    @Test
+    fun noPasswordLeavesNoEmptyFileBehind() {
+        val local = local()
+        val deleted = java.util.Collections.synchronizedList(mutableListOf<String>())
+        local.choose(ChosenFile.Export("erste", { error("not written") }) { deleted += "erste" })
+        local.choose(ChosenFile.Export("zweite", { error("not written") }) { deleted += "zweite" })
+        assertEquals("zweite", local.status.value.waiting?.name)
+        blocking { local.cancelChosen().join() }
+        blocking { local.status.first { it.waiting == null } }
+        blocking { withTimeout(5_000) { while (deleted.size < 2) kotlinx.coroutines.delay(10) } }
+        assertEquals(setOf("erste", "zweite"), deleted.toSet())
+        assertNull(local.status.value.exported)
+
+        val wiped = password.toCharArray()
+        blocking { local.withPassword(wiped).join() }
+        assertTrue("a password without a file is wiped too", wiped.all { it == ' ' })
+        assertNull(local.status.value.exported)
     }
 }
