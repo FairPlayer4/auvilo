@@ -27,12 +27,25 @@ Strenge und invasive Mechanismen sind gewollt. Kommunikation auf **Deutsch, mit 
 - Eine Etappe ist erst fertig, wenn ihr Entwurf in die Themen von `design.md` eingearbeitet
   und der Entwurfsabschnitt gelöscht ist; `stand.md` und Kap. 10.1 nachziehen.
 
+## Abnahme jeder Etappe (V1.3c14, gegen wiederkehrende Review-Funde)
+- Regeln (Zeiten, Limits, was erlaubt ist) stehen in `:core` mit Test. `TimeRuleTest` und
+  `ClockRuleTest` nur mit Begründung erweitern; wird eine Stelle frei, die Zahl senken.
+- Jeder neue Weg über eine Android-Komponente (Activity-Ergebnis, Berechtigung, Receiver,
+  Dienst) hat einen Test durch die echte Komponente; wartet er auf einen Systemdialog, auch
+  einen mit Neuaufbau (`scenario.recreate()`).
+- Knöpfe mit Engine-Aufruf nutzen `rememberBusy`, mit einem Test, der zweimal tippt.
+- Neue Wege bekommen einen Mutanten in `tools/mutate.py`.
+- Zitiert die Doku App-Texte wörtlich, prüft sie `DocQuoteTest`. Zahlen nennt die Doku als
+  Konstante mit Beispiel, statt den Wert herzuleiten.
+
 ## Bauen und testen (Git Bash)
 ```bash
 ./gradlew -q :core:check :core:koverLog :app:testDebugUnitTest :app:lintDebug :app:assembleDebug
 ```
 - Vor einem PR nach `main` zusätzlich `-PbackendStreng=true` (wie die CI): bricht ab,
-  wenn der Backend-Stand nicht zu `gradle/backend-commit.txt` passt.
+  wenn der Backend-Stand nicht zu `gradle/backend-commit.txt` passt. Dazu die
+  Mutations-Suite `python -I -X utf8 tools/mutate.py` (etwa 20 min, im Hintergrund, Netz wie
+  Gradle): Gegenprobe grün, alle Mutanten entdeckt; das Ergebnis in den PR-Text.
 - `JAVA_HOME` und `ANDROID_HOME` sind auf dem Rechner gesetzt, nichts exportieren
   (Pfade in entwicklungsumgebung.md).
 - Gradle, adb und `git push` brauchen in Claude Code Netz/Geräte außerhalb der Sandbox.

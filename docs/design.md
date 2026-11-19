@@ -55,8 +55,9 @@
   „Nachweis verlassen“), wenn das System ihn schließt (verpasst, Tagesende, Ende einer
   Sitzung, Notaus-Skip; Frage 3), beim Löschen und Pausieren, und bei einem Knopf auf
   einem geschlossenen oder unbekannten Termin. Eine abgelehnte Aktion auf einem offenen
-  Termin lässt ihn klingeln; was im selben Befehl wieder klingelt, wird nicht beendet. Die
-  Aufrufer klingeln und beenden nicht selbst. Nach jedem Befehl (nicht nach dem Lesen)
+  Termin lässt ihn klingeln. Kein Befehl beendet und klingelt denselben Termin; der Filter
+  dafür hatte keinen Fall und ist weg (E24, V1.3c14). Die Aufrufer klingeln und beenden
+  nicht selbst. Nach jedem Befehl (nicht nach dem Lesen)
   meldet `changed` der App, Widget und Sitzungs-Benachrichtigung neu aufzubauen (E17).
 - **Die Alarm-Ansicht kommt aus `core`** (`AlarmView`): Alarm-Bildschirm, Benachrichtigung
   und der Knopf „✓ Punkt“ zeigen dieselben erlaubten Aktionen; `Ring` trägt sie mit der
@@ -84,6 +85,13 @@
   `AppGraph.clock` (`SystemZoneClock`). Das gilt für alles, wonach die App entscheidet:
   *Heute*-Ticks, Widget, Alarm-Bildschirm, Timer der Sitzung, Notaus-Ende, Alter des
   WLAN-Scans. Frei sind nur Log-Stempel und Dateinamen; `ClockRuleTest` hält die Liste.
+- **Regeln über Zeit stehen im Core** (V1.3c14): Probealarm (`Presets.probe`), Ziele beim
+  Verschieben und *Rest auf morgen* (`AlarmView.postponeTargets`, `tomorrowAtDueTime`),
+  Dauer des Notaus (`PauseLength`). Zeitrechnung in `:app` (`plus…`, `minus…`,
+  `truncatedTo`, `ChronoUnit`, `Duration.between`) steht nur in den Dateien, die
+  `TimeRuleTest` mit Zahl und Grund nennt: Anzeige, Cloud, Vorschau, Vorschläge im
+  Formular, die Planung der Übersicht (`OverviewTimes` liegt in `:app`). Die Liste muss
+  genau stimmen; sie schrumpft mit jedem Umzug (V1.3c13: 33 Stellen, V1.3c14: 23).
   Keine DI-Bibliothek: ein kleiner Container (`AppGraph`). Engine-Aufrufe laufen
   nacheinander (`withEngine`).
 - **Ein Rezept für den Neuaufbau:** `AppGraph.rebuild(reason)` macht `sync`, Pause-Hinweis
@@ -581,6 +589,9 @@ https://claude.ai/artifact/PXA9YgWi8XoHupYnN7Z3cS
 - **Sitzung:** großer Timer, die vier Antworten, die vorgeschlagene hervorgehoben (3.1).
 - **Einstellungen:** Vorschläge, Darstellung, Alarmzeiten, Nachfragen, Vorlagen,
   Übersicht, Zuhause, Berechtigungen. Zahnrad auf allen Tabs.
+- **Knöpfe mit Engine-Aufruf** (*Probealarm stellen*, *Hier festlegen*) sperren mit
+  `rememberBusy`, bis das Ergebnis da ist; der Mutex in `withEngine` reiht einen zweiten
+  Tipp nur ein (E31, V1.3c14).
 
 ### 11.2 Benachrichtigungen, Uhr, Widget
 - **Alarm-Kanäle:** Vollbild über Foreground-Service; zusätzlich eine normale
@@ -752,6 +763,17 @@ umgesetzt / verworfen. Liste in den Einstellungen, *Teilen* als Markdown.
   (2026-11-15). `MainActivityTest` belegt diesen Singleton vor jedem Test mit einer fremden
   Application.
 
+- **Stolperdrähte** lesen die Quellen und brechen bei einer neuen Abweichung ab, mit einer
+  Liste begründeter Ausnahmen, die genau stimmen muss: `ClockRuleTest` (Systemuhr),
+  `TimeRuleTest` (Zeitrechnung in `:app`, 1.), `DocQuoteTest` (App-Texte, die die Doku
+  wörtlich zitiert, z. B. der Standort-Hinweis in playstore-erklaerungen.md). Für Trends
+  aus den Reviews, die trotz Fixes wiederkamen (V1.3c14).
+- **Mutations-Suite** `tools/mutate.py`: 15 feste Mutanten an Stellen, die schon einmal
+  kaputt waren oder nur über Android erreichbar sind, je mit den Tests, die rot werden
+  müssen. Erst die Gegenprobe (unverändert grün, echte Testzahl), dann je Mutant nur seine
+  Tests; die Datei wird aus dem Speicher zurückgeschrieben, Dateien mit uncommitteten
+  Änderungen fasst sie nicht an. Läuft vor jedem PR nach `main` (etwa 20 min); jede Etappe
+  bringt Mutanten für ihre neuen Wege mit. Abnahmeliste in CLAUDE.md.
 - Tests entstehen mit dem Code; Regeln haben sprechende Testnamen.
 - Ein Befehl für alles, lokal wie in CI:
   `./gradlew :core:check :core:koverLog :app:testDebugUnitTest :app:lintDebug :app:assembleDebug`.
@@ -881,40 +903,6 @@ aus der App (A-12); *Diagnose senden* nur für Konten mit Diagnose-Erlaubnis.
 Schlüssel-Backup), `RestoreFilesTest`, `LocalRestoreTest`, `CorruptCopyTest`,
 `ExportFileTest` (Format festgenagelt), `ExportFileUiTest`; auf dem
 Gerät [geraetetest.md](geraetetest.md) Abschnitt D.
-
-## Entwurf V1.3c14 – Umbau gegen die Trends
-
-> Grundlage: Review-Lauf 7 und Kevins Auftrag vom 2026-11-19 (anforderungen.md Kap. 9).
-> Kein neues Verhalten. Was in mehreren Läufen wiederkam, bekommt einen Test, der von
-> selbst rot wird, statt eines Vorsatzes; die Review-Fixes allein haben die Trends nicht
-> gestoppt.
-
-- **U1 Regeln aus `:app` in den Core** (E30, Rest von E25): Zeit und Reminder des
-  Probealarms (`Presets.probe`), die Ziele beim Verschieben im Alarm, die Zeit für
-  *Rest auf morgen*, „bis morgen früh“ beim Notaus; die Knöpfe der laufenden
-  Sitzungs-Benachrichtigung aus `Sessions.quickAnswers`.
-- **U2 Stolperdraht Zeitrechnung:** `TimeRuleTest` nach dem Muster von `ClockRuleTest`.
-  Zeitrechnung (`plus…`, `minus…`, `truncatedTo`, `ChronoUnit`, `Duration.between`) steht
-  in `:app` nur in Dateien der Liste, je mit Zahl und Grund (Anzeige, Cloud, Vorschau).
-  Die Liste muss genau stimmen: Sie schrumpft mit jedem Umzug und wächst nur mit Grund.
-  Dazu erkennt `ClockRuleTest` auch `SystemZoneClock.instant()` (E28).
-- **U3 Doppeltipp** (E31, E28): `rememberBusy` sperrt einen Knopf mit Engine-Aufruf, bis
-  das Ergebnis da ist; Probealarm und *Hier festlegen* damit, je mit einem Test, der
-  zweimal tippt.
-- **U4 Doku gleich Code:** `DocQuoteTest` prüft, dass der Standort-Hinweis in
-  playstore-erklaerungen.md wörtlich `LocationDisclosure` ist. Zahlen stehen im Code;
-  Doku und KDoc nennen die Konstante und ein Beispiel, statt den Wert herzuleiten.
-- **U5 Vertrag für `countPostponed`** (E32) in `RepositoryCases`, also für Fake und Room;
-  ein eigener `EventType` statt des Textsuffixes erst mit der nächsten Schema-Änderung.
-- **U6 Schutzfilter in `EngineContext.commit`** (E24): mit einem echten Fall belegen oder
-  streichen.
-- **U7 Mutations-Suite** `tools/mutate.py`: feste Mutanten in Android-Verdrahtung und
-  Regeln, je mit dem Test, der rot werden muss; Gegenprobe unverändert grün. Läuft vor
-  jedem PR nach `main`; jede Etappe bringt Mutanten für ihre neuen Wege mit.
-- **U8 Ablauf:** Abnahmeliste in CLAUDE.md; Kennzahlen je Review-Lauf in
-  `.review/state.md` (Mutanten der Suite, Einträge im Stolperdraht, offene Empfehlungen);
-  eine Empfehlung, die zwei Läufe offen ist, kommt in eine Etappe oder wird abgelehnt
-  (`.claude/review-loop.md`).
 
 ## Entwurf V1.3c – Abläufe (Skizze)
 

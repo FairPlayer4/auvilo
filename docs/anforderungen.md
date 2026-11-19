@@ -1578,7 +1578,7 @@ Neueste zuerst. Kap. 7 enthält immer den gültigen Stand; diese Tabelle ist die
 | V1.3c11 | 2026-11-16 | Schnellerinnerung per Sprache, einfachste Fassung: eigenes Widget, Aufnahme bis *Fertig*, Zusammenfassung mit Bestätigung (7.35) |
 | V1.3c12 | – | Cloud-Backup nur auf Einladung: Text und *Einladung per E-Mail anfragen* mit Kennung (7.28 PS16) |
 | V1.3c13 | – | Fixes und Antworten aus Review-Lauf 7: Sicherungsdatei erst Datei, dann Passwort, ohne liegengebliebene Datei; Standort in einem Zug; Lautstärketasten nur bei sichtbarer Vorschau; Probealarm im Notaus; Sitzungsdienst nach dem Erteilen; Verschiebe-Limit 0 pro Woche/Monat; bekannte Grenzen Neustart und Vollbild dokumentiert |
-| V1.3c14 | – | Umbau-Etappe gegen die Trends aus Review-Lauf 7, ohne neues Verhalten (Kap. 9, 2026-11-19; design.md, Entwurf V1.3c14) |
+| V1.3c14 | – | Umbau-Etappe gegen die Trends aus Review-Lauf 7, ohne neues Verhalten (Kap. 9, 2026-11-19): Zeitregeln im Core (Probealarm, Verschiebe-Ziele, Notaus-Dauer; E30), Stolperdrähte `TimeRuleTest` und `DocQuoteTest`, Knöpfe gegen Doppeltipp (E31), Vertrag `countPostponed` (E32), Schutzfilter gestrichen (E24), Mutations-Suite `tools/mutate.py`, Abnahmeliste in CLAUDE.md (design.md 1, 11.1, 14) |
 
 Details zum Verhalten: [design.md](design.md), Gerätetests: [geraetetest.md](geraetetest.md).
 

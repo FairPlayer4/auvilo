@@ -81,6 +81,27 @@ Das Cloud-Backup (`app/…/cloud`, `restore`) prüft der review-loop des Backend
 - 2026-11-18: Semantik als Textsuffix (`Lifecycle.COUNTED` in `event.detail`) an drei Stellen (Room, Fake, Exportskript); im Skript schon verloren (08d61ad). E32.
 - 2026-11-18: Verhalten unter Android 14 durch Robolectric nicht belegt (Vordergrunddienst-Typen, Startsperren, Vollbild). E33.
 
+## Kennzahlen je Lauf (seit V1.3c14; `.claude/review-loop.md`)
+| Stand | Mutations-Suite entdeckt/gesamt | Zeitrechnung in `:app` (`TimeRuleTest`) | offene Empfehlungen |
+|---|---|---|---|
+| vor V1.3c14 (Lauf 7) | – | 33 Stellen in 17 Dateien | 11 (E24–E34) |
+| V1.3c14 (2026-11-19) | 15/15 (erst 14/15: M5 Doppeltipp im selben Frame, `BusyTest` ergänzt) | 23 in 14 | 5 (E26, E29, E32-Typ, E33, E34), dazu Rest E28 in V1.3c |
+
+## Empfehlungen: Stand (Regel seit 2026-11-19: höchstens zwei Läufe offen, dann Etappe oder abgelehnt)
+| E | seit | Stand |
+|---|---|---|
+| E24 Schutzfilter in `commit` | Lauf 6 | erledigt V1.3c14: gestrichen, kein Befehl beendet und klingelt denselben Termin |
+| E25 Antworten ohne Bildschirm in den Core | Lauf 6 | erledigt: `quickDone`, `quickMinimum`, `minimumUsedUp`, `Sessions.quickAnswers` im Core; die feste Reihenfolge der laufenden Sitzungs-Benachrichtigung ist Design (3.1), keine Regel |
+| E26 Folge-Benachrichtigung mit gleicher ID | Lauf 6 | Gerätetest bei der nächsten Installation (geraetetest.md); erst bei Befund eigene ID-Bereiche |
+| E27 Nebenläufigkeit der App | Lauf 6 | **abgelehnt** (2026-11-19): niedrige Konfidenz, nie am Gerät aufgefallen; neu aufnehmen nur mit Befund oder wenn V1.3c die Stellen anfasst |
+| E28 Struktur-Reste | Lauf 6 | Doppeltipp *Hier festlegen* erledigt V1.3c14; `SystemZoneClock.instant()` **abgelehnt** (folgt `shift`, gleichwertig); `checkPlaces` als zweiter Befehl und `Changes.planTask` von Hand: in V1.3c (fasst `Changes` an) |
+| E29 Format der Sicherungsdatei festnageln | Lauf 7 | offen, spätestens Lauf 9 in eine Etappe |
+| E30 Regeln in `:app` | Lauf 7 | erledigt V1.3c14: Core plus `TimeRuleTest` |
+| E31 Doppeltipp | Lauf 7 | erledigt V1.3c14: `rememberBusy`, Tests, Mutant M5 |
+| E32 Vertrag `countPostponed` | Lauf 7 | Test erledigt V1.3c14 (`RepositoryCases`); eigener `EventType` mit der nächsten Schema-Änderung |
+| E33 Android 14 nur am Emulator | Lauf 7 | Gerätetest auf `Pixel_API34` vor dem Play-Store-Release (geraetetest.md) |
+| E34 Play-Prüfung Standort-Hinweis | Lauf 7 | offen, mit dem Video P5 (playstore.md) |
+
 ## Offene Fragen an den Entwickler
 Keine aus Lauf 7 (beantwortet am 2026-11-19, siehe unten).
 

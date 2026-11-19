@@ -65,7 +65,7 @@ MUTANTS = [
            APP + "ui/Components.kt",
            "        if (state.value) return\n",
            "",
-           ("app:com.avlreminder.ui.IntroUiTest", "app:com.avlreminder.ui.PlaceSettingUiTest")),
+           ("app:com.avlreminder.ui.BusyTest", "app:com.avlreminder.ui.IntroUiTest", "app:com.avlreminder.ui.PlaceSettingUiTest")),
     Mutant("M6", "Nach dem Neustart werden die Alarme nicht neu geplant",
            APP + "system/SystemReceiver.kt",
            "        Intent.ACTION_BOOT_COMPLETED,\n",

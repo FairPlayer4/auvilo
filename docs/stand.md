@@ -4,6 +4,13 @@ Stand: 2026-11-19. Bei jedem größeren Schritt aktualisieren. Erledigtes steht 
 anforderungen.md Kap. 10.1 und in den Review-Berichten (`.review/runs/`), nicht hier.
 
 ## Auf dem Gerät (S24)
+- **V1.3c14** (`versionCode` 34) gebaut, noch nicht installiert: Umbau-Etappe gegen die
+  Trends aus den Review-Läufen, ohne neues Verhalten (anforderungen.md Kap. 9, 2026-11-19):
+  Zeitregeln im Core, Stolperdrähte, Knöpfe gegen Doppeltipp, Mutations-Suite
+  `tools/mutate.py`. Keine Migration. Enthält V1.3c13. Vor dem Installieren
+  `gradle/backend-commit.txt` auf den Backend-Stand nachziehen (der Build warnt sonst).
+  Am Gerät zusätzlich prüfen: *Verschieben* im Alarm zeigt dieselben Ziele wie vorher,
+  Notaus „bis morgen früh“.
 - **V1.3c13** (`versionCode` 33) gebaut, noch nicht installiert: Fixes und Antworten aus
   Review-Lauf 7 (anforderungen.md Kap. 9, 2026-11-19). Keine Migration. Vor dem Installieren
   `gradle/backend-commit.txt` auf den Backend-Stand nachziehen (der Build warnt sonst).
