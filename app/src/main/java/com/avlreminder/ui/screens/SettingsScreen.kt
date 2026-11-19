@@ -51,8 +51,9 @@ import com.avlreminder.ui.Format
 import com.avlreminder.system.Contact
 import com.avlreminder.ui.SectionTitle
 import com.avlreminder.ui.TimeDialog
+import com.avlreminder.ui.rememberBusy
 import com.avlreminder.ui.theme.Avl
-import java.time.Duration
+import com.avlreminder.core.rules.PauseLength
 import com.avlreminder.SystemZoneClock
 import java.time.Instant
 import java.time.LocalTime
@@ -369,11 +370,11 @@ private fun PauseSetting(alert: AlertSettings, onPause: (Instant?) -> Unit, now:
             Text("Alle Alarme pausieren", color = c.text, fontSize = 15.sp)
             FlowRow(Modifier.padding(top = 6.dp), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                 listOf(
-                    Triple("1 Stunde", "pause1h", { n: Instant -> n.plus(Duration.ofHours(1)) }),
-                    Triple("bis morgen früh", "pauseMorning", { n: Instant -> AlarmPause.untilMorning(n, zone) }),
-                    Triple("bis ich einschalte", "pauseForGood", { _: Instant -> AlertSettings.PAUSED_FOR_GOOD }),
-                ).forEach { (label, tag, end) ->
-                    OutlinedButton(onClick = { asking = label to end(SystemZoneClock.instant()) }, Modifier.testTag(tag)) { Text(label) }
+                    Triple("1 Stunde", "pause1h", PauseLength.HOUR),
+                    Triple("bis morgen früh", "pauseMorning", PauseLength.MORNING),
+                    Triple("bis ich einschalte", "pauseForGood", PauseLength.FOR_GOOD),
+                ).forEach { (label, tag, length) ->
+                    OutlinedButton(onClick = { asking = label to length.until(SystemZoneClock.instant(), zone) }, Modifier.testTag(tag)) { Text(label) }
                 }
             }
             Text(
@@ -419,7 +420,7 @@ private fun TimeSetting(
  * connected WLAN with all its access points. [fixedName] null: the name can be typed.
  */
 @Composable
-private fun PlaceSetting(
+internal fun PlaceSetting(
     place: Place?,
     fixedName: String?,
     onSetPlace: (Long?, String, (PlaceSetResult) -> Unit) -> Unit,
@@ -428,6 +429,7 @@ private fun PlaceSetting(
     val c = Avl.colors
     var name by remember(place?.id) { mutableStateOf(place?.name.orEmpty()) }
     var status by remember { mutableStateOf<String?>(null) }
+    val setting = rememberBusy()
     Column(modifier) {
         if (fixedName != null) {
             Text(fixedName, color = c.text, fontSize = 15.sp, fontWeight = FontWeight.SemiBold)
@@ -440,11 +442,13 @@ private fun PlaceSetting(
         Text(describe(place), color = c.muted, fontSize = 13.sp)
         TextButton(
             onClick = {
-                status = "Standort und WLAN werden bestimmt …"
-                onSetPlace(place?.id, fixedName ?: name) { status = message(it) }
+                setting.run { done ->
+                    status = "Standort und WLAN werden bestimmt …"
+                    onSetPlace(place?.id, fixedName ?: name) { done(); status = message(it) }
+                }
             },
             Modifier.testTag("setPlace${place?.id ?: "New"}"),
-            enabled = fixedName != null || name.isNotBlank(),
+            enabled = (fixedName != null || name.isNotBlank()) && !setting.busy,
         ) { Text(if (place == null) "Hier festlegen" else "Neu festlegen: hier", color = c.accent) }
         status?.let { Text(it, color = c.muted, fontSize = 13.sp) }
     }

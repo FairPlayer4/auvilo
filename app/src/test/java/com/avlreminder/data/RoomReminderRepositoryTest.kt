@@ -10,7 +10,6 @@ import com.avlreminder.core.model.Event
 import com.avlreminder.core.model.EventType
 import com.avlreminder.core.model.ItemDone
 import com.avlreminder.core.model.Occurrence
-import com.avlreminder.core.rules.Lifecycle
 import com.avlreminder.core.model.PostponePeriod
 import com.avlreminder.core.model.OccurrenceState
 import com.avlreminder.core.model.Place
@@ -113,26 +112,10 @@ class RoomReminderRepositoryTest {
         assertEquals(1, repo.occurrence(o1)!!.postponeCount)
     }
 
-    // Das Limit pro Woche oder Monat zählt Verschieben und ein zählendes „Rest auf morgen“, wann es geschah (Z2b).
+    // Was das Verschiebe-Limit zählt, prüft RepositoryCases für Fake und Room (E32); hier nur der Zeitraum.
     @Test
-    fun countPostponedCountsMovesOfTheReminderInTheSpan() = runTest {
+    fun thePostponePeriodIsStored() = runTest {
         val id = repo.saveReminder(reminder(Schedule.Daily(LocalTime.NOON)))
-        val other = repo.saveReminder(reminder(Schedule.Daily(LocalTime.NOON)))
-        val o1 = repo.saveOccurrence(Occurrence(reminderId = id, dueAt = t0))
-        val o2 = repo.saveOccurrence(Occurrence(reminderId = id, dueAt = t0.plusSeconds(86_400)))
-        val x = repo.saveOccurrence(Occurrence(reminderId = other, dueAt = t0))
-        val to = t0.plusSeconds(90_000).toString()
-        repo.addEvent(Event(occurrenceId = o1, at = t0, type = EventType.POSTPONED, detail = to))
-        repo.addEvent(Event(occurrenceId = o2, at = t0.plusSeconds(60), type = EventType.DEFERRED, detail = to + Lifecycle.COUNTED))
-        // Not counted: a free "Rest auf morgen", a snooze, another reminder, outside the span.
-        repo.addEvent(Event(occurrenceId = o2, at = t0.plusSeconds(120), type = EventType.DEFERRED, detail = to))
-        repo.addEvent(Event(occurrenceId = o1, at = t0.plusSeconds(180), type = EventType.SNOOZED, detail = "10 min"))
-        repo.addEvent(Event(occurrenceId = x, at = t0, type = EventType.POSTPONED, detail = to))
-        repo.addEvent(Event(occurrenceId = o1, at = t0.plusSeconds(3600), type = EventType.POSTPONED, detail = to))
-        assertEquals(2, repo.countPostponed(id, t0, t0.plusSeconds(3600)))
-        assertEquals(1, repo.countPostponed(id, t0.plusSeconds(61), t0.plusSeconds(7200)))
-        assertEquals(1, repo.countPostponed(other, t0, t0.plusSeconds(3600)))
-
         repo.saveReminder(repo.reminder(id)!!.copy(postponePeriod = PostponePeriod.WEEK))
         assertEquals(PostponePeriod.WEEK, repo.reminder(id)!!.postponePeriod)
     }

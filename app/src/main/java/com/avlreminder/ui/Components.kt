@@ -13,6 +13,10 @@ import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.MutableState
+import androidx.compose.runtime.Stable
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
@@ -104,3 +108,23 @@ fun EntryCard(
         trailing()
     }
 }
+
+/**
+ * Keeps a button that calls the engine locked until its result is there (V1.3c14 U3, Review-Lauf 7
+ * E31): the engine's mutex only queues a second tap, so a double tap ran the command twice (two
+ * test alarms, two places). [run] does nothing while busy; the callback it hands over unlocks.
+ */
+@Stable
+class Busy internal constructor(private val state: MutableState<Boolean>) {
+    val busy: Boolean get() = state.value
+
+    fun run(start: (done: () -> Unit) -> Unit) {
+        if (state.value) return
+        state.value = true
+        start { state.value = false }
+    }
+}
+
+/** A [Busy] for one button; after a rebuild of the screen it starts unlocked. */
+@Composable
+fun rememberBusy(): Busy = remember { Busy(mutableStateOf(false)) }

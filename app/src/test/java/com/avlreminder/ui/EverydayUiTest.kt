@@ -281,10 +281,8 @@ class EverydayUiTest {
     }
 
     @Test
-    fun thePauseEndsAtTheRightMoment() {
-        // 14:00 → tomorrow 06:00; 03:00 → today 06:00.
-        assertEquals(Instant.parse("2026-10-30T05:00:00Z"), AlarmPause.untilMorning(now, zone))
-        assertEquals(Instant.parse("2026-10-30T05:00:00Z"), AlarmPause.untilMorning(Instant.parse("2026-10-30T02:00:00Z"), zone))
+    fun thePauseSaysWhenItEnds() {
+        // When it ends: PauseLength in core (TimeRulesFromAppTest).
         assertEquals("bis morgen 06:00", AlarmPause.untilText(Instant.parse("2026-10-30T05:00:00Z"), now, zone))
         assertEquals("bis du sie wieder einschaltest", AlarmPause.untilText(AlertSettings.PAUSED_FOR_GOOD, now, zone))
         assertEquals("bis 01.11. 10:00", AlarmPause.untilText(Instant.parse("2026-11-01T09:00:00Z"), now, zone))

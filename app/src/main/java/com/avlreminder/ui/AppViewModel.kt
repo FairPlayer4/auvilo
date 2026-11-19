@@ -15,11 +15,9 @@ import com.avlreminder.core.model.Place
 import com.avlreminder.core.model.PrepAnswer
 import com.avlreminder.core.model.Proof
 import com.avlreminder.core.model.Reminder
-import com.avlreminder.core.model.Character
 import com.avlreminder.core.model.Schedule
 import com.avlreminder.core.rules.Presets
 import com.avlreminder.ui.screens.Intro
-import java.time.temporal.ChronoUnit
 import com.avlreminder.core.rules.Action
 import com.avlreminder.core.rules.AlertSettings
 import com.avlreminder.core.rules.Checklists
@@ -238,17 +236,16 @@ class AppViewModel(app: Application) : AndroidViewModel(app) {
     }
 
     /**
-     * The test alarm of the introduction (Anf. 7.28 PS15): a one-off "Probealarm", normal and
-     * "Dokumentieren" (no "Startklar" questions), one to two minutes ahead ([Intro.PROBE_MINUTES]).
+     * The test alarm of the introduction (Anf. 7.28 PS15), built by [Presets.probe]; [onResult]
+     * gets its time, or null if the engine refused it.
      */
     fun probeAlarm(onResult: (LocalDateTime?) -> Unit) {
         viewModelScope.launch {
             val now = graph.now()
-            val at = LocalDateTime.ofInstant(now, zone).truncatedTo(ChronoUnit.MINUTES).plusMinutes(Intro.PROBE_MINUTES)
-            val probe = Presets.newReminder(Intro.PROBE_TITLE, Schedule.Once(at), now).copy(character = Character.DOCUMENT)
+            val probe = Presets.probe(Intro.PROBE_TITLE, now, zone)
             val result = graph.withEngine { it.save(probe, emptyList()) }
             if (result is SaveResult.Invalid) rejected(result.problems)
-            onResult(at.takeIf { result is SaveResult.Saved })
+            onResult((probe.schedule as Schedule.Once).at.takeIf { result is SaveResult.Saved })
         }
     }
 

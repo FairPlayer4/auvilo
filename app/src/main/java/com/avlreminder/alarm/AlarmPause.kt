@@ -15,7 +15,6 @@ import com.avlreminder.ui.MainActivity
 import kotlinx.coroutines.launch
 import java.time.Duration
 import java.time.Instant
-import java.time.LocalTime
 import java.time.ZoneId
 import java.time.format.DateTimeFormatter
 
@@ -27,20 +26,11 @@ object AlarmPause {
     private const val CHANNEL = "pause"
     private const val ACTION_RESUME = "com.avlreminder.RESUME_ALARMS"
     private const val NOTIFICATION_ID = Int.MIN_VALUE + 2
-    /** "Bis morgen früh". */
-    val MORNING: LocalTime = LocalTime.of(6, 0)
 
     fun createChannel(context: Context) {
         context.getSystemService(NotificationManager::class.java).createNotificationChannel(
             NotificationChannel(CHANNEL, "Alarme pausiert", NotificationManager.IMPORTANCE_LOW),
         )
-    }
-
-    /** The next [MORNING] after [now]: today before six, tomorrow otherwise. */
-    fun untilMorning(now: Instant, zone: ZoneId): Instant {
-        val local = now.atZone(zone)
-        val day = if (local.toLocalTime() < MORNING) local.toLocalDate() else local.toLocalDate().plusDays(1)
-        return day.atTime(MORNING).atZone(zone).toInstant()
     }
 
     /** "bis 19:30", "bis morgen 06:00" or "bis du sie wieder einschaltest". */

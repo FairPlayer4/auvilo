@@ -1468,6 +1468,7 @@ Neueste zuerst. Kap. 7 enthält immer den gültigen Stand; diese Tabelle ist die
 
 | Datum | Entscheidung |
 |---|---|
+| 2026-11-19 | **Umbau-Etappe V1.3c14 gegen die Trends** vor der nächsten Funktion (Kevin: „Ja kannst Umbau-Etappe eintragen und damit anfangen“). Trends, die eine Umbau-Etappe oder einen Stolperdraht bekamen, sind verschwunden; die übrigen (Regeln in `:app`, Android-Schicht dünn getestet, Doppeltipp, Doku widerspricht Code) kamen trotz Fixes wieder. Deshalb: Regeln in den Core, Stolperdraht für Zeitrechnung in `:app`, Knöpfe gegen Doppeltipp, Test für zitierte Texte, feste Mutations-Suite vor jedem PR nach `main`, Abnahmeliste, Kennzahlen je Review-Lauf, Empfehlungen höchstens zwei Läufe offen (design.md, Entwurf V1.3c14) |
 | 2026-11-19 | **Antworten auf Review-Lauf 7** (Kevin, Fragen 1–6): Nach einem Neustart keine Reminder bis zum ersten Entsperren, als bekannte Grenze („Das ist eh kein guter Zustand“); ohne *Wecker und Erinnerungen* kein Vollbild, ebenfalls bekannte Grenze („Das ist ein Kernfeature“) (7.28 PS10, design.md 12). Nach Vorschlag: Sicherungsdatei erst Datei, dann Passwort, bei Abbruch oder Fehler Datei löschen (PS14); Standort „Immer erlauben“ gleich nach der Zusage (PS13); Lautstärketasten nur bei sichtbarer Vorschau (7.5 N2a); Probealarm in ein bis zwei Minuten, im Notaus mit Hinweis (PS15). Umgesetzt in V1.3c13 |
 | 2026-11-18 | **Tester-Daten nur über Vertex AI in der EU auswerten** (Kevin: „Idealerweise würde ich für solche Auswertungen ZDR API Token benutzen. Wenn Anthropic das nicht anbietet, könnte man das bestimmt über GCP hinbekommen“; nach Empfehlung „Ja, festhalten“): Anthropics Auftragsverarbeitungsvertrag gilt zwar für API-Konten, nicht aber für Claude Code mit Abo; ZDR gibt es bei Anthropic nur auf Antrag. Claude über Vertex AI, Region `eu`, fällt unter Googles Vertrag des bestehenden GCP-Projekts. Auswertung per Skript, Tester-Daten nie in einer Claude-Code-Sitzung; der Hinweis nennt „Claude, betrieben von Google Cloud in der EU“ (7.36 RM3, RM8). Ersetzt die Voraussetzung „Auftragsverarbeitungsvertrag mit Anthropic“ (Backend P9) |
 | 2026-11-18 | **Rückmeldung senden mit aktiver Wahl und ehrlichem Hinweis** (Kevin: „Deine Vorschläge sind gut, der Nutzer soll aktiv wählen“; „es soll transparent sein, dass der Nutzer weiß, dass diese Daten (Diagnose/Vorschläge) nicht den E2E Schutz wie das Backend haben“; „soll immer dran stehen, dass die Daten teilweise von KI ausgewertet werden“): Zustimmung je Sendung ohne vorgesetzte Haken, Vorschau, Gesendet-Liste, Einladung getrennt vom Backup, fester Hinweis auf jedem Sende-Bildschirm (7.36 RM1–RM6) |
@@ -1577,6 +1578,7 @@ Neueste zuerst. Kap. 7 enthält immer den gültigen Stand; diese Tabelle ist die
 | V1.3c11 | 2026-11-16 | Schnellerinnerung per Sprache, einfachste Fassung: eigenes Widget, Aufnahme bis *Fertig*, Zusammenfassung mit Bestätigung (7.35) |
 | V1.3c12 | – | Cloud-Backup nur auf Einladung: Text und *Einladung per E-Mail anfragen* mit Kennung (7.28 PS16) |
 | V1.3c13 | – | Fixes und Antworten aus Review-Lauf 7: Sicherungsdatei erst Datei, dann Passwort, ohne liegengebliebene Datei; Standort in einem Zug; Lautstärketasten nur bei sichtbarer Vorschau; Probealarm im Notaus; Sitzungsdienst nach dem Erteilen; Verschiebe-Limit 0 pro Woche/Monat; bekannte Grenzen Neustart und Vollbild dokumentiert |
+| V1.3c14 | – | Umbau-Etappe gegen die Trends aus Review-Lauf 7, ohne neues Verhalten (Kap. 9, 2026-11-19; design.md, Entwurf V1.3c14) |
 
 Details zum Verhalten: [design.md](design.md), Gerätetests: [geraetetest.md](geraetetest.md).
 
@@ -1584,7 +1586,9 @@ Details zum Verhalten: [design.md](design.md), Gerätetests: [geraetetest.md](ge
 
 Was schon umgesetzt ist, steht in 10.1.
 
-1. **Jetzt: Nutzung beobachten und trimmen** (7.27): welche Funktionen Kevin wirklich
+1. **Jetzt: Umbau-Etappe V1.3c14** gegen die Trends aus den Review-Läufen (Kap. 9,
+   2026-11-19), danach weiter:
+   **Nutzung beobachten und trimmen** (7.27): welche Funktionen Kevin wirklich
    nutzt, Rückfragen bei Schlupflöchern. Fehler aus dem Alltag als Fix auf `develop`.
 2. **V1.3c:** **Abläufe** für Training (7.12), dazu ein Vollbild zur Zeit mit *+1 wartet*
    (7.3) und Knöpfe je Art mit *Rest später* (7.4). Entwurf nach einer Woche Training mit

@@ -13,7 +13,9 @@ import com.avlreminder.core.model.Strictness
 import java.time.DayOfWeek
 import java.time.Instant
 import java.time.LocalDate
+import java.time.LocalDateTime
 import java.time.ZoneId
+import java.time.temporal.ChronoUnit
 import java.time.temporal.TemporalAdjusters
 
 /** Start values of a strictness preset; every value can be changed per reminder. */
@@ -30,6 +32,23 @@ object Presets {
      */
     fun newReminder(title: String, schedule: Schedule, createdAt: Instant, strictness: Strictness = DEFAULT_STRICTNESS): Reminder =
         apply(Reminder(title = title, character = DEFAULT_CHARACTER, schedule = schedule, createdAt = createdAt), strictness)
+
+    /**
+     * The test alarm rings this many minutes after the start of the current minute, so one to two
+     * minutes ahead (14:29:40 → 14:31).
+     */
+    const val PROBE_MINUTES = 2L
+
+    /** When a test alarm made at [now] rings: [PROBE_MINUTES] after the start of the current minute. */
+    fun probeAt(now: Instant, zone: ZoneId): LocalDateTime =
+        LocalDateTime.ofInstant(now, zone).truncatedTo(ChronoUnit.MINUTES).plusMinutes(PROBE_MINUTES)
+
+    /**
+     * The test alarm of the intro (Anf. 7.28 PS15): normal, "Dokumentieren" whatever the default is
+     * (no "Startklar" questions), once at [probeAt].
+     */
+    fun probe(title: String, now: Instant, zone: ZoneId): Reminder =
+        newReminder(title, Schedule.Once(probeAt(now, zone)), now).copy(character = Character.DOCUMENT)
 
     fun of(strictness: Strictness): Preset = when (strictness) {
         Strictness.RELAXED -> Preset(ProofSpec.CONFIRM, postponeLimit = null, minimumLimitPerWeek = null)

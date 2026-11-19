@@ -29,6 +29,7 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.avlreminder.system.Contact
+import com.avlreminder.ui.rememberBusy
 import com.avlreminder.ui.theme.Avl
 import java.time.LocalDateTime
 import java.time.format.DateTimeFormatter
@@ -42,12 +43,6 @@ import java.time.format.DateTimeFormatter
 object Intro {
     const val PAGES = 4
     const val PROBE_TITLE = "Probealarm"
-
-    /**
-     * The test alarm rings this many minutes after the start of the current minute, so one to two
-     * minutes ahead (14:29:40 → 14:31).
-     */
-    const val PROBE_MINUTES = 2L
 
     const val WELCOME = "AuViLo-Reminder ist ein Wecker für Vorhaben, die dir wichtig sind. Zur Uhrzeit klingelt er " +
         "wie ein Wecker und hört erst auf, wenn du reagierst: erledigt, später oder auslassen. Wie streng er dabei ist, " +
@@ -121,12 +116,16 @@ fun IntroScreen(
                         Text(Intro.PAUSED, Modifier.padding(top = 12.dp).testTag("introPaused"), color = c.strict, fontSize = 15.sp)
                         TextButton(onClick = onResume, Modifier.testTag("introResume")) { Text("Wieder einschalten", color = c.accent) }
                     }
+                    val probing = rememberBusy()
                     OutlinedButton(
                         onClick = {
-                            probeFailed = false
-                            onProbe { at -> probeAt = at; probeFailed = at == null }
+                            probing.run { done ->
+                                probeFailed = false
+                                onProbe { at -> done(); probeAt = at; probeFailed = at == null }
+                            }
                         },
                         Modifier.padding(top = 12.dp).testTag("introProbe"),
+                        enabled = !probing.busy,
                     ) { Text(if (probeAt == null) "Probealarm stellen" else "Noch einen Probealarm") }
                     probeAt?.let { Text(Intro.probeAt(it), Modifier.padding(top = 8.dp).testTag("introProbeAt"), color = c.text, fontSize = 15.sp) }
                     if (probeFailed) Text("Das hat nicht geklappt; der Grund steht unten im Hinweis.", Modifier.padding(top = 8.dp), color = c.strict, fontSize = 14.sp)

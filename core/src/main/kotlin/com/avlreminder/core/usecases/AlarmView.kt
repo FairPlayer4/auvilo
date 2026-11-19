@@ -11,6 +11,8 @@ import com.avlreminder.core.rules.Sessions
 import java.time.Duration
 import com.avlreminder.core.rules.WeekStatus
 import java.time.Instant
+import java.time.LocalTime
+import java.time.ZoneId
 
 /**
  * Everything the alarm screen and the notification show about an open occurrence, with the
@@ -61,6 +63,32 @@ data class AlarmView(
     /** A limit per week or month is used up: from then on postponing works again (Z2b). */
     val postponeAgainAt: Instant? = null,
 ) {
+    /** Tomorrow (counted from [now]) at the time of day the occurrence was due: "Rest auf morgen", "Morgen". */
+    fun tomorrowAtDueTime(now: Instant, zone: ZoneId): Instant =
+        now.atZone(zone).toLocalDate().plusDays(1).atTime(occurrence.dueAt.atZone(zone).toLocalTime()).atZone(zone).toInstant()
+
+    /**
+     * Where "Verschieben" can move the occurrence at [now]. In advance (7.32 VB2) +30 min, +1 and
+     * +2 h from the planned time (18:00 "+1 Std" is 19:00, whenever one taps), each only before
+     * it would count as missed; otherwise in an hour and this evening at [EVENING] if that is more
+     * than half an hour ahead. Always tomorrow at the time it was due ([tomorrowAtDueTime]). Only
+     * targets after [now], before the [deadline] and before the [nextTime].
+     */
+    fun postponeTargets(now: Instant, zone: ZoneId): List<PostponeTarget> = buildList {
+        if (early) {
+            listOf(PostponeTarget.Kind.PLUS_30 to 30L, PostponeTarget.Kind.PLUS_60 to 60L, PostponeTarget.Kind.PLUS_120 to 120L)
+                .forEach { (kind, minutes) ->
+                    val at = occurrence.currentAt.plus(Duration.ofMinutes(minutes))
+                    if (missedAt == null || at < missedAt) add(PostponeTarget(kind, at))
+                }
+        } else {
+            add(PostponeTarget(PostponeTarget.Kind.IN_AN_HOUR, now.plus(Duration.ofHours(1))))
+            val evening = now.atZone(zone).toLocalDate().atTime(EVENING).atZone(zone).toInstant()
+            if (evening > now.plus(Duration.ofMinutes(30))) add(PostponeTarget(PostponeTarget.Kind.EVENING, evening))
+        }
+        add(PostponeTarget(PostponeTarget.Kind.TOMORROW, tomorrowAtDueTime(now, zone)))
+    }.filter { it.at > now && (deadline == null || it.at < deadline) && (nextTime == null || it.at < nextTime) }
+
     /** The first open checklist item. */
     val nextItem: ChecklistItem? get() = reminder.checklist.firstOrNull { it.id !in done }
 
@@ -82,6 +110,11 @@ data class AlarmView(
      */
     val sessionAnswers: List<SessionAnswer>
         get() = session?.let { Sessions.answers(it.final, it.suggestion, reminder.hasMinimum) }.orEmpty()
+
+    companion object {
+        /** "Heute Abend" when postponing. */
+        val EVENING: LocalTime = LocalTime.of(20, 30)
+    }
 }
 
 /** A running session as the check, the session screen and its notification show it (7.11). */
@@ -100,6 +133,11 @@ data class SessionView(
 )
 
 /** Something that has to ring now, and how loud. */
+/** A target of "Verschieben" ([AlarmView.postponeTargets]); the screen names it. */
+data class PostponeTarget(val kind: Kind, val at: Instant) {
+    enum class Kind { PLUS_30, PLUS_60, PLUS_120, IN_AN_HOUR, EVENING, TOMORROW }
+}
+
 data class Ring(val view: AlarmView, val level: AlarmLevel) {
     val reminder: Reminder get() = view.reminder
     val occurrence: Occurrence get() = view.occurrence

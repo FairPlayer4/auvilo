@@ -87,15 +87,16 @@ internal class EngineContext(
     }
 
     /**
-     * The command was stored: its alarm changes take effect, what it ended stops (unless it rings
-     * again right away), its rings are handed out.
+     * The command was stored: its alarm changes take effect, what it ended stops, its rings are
+     * handed out. No command ends and rings the same occurrence; a filter for that had no case and
+     * is gone (Review-Lauf 6, E24; V1.3c14 U6) – a command that needs it brings its own test.
      */
     fun commit(): List<Ring> {
         buffering = false
         effects.forEach { it() }
         effects.clear()
         val rings = pending.toList().also { pending.clear() }
-        ended.filter { id -> rings.none { it.occurrence.id == id } }.forEach(ringer::end)
+        ended.forEach(ringer::end)
         ended.clear()
         return rings
     }

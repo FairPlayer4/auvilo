@@ -47,6 +47,7 @@ import com.avlreminder.core.model.Strictness
 import com.avlreminder.core.model.PrepAnswer
 import com.avlreminder.core.model.severalADay
 import com.avlreminder.core.usecases.AlarmView
+import com.avlreminder.core.usecases.PostponeTarget
 import com.avlreminder.core.usecases.Digests
 import com.avlreminder.core.rules.Evidence
 import com.avlreminder.core.rules.Prep
@@ -218,8 +219,7 @@ fun AlarmContent(
                     }
                     if (!ui.early) {
                         if (checklist && !oneItem) {
-                            val time = ui.occurrence.dueAt.atZone(zone).toLocalTime()
-                            val tomorrow = now.atZone(zone).toLocalDate().plusDays(1).atTime(time).atZone(zone).toInstant()
+                            val tomorrow = ui.tomorrowAtDueTime(now, zone)
                             OutlinedButton(
                                 onClick = { onDeferRest(tomorrow) },
                                 enabled = ui.canDeferRest,
@@ -432,6 +432,15 @@ internal object PostponeText {
         return ui.postponeAgainAt?.let { "wieder ab " + Format.shortDay(it.atZone(zone).toLocalDate()) } ?: "aufgebraucht"
     }
 
+    fun label(kind: PostponeTarget.Kind): String = when (kind) {
+        PostponeTarget.Kind.PLUS_30 -> "+30 min"
+        PostponeTarget.Kind.PLUS_60 -> "+1 Std"
+        PostponeTarget.Kind.PLUS_120 -> "+2 Std"
+        PostponeTarget.Kind.IN_AN_HOUR -> "In 1 Stunde"
+        PostponeTarget.Kind.EVENING -> "Heute Abend"
+        PostponeTarget.Kind.TOMORROW -> "Morgen"
+    }
+
     /** After the title in the step: " · noch 2× diese Woche", " · letzte Verschiebung". */
     fun step(ui: AlarmView): String = ui.postponesLeft
         ?.let { (if (it == 1) " · letzte Verschiebung" else " · noch $it×") + period(ui.reminder.postponePeriod) }
@@ -447,22 +456,7 @@ private fun PostponeStep(ui: AlarmView, now: Instant, zone: ZoneId, onPostpone: 
     val today = now.atZone(zone).toLocalDate()
     val left = ui.postponesLeft
     StepHeader("Verschieben", ui.reminder.title + PostponeText.step(ui))
-    val evening = today.atTime(20, 30).atZone(zone).toInstant()
-    val tomorrow = today.plusDays(1).atTime(ui.occurrence.dueAt.atZone(zone).toLocalTime()).atZone(zone).toInstant()
-    // In advance from the planned time: 18:00 "+1 Std" is 19:00, whenever one taps (7.32 VB2).
-    val planned = ui.occurrence.currentAt
-    val options = buildList {
-        if (ui.early) {
-            listOf("+30 min" to 30L, "+1 Std" to 60L, "+2 Std" to 120L).forEach { (label, minutes) ->
-                val at = planned.plusSeconds(minutes * 60)
-                if (ui.missedAt == null || at < ui.missedAt) add(label to at)
-            }
-        } else {
-            add("In 1 Stunde" to now.plusSeconds(3600))
-            if (evening > now.plusSeconds(1800)) add("Heute Abend" to evening)
-        }
-        add("Morgen" to tomorrow)
-    }.filter { (_, at) -> at > now && (ui.deadline == null || at < ui.deadline) && (ui.nextTime == null || at < ui.nextTime) }
+    val options = ui.postponeTargets(now, zone).map { PostponeText.label(it.kind) to it.at }
     // Strict and in advance: one question first (7.32 VB3).
     var confirm by remember { mutableStateOf<Instant?>(null) }
     val postpone: (Instant) -> Unit = { at -> if (ui.early && ui.reminder.strictness == Strictness.STRICT) confirm = at else onPostpone(at) }

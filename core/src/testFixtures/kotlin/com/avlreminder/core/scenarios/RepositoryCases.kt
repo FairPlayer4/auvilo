@@ -2,6 +2,9 @@ package com.avlreminder.core.scenarios
 
 import com.avlreminder.core.at
 import com.avlreminder.core.model.ChecklistItem
+import com.avlreminder.core.model.Event
+import com.avlreminder.core.model.EventType
+import com.avlreminder.core.model.Occurrence
 import com.avlreminder.core.model.OccurrenceState
 import com.avlreminder.core.model.ProofKind
 import com.avlreminder.core.model.ProofSpec
@@ -12,6 +15,7 @@ import com.avlreminder.core.ports.ReminderRepository
 import com.avlreminder.core.reminder
 import com.avlreminder.core.rules.Action
 import com.avlreminder.core.rules.Evidence
+import com.avlreminder.core.rules.Lifecycle
 import com.avlreminder.core.usecases.SaveResult
 import java.time.LocalDateTime
 
@@ -27,6 +31,7 @@ object RepositoryCases {
         "deleted with an open occurrence, nothing is left" to ::deleteWithOpenOccurrence,
         "saving an unknown id creates nothing, foreign item ids are new" to ::unknownIdsAreNotTakenOver,
         "a session counts in the week of its start" to ::sessionCountsInItsStartWeek,
+        "moves and a counted rest count for the limit per week or month" to ::postponesCountInTheirSpan,
     )
 
     private fun list() = reminder().copy(
@@ -124,5 +129,35 @@ object RepositoryCases {
         val startWeek = sim.repo.countResolved(id, Resolution.GOAL, at(26, 0), at(2, 0, month = 11))
         val nextWeek = sim.repo.countResolved(id, Resolution.GOAL, at(2, 0, month = 11), at(9, 0, month = 11))
         check(startWeek == 1 && nextWeek == 0) { "counted $startWeek in the start week, $nextWeek in the next" }
+    }
+
+    /**
+     * The limit per week or month (Z2b) counts "Verschieben" and a "Rest auf morgen" that counted,
+     * by when it happened (Review-Lauf 7, E32). The mark "counted" is a suffix of the event's
+     * detail ([Lifecycle.COUNTED]); Room filters with `LIKE`, the fake with `endsWith`.
+     */
+    suspend fun postponesCountInTheirSpan(sim: Simulation<out ReminderRepository>) {
+        val repo = sim.repo
+        val t0 = at(27, 12)
+        val id = repo.saveReminder(reminder())
+        val other = repo.saveReminder(reminder())
+        val o1 = repo.saveOccurrence(Occurrence(reminderId = id, dueAt = t0))
+        val o2 = repo.saveOccurrence(Occurrence(reminderId = id, dueAt = t0.plusSeconds(86_400)))
+        val x = repo.saveOccurrence(Occurrence(reminderId = other, dueAt = t0))
+        val to = t0.plusSeconds(90_000).toString()
+        repo.addEvent(Event(occurrenceId = o1, at = t0, type = EventType.POSTPONED, detail = to))
+        repo.addEvent(Event(occurrenceId = o2, at = t0.plusSeconds(60), type = EventType.DEFERRED, detail = to + Lifecycle.COUNTED))
+        // Not counted: a free "Rest auf morgen", a snooze, another reminder, outside the span.
+        repo.addEvent(Event(occurrenceId = o2, at = t0.plusSeconds(120), type = EventType.DEFERRED, detail = to))
+        repo.addEvent(Event(occurrenceId = o1, at = t0.plusSeconds(180), type = EventType.SNOOZED, detail = "10 min"))
+        repo.addEvent(Event(occurrenceId = x, at = t0, type = EventType.POSTPONED, detail = to))
+        repo.addEvent(Event(occurrenceId = o1, at = t0.plusSeconds(3600), type = EventType.POSTPONED, detail = to))
+
+        val counts = listOf(
+            repo.countPostponed(id, t0, t0.plusSeconds(3600)),
+            repo.countPostponed(id, t0.plusSeconds(61), t0.plusSeconds(7200)),
+            repo.countPostponed(other, t0, t0.plusSeconds(3600)),
+        )
+        check(counts == listOf(2, 1, 1)) { "counted $counts instead of [2, 1, 1]" }
     }
 }

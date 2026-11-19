@@ -51,7 +51,10 @@ class IntroUiTest {
         override fun play(path: String) {}
         override fun introDone() { introDone++ }
         override fun mailFeedback() { mails++ }
-        override fun probeAlarm(onResult: (LocalDateTime?) -> Unit) { probes++; onResult(probeAt) }
+        /** Results held back until the test hands them over, as when the engine is still busy. */
+        var hold = false
+        val held = mutableListOf<(LocalDateTime?) -> Unit>()
+        override fun probeAlarm(onResult: (LocalDateTime?) -> Unit) { probes++; if (hold) held += onResult else onResult(probeAt) }
         val paused = mutableListOf<Instant?>()
         override fun setAlarmsPaused(until: Instant?) { paused += until }
     }
@@ -133,6 +136,21 @@ class IntroUiTest {
         actions.probeAt = null
         compose.onNodeWithTag("introProbe").performClick()
         compose.onNodeWithText("Das hat nicht geklappt; der Grund steht unten im Hinweis.").assertExists()
+    }
+
+    // V1.3c14 U3 (Review-Lauf 7, E31): a double tap made two test alarms.
+    @Test
+    fun aDoubleTapSetsOneTestAlarmUntilTheResultIsThere() {
+        val actions = show(state(intro = true))
+        actions.hold = true
+        next(); next()
+        compose.onNodeWithTag("introProbe").performClick()
+        compose.onNodeWithTag("introProbe").performClick()
+        assertEquals(1, actions.probes)
+        actions.held.single()(actions.probeAt)
+        compose.onNodeWithText("Klingelt um 14:32.").assertExists()
+        compose.onNodeWithTag("introProbe").performClick()
+        assertEquals(2, actions.probes)
     }
 
     // Review 2026-11-18, Frage 6: under *Notaus* the test alarm stays silent; the page says so.

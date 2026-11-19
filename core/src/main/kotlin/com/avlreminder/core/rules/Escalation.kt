@@ -56,6 +56,30 @@ data class AlertSettings(
     }
 }
 
+/** How long "Notaus" pauses all alarms (PS7). */
+enum class PauseLength {
+    HOUR, MORNING, FOR_GOOD;
+
+    /**
+     * When a pause switched on at [now] ends: in an hour, at the next [MORNING_AT] (today before
+     * six, tomorrow otherwise) or [AlertSettings.PAUSED_FOR_GOOD].
+     */
+    fun until(now: Instant, zone: ZoneId): Instant = when (this) {
+        HOUR -> now.plus(Duration.ofHours(1))
+        MORNING -> {
+            val local = now.atZone(zone)
+            val day = if (local.toLocalTime() < MORNING_AT) local.toLocalDate() else local.toLocalDate().plusDays(1)
+            day.atTime(MORNING_AT).atZone(zone).toInstant()
+        }
+        FOR_GOOD -> AlertSettings.PAUSED_FOR_GOOD
+    }
+
+    companion object {
+        /** "Bis morgen früh". */
+        val MORNING_AT: LocalTime = LocalTime.of(6, 0)
+    }
+}
+
 enum class AlarmLevel {
     /** Notification without sound or vibration. */
     SILENT,

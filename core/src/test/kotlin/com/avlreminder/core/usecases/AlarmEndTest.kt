@@ -191,7 +191,7 @@ class AlarmEndTest {
     }
 
     @Test
-    fun `what rings again in the same command is not ended`() = runTest {
+    fun `the next round of a ringing occurrence does not end it`() = runTest {
         val o = ringing()
         rung.clear()
         // The next round of the same occurrence.
