@@ -7,8 +7,10 @@ anforderungen.md Kap. 10.1 und in den Review-Berichten (`.review/runs/`), nicht 
 - **V1.3c14** (`versionCode` 34) gebaut, noch nicht installiert: Umbau-Etappe gegen die
   Trends aus den Review-Läufen, ohne neues Verhalten (anforderungen.md Kap. 9, 2026-11-19):
   Zeitregeln im Core, Stolperdrähte, Knöpfe gegen Doppeltipp, Mutations-Suite
-  `tools/mutate.py`. Keine Migration. Enthält V1.3c13. Vor dem Installieren
-  `gradle/backend-commit.txt` auf den Backend-Stand nachziehen (der Build warnt sonst).
+  `tools/mutate.py`. Keine Migration. Enthält V1.3c13. Dazu (2026-11-19, Backend-Review
+  Lauf 11): *Konto löschen* fragt nach einer verlorenen Antwort per Erneuern nach
+  (`ConnectCloudServerTest`, Mutant M16); `gradle/backend-commit.txt` steht auf dem
+  Backend-Stand dafür.
   Am Gerät zusätzlich prüfen: *Verschieben* im Alarm zeigt dieselben Ziele wie vorher,
   Notaus „bis morgen früh“.
 - **V1.3c13** (`versionCode` 33) gebaut, noch nicht installiert: Fixes und Antworten aus

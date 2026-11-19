@@ -116,6 +116,11 @@ MUTANTS = [
            "\"Standort und WLAN bleiben auf dem Handy und werden nicht weitergegeben.",
            "\"Standort und WLAN bleiben auf dem Handy.",
            ("app:com.avlreminder.DocQuoteTest",)),
+    Mutant("M16", "Konto löschen fragt nach einer verlorenen Antwort nicht nach (Backend-Review Lauf 11)",
+           APP + "cloud/CloudServer.kt",
+           "ServerKontoLoeschen(verbindung, token, anmeldung)",
+           "ServerKontoLoeschen(verbindung, token)",
+           ("app:com.avlreminder.cloud.ConnectCloudServerTest",)),
 ]
 
 

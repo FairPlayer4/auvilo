@@ -52,7 +52,10 @@ interface CloudServer {
     fun dataBackups(token: String): SicherungsAblage
     fun diagnosis(token: String): DiagnoseAblage
 
-    /** "Konto löschen" (backend B1) for `KontoLoeschen`: deletes at once or requests it. */
+    /**
+     * "Konto löschen" (backend B1) for `KontoLoeschen`: deletes at once or requests it. After an
+     * error it asks with a renewal whether the server still knows this device (`zugangWeg`).
+     */
     fun deletion(token: String): KontoLoeschenAmServer
 
     /**
@@ -130,7 +133,9 @@ class ConnectCloudServer(private val verbindung: Verbindung, key: Geraeteschlues
     override fun unlocking(): GeraeteFreischaltung = ServerGeraete(verbindung) { anmeldung.sitzung().token }
     override fun dataBackups(token: String): SicherungsAblage = ServerSicherungsAblage(verbindung, token)
     override fun diagnosis(token: String): DiagnoseAblage = ServerDiagnoseAblage(verbindung, token)
-    override fun deletion(token: String): KontoLoeschenAmServer = ServerKontoLoeschen(verbindung, token)
+    // KRITISCH: with the sign-in, so that after a lost answer the renewal can tell a deleted
+    // account (device locked or unknown) from a server that is just not reachable.
+    override fun deletion(token: String): KontoLoeschenAmServer = ServerKontoLoeschen(verbindung, token, anmeldung)
     override fun deletionNews(): DeletionNews? = if (heard.get()) DeletionNews(anmeldung.loeschenAb) else null
     override suspend fun lock(token: String, device: String) = ServerGeraete(verbindung, token).sperren(device)
 }

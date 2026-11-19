@@ -485,8 +485,10 @@ class CloudBackup(
      * and this phone keeps its keys.
      *
      * KRITISCH: The phone forgets its keys only after the server confirmed the deletion
-     * (`KontoLoeschen`). Not reachable, or only requested, the data on the server are still there,
-     * and without the keys this phone could neither read them nor cancel.
+     * (`KontoLoeschen`), or after an error when a renewal shows the server no longer knows this
+     * device (the answer got lost; backend, b2b-entwurf.md "Konto löschen"). Not reachable, or only
+     * requested, the data on the server are still there, and without the keys this phone could
+     * neither read them nor cancel.
      * Only after the screen lock ([confirmed]).
      */
     fun deleteAccount(activity: Activity): Job = work(CloudStep.DELETE_ACCOUNT) {
