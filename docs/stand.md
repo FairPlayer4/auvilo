@@ -60,8 +60,8 @@ Schritte 1–5 installiert (2026-11-07 bis 11-09), seit 2026-11-11 in `develop`.
 Entscheidungen: [cloud-entscheidungen.md](cloud-entscheidungen.md), Aufbau: design.md 16,
 Backend: [backend.md](backend.md). **Eigenbetrieb** seit 2026-11-07: Die App sichert
 Kevins echte Daten; vor dem ersten weiteren Nutzer kommt die Sicherheitsphase (Backend
-`CLAUDE.md`). Ältere Fassungen holen (R-4): Backend fertig, in der App fehlt die Auswahl
-einer Fassung.
+`CLAUDE.md`). Ältere Fassungen holen (R-4): Backend und `protokoll` fertig
+(`fassungEinspielen`), in der App fehlen die Auswahl einer Fassung und der Aufruf.
 
 ## Offen
 0. **Gerätetests zu V1.3c0–V1.3c11** (alle installiert, siehe oben): ein verpasster Termin
