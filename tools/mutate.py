@@ -157,7 +157,7 @@ MUTANTS = [
            WEAR + "WatchRoute.kt",
            "        if (state.value) return\n",
            "",
-           ("wear:com.avlreminder.wear.WatchRouteTest",)),
+           ("wear:com.avlreminder.wear.WatchRouteTest", "wear:com.avlreminder.wear.BusyTest")),
     Mutant("M24", "Start von der Kachel nach Neuaufbau ein zweites Mal",
            WEAR + "WatchActivity.kt",
            "if (savedInstanceState == null) start.value = intent.startId()",
