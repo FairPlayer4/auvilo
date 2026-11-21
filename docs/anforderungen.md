@@ -483,6 +483,11 @@ schafft oder schaffen will. **[V1.1]**
   offenen Termin wie *Vorab erledigen*; *Fertig für jetzt – Termin bleibt* geht ohne
   Abschluss zurück, der nächste Zeitpunkt ändert sich nicht. Im Alarm sind die Punkte
   schlichte Zeilen (kleiner Radius, mehrzeilig), damit lange Punkte lesbar bleiben.
+- C9 **Checklisten überarbeiten** (2026-11-21) **[nach den Abläufen]**: Checklisten sind
+  zu unattraktiv, die Bedienung soll besser werden. Es geht vor allem um Reminder für
+  **Arbeitsaufgaben**. Der Kern ist die **Erfassung schaffbarer Punkte**: Eine Aufgabe
+  muss in Punkte zerlegt sein, die man an einem Tag wirklich schafft. Kevin macht sich
+  dazu Gedanken, wenn die Abläufe (7.12) umgesetzt sind; erst dann Entwurf.
 
 ### 7.14 Galaxy Watch
 Guter Hebel für neue Anforderungen; zuerst so viel wie möglich über
@@ -504,7 +509,11 @@ Guter Hebel für neue Anforderungen; zuerst so viel wie möglich über
 - G4 Foto-Nachweis bleibt auf dem Handy; die Uhr verweist darauf.
 - **Eigene Watch-App [V1.4]:** Die Uhr ist der beste Hebel für laufende Reminder,
   besonders wenn das Handy weiter weg liegt (Training). Ziel: eine Sitzung komplett
-  von der Uhr aus bedienen können.
+  von der Uhr aus bedienen können. Die Benachrichtigungen reichen für die allgemeinen
+  Reminder, für eine gute Sitzung nicht (Kevin, 2026-11-21).
+  **Erste Etappe V1.4a:** die Sitzung ohne Schritte (G5, G6, *Ich starte jetzt* aus G7,
+  G8, G9, G10); Schritte kommen mit den Abläufen (V1.4b), Checklisten-Punkte nach ihrer
+  Überarbeitung (7.13 C9), Audio (G8b) danach. Entwurf am Ende von design.md.
   - G5 Laufende Sitzung als eigene Ansicht: Timer, aktueller Schritt, Pausen-Countdown,
     große Knöpfe für *Fertig* / *Nächster Schritt* / *Pause verlängern*.
   - G6 Nachfragen (7.11) und Signale (A4) direkt auf der Uhr, ohne dass das Handy
@@ -1391,6 +1400,10 @@ Entwickler schicken können, transparent und nur auf Einladung. Entwurf:
 ### 8.1 Zielgerät
 - **Samsung Galaxy S24 Ultra, Android 17** (API 37), nur Privatgeräte
 - Galaxy Watch vorhanden → Integration in V1.3 über Benachrichtigungen, eigene Watch-App in V1.4 (siehe 7.14)
+- **Uhr** (2026-11-21): Galaxy Watch 4 mit „Galaxy Wear OS 8“ (Kevin; vermutlich One UI 8
+  Watch auf Wear OS 6, beim ersten Verbinden per adb prüfen). Ihr Akku lässt deutlich
+  nach, eine neue Uhr kommt bald. Geplant wird für ein **aktuelles Wear OS**; `minSdk` der
+  Watch-App 34 wie am Handy, weil es nichts kostet (design.md, Entwurf V1.4a).
 - **Entscheidung:** targetSdk = 37, **minSdk = 34** (Android 14, seit 2026-11-15; vorher 37).
   Für den geschlossenen Test mit Freunden (7.28 PS1) reichen damit fast alle Handys, die
   noch Updates bekommen. Die App nutzt keine API über Stufe 34; Lint (NewApi) hält das
@@ -1468,6 +1481,8 @@ Neueste zuerst. Kap. 7 enthält immer den gültigen Stand; diese Tabelle ist die
 
 | Datum | Entscheidung |
 |---|---|
+| 2026-11-21 | **Watch-App V1.4a vor den Abläufen** (Kevin: „Sitzung funktioniert bisher gut, Abläufe wären eine natürliche Ergänzung. Die Watch App erleichtert die Steuerung weil man das Handy nicht immer direkt in Griffweite hat. Benachrichtigungen auf der Uhr funktionieren gut bei den allgemeinen Remindern. Aber für eine gute Sitzung braucht man eine Watch-App.“; „Schreib mal den Entwurf für V1.4a“). Reihenfolge: V1.4a Watch-App für die Sitzung ohne Schritte, dann V1.4b Abläufe mit Schritten auf Handy und Uhr (bisher als V1.3c geplant), dann Checklisten (7.13 C9). Uhr: Galaxy Watch 4, bald eine neue, geplant für ein aktuelles Wear OS (8.1, 7.14) |
+| 2026-11-21 | **Checklisten überarbeiten, nach den Abläufen** (Kevin: „Die sind zu unattraktiv und die Bedienung sollte etwas besser sind. Es geht hier insbesondere um Reminder für gewisse Arbeitsaufgaben. Das ist außer meiner Sicht ein komplexes Thema, weil es viel mit der Erfassung von schaffbaren Punkten geht. Ich würde mir dazu Gedanken machen wenn wir Abläufe umgesetzt haben.“) (7.13 C9) |
 | 2026-11-19 | **Umbau-Etappe V1.3c14 gegen die Trends** vor der nächsten Funktion (Kevin: „Ja kannst Umbau-Etappe eintragen und damit anfangen“). Trends, die eine Umbau-Etappe oder einen Stolperdraht bekamen, sind verschwunden; die übrigen (Regeln in `:app`, Android-Schicht dünn getestet, Doppeltipp, Doku widerspricht Code) kamen trotz Fixes wieder. Deshalb: Regeln in den Core, Stolperdraht für Zeitrechnung in `:app`, Knöpfe gegen Doppeltipp, Test für zitierte Texte, feste Mutations-Suite vor jedem PR nach `main`, Abnahmeliste, Kennzahlen je Review-Lauf, Empfehlungen höchstens zwei Läufe offen (design.md, Entwurf V1.3c14) |
 | 2026-11-19 | **Antworten auf Review-Lauf 7** (Kevin, Fragen 1–6): Nach einem Neustart keine Reminder bis zum ersten Entsperren, als bekannte Grenze („Das ist eh kein guter Zustand“); ohne *Wecker und Erinnerungen* kein Vollbild, ebenfalls bekannte Grenze („Das ist ein Kernfeature“) (7.28 PS10, design.md 12). Nach Vorschlag: Sicherungsdatei erst Datei, dann Passwort, bei Abbruch oder Fehler Datei löschen (PS14); Standort „Immer erlauben“ gleich nach der Zusage (PS13); Lautstärketasten nur bei sichtbarer Vorschau (7.5 N2a); Probealarm in ein bis zwei Minuten, im Notaus mit Hinweis (PS15). Umgesetzt in V1.3c13 |
 | 2026-11-18 | **Tester-Daten nur über Vertex AI in der EU auswerten** (Kevin: „Idealerweise würde ich für solche Auswertungen ZDR API Token benutzen. Wenn Anthropic das nicht anbietet, könnte man das bestimmt über GCP hinbekommen“; nach Empfehlung „Ja, festhalten“): Anthropics Auftragsverarbeitungsvertrag gilt zwar für API-Konten, nicht aber für Claude Code mit Abo; ZDR gibt es bei Anthropic nur auf Antrag. Claude über Vertex AI, Region `eu`, fällt unter Googles Vertrag des bestehenden GCP-Projekts. Auswertung per Skript, Tester-Daten nie in einer Claude-Code-Sitzung; der Hinweis nennt „Claude, betrieben von Google Cloud in der EU“ (7.36 RM3, RM8). Ersetzt die Voraussetzung „Auftragsverarbeitungsvertrag mit Anthropic“ (Backend P9) |
@@ -1586,26 +1601,31 @@ Details zum Verhalten: [design.md](design.md), Gerätetests: [geraetetest.md](ge
 
 Was schon umgesetzt ist, steht in 10.1.
 
-1. **Jetzt: Umbau-Etappe V1.3c14** gegen die Trends aus den Review-Läufen (Kap. 9,
-   2026-11-19), danach weiter:
-   **Nutzung beobachten und trimmen** (7.27): welche Funktionen Kevin wirklich
+1. **Laufend: Nutzung beobachten und trimmen** (7.27): welche Funktionen Kevin wirklich
    nutzt, Rückfragen bei Schlupflöchern. Fehler aus dem Alltag als Fix auf `develop`.
-2. **V1.3c:** **Abläufe** für Training (7.12), dazu ein Vollbild zur Zeit mit *+1 wartet*
-   (7.3) und Knöpfe je Art mit *Rest später* (7.4). Entwurf nach einer Woche Training mit
-   der Sitzung (Skizze am Ende von design.md).
-3. **V1.4:** **eigene Watch-App** für laufende Reminder (7.14, G5–G9).
+   Die Umbau-Etappe V1.3c14 ist fertig (10.1).
+2. **Jetzt: V1.4a Watch-App für die Sitzung** (7.14, Kap. 9, 2026-11-21): laufende
+   Sitzung, Nachfragen, *Ich starte jetzt*, Kachel, ohne Verbindung klarer Hinweis.
+   Entwurf am Ende von design.md.
+3. **V1.4b: Abläufe** für Training (7.12) mit Schritten und Signalen auf Handy und Uhr,
+   dazu ein Vollbild zur Zeit mit *+1 wartet* (7.3) und Knöpfe je Art mit *Rest später*
+   (7.4). Bisher als V1.3c geplant; die Sitzung hat sich im Training bewährt (Skizze am
+   Ende von design.md).
+4. **Danach: Checklisten überarbeiten** (7.13 C9), vor allem für Arbeitsaufgaben; Kevin
+   macht sich dazu nach den Abläufen Gedanken. Dann die übrigen Punkte der Uhr (G7
+   Checklisten-Punkte, G8b Audio).
    - Kandidat zum Vorziehen: Aufsteh-Wecker (7.22) als PoC mit Schritten – sinnvoll ab
      V1.4 (Schritte auf der Uhr), eine Handy-only-Variante auch früher.
    - Möglicher Kandidat: Einkaufsliste nur für einen selbst mit Geschäfts-Trigger (7.23,
      E1–E3), ohne Inventar, KI und Abgleich. Nicht festgelegt.
-4. GPS für die Ortsprüfung (7.30), wenn WLAN im Alltag nicht reicht.
+5. GPS für die Ortsprüfung (7.30), wenn WLAN im Alltag nicht reicht.
    - Unabhängig davon: **Repo veröffentlichen** (7.34), in den nächsten Wochen oder
      Monaten; OV1–OV3 schon vorher.
    - Kandidat zum Vorziehen: **Schnellerinnerung** (7.35 SR1–SR6), klein und rein
      lokal; die Cloud-KI (SR7) erst mit Backend-Etappe B5.
-5. **V2** (Kap. 4), vorher Testsession und Nutzung zählen (NT4); danach erst der
+6. **V2** (Kap. 4), vorher Testsession und Nutzung zählen (NT4); danach erst der
    **Play-Store-Release** mit Backend für Backup und Sync, EU-Datenschutz (7.28 PS5).
-6. Weitere Anforderungen ergeben sich aus der Nutzung.
+7. Weitere Anforderungen ergeben sich aus der Nutzung.
 
 ## 11. Offene Fragen
 

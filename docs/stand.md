@@ -1,6 +1,6 @@
 # Stand und nächste Schritte
 
-Stand: 2026-11-19. Bei jedem größeren Schritt aktualisieren. Erledigtes steht in git, in
+Stand: 2026-11-21. Bei jedem größeren Schritt aktualisieren. Erledigtes steht in git, in
 anforderungen.md Kap. 10.1 und in den Review-Berichten (`.review/runs/`), nicht hier.
 
 ## Auf dem Gerät (S24)
@@ -75,9 +75,11 @@ Kevins echte Daten; vor dem ersten weiteren Nutzer kommt die Sicherheitsphase (B
    *Orte* mit WLAN neu festlegen), K27–K30 (Sitzung, dabei: zeigt die Uhr den
    Chronometer?), K31, K32. In den nächsten Tagen im `diag.log` prüfen, dass keine Ankunft mehr direkt nach
    „app start“ kommt und die erste Prüfung eines Zeitraums pünktlich ist (`late=`).
-2. **Eine Woche Training mit der Sitzung**, dann Entwurf **V1.3c**: Abläufe (7.12), ein
-   Vollbild zur Zeit mit *+1 wartet* (7.3), Knöpfe je Art mit *Rest später* (7.4);
-   Vorlagen mit Sitzung.
+2. **Als Nächstes V1.4a: Watch-App für die Sitzung** (Kap. 9, 2026-11-21). Entwurf am Ende
+   von design.md, offene Fragen dort mit **[F]**. Danach V1.4b Abläufe (7.12, bisher
+   V1.3c; die Sitzung hat sich im Training bewährt), dann Checklisten überarbeiten
+   (7.13 C9, Kevin macht sich dazu nach den Abläufen Gedanken). Offen aus V1.3c: Vorlagen
+   mit Sitzung.
 3. **Nutzung beobachten und trimmen** (7.27): Reminder werden manchmal zu streng angelegt
    und mehrfach um 10 min geschoben; Cheats bekommen später Rückfragen. Zählen erst vor V2
    mit einer neuen Testsession (NT4).
