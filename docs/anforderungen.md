@@ -954,7 +954,9 @@ Vordergrund, nicht Reichweite.
     Einstellungen), damit die Sideload-App per `adb install -r` weiterläuft. Umgesetzt in
     V1.3c5.
   - Vor einem Play-Store-Antrag der Rest: `applicationId`, Namespace und Paket
-    `com.avlreminder`, Logo (zeigt „AVL“), Repo- und Dateinamen (playstore.md B7, N1).
+    `com.avlreminder`, Repo- und Dateinamen (playstore.md B7, N1).
+  - Logo ohne „AVL“ (2026-11-21, Kevin: „A übernehmen“): Glocke mit Haken, auf Handy und
+    Uhr, umgesetzt in V1.4a1 (`docs/logo-entwuerfe.html`, Vorschlag A).
   - Eine Marke (Wortmarke „AuViLo“) meldet Kevin wahrscheinlich an, wenn der Play Store
     wirklich kommt; die Namenssitzung empfiehlt dafür das DPMA, Klassen 9 und 42.
 - PS12 **Akku-Optimierung nur empfohlen (2026-11-15):** Die App soll auch mit
@@ -1483,6 +1485,7 @@ Neueste zuerst. Kap. 7 enthält immer den gültigen Stand; diese Tabelle ist die
 
 | Datum | Entscheidung |
 |---|---|
+| 2026-11-21 | **Logo ohne „AVL“: Glocke mit Haken** (Kevin: „Aus meiner Sicht passt das Logo weiterhin.“, dann nach vier Vorschlägen: „A übernehmen“): Glocke, Farben und Haken bleiben, nur „A“ und „L“ fallen weg; schon jetzt statt erst vor dem Store-Antrag, auf Handy und Uhr (7.28 PS11, playstore.md N1, `docs/logo-entwuerfe.html` Vorschlag A). Umgesetzt in V1.4a1 |
 | 2026-11-21 | **Fragen zum Entwurf V1.4a** (Kevin: „2. und 3. nach Vorschlag“; zu 1.: „Sollte das nicht über Bluetooth laufen? Es reicht wenn die App nur funktioniert wenn das Handy in der Nähe ist. Meine Uhr hat eh keine Mobilfunkverbindung. … Die Uhr App wäre ja eh optional.“; „Ja es ist Wear OS 6.0“): Die Watch-App spricht nur mit einem Handy in der Nähe, nur über Nachrichten an direkt verbundene Knoten, ohne DataItems, damit nichts über Googles Server geht (7.14 G9b). Kachel mit Sitzung, sonst nächstem Reminder mit Sitzung, sonst nächstem Reminder; bei einer Nachfrage vibriert die Uhr zusätzlich zum Alarm am Handy (design.md, Entwurf V1.4a) |
 | 2026-11-21 | **Watch-App V1.4a vor den Abläufen** (Kevin: „Sitzung funktioniert bisher gut, Abläufe wären eine natürliche Ergänzung. Die Watch App erleichtert die Steuerung weil man das Handy nicht immer direkt in Griffweite hat. Benachrichtigungen auf der Uhr funktionieren gut bei den allgemeinen Remindern. Aber für eine gute Sitzung braucht man eine Watch-App.“; „Schreib mal den Entwurf für V1.4a“). Reihenfolge: V1.4a Watch-App für die Sitzung ohne Schritte, dann V1.4b Abläufe mit Schritten auf Handy und Uhr (bisher als V1.3c geplant), dann Checklisten (7.13 C9). Uhr: Galaxy Watch 4, bald eine neue, geplant für ein aktuelles Wear OS (8.1, 7.14) |
 | 2026-11-21 | **Checklisten überarbeiten, nach den Abläufen** (Kevin: „Die sind zu unattraktiv und die Bedienung sollte etwas besser sind. Es geht hier insbesondere um Reminder für gewisse Arbeitsaufgaben. Das ist außer meiner Sicht ein komplexes Thema, weil es viel mit der Erfassung von schaffbaren Punkten geht. Ich würde mir dazu Gedanken machen wenn wir Abläufe umgesetzt haben.“) (7.13 C9) |
@@ -1597,7 +1600,8 @@ Neueste zuerst. Kap. 7 enthält immer den gültigen Stand; diese Tabelle ist die
 | V1.3c12 | – | Cloud-Backup nur auf Einladung: Text und *Einladung per E-Mail anfragen* mit Kennung (7.28 PS16) |
 | V1.3c13 | – | Fixes und Antworten aus Review-Lauf 7: Sicherungsdatei erst Datei, dann Passwort, ohne liegengebliebene Datei; Standort in einem Zug; Lautstärketasten nur bei sichtbarer Vorschau; Probealarm im Notaus; Sitzungsdienst nach dem Erteilen; Verschiebe-Limit 0 pro Woche/Monat; bekannte Grenzen Neustart und Vollbild dokumentiert |
 | V1.3c14 | – | Umbau-Etappe gegen die Trends aus Review-Lauf 7, ohne neues Verhalten (Kap. 9, 2026-11-19): Zeitregeln im Core (Probealarm, Verschiebe-Ziele, Notaus-Dauer; E30), Stolperdrähte `TimeRuleTest` und `DocQuoteTest`, Knöpfe gegen Doppeltipp (E31), Vertrag `countPostponed` (E32), Schutzfilter gestrichen (E24), Mutations-Suite `tools/mutate.py`, Abnahmeliste in CLAUDE.md (design.md 1, 11.1, 14) |
-| V1.4a | – | Watch-App für die Sitzung (7.14 G5–G10 ohne Schritte): Ansicht mit Timer und Antworten, Nachfragen auf der Uhr, *Ich starte jetzt*, Kachel, laufende Aktivität, nur mit dem Handy in der Nähe (G9b); Modul `:wear` (design.md 17) |
+| V1.4a | 2026-11-21 | Watch-App für die Sitzung (7.14 G5–G10 ohne Schritte): Ansicht mit Timer und Antworten, Nachfragen auf der Uhr, *Ich starte jetzt*, Kachel, laufende Aktivität, nur mit dem Handy in der Nähe (G9b); Modul `:wear` (design.md 17) |
+| V1.4a1 | – | Logo ohne „AVL“: Glocke mit Haken, auf Handy und Uhr (7.28 PS11) |
 
 Details zum Verhalten: [design.md](design.md), Gerätetests: [geraetetest.md](geraetetest.md).
 

@@ -124,7 +124,8 @@ betrifft P4.
   „AuViLo-Reminder“** (Anf. 7.28 PS11). Der Anzeigename ist seit V1.3c5 umgestellt. Vor dem
   ersten Upload noch offen:
   - `applicationId` (B7), Namespace und Paket `com.avlreminder` passend umbenennen;
-  - Logo ohne „AVL“ (`ic_launcher_foreground.xml`), Store-Grafiken mit dem neuen Namen;
+  - Store-Grafiken mit dem neuen Namen (das Logo ohne „AVL“, Glocke mit Haken, ist seit
+    V1.4a1 in der App, Anf. 7.28 PS11);
   - Repo- und Dateinamen, Texte in der Doku; im Backend Paketname und Namen prüfen
     (`backend.md`);
   - Wortmarke „AuViLo“ anmelden, falls der Store kommt (Kevin entscheidet).

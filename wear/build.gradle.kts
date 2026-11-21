@@ -16,8 +16,8 @@ android {
         // As on the phone (anforderungen.md 8.1): costs nothing, test watches from Wear OS 5.
         minSdk = 34
         targetSdk = 36
-        versionCode = 35
-        versionName = "1.4a"
+        versionCode = 36
+        versionName = "1.4a1"
     }
 
     buildFeatures {

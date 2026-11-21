@@ -4,6 +4,9 @@ Stand: 2026-11-21. Bei jedem größeren Schritt aktualisieren. Erledigtes steht 
 anforderungen.md Kap. 10.1 und in den Review-Berichten (`.review/runs/`), nicht hier.
 
 ## Auf dem Gerät (S24)
+- **V1.4a1** (`versionCode` 36) gebaut, noch nicht installiert: nur das Logo ohne „AVL“,
+  Glocke mit Haken (7.28 PS11), auf Handy und Uhr. Keine Migration. Erst das Handy, dann
+  die Uhr; am Gerät prüfen: Symbol im Launcher, in den App-Infos und auf der Uhr.
 - **V1.4a** (`versionCode` 35), installiert am 2026-11-21 über V1.3c11 (Handy) und neu auf
   der Galaxy Watch4 (SM-R870, Wear OS 6, API 36), beides über Debugging per WLAN. Enthält
   V1.3c12–c14. Start ohne Fehler, Alarme neu geplant, Berechtigungen weiter erteilt; die Uhr
@@ -83,7 +86,7 @@ Kevins echte Daten; vor dem ersten weiteren Nutzer kommt die Sicherheitsphase (B
    *Orte* mit WLAN neu festlegen), K27–K30 (Sitzung, dabei: zeigt die Uhr den
    Chronometer?), K31, K32. In den nächsten Tagen im `diag.log` prüfen, dass keine Ankunft mehr direkt nach
    „app start“ kommt und die erste Prüfung eines Zeitraums pünktlich ist (`late=`).
-2. **V1.4a Watch-App** umgesetzt (design.md 17), nicht installiert; Gerätetests K44–K48.
+2. **V1.4a Watch-App** umgesetzt (design.md 17), installiert am 2026-11-21; Gerätetests K44–K48.
    Als Nächstes V1.4b Abläufe (7.12, bisher
    V1.3c; die Sitzung hat sich im Training bewährt), dann Checklisten überarbeiten
    (7.13 C9, Kevin macht sich dazu nach den Abläufen Gedanken). Offen aus V1.3c: Vorlagen
@@ -100,8 +103,8 @@ Kevins echte Daten; vor dem ersten weiteren Nutzer kommt die Sicherheitsphase (B
 6. **Versionsname** je installiertem Stand `1.3b<n>-backup<Schritt>`, `versionCode` +1.
 7. **Play-Store-Release** ohne Eile, frühestens mit V2 (7.28 PS5–PS9). Branch-Regel für
    `main` setzt Kevin. Lückenliste vom 2026-11-15: [playstore.md](playstore.md). Name
-   „AuViLo-Reminder“ entschieden (7.28 PS11), Anzeigename in V1.3c5; `applicationId`, Paket
-   und Logo vor dem Antrag.
+   „AuViLo-Reminder“ entschieden (7.28 PS11), Anzeigename in V1.3c5, Logo ohne „AVL“ in
+   V1.4a1; `applicationId` und Paket vor dem Antrag.
 8. **Vor der Sicherheitsphase** (Backend-Prüfung 2026-11-12; Liste „Vorher fertig“ in
    Backend `docs/b2b-entwurf.md`): Format v2 kommt über `client/`. *Konto löschen* und
    die Displaysperre (SE5) sind in V1.3c2 umgesetzt, A-15 neu in V1.3c3.
