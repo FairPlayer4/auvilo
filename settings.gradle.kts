@@ -23,7 +23,7 @@ dependencyResolutionManagement {
 }
 
 rootProject.name = "avlreminder"
-include(":core", ":app")
+include(":core", ":app", ":wear")
 
 // Cloud-Backup (docs/cloud-entscheidungen.md A-2): Die Module protokoll und verbindung
 // kommen als Quellcode aus dem Backend-Repo daneben (Composite Build), nicht als

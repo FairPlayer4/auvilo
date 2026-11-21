@@ -9,6 +9,7 @@ import android.app.NotificationManager
 import android.app.PendingIntent
 import android.content.Context
 import com.avlreminder.R
+import com.avlreminder.graph
 import com.avlreminder.core.model.ChecklistItem
 import com.avlreminder.core.usecases.AlarmView
 import com.avlreminder.core.usecases.Ring
@@ -172,8 +173,12 @@ object Notifications {
             .build()
     }
 
-    /** Normal copy of a full-screen alarm with the same buttons, so the watch shows it too. */
+    /**
+     * Normal copy of a full-screen alarm with the same buttons, so the watch shows it too; not for
+     * a check while the watch app is nearby, it shows the check itself (design.md 17, "Kein Doppel").
+     */
     fun showMirror(context: Context, info: AlarmInfo) {
+        if (watchAppHasIt(context, info)) return
         val notification = builder(context, CHANNEL_WATCH, info)
             .setCategory(Notification.CATEGORY_ALARM)
             .setOnlyAlertOnce(false)
@@ -202,9 +207,14 @@ object Notifications {
     fun show(context: Context, info: AlarmInfo, quiet: Boolean) {
         val notification = builder(context, if (quiet) CHANNEL_SILENT else CHANNEL_BANNER, info)
             .setCategory(Notification.CATEGORY_REMINDER)
+            .setLocalOnly(watchAppHasIt(context, info))
             .build()
         context.getSystemService(NotificationManager::class.java).notify(id(info.occurrenceId), notification)
     }
+
+    /** A check of a running session while the watch app is nearby: the watch app shows it, not the bridge. */
+    private fun watchAppHasIt(context: Context, info: AlarmInfo): Boolean =
+        info.session != null && context.graph.watch.nearby
 
     fun cancel(context: Context, occurrenceId: Long) {
         context.getSystemService(NotificationManager::class.java).cancel(id(occurrenceId))

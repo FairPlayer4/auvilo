@@ -39,8 +39,8 @@ android {
         applicationId = "com.avlreminder"
         minSdk = 34
         targetSdk = 37
-        versionCode = 34
-        versionName = "1.3c14-backup5"
+        versionCode = 35
+        versionName = "1.4a"
         buildConfigField("String", "CLOUD_SERVER_URL", "\"$cloudServerUrl\"")
         buildConfigField("String", "CLOUD_WEB_CLIENT_ID", "\"$cloudWebClientId\"")
     }
@@ -107,6 +107,9 @@ dependencies {
     implementation("androidx.work:work-runtime-ktx:2.12.0")
     // Geofence and current position (V1.1b, tried in the spike)
     implementation("com.google.android.gms:play-services-location:21.4.0")
+    // Watch app (V1.4a, design.md 17): messages to the watch nearby, no data items.
+    implementation("com.google.android.gms:play-services-wearable:20.0.1")
+    implementation("org.jetbrains.kotlinx:kotlinx-coroutines-play-services:1.11.0")
 
     implementation("androidx.glance:glance-appwidget:1.2.0")
     implementation("androidx.glance:glance-material3:1.2.0")

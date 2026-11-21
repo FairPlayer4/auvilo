@@ -513,7 +513,7 @@ Guter Hebel für neue Anforderungen; zuerst so viel wie möglich über
   Reminder, für eine gute Sitzung nicht (Kevin, 2026-11-21).
   **Erste Etappe V1.4a:** die Sitzung ohne Schritte (G5, G6, *Ich starte jetzt* aus G7,
   G8, G9, G10); Schritte kommen mit den Abläufen (V1.4b), Checklisten-Punkte nach ihrer
-  Überarbeitung (7.13 C9), Audio (G8b) danach. Entwurf am Ende von design.md.
+  Überarbeitung (7.13 C9), Audio (G8b) danach. Umgesetzt in design.md 17.
   - G5 Laufende Sitzung als eigene Ansicht: Timer, aktueller Schritt, Pausen-Countdown,
     große Knöpfe für *Fertig* / *Nächster Schritt* / *Pause verlängern*.
   - G6 Nachfragen (7.11) und Signale (A4) direkt auf der Uhr, ohne dass das Handy
@@ -1405,7 +1405,7 @@ Entwickler schicken können, transparent und nur auf Einladung. Entwurf:
 - Galaxy Watch vorhanden → Integration in V1.3 über Benachrichtigungen, eigene Watch-App in V1.4 (siehe 7.14)
 - **Uhr** (2026-11-21): Galaxy Watch 4 mit Wear OS 6.0, ohne Mobilfunk. Ihr Akku lässt
   deutlich nach, eine neue Uhr kommt bald. Geplant wird für ein **aktuelles Wear OS**; `minSdk` der
-  Watch-App 34 wie am Handy, weil es nichts kostet (design.md, Entwurf V1.4a).
+  Watch-App 34 wie am Handy, weil es nichts kostet (design.md 17).
 - **Entscheidung:** targetSdk = 37, **minSdk = 34** (Android 14, seit 2026-11-15; vorher 37).
   Für den geschlossenen Test mit Freunden (7.28 PS1) reichen damit fast alle Handys, die
   noch Updates bekommen. Die App nutzt keine API über Stufe 34; Lint (NewApi) hält das
@@ -1597,6 +1597,7 @@ Neueste zuerst. Kap. 7 enthält immer den gültigen Stand; diese Tabelle ist die
 | V1.3c12 | – | Cloud-Backup nur auf Einladung: Text und *Einladung per E-Mail anfragen* mit Kennung (7.28 PS16) |
 | V1.3c13 | – | Fixes und Antworten aus Review-Lauf 7: Sicherungsdatei erst Datei, dann Passwort, ohne liegengebliebene Datei; Standort in einem Zug; Lautstärketasten nur bei sichtbarer Vorschau; Probealarm im Notaus; Sitzungsdienst nach dem Erteilen; Verschiebe-Limit 0 pro Woche/Monat; bekannte Grenzen Neustart und Vollbild dokumentiert |
 | V1.3c14 | – | Umbau-Etappe gegen die Trends aus Review-Lauf 7, ohne neues Verhalten (Kap. 9, 2026-11-19): Zeitregeln im Core (Probealarm, Verschiebe-Ziele, Notaus-Dauer; E30), Stolperdrähte `TimeRuleTest` und `DocQuoteTest`, Knöpfe gegen Doppeltipp (E31), Vertrag `countPostponed` (E32), Schutzfilter gestrichen (E24), Mutations-Suite `tools/mutate.py`, Abnahmeliste in CLAUDE.md (design.md 1, 11.1, 14) |
+| V1.4a | – | Watch-App für die Sitzung (7.14 G5–G10 ohne Schritte): Ansicht mit Timer und Antworten, Nachfragen auf der Uhr, *Ich starte jetzt*, Kachel, laufende Aktivität, nur mit dem Handy in der Nähe (G9b); Modul `:wear` (design.md 17) |
 
 Details zum Verhalten: [design.md](design.md), Gerätetests: [geraetetest.md](geraetetest.md).
 
@@ -1607,10 +1608,9 @@ Was schon umgesetzt ist, steht in 10.1.
 1. **Laufend: Nutzung beobachten und trimmen** (7.27): welche Funktionen Kevin wirklich
    nutzt, Rückfragen bei Schlupflöchern. Fehler aus dem Alltag als Fix auf `develop`.
    Die Umbau-Etappe V1.3c14 ist fertig (10.1).
-2. **Jetzt: V1.4a Watch-App für die Sitzung** (7.14, Kap. 9, 2026-11-21): laufende
-   Sitzung, Nachfragen, *Ich starte jetzt*, Kachel, ohne Verbindung klarer Hinweis.
-   Entwurf am Ende von design.md.
-3. **V1.4b: Abläufe** für Training (7.12) mit Schritten und Signalen auf Handy und Uhr,
+2. **V1.4a Watch-App für die Sitzung** ist umgesetzt (10.1, design.md 17), Gerätetests
+   K44–K48 stehen aus.
+3. **Jetzt: V1.4b Abläufe** für Training (7.12) mit Schritten und Signalen auf Handy und Uhr,
    dazu ein Vollbild zur Zeit mit *+1 wartet* (7.3) und Knöpfe je Art mit *Rest später*
    (7.4). Bisher als V1.3c geplant; die Sitzung hat sich im Training bewährt (Skizze am
    Ende von design.md).

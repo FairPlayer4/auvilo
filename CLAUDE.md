@@ -15,7 +15,8 @@ Strenge und invasive Mechanismen sind gewollt. Kommunikation auf **Deutsch, mit 
 - [docs/rueckmeldung-entwurf.md](docs/rueckmeldung-entwurf.md) – Diagnose und Vorschläge senden, Verschlüsselung (Anf. 7.36, noch keine Etappe)
 - [docs/playstore.md](docs/playstore.md) – was für den Play Store fehlt (Lückenliste); Entwürfe der Console-Erklärungen in [playstore-erklaerungen.md](docs/playstore-erklaerungen.md)
 - [docs/entwicklungsumgebung.md](docs/entwicklungsumgebung.md) – Toolchain und Pfade auf Kevins Rechner
-- Module: `core` (reine Kotlin-Logik, Kover-Abdeckung), `app` (Android, Compose, Room)
+- Module: `core` (reine Kotlin-Logik, Kover-Abdeckung), `app` (Android, Compose, Room),
+  `wear` (Watch-App für die Sitzung, Wear OS, optional; design.md 17)
 
 ## Zusammenarbeit
 - Kevin entwickelt die Anforderungen iterativ mit Claude: Feedback und Rückfragen geben,
@@ -40,7 +41,8 @@ Strenge und invasive Mechanismen sind gewollt. Kommunikation auf **Deutsch, mit 
 
 ## Bauen und testen (Git Bash)
 ```bash
-./gradlew -q :core:check :core:koverLog :app:testDebugUnitTest :app:lintDebug :app:assembleDebug
+./gradlew -q :core:check :core:koverLog :app:testDebugUnitTest :app:lintDebug :app:assembleDebug \
+  :wear:testDebugUnitTest :wear:lintDebug :wear:assembleDebug
 ```
 - Vor einem PR nach `main` zusätzlich `-PbackendStreng=true` (wie die CI): bricht ab,
   wenn der Backend-Stand nicht zu `gradle/backend-commit.txt` passt. Dazu die
@@ -74,6 +76,10 @@ Strenge und invasive Mechanismen sind gewollt. Kommunikation auf **Deutsch, mit 
   (*Einstellungen → Entwickleroptionen*; Kevin, 2026-11-15). Solange es an ist, kann ein
   freigegebener Rechner per USB voll auf das Handy zugreifen. Für die nächste Installation
   schaltet Kevin es wieder ein.
+- **Uhr** (Watch-App, design.md 17): adb über WLAN (`adb pair`, `adb connect`), dieselben
+  Regeln wie beim Handy: erst nach Kevins Go, `adb install -r`, nie deinstallieren; erst die
+  Handy-App, dann die Uhr, beide aus demselben Stand. Danach Kevin erinnern, auch auf der Uhr
+  *ADB-Debugging* und *Debugging über WLAN* auszuschalten. Mehrere Geräte: `adb -s <serial>`.
 - Starten mit `adb shell am start -n com.avlreminder/.ui.MainActivity`, **nie mit `adb shell monkey`** (schaltet die Auto-Rotation ein, 2026-11-08).
 - Bei Gerätetests genau sagen, wann Kevin sperren, entsperren oder etwas tun soll.
   Simulationen danach zurücksetzen.

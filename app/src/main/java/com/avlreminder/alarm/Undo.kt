@@ -9,6 +9,7 @@ import com.avlreminder.core.model.OccurrenceState
 import com.avlreminder.core.model.Resolution
 import com.avlreminder.core.rules.Lifecycle
 import com.avlreminder.core.rules.TransitionResult
+import com.avlreminder.core.usecases.Watch
 import com.avlreminder.graph
 import com.avlreminder.system.Diag
 import java.time.Instant
@@ -22,7 +23,7 @@ import java.time.format.DateTimeFormatter
  * Later the same is on "Heute" under "Erledigt", until the next time or the end of the day.
  */
 object Undo {
-    const val TIMEOUT_MS = 60_000L
+    const val TIMEOUT_MS = Watch.UNDO_MS
 
     /** The engine's reason when a session is past its maximum ([Lifecycle.transition]). */
     private const val MAX_REACHED = "maximum duration reached"

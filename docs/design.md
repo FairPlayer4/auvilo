@@ -21,6 +21,7 @@
 │  data/      Room-DB, Repository, DataStore-Einstellungen, Vorschläge    │
 │  claude/    Schnittstelle für Claude (Provider nur im Debug-Build)      │
 │  cloud/, restore/  Cloud-Backup, Wiederherstellen, Tageskopien (16.)    │
+│  watch/     Zustand an die Watch-App, Befehle von ihr (17.)             │
 └───────────────┬─────────────────────────────────────────────────────────┘
                 │ nutzt
 ┌───────────────▼──────────── :core (reines Kotlin, kein Android) ────────┐
@@ -33,7 +34,13 @@
 │             LocationPort, WifiPort, DeviceStatePort, PreNoticePort      │
 │  usecases/  ReminderEngine (Fassade) mit Scheduler (+ Arrivals,         │
 │             SessionTimer), AlarmViews, Changes, EngineContext;          │
-│             AlarmView, RingPort; Overview, Digest                       │
+│             AlarmView, RingPort; Overview, Digest; Watch, WatchCodec,   │
+│             WatchScreen (17.)                                           │
+└───────────────▲─────────────────────────────────────────────────────────┘
+                │ nutzt
+┌───────────────┴──────────── :wear (Wear OS, optional) ──────────────────┐
+│  Watch-App für die Sitzung: Ansicht, Kachel, laufende Aktivität,        │
+│  Nachfrage; Fernbedienung und Anzeige, entscheidet nichts (17.)         │
 └─────────────────────────────────────────────────────────────────────────┘
 ```
 
@@ -299,7 +306,8 @@ PLANNED/DUE/ESCALATING ─Ich starte jetzt─► RUNNING ─Fertig────�
   lange für `shortService`) mit einer laufenden Benachrichtigung je Sitzung: Chronometer,
   am Handy höchstens drei Knöpfe (*Noch dran*, die vorgeschlagene Antwort zum Beenden,
   *Abbruch*), auf der Uhr alle vier (`WearableExtender`, zweite spiegelbare
-  Benachrichtigung, weil die laufende nicht auf die Uhr kommt). *Fertig* dort nur ohne
+  Benachrichtigung, weil die laufende nicht auf die Uhr kommt; nicht, solange die Watch-App
+  in der Nähe ist, 17.). *Fertig* dort nur ohne
   Foto-, Text- oder Audio-Nachweis. Der Dienst misst nichts selbst: Die App aktualisiert
   ihn nach jedem Befehl aus den laufenden Fälligkeiten; fällt er aus, bleibt eine normale
   laufende Benachrichtigung. Nachfragen und letzter Reminder kommen über den `AlarmPort`
@@ -609,7 +617,7 @@ https://claude.ai/artifact/PXA9YgWi8XoHupYnN7Z3cS
   *wenn ich zuhause bin*. Stiller Kanal, inexakt (`setWindow`, 5 min), mit erstem Schritt
   und offenen Blockern; entfällt, wenn schon erledigt. Tipp öffnet den Reminder.
 - **Sitzung:** laufende Benachrichtigung des `SessionService` und eine spiegelbare für die
-  Uhr (3.1).
+  Uhr (3.1); ist die Watch-App in der Nähe, zeigt sie Sitzung und Nachfragen selbst (17.).
 - **Widget** (Glance, folgt dem System-Modus): *+ Reminder* und nächste Fälligkeit.
 - **Sprach-Reminder** (Anf. 7.35, einfachste Fassung seit V1.3c11): eigenes 1×1-Widget,
   ein Tipp öffnet `VoiceActivity`. Sie hört sofort zu und zeigt das Muster
@@ -768,7 +776,7 @@ umgesetzt / verworfen. Liste in den Einstellungen, *Teilen* als Markdown.
   `TimeRuleTest` (Zeitrechnung in `:app`, 1.), `DocQuoteTest` (App-Texte, die die Doku
   wörtlich zitiert, z. B. der Standort-Hinweis in playstore-erklaerungen.md). Für Trends
   aus den Reviews, die trotz Fixes wiederkamen (V1.3c14).
-- **Mutations-Suite** `tools/mutate.py`: 15 feste Mutanten an Stellen, die schon einmal
+- **Mutations-Suite** `tools/mutate.py`: feste Mutanten (`--list`) an Stellen, die schon einmal
   kaputt waren oder nur über Android erreichbar sind, je mit den Tests, die rot werden
   müssen. Erst die Gegenprobe (unverändert grün, echte Testzahl), dann je Mutant nur seine
   Tests; die Datei wird aus dem Speicher zurückgeschrieben, Dateien mit uncommitteten
@@ -776,7 +784,8 @@ umgesetzt / verworfen. Liste in den Einstellungen, *Teilen* als Markdown.
   bringt Mutanten für ihre neuen Wege mit. Abnahmeliste in CLAUDE.md.
 - Tests entstehen mit dem Code; Regeln haben sprechende Testnamen.
 - Ein Befehl für alles, lokal wie in CI:
-  `./gradlew :core:check :core:koverLog :app:testDebugUnitTest :app:lintDebug :app:assembleDebug`.
+  `./gradlew :core:check :core:koverLog :app:testDebugUnitTest :app:lintDebug :app:assembleDebug
+  :wear:testDebugUnitTest :wear:lintDebug :wear:assembleDebug`.
 
 ## 15. Schnittstelle für Claude (Anf. 7.26 AG11)
 
@@ -904,120 +913,117 @@ Schlüssel-Backup), `RestoreFilesTest`, `LocalRestoreTest`, `CorruptCopyTest`,
 `ExportFileTest` (Format festgenagelt), `ExportFileUiTest`; auf dem
 Gerät [geraetetest.md](geraetetest.md) Abschnitt D.
 
-## Entwurf V1.4a – Watch-App für die Sitzung
+## 17. Watch-App für die Sitzung (V1.4a, Anf. 7.14)
 
 > Grundlage: anforderungen.md 7.14 G5–G10, Sitzung 7.11 (3.1); Reihenfolge Kap. 9,
-> 2026-11-21. Uhr: Galaxy Watch 4 mit Wear OS 6.0, bald eine neue, geplant für ein
-> aktuelles Wear OS (8.1). **[P]** = vorher auf dem Gerät prüfen.
+> 2026-11-21. Uhr: Galaxy Watch 4 mit Wear OS 6.0, bald eine neue mit aktuellem Wear OS.
+> **[P]** = auf dem Gerät noch zu prüfen (geraetetest.md, K-Nummern der Watch-App).
 
 **Umfang.** Eine laufende Sitzung geht komplett von der Uhr aus, ohne das Handy in die
 Hand zu nehmen (G10); nur ein Nachweis mit Foto, Text oder Audio bleibt am Handy (G4).
-- **Sitzungsansicht** (G5 ohne Schritte): Titel, Timer seit dem Start, Ziel- und
-  Minimum-Dauer als Marken, „noch x min bis zum Maximum“. Große Knöpfe in der Reihenfolge
-  von `Sessions.quickAnswers` (Vorschlag zuerst); *Fertig* und *Teilschritt* fehlen wie in
-  der Benachrichtigung, wenn ein Nachweis mit Foto, Text oder Audio nötig ist, mit dem
-  Hinweis „Fertig am Handy“.
-- **Nachfragen auf der Uhr** (G6): Die Uhr vibriert selbst und öffnet die Antworten;
-  *Noch dran* nur bei offener Nachfrage, nicht beim letzten Reminder (3.1).
-- ***Ich starte jetzt*** (G7, ohne Checklisten-Punkte): für einen klingelnden Reminder mit
-  Sitzung und als Vorab-Start für den nächsten heute (7.20 V2, V6).
-- **Kachel** (G8): die laufende Sitzung mit Timer; sonst der nächste Reminder mit Sitzung
-  heute mit *Ich starte jetzt*; sonst der nächste Reminder überhaupt, nur zur Anzeige.
-- **Laufende Aktivität** (Ongoing Activity) auf dem Zifferblatt: Timer, ein Tipp öffnet
-  die Sitzungsansicht.
-- **Ohne Verbindung** (G9): „Keine Verbindung zum Handy – Stand 14:05“, Knöpfe gesperrt;
-  die Sitzung läuft auf dem Handy weiter, Nachfragen kommen dort.
-- ***Abbruch*** ohne Rückfrage, danach 60 s *Rückgängig* auf der Uhr (3.1).
+- **Ansicht** (`WatchActivity`, `WatchRoute`, G5 ohne Schritte): Titel, Timer seit dem
+  Start, „seit … · noch … min“ bis zum Maximum, Ziel und Minimum als Marken
+  (`WatchScreen.detail`, `timer`, `marks`). Die Knöpfe sind `WatchScreen.buttons`: die
+  Antworten aus `Sessions.quickAnswers` (Vorschlag zuerst, E18), *Abbruch* immer zuletzt.
+  Braucht *Fertig* Foto, Text oder Audio, fehlen *Fertig* und *Teilschritt* wie in der
+  Benachrichtigung; die Uhr sagt dann `WatchScreen.DONE_ON_PHONE`.
+- **Nachfragen auf der Uhr** (G6): Die Uhr postet eine eigene Benachrichtigung
+  (`WearNotifications.check`, Kanal *Nachfrage* mit eigenem Muster `PATTERN`); ein Tipp
+  öffnet die Ansicht. So gelten „Nicht stören“ und Kinomodus der Uhr von selbst. Ist die
+  Nachfrage am Handy still (`Ring.level` `SILENT`: Notaus, „Nicht stören“, 3.1), kommt sie
+  auf dem stillen Kanal. Am Handy klingelt sie wie bisher nach ihrer Strenge; eine Antwort
+  auf der Uhr beendet sie über die Engine (`RingPort.end`), die Uhr nimmt sie dann weg.
+  *Noch dran* fehlt beim letzten Reminder (D5).
+- ***Ich starte jetzt*** (G7, ohne Checklisten-Punkte): `Watch.state` nimmt bis zu
+  `Watch.STARTABLE` (z. B. 3) Reminder mit Sitzung, die `canStart` haben und noch nicht
+  laufen: klingelnde zuerst, dann später heute (Vorab-Start, 7.20 V2).
+- **Kachel** (`SessionTileService`, G8): die laufende Sitzung mit den Minuten seit dem
+  Start; sonst der erste startbare Reminder mit *Ich starte jetzt*; sonst der nächste
+  Reminder (`Overview.next`), nur zur Anzeige. *Ich starte jetzt* öffnet die App mit
+  `WatchActivity.EXTRA_START` und startet sofort, nach einem Neuaufbau nicht ein zweites Mal.
+- **Laufende Aktivität** (`OngoingActivity`) auf dem Zifferblatt mit Stoppuhr, ein Tipp
+  öffnet die Ansicht. Dafür fragt die App beim Öffnen nach der Erlaubnis für
+  Benachrichtigungen; ohne sie gehen die Knöpfe trotzdem.
+- **Ohne Verbindung** (G9): `WatchScreen.connection` mit dem Alter des letzten Stands,
+  alle Knöpfe gesperrt (`WatchScreen.enabled`); die Sitzung läuft am Handy weiter,
+  Nachfragen kommen dort.
+- ***Abbruch*** ohne Rückfrage, danach *Rückgängig* auf der Uhr für `Watch.UNDO_MS`
+  (z. B. 60 s), so lange wie am Handy (`Undo.TIMEOUT_MS` ist dieselbe Konstante).
 - **Nicht in V1.4a:** Schritte und Signale je Schritt (V1.4b), Checklisten-Punkte (nach
   7.13 C9), Audio-Nachweis auf der Uhr (G8b), Bewegungsdaten (7.16), Aufsteh-Wecker (7.22).
 
 **Aufbau** (G9: Die Uhr ist Fernbedienung und Anzeige, das Handy das Gehirn):
 
 ```
-:core      WatchState.of(views, now): was die Uhr zeigt; WatchCommand (Aktion je Knopf)
-:wearlink  Android-Bibliothek: Pfade, DataMap-Codec, Fähigkeit "avl_watch"   (für :app und :wear)
-:app       WatchSync schickt den Zustand, WatchCommandService (WearableListenerService)
-:wear      Wear-App: Compose for Wear OS (Material 3), Kachel, Ongoing Activity, Listener
+:core   Watch.state (was die Uhr zeigt), Watch.check (Nachfrage), WatchAction → Action,
+        WatchCodec (Nachrichten als Bytes), WatchScreen (Texte, wann Knöpfe frei sind)
+:app    watch/WatchSync (Zustand und Nachfragen an die Uhr), WatchCommandService (Befehle)
+:wear   WatchActivity/WatchRoute, SessionTileService, PhoneListenerService, WearNotifications
 ```
 
-- **Regeln im Core** (Abnahmeliste): `WatchState.of` nimmt die `AlarmView`s und liefert
-  laufende Sitzungen (Termin-Id, Titel, `startedAt`, `maxAt`, Ziel- und Minimum-Dauer,
-  Antworten aus `Sessions.quickAnswers`, offene Nachfrage mit `final` und *still*),
-  startbare Reminder (`canStart`: klingelnd oder heute als nächster) und Notaus. Die Uhr
-  rechnet nur die Anzeige aus Startzeit und Dauer.
+- **Kein eigenes Modul für die Verbindung:** Pfade, Fähigkeiten und `WatchCodec` stehen im
+  Core, den beide Apps nutzen. Der Codec schreibt mit `DataOutputStream`, jede Nachricht
+  beginnt mit `WatchCodec.VERSION`; eine andere Version, eine abgeschnittene Nachricht,
+  übrige Bytes oder ein unbekannter Wert werden nicht gelesen. Ändert sich das Format,
+  steigt die Version (`WatchCodecTest` hält die Bytes fest).
 - **Nur in der Nähe** (Kevin, 2026-11-21): Die Watch-App funktioniert nur, wenn das Handy
   in der Nähe ist; nichts von ihr geht über Googles Server. Deshalb nur Nachrichten
   (`MessageClient`), keine DataItems (die würde der Data Layer auch über Googles Server
-  abgleichen), und nur an Knoten mit `Node.isNearby` (direkt verbunden, in der Regel
-  Bluetooth). Ist die Uhr nur über das Internet erreichbar, gilt sie als nicht verbunden.
-  **[P]** mit Bluetooth am Handy aus: `isNearby` ist dann falsch, die Uhr zeigt „Keine
-  Verbindung“.
-- **Zustand:** Nachricht `/avl/state` an die Uhr. `WatchSync` schickt sie nach jedem
-  Befehl, an derselben Stelle, an der heute `SessionService.show` aktualisiert wird, und
-  nur, wenn sich der Inhalt geändert hat; außerdem, wenn die Uhr wieder in der Nähe ist
-  (`CapabilityClient`-Listener) oder mit `/avl/hello` fragt (beim Öffnen der App oder der
-  Kachel). Die Uhr behält den letzten Stand lokal und zeigt sein Alter.
-- **Befehle:** Nachricht `/avl/act` mit Termin-Id, Aktion (`START`, `STILL_ON`, `DONE`,
-  `MINIMUM`, `ABORT`, `REOPEN`) und Anfrage-Id. Der `WatchCommandService` am Handy führt
-  sie über denselben Weg aus wie `ActionReceiver` (eine gemeinsame Funktion, keine Kopie)
-  und antwortet mit `/avl/result` (ausgeführt oder abgelehnt mit Grund). Die Uhr sperrt
-  den Knopf mit `rememberBusy`, bis die Antwort oder ein neuer Zustand da ist; nach 10 s
-  „Keine Antwort vom Handy“, dann ist er wieder frei. Ins Diagnose-Log geht
-  `watch action occ=… START → Ok`, wie bei den Knöpfen der Benachrichtigung.
-- **Kein Doppel auf der Uhr:** Ist die Watch-App über die Fähigkeit `avl_watch` in der Nähe
-  erreichbar (`CapabilityClient`, Änderungen per Listener), lässt das Handy die spiegelbare
-  Benachrichtigung der Sitzung und der Nachfragen weg; sonst bleibt alles wie heute. Die
-  laufende Benachrichtigung am Handy bleibt. **[P]** ob der Wechsel bei einem
-  Verbindungsverlust schnell genug greift; sonst `setBridgeTag` mit `BridgingConfig` auf
-  der Uhr, falls Samsungs Spiegelung das beachtet **[P]**.
-- **Vibration:** Für eine Nachfrage postet die Uhr eine eigene Benachrichtigung (Kanal
-  *Nachfrage*, eigenes Muster, öffnet die Antworten). So gelten „Nicht stören“ und
-  Kinomodus der Uhr von selbst. Kommt die Nachfrage am Handy still (Notaus, „Nicht
-  stören“, 3.1), bleibt auch die Uhr still. Am Handy klingelt die Nachfrage wie heute nach
-  ihrer Strenge; eine Antwort auf der Uhr beendet sie über die Engine (`RingPort.end`).
-  **[P]** ob die Uhr die Antworten mit einem Full-Screen-Intent direkt öffnet oder erst
-  nach einem Tipp.
-- **Akku** (der Akku der Watch 4 lässt nach): kein Dienst und kein Wecker auf der Uhr; sie
-  arbeitet nur, wenn ein Zustand oder eine Antwort kommt. Der Timer läuft als Chronometer
-  bzw. als dynamische Zeit der Kachel, nicht per Sekundentakt im Code. Die Kachel
-  aktualisiert sich nur bei neuem Zustand.
-- **Modul `:wear`:** dieselbe `applicationId` `com.avlreminder` und derselbe
-  Signaturschlüssel wie die Handy-App, sonst finden sich beide im Data Layer nicht.
-  `minSdk` 34 wie am Handy (kostet nichts, Tester-Uhren ab Wear OS 5), `targetSdk` aktuell,
-  nicht eigenständig (`com.google.android.wearable.standalone` = `false`). Für den Play
-  Store später ein eigener Bereich der `versionCode` (playstore.md).
-- **Optional:** Ohne Watch-App oder ohne Verbindung bleibt alles wie heute (spiegelbare
+  abgleichen), und nur an Knoten mit `Node.isNearby` (`PlayWatchLink.nearby`,
+  `PlayPhoneLink.nearby`). Ist die Uhr nur über das Internet erreichbar, gilt sie als nicht
+  verbunden. Befehle von einem Knoten, der nicht in der Nähe ist, nimmt das Handy nicht an.
+  **[P]** mit Bluetooth am Handy aus: `isNearby` ist dann falsch.
+- **Fähigkeiten** in `res/values/wear.xml`: das Handy hat `avl_phone`, die Uhr `avl_watch`
+  (`Watch.CAPABILITY_*`). Gleiche `applicationId` und gleicher Signaturschlüssel, sonst
+  finden sich beide im Data Layer nicht.
+- **Zustand** (`/avl/state`): `WatchSync.push` nach jedem Befehl, an derselben Stelle wie
+  `SessionService.show` (`AppGraph.refresh`), nur wenn sich die Bytes geändert haben;
+  außerdem, wenn die Uhr wieder in der Nähe ist (`onCapabilityChanged`) oder mit
+  `/avl/hello` fragt (App geöffnet, Kachel sichtbar). Nach einem Sendefehler wird der
+  nächste Zustand wieder geschickt. Die Uhr behält den letzten Stand in ihren
+  SharedPreferences (kein Backup) und zeigt sein Alter.
+- **Befehle** (`/avl/act`): Termin-Id, `WatchAction` (`START`, `STILL_ON`, `DONE`,
+  `MINIMUM`, `ABORT`, `REOPEN`) und Anfrage-Id. `WatchCommands.act` führt sie über die
+  Engine aus wie der `ActionReceiver` (`WatchAction.toAction`, `REOPEN` ist `reopen`) und
+  antwortet mit `/avl/result`: ausgeführt, oder abgelehnt mit `WatchScreen.NOT_POSSIBLE`
+  (nach *Rückgängig* der Text von `Undo.message`). Die Uhr sperrt alle Knöpfe (`Busy`),
+  bis die Antwort da ist; nach `Watch.ANSWER_TIMEOUT_MS` (z. B. 10 s) zeigt sie
+  `WatchScreen.NO_ANSWER` und gibt sie frei. Ins Diagnose-Log geht
+  `watch action occ=… DONE → Ok`, wie bei den Knöpfen der Benachrichtigung.
+- **Nachfrage** (`/avl/check`, `/avl/check-end`): `RingPort.ring` schickt `Watch.check`,
+  `RingPort.end` das Ende, aber nur für Nachfragen, die die Uhr bekommen hat.
+- **Kein Doppel auf der Uhr:** War die Watch-App beim letzten Blick in der Nähe
+  (`WatchSync.nearby`, bei jedem Senden und bei `onCapabilityChanged` neu), ist die
+  Benachrichtigung einer Nachfrage `setLocalOnly` und ihre spiegelbare Kopie fällt weg;
+  sonst bleibt alles wie bisher. Alarme ohne Sitzung kommen weiter über die Spiegelung.
+  **[P]** ob der Wechsel bei einem Verbindungsverlust schnell genug greift.
+- **Akku** (der Akku der Watch 4 lässt nach): kein eigener Dienst und kein Wecker auf der
+  Uhr; sie arbeitet nur, wenn eine Nachricht kommt. Die Ansicht zählt die Sekunden nur,
+  solange sie offen ist; Zifferblatt (Stoppuhr der laufenden Aktivität) und Kachel
+  (dynamische Zeit) zählen selbst. Die Kachel wird nur bei neuem Zustand aktualisiert.
+- **Modul `:wear`:** `applicationId` `com.avlreminder`, `minSdk` 34 wie am Handy,
+  `targetSdk` 36, nicht eigenständig (`com.google.android.wearable.standalone` = `false`),
+  Lint ohne Baseline. Handy und Uhr haben dieselbe `versionCode`; für den Play Store
+  später ein eigener Bereich (playstore.md).
+- **Optional:** Ohne Watch-App oder ohne Verbindung bleibt alles wie bisher (spiegelbare
   Benachrichtigungen). Die Watch-App braucht keine Einstellung am Handy.
 
-**Tests** (Abnahmeliste in CLAUDE.md):
-- `:core`: `WatchState.of` (Antworten und Reihenfolge, Nachweis nötig, `final` ohne
-  *Noch dran*, still, startbar, Notaus).
-- `:wearlink`: Codec hin und zurück, unbekannte Aktion und fremde Version abgelehnt.
-- `:app` durch die echten Komponenten (Robolectric): `WatchCommandService` mit Nachricht
-  → Engine → Antwort, auch abgelehnt und unbekannter Termin; `WatchSync` schickt nur bei
-  Änderung und nur an Knoten in der Nähe; die spiegelbare Benachrichtigung fehlt mit erreichbarer Watch-App und ist ohne
-  sie da.
-- `:wear` (Compose for Wear OS mit Robolectric): Knöpfe wie im Zustand, Doppeltipp,
-  ohne Verbindung gesperrt, keine Antwort nach 10 s, *Rückgängig* 60 s; die Kachel über
-  ihren Renderer.
-- Mutanten in `tools/mutate.py`: Befehl auf falsche Aktion, Spiegelung trotz Watch-App,
-  Knopf ohne Verbindung frei, *Noch dran* beim letzten Reminder, Senden auch an Knoten,
-  die nicht in der Nähe sind.
-- Lint auch für `:wear`, ohne Baseline; die CI baut `:wear` mit.
-- Gerätetests (neue K-Nummern): Sitzung von der Kachel starten, Nachfrage auf der Uhr mit
-  dem Handy in einem anderen Raum beantworten, Bluetooth am Handy aus (beide im WLAN) →
-  Hinweis und gesperrte Knöpfe, wieder an → aktueller Stand, *Abbruch* und *Rückgängig*, kein
-  doppelter Eintrag auf der Uhr. Dazu K28 vorher noch mit der Spiegelung.
+**Tests** (Abnahmeliste in CLAUDE.md): `:core` `WatchTest` (Antworten und Reihenfolge,
+Nachweis am Handy, kein *Noch dran* beim letzten Reminder, startbar, Notaus, Nachfrage
+still), `WatchCodecTest`, `WatchScreenTest`. `:app` `WatchGlueTest` durch den echten
+`WatchCommandService`: jeder Knopf bis in die Engine, abgelehnt, unbekannter Termin,
+nicht in der Nähe, unlesbar; Zustand nur bei Änderung und nur an Uhren in der Nähe,
+Nachfrage und ihr Ende, Spiegelung mit und ohne Watch-App. `:wear` (Robolectric):
+`PhoneListenerTest` durch den echten Dienst, `WatchRouteTest` (Knöpfe, Doppeltipp,
+ohne Verbindung, keine Antwort, abgelehnt, *Rückgängig*, *Ich starte jetzt*),
+`TileAndActivityTest` (Kachel je Fall; Start von der Kachel und Erlaubnis durch die echte
+Activity, mit Neuaufbau). Mutanten M17–M25 in `tools/mutate.py`.
 
-**Uhr als Gerät** (beim Umsetzen in CLAUDE.md): Installieren per adb über WLAN (auf der Uhr
-*Entwickleroptionen → ADB-Debugging* und *Debugging über WLAN*, *Neues Gerät koppeln*; am
-Rechner `adb pair` und `adb connect`). Dieselben Regeln wie beim Handy: erst nach Kevins
-Go, immer `adb install -r`, erst die Handy-App, dann die Uhr, beide aus demselben Stand;
-danach Debugging auf der Uhr wieder ausschalten.
-
-**Geklärt** (Kevin, 2026-11-21, anforderungen.md Kap. 9): nur in der Nähe, nichts über
-Googles Server; Kachel wie oben; bei einer Nachfrage vibriert die Uhr zusätzlich zum Alarm
-am Handy. Die Uhr läuft mit Wear OS 6.0.
+**Uhr als Gerät:** Installieren per adb über WLAN (auf der Uhr *Entwickleroptionen →
+ADB-Debugging* und *Debugging über WLAN*, *Neues Gerät koppeln*; am Rechner `adb pair` und
+`adb connect`). Dieselben Regeln wie beim Handy (CLAUDE.md): erst nach Kevins Go, immer
+`adb install -r`, erst die Handy-App, dann die Uhr, beide aus demselben Stand; danach
+Debugging auf der Uhr wieder ausschalten.
 
 ## Entwurf V1.4b – Abläufe (Skizze)
 

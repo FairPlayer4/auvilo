@@ -4,6 +4,11 @@ Stand: 2026-11-21. Bei jedem größeren Schritt aktualisieren. Erledigtes steht 
 anforderungen.md Kap. 10.1 und in den Review-Berichten (`.review/runs/`), nicht hier.
 
 ## Auf dem Gerät (S24)
+- **V1.4a** (`versionCode` 35) gebaut, noch nicht installiert: Watch-App für die Sitzung
+  (Anf. 7.14, design.md 17), neues Modul `:wear`. Keine Migration. Am Handy ändert sich
+  nur etwas, wenn die Watch-App auf der Uhr ist: Dann kommt die Sitzung nicht mehr
+  zusätzlich als gespiegelte Benachrichtigung auf die Uhr. Erst die Handy-App installieren,
+  dann die Uhr (adb über WLAN, design.md 17 „Uhr als Gerät“). Gerätetests K44–K48.
 - **V1.3c14** (`versionCode` 34) gebaut, noch nicht installiert: Umbau-Etappe gegen die
   Trends aus den Review-Läufen, ohne neues Verhalten (anforderungen.md Kap. 9, 2026-11-19):
   Zeitregeln im Core, Stolperdrähte, Knöpfe gegen Doppeltipp, Mutations-Suite
@@ -75,8 +80,8 @@ Kevins echte Daten; vor dem ersten weiteren Nutzer kommt die Sicherheitsphase (B
    *Orte* mit WLAN neu festlegen), K27–K30 (Sitzung, dabei: zeigt die Uhr den
    Chronometer?), K31, K32. In den nächsten Tagen im `diag.log` prüfen, dass keine Ankunft mehr direkt nach
    „app start“ kommt und die erste Prüfung eines Zeitraums pünktlich ist (`late=`).
-2. **Als Nächstes V1.4a: Watch-App für die Sitzung** (Kap. 9, 2026-11-21). Entwurf am Ende
-   von design.md, Fragen dazu geklärt. Danach V1.4b Abläufe (7.12, bisher
+2. **V1.4a Watch-App** umgesetzt (design.md 17), nicht installiert; Gerätetests K44–K48.
+   Als Nächstes V1.4b Abläufe (7.12, bisher
    V1.3c; die Sitzung hat sich im Training bewährt), dann Checklisten überarbeiten
    (7.13 C9, Kevin macht sich dazu nach den Abläufen Gedanken). Offen aus V1.3c: Vorlagen
    mit Sitzung.

@@ -1,0 +1,14 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- Bell silhouette of the logo, one colour: themed launcher icon and status bar icon. -->
+<vector xmlns:android="http://schemas.android.com/apk/res/android"
+    android:width="24dp"
+    android:height="24dp"
+    android:viewportWidth="60"
+    android:viewportHeight="60">
+    <group android:translateX="-24" android:translateY="-26">
+        <path android:fillColor="#FFFFFF" android:pathData="M50.5,31a3.5,3.5 0,1 0,7 0a3.5,3.5 0,1 0,-7 0z" />
+        <path android:fillColor="#FFFFFF" android:pathData="M35,71C37,67 38,63 38,55C38,43 45,34 54,34C63,34 70,43 70,55C70,63 71,67 73,71Z" />
+        <path android:fillColor="#FFFFFF" android:pathData="M34.5,70h39a2.5,2.5 0,0 1,0 5h-39a2.5,2.5 0,0 1,0 -5z" />
+        <path android:fillColor="#FFFFFF" android:pathData="M50,80a4,4 0,1 0,8 0a4,4 0,1 0,-8 0z" />
+    </group>
+</vector>

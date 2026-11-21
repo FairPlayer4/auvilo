@@ -28,6 +28,7 @@ ROOT = Path(__file__).resolve().parent.parent
 LOGS = ROOT / "build" / "mutate"
 APP = "app/src/main/java/com/avlreminder/"
 CORE = "core/src/main/kotlin/com/avlreminder/core/"
+WEAR = "wear/src/main/java/com/avlreminder/wear/"
 
 
 @dataclass(frozen=True)
@@ -37,7 +38,7 @@ class Mutant:
     file: str
     old: str
     new: str
-    tests: tuple[str, ...]  # "app:<Klasse>" oder "core:<Klasse>"
+    tests: tuple[str, ...]  # "app:<Klasse>", "core:<Klasse>" oder "wear:<Klasse>"
 
 
 MUTANTS = [
@@ -121,6 +122,52 @@ MUTANTS = [
            "ServerKontoLoeschen(verbindung, token, anmeldung)",
            "ServerKontoLoeschen(verbindung, token)",
            ("app:com.avlreminder.cloud.ConnectCloudServerTest",)),
+    # V1.4a Watch-App (design.md 17)
+    Mutant("M17", "Fertig von der Uhr zählt nur als Teilschritt",
+           CORE + "usecases/Watch.kt",
+           "DONE -> Action.Complete(minimumOnly = false)",
+           "DONE -> Action.Complete(minimumOnly = true)",
+           ("core:com.avlreminder.core.usecases.WatchTest", "app:com.avlreminder.watch.WatchGlueTest")),
+    Mutant("M18", "Nachfrage auch gespiegelt, wenn die Uhr-App in der Nähe ist (doppelt auf der Uhr)",
+           APP + "alarm/Notifications.kt",
+           "info.session != null && context.graph.watch.nearby",
+           "false",
+           ("app:com.avlreminder.watch.WatchGlueTest",)),
+    Mutant("M19", "Knopf auf der Uhr ohne Verbindung frei",
+           CORE + "usecases/WatchScreen.kt",
+           "connected && !waiting",
+           "!waiting",
+           ("core:com.avlreminder.core.usecases.WatchScreenTest", "wear:com.avlreminder.wear.WatchRouteTest")),
+    Mutant("M20", "Noch dran auf der Uhr auch beim letzten Reminder",
+           CORE + "usecases/Watch.kt",
+           "Sessions.quickAnswers(session.final, session.suggestion",
+           "Sessions.quickAnswers(false, session.suggestion",
+           ("core:com.avlreminder.core.usecases.WatchTest",)),
+    Mutant("M21", "Uhr nur über das Internet erreichbar zählt als in der Nähe (G9b)",
+           APP + "watch/WatchSync.kt",
+           "nodes.filter { it.isNearby }.map { it.id }",
+           "nodes.map { it.id }",
+           ("app:com.avlreminder.watch.WatchGlueTest",)),
+    Mutant("M22", "Befehl von einer Uhr, die nicht in der Nähe ist, wird ausgeführt",
+           APP + "watch/WatchCommandService.kt",
+           "if (!watch.isNearby(from)) {",
+           "if (false) {",
+           ("app:com.avlreminder.watch.WatchGlueTest",)),
+    Mutant("M23", "Doppeltipp auf der Uhr schickt den Befehl zweimal",
+           WEAR + "WatchRoute.kt",
+           "        if (state.value) return\n",
+           "",
+           ("wear:com.avlreminder.wear.WatchRouteTest",)),
+    Mutant("M24", "Start von der Kachel nach Neuaufbau ein zweites Mal",
+           WEAR + "WatchActivity.kt",
+           "if (savedInstanceState == null) start.value = intent.startId()",
+           "start.value = intent.startId()",
+           ("wear:com.avlreminder.wear.TileAndActivityTest",)),
+    Mutant("M25", "Stille Nachfrage vibriert auf der Uhr doch",
+           WEAR + "WearNotifications.kt",
+           "if (check.audible) CHANNEL_CHECK else CHANNEL_CHECK_QUIET",
+           "CHANNEL_CHECK",
+           ("wear:com.avlreminder.wear.PhoneListenerTest",)),
 ]
 
 
@@ -130,18 +177,25 @@ def gradle_cmd() -> list[str]:
     return [str(ROOT / "gradlew")]
 
 
+MODULES = ("core", "app", "wear")
+
+
+def test_task(module: str) -> str:
+    return ":core:test" if module == "core" else f":{module}:testDebugUnitTest"
+
+
 def results_dir(module: str) -> Path:
-    return ROOT / module / "build" / "test-results" / ("testDebugUnitTest" if module == "app" else "test")
+    return ROOT / module / "build" / "test-results" / ("test" if module == "core" else "testDebugUnitTest")
 
 
 def run_tests(tests: tuple[str, ...], log: Path) -> tuple[int, dict[str, tuple[int, int]]]:
     """Runs [tests] once; returns Gradle's exit code and per class (tests, failures+errors)."""
     args = gradle_cmd() + ["-q", "--continue"]
-    for module in ("core", "app"):
+    for module in MODULES:
         classes = [t.split(":", 1)[1] for t in tests if t.startswith(module + ":")]
         if not classes:
             continue
-        args.append(":app:testDebugUnitTest" if module == "app" else ":core:test")
+        args.append(test_task(module))
         for c in classes:
             args += ["--tests", c]
         args.append("--rerun")
@@ -149,7 +203,7 @@ def run_tests(tests: tuple[str, ...], log: Path) -> tuple[int, dict[str, tuple[i
     with open(log, "w", encoding="utf-8", newline="\n") as out:
         code = subprocess.run(args, cwd=ROOT, stdout=out, stderr=subprocess.STDOUT).returncode
     found: dict[str, tuple[int, int]] = {}
-    for module in ("core", "app"):
+    for module in MODULES:
         folder = results_dir(module)
         if not folder.is_dir():
             continue

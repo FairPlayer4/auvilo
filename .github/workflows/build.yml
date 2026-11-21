@@ -71,7 +71,7 @@ jobs:
 
       - name: Build und Tests
         # backendStreng: bricht ab, falls der Backend-Stand nicht zum festgehaltenen passt.
-        run: ./gradlew -PbackendStreng=true :core:check :core:koverLog :app:testDebugUnitTest :app:lintDebug :app:assembleDebug
+        run: ./gradlew -PbackendStreng=true :core:check :core:koverLog :app:testDebugUnitTest :app:lintDebug :app:assembleDebug :wear:testDebugUnitTest :wear:lintDebug :wear:assembleDebug
 
       - name: Testberichte
         if: failure()
@@ -81,6 +81,7 @@ jobs:
           path: |
             avlreminder/core/build/reports/
             avlreminder/app/build/reports/
+            avlreminder/wear/build/reports/
           retention-days: 7
 
       - name: Debug-APK
@@ -88,4 +89,11 @@ jobs:
         with:
           name: app-debug
           path: avlreminder/app/build/outputs/apk/debug/app-debug.apk
+          retention-days: 14
+
+      - name: Debug-APK der Watch-App
+        uses: actions/upload-artifact@b7c566a772e6b6bfb58ed0dc250532a479d7789f # v6.0.0
+        with:
+          name: wear-debug
+          path: avlreminder/wear/build/outputs/apk/debug/wear-debug.apk
           retention-days: 14

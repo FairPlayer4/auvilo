@@ -17,6 +17,11 @@ import com.avlreminder.alarm.Notifications
 import com.avlreminder.alarm.OverviewNotifications
 import com.avlreminder.alarm.PreNotices
 import com.avlreminder.alarm.Ringer
+import com.avlreminder.core.usecases.Watch
+import com.avlreminder.core.usecases.WatchState
+import com.avlreminder.watch.PlayWatchLink
+import com.avlreminder.watch.WatchLink
+import com.avlreminder.watch.WatchSync
 import com.avlreminder.claude.ClaudeApi
 import com.avlreminder.cloud.AndroidCloudNotices
 import com.avlreminder.cloud.CloudWiring
@@ -66,11 +71,14 @@ open class AvlApp : Application() {
     lateinit var started: Job
         private set
 
+    /** The way to the watch app (design.md 17); the tests replace it. */
+    protected open fun watchLink(): WatchLink = PlayWatchLink(this)
+
     override fun onCreate() {
         super.onCreate()
         Diag.init(this)
         Diag.state(this, "app start ${packageManager.getPackageInfo(packageName, 0).versionName}")
-        graph = AppGraph(this)
+        graph = AppGraph(this, watchLink())
         Notifications.createChannels(this)
         OverviewNotifications.createChannel(this)
         PreNotices.createChannel(this)
@@ -118,7 +126,7 @@ class AndroidDeviceState(private val context: Context) : DeviceStatePort {
 }
 
 /** Manually wired dependencies; no DI library needed for one user and a handful of classes. */
-class AppGraph(private val context: Context) : ClaudeApi.Access {
+class AppGraph(private val context: Context, watchLink: WatchLink) : ClaudeApi.Access {
     /**
      * KRITISCH: A staged restore (W-5) is swapped in here, before anything opens the database;
      * [db] is the only place that opens it.
@@ -174,6 +182,9 @@ class AppGraph(private val context: Context) : ClaudeApi.Access {
         "modell" to Build.MODEL,
         "schema" to AvlDatabase.VERSION,
     )
+    /** The watch app (design.md 17): state after every command, checks while they ring. */
+    val watch = WatchSync(watchLink, ::watchState, Diag::log)
+
     private val engine = ReminderEngine(
         repository, AndroidAlarmPort(context), clock, AndroidDeviceState(context),
         settings = { alert },
@@ -183,8 +194,15 @@ class AppGraph(private val context: Context) : ClaudeApi.Access {
         preNotices = PreNotices.Port(context),
         // Ringing and its end are effects of the engine (E17); nobody else dismisses an alarm.
         ringer = object : RingPort {
-            override fun ring(ring: Ring) = Ringer.ring(context, ring)
-            override fun end(occurrenceId: Long) = Ringer.dismiss(context, occurrenceId)
+            override fun ring(ring: Ring) {
+                Ringer.ring(context, ring)
+                Watch.check(ring)?.let { scope.launch { runCatching { watch.check(it) } } }
+            }
+
+            override fun end(occurrenceId: Long) {
+                Ringer.dismiss(context, occurrenceId)
+                scope.launch { runCatching { watch.ended(occurrenceId) } }
+            }
         },
         placeAlarms = AndroidPlaceAlarms(context),
         diag = Diag::log,
@@ -222,6 +240,15 @@ class AppGraph(private val context: Context) : ClaudeApi.Access {
     private fun refresh() {
         scope.launch { runCatching { AvlWidget().updateAll(context) } }
         scope.launch { runCatching { SessionService.show(context, withEngine { sessions(it) }) } }
+        scope.launch { runCatching { watch.push() } }
+    }
+
+    /** What the watch app shows (design.md 17), from *Heute* and the alarm views of the engine. */
+    private suspend fun watchState(): WatchState = withEngine { engine ->
+        val now = now()
+        val today = today(now)
+        val open = today.running + today.dueNow + today.laterToday
+        Watch.state(today, open.mapNotNull { engine.alarmView(it.occurrence.id) }, alert.alarmsPausedUntil?.takeIf { alert.alarmsPaused(now) })
     }
 
     /** The running sessions for their notification (Anf. 7.11), from the alarm view of the engine (E18). */
