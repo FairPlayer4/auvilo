@@ -907,8 +907,8 @@ Gerät [geraetetest.md](geraetetest.md) Abschnitt D.
 ## Entwurf V1.4a – Watch-App für die Sitzung
 
 > Grundlage: anforderungen.md 7.14 G5–G10, Sitzung 7.11 (3.1); Reihenfolge Kap. 9,
-> 2026-11-21. Uhr: Galaxy Watch 4, bald eine neue, geplant für ein aktuelles Wear OS
-> (8.1). **[P]** = vorher auf dem Gerät prüfen, **[F]** = Frage an Kevin.
+> 2026-11-21. Uhr: Galaxy Watch 4 mit Wear OS 6.0, bald eine neue, geplant für ein
+> aktuelles Wear OS (8.1). **[P]** = vorher auf dem Gerät prüfen.
 
 **Umfang.** Eine laufende Sitzung geht komplett von der Uhr aus, ohne das Handy in die
 Hand zu nehmen (G10); nur ein Nachweis mit Foto, Text oder Audio bleibt am Handy (G4).
@@ -936,7 +936,7 @@ Hand zu nehmen (G10); nur ein Nachweis mit Foto, Text oder Audio bleibt am Handy
 ```
 :core      WatchState.of(views, now): was die Uhr zeigt; WatchCommand (Aktion je Knopf)
 :wearlink  Android-Bibliothek: Pfade, DataMap-Codec, Fähigkeit "avl_watch"   (für :app und :wear)
-:app       WatchSync schreibt den Zustand, WatchCommandService (WearableListenerService)
+:app       WatchSync schickt den Zustand, WatchCommandService (WearableListenerService)
 :wear      Wear-App: Compose for Wear OS (Material 3), Kachel, Ongoing Activity, Listener
 ```
 
@@ -945,10 +945,18 @@ Hand zu nehmen (G10); nur ein Nachweis mit Foto, Text oder Audio bleibt am Handy
   Antworten aus `Sessions.quickAnswers`, offene Nachfrage mit `final` und *still*),
   startbare Reminder (`canStart`: klingelnd oder heute als nächster) und Notaus. Die Uhr
   rechnet nur die Anzeige aus Startzeit und Dauer.
-- **Zustand:** ein DataItem `/avl/state` (`setUrgent`). `WatchSync` schreibt es nach jedem
+- **Nur in der Nähe** (Kevin, 2026-11-21): Die Watch-App funktioniert nur, wenn das Handy
+  in der Nähe ist; nichts von ihr geht über Googles Server. Deshalb nur Nachrichten
+  (`MessageClient`), keine DataItems (die würde der Data Layer auch über Googles Server
+  abgleichen), und nur an Knoten mit `Node.isNearby` (direkt verbunden, in der Regel
+  Bluetooth). Ist die Uhr nur über das Internet erreichbar, gilt sie als nicht verbunden.
+  **[P]** mit Bluetooth am Handy aus: `isNearby` ist dann falsch, die Uhr zeigt „Keine
+  Verbindung“.
+- **Zustand:** Nachricht `/avl/state` an die Uhr. `WatchSync` schickt sie nach jedem
   Befehl, an derselben Stelle, an der heute `SessionService.show` aktualisiert wird, und
-  nur, wenn sich der Inhalt geändert hat. Die Uhr behält den letzten Stand und zeigt sein
-  Alter.
+  nur, wenn sich der Inhalt geändert hat; außerdem, wenn die Uhr wieder in der Nähe ist
+  (`CapabilityClient`-Listener) oder mit `/avl/hello` fragt (beim Öffnen der App oder der
+  Kachel). Die Uhr behält den letzten Stand lokal und zeigt sein Alter.
 - **Befehle:** Nachricht `/avl/act` mit Termin-Id, Aktion (`START`, `STILL_ON`, `DONE`,
   `MINIMUM`, `ABORT`, `REOPEN`) und Anfrage-Id. Der `WatchCommandService` am Handy führt
   sie über denselben Weg aus wie `ActionReceiver` (eine gemeinsame Funktion, keine Kopie)
@@ -956,8 +964,8 @@ Hand zu nehmen (G10); nur ein Nachweis mit Foto, Text oder Audio bleibt am Handy
   den Knopf mit `rememberBusy`, bis die Antwort oder ein neuer Zustand da ist; nach 10 s
   „Keine Antwort vom Handy“, dann ist er wieder frei. Ins Diagnose-Log geht
   `watch action occ=… START → Ok`, wie bei den Knöpfen der Benachrichtigung.
-- **Kein Doppel auf der Uhr:** Ist die Watch-App über die Fähigkeit `avl_watch` erreichbar
-  (`CapabilityClient`, Änderungen per Listener), lässt das Handy die spiegelbare
+- **Kein Doppel auf der Uhr:** Ist die Watch-App über die Fähigkeit `avl_watch` in der Nähe
+  erreichbar (`CapabilityClient`, Änderungen per Listener), lässt das Handy die spiegelbare
   Benachrichtigung der Sitzung und der Nachfragen weg; sonst bleibt alles wie heute. Die
   laufende Benachrichtigung am Handy bleibt. **[P]** ob der Wechsel bei einem
   Verbindungsverlust schnell genug greift; sonst `setBridgeTag` mit `BridgingConfig` auf
@@ -978,28 +986,27 @@ Hand zu nehmen (G10); nur ein Nachweis mit Foto, Text oder Audio bleibt am Handy
   `minSdk` 34 wie am Handy (kostet nichts, Tester-Uhren ab Wear OS 5), `targetSdk` aktuell,
   nicht eigenständig (`com.google.android.wearable.standalone` = `false`). Für den Play
   Store später ein eigener Bereich der `versionCode` (playstore.md).
-- **Datenweg** **[F]**: Der Data Layer geht über Bluetooth oder WLAN. Sind Uhr und Handy
-  nur über das Internet verbunden, läuft er über Googles Server. Dann gehen Titel und
-  Zeiten der laufenden Sitzungen über Google. Empfehlung: so annehmen, die Daten bleiben
-  zwischen Kevins Geräten; für den Play Store im Datenschutz-Hinweis nennen.
+- **Optional:** Ohne Watch-App oder ohne Verbindung bleibt alles wie heute (spiegelbare
+  Benachrichtigungen). Die Watch-App braucht keine Einstellung am Handy.
 
 **Tests** (Abnahmeliste in CLAUDE.md):
 - `:core`: `WatchState.of` (Antworten und Reihenfolge, Nachweis nötig, `final` ohne
   *Noch dran*, still, startbar, Notaus).
 - `:wearlink`: Codec hin und zurück, unbekannte Aktion und fremde Version abgelehnt.
 - `:app` durch die echten Komponenten (Robolectric): `WatchCommandService` mit Nachricht
-  → Engine → Antwort, auch abgelehnt und unbekannter Termin; `WatchSync` schreibt nur bei
-  Änderung; die spiegelbare Benachrichtigung fehlt mit erreichbarer Watch-App und ist ohne
+  → Engine → Antwort, auch abgelehnt und unbekannter Termin; `WatchSync` schickt nur bei
+  Änderung und nur an Knoten in der Nähe; die spiegelbare Benachrichtigung fehlt mit erreichbarer Watch-App und ist ohne
   sie da.
 - `:wear` (Compose for Wear OS mit Robolectric): Knöpfe wie im Zustand, Doppeltipp,
   ohne Verbindung gesperrt, keine Antwort nach 10 s, *Rückgängig* 60 s; die Kachel über
   ihren Renderer.
 - Mutanten in `tools/mutate.py`: Befehl auf falsche Aktion, Spiegelung trotz Watch-App,
-  Knopf ohne Verbindung frei, *Noch dran* beim letzten Reminder.
+  Knopf ohne Verbindung frei, *Noch dran* beim letzten Reminder, Senden auch an Knoten,
+  die nicht in der Nähe sind.
 - Lint auch für `:wear`, ohne Baseline; die CI baut `:wear` mit.
 - Gerätetests (neue K-Nummern): Sitzung von der Kachel starten, Nachfrage auf der Uhr mit
-  dem Handy in einem anderen Raum beantworten, Bluetooth am Handy aus → Hinweis und
-  gesperrte Knöpfe, wieder an → aktueller Stand, *Abbruch* und *Rückgängig*, kein
+  dem Handy in einem anderen Raum beantworten, Bluetooth am Handy aus (beide im WLAN) →
+  Hinweis und gesperrte Knöpfe, wieder an → aktueller Stand, *Abbruch* und *Rückgängig*, kein
   doppelter Eintrag auf der Uhr. Dazu K28 vorher noch mit der Spiegelung.
 
 **Uhr als Gerät** (beim Umsetzen in CLAUDE.md): Installieren per adb über WLAN (auf der Uhr
@@ -1008,13 +1015,9 @@ Rechner `adb pair` und `adb connect`). Dieselben Regeln wie beim Handy: erst nac
 Go, immer `adb install -r`, erst die Handy-App, dann die Uhr, beide aus demselben Stand;
 danach Debugging auf der Uhr wieder ausschalten.
 
-**Fragen an Kevin [F]:**
-1. Datenweg über Googles Server, wenn Uhr und Handy nur übers Internet verbunden sind:
-   annehmen? Empfehlung ja.
-2. Kachel wie oben (Sitzung, sonst nächster Reminder mit Sitzung, sonst nächster
-   Reminder)? Empfehlung ja; mehr erst, wenn sie im Alltag fehlt.
-3. Bei einer Nachfrage vibriert die Uhr zusätzlich zum Alarm am Handy. Empfehlung ja; ein
-   späterer Schalter „Nachfragen nur auf der Uhr, wenn verbunden“ wäre möglich.
+**Geklärt** (Kevin, 2026-11-21, anforderungen.md Kap. 9): nur in der Nähe, nichts über
+Googles Server; Kachel wie oben; bei einer Nachfrage vibriert die Uhr zusätzlich zum Alarm
+am Handy. Die Uhr läuft mit Wear OS 6.0.
 
 ## Entwurf V1.4b – Abläufe (Skizze)
 

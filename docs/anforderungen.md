@@ -527,6 +527,9 @@ Guter Hebel für neue Anforderungen; zuerst so viel wie möglich über
     Knopfdrücke zurück und vibriert auf Befehl. Countdowns rechnet die Uhr nur für die
     Anzeige aus Startzeit und Dauer. Ohne Verbindung zeigt die Uhr das deutlich an;
     die Sitzung läuft auf dem Handy weiter.
+  - G9b **Nur in der Nähe** (2026-11-21): Die Watch-App funktioniert nur, wenn das Handy
+    in der Nähe ist (Bluetooth); nichts von ihr geht über Googles Server. Die Watch-App
+    ist optional: Ohne sie bleibt alles wie heute.
   - G10 **Während ein Reminder läuft, muss man das Handy nie in die Hand nehmen.**
     Jede Aktion einer laufenden Sitzung (inkl. Nachfragen und letzter Reminder aus D5)
     ist auf der Uhr möglich. Nur Foto-Nachweis bleibt am Handy.
@@ -1400,9 +1403,8 @@ Entwickler schicken können, transparent und nur auf Einladung. Entwurf:
 ### 8.1 Zielgerät
 - **Samsung Galaxy S24 Ultra, Android 17** (API 37), nur Privatgeräte
 - Galaxy Watch vorhanden → Integration in V1.3 über Benachrichtigungen, eigene Watch-App in V1.4 (siehe 7.14)
-- **Uhr** (2026-11-21): Galaxy Watch 4 mit „Galaxy Wear OS 8“ (Kevin; vermutlich One UI 8
-  Watch auf Wear OS 6, beim ersten Verbinden per adb prüfen). Ihr Akku lässt deutlich
-  nach, eine neue Uhr kommt bald. Geplant wird für ein **aktuelles Wear OS**; `minSdk` der
+- **Uhr** (2026-11-21): Galaxy Watch 4 mit Wear OS 6.0, ohne Mobilfunk. Ihr Akku lässt
+  deutlich nach, eine neue Uhr kommt bald. Geplant wird für ein **aktuelles Wear OS**; `minSdk` der
   Watch-App 34 wie am Handy, weil es nichts kostet (design.md, Entwurf V1.4a).
 - **Entscheidung:** targetSdk = 37, **minSdk = 34** (Android 14, seit 2026-11-15; vorher 37).
   Für den geschlossenen Test mit Freunden (7.28 PS1) reichen damit fast alle Handys, die
@@ -1481,6 +1483,7 @@ Neueste zuerst. Kap. 7 enthält immer den gültigen Stand; diese Tabelle ist die
 
 | Datum | Entscheidung |
 |---|---|
+| 2026-11-21 | **Fragen zum Entwurf V1.4a** (Kevin: „2. und 3. nach Vorschlag“; zu 1.: „Sollte das nicht über Bluetooth laufen? Es reicht wenn die App nur funktioniert wenn das Handy in der Nähe ist. Meine Uhr hat eh keine Mobilfunkverbindung. … Die Uhr App wäre ja eh optional.“; „Ja es ist Wear OS 6.0“): Die Watch-App spricht nur mit einem Handy in der Nähe, nur über Nachrichten an direkt verbundene Knoten, ohne DataItems, damit nichts über Googles Server geht (7.14 G9b). Kachel mit Sitzung, sonst nächstem Reminder mit Sitzung, sonst nächstem Reminder; bei einer Nachfrage vibriert die Uhr zusätzlich zum Alarm am Handy (design.md, Entwurf V1.4a) |
 | 2026-11-21 | **Watch-App V1.4a vor den Abläufen** (Kevin: „Sitzung funktioniert bisher gut, Abläufe wären eine natürliche Ergänzung. Die Watch App erleichtert die Steuerung weil man das Handy nicht immer direkt in Griffweite hat. Benachrichtigungen auf der Uhr funktionieren gut bei den allgemeinen Remindern. Aber für eine gute Sitzung braucht man eine Watch-App.“; „Schreib mal den Entwurf für V1.4a“). Reihenfolge: V1.4a Watch-App für die Sitzung ohne Schritte, dann V1.4b Abläufe mit Schritten auf Handy und Uhr (bisher als V1.3c geplant), dann Checklisten (7.13 C9). Uhr: Galaxy Watch 4, bald eine neue, geplant für ein aktuelles Wear OS (8.1, 7.14) |
 | 2026-11-21 | **Checklisten überarbeiten, nach den Abläufen** (Kevin: „Die sind zu unattraktiv und die Bedienung sollte etwas besser sind. Es geht hier insbesondere um Reminder für gewisse Arbeitsaufgaben. Das ist außer meiner Sicht ein komplexes Thema, weil es viel mit der Erfassung von schaffbaren Punkten geht. Ich würde mir dazu Gedanken machen wenn wir Abläufe umgesetzt haben.“) (7.13 C9) |
 | 2026-11-19 | **Umbau-Etappe V1.3c14 gegen die Trends** vor der nächsten Funktion (Kevin: „Ja kannst Umbau-Etappe eintragen und damit anfangen“). Trends, die eine Umbau-Etappe oder einen Stolperdraht bekamen, sind verschwunden; die übrigen (Regeln in `:app`, Android-Schicht dünn getestet, Doppeltipp, Doku widerspricht Code) kamen trotz Fixes wieder. Deshalb: Regeln in den Core, Stolperdraht für Zeitrechnung in `:app`, Knöpfe gegen Doppeltipp, Test für zitierte Texte, feste Mutations-Suite vor jedem PR nach `main`, Abnahmeliste, Kennzahlen je Review-Lauf, Empfehlungen höchstens zwei Läufe offen (design.md, Entwurf V1.3c14) |

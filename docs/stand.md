@@ -76,7 +76,7 @@ Kevins echte Daten; vor dem ersten weiteren Nutzer kommt die Sicherheitsphase (B
    Chronometer?), K31, K32. In den nächsten Tagen im `diag.log` prüfen, dass keine Ankunft mehr direkt nach
    „app start“ kommt und die erste Prüfung eines Zeitraums pünktlich ist (`late=`).
 2. **Als Nächstes V1.4a: Watch-App für die Sitzung** (Kap. 9, 2026-11-21). Entwurf am Ende
-   von design.md, offene Fragen dort mit **[F]**. Danach V1.4b Abläufe (7.12, bisher
+   von design.md, Fragen dazu geklärt. Danach V1.4b Abläufe (7.12, bisher
    V1.3c; die Sitzung hat sich im Training bewährt), dann Checklisten überarbeiten
    (7.13 C9, Kevin macht sich dazu nach den Abläufen Gedanken). Offen aus V1.3c: Vorlagen
    mit Sitzung.
