@@ -76,10 +76,15 @@ Strenge und invasive Mechanismen sind gewollt. Kommunikation auf **Deutsch, mit 
   (*Einstellungen → Entwickleroptionen*; Kevin, 2026-11-15). Solange es an ist, kann ein
   freigegebener Rechner per USB voll auf das Handy zugreifen. Für die nächste Installation
   schaltet Kevin es wieder ein.
-- **Uhr** (Watch-App, design.md 17): adb über WLAN (`adb pair`, `adb connect`), dieselben
-  Regeln wie beim Handy: erst nach Kevins Go, `adb install -r`, nie deinstallieren; erst die
-  Handy-App, dann die Uhr, beide aus demselben Stand. Danach Kevin erinnern, auch auf der Uhr
-  *ADB-Debugging* und *Debugging über WLAN* auszuschalten. Mehrere Geräte: `adb -s <serial>`.
+- **Debugging über WLAN** geht für Handy und Uhr (Kevin, 2026-11-21), nur im WLAN zu Hause:
+  Kevin nennt IP:Port und Code aus *Gerät mit Kopplungscode koppeln*, dann `adb pair`; den
+  Port zum Verbinden zeigt `adb mdns services` (`_adb-tls-connect`), dann `adb connect`.
+  Danach Kevin erinnern, *Debugging über WLAN* auszuschalten (wie USB-Debugging oben).
+- **Uhr** (Watch-App, design.md 17): nur über WLAN, dieselben Regeln wie beim Handy: erst
+  nach Kevins Go, `adb install -r`, nie deinstallieren; erst die Handy-App, dann die Uhr,
+  beide aus demselben Stand. Danach Kevin erinnern, auf der Uhr *ADB-Debugging* und
+  *Debugging über WLAN* auszuschalten. Mehrere Geräte: `adb -s <serial>`; die Uhr startet
+  mit `am start -n com.avlreminder/com.avlreminder.wear.WatchActivity`.
 - Starten mit `adb shell am start -n com.avlreminder/.ui.MainActivity`, **nie mit `adb shell monkey`** (schaltet die Auto-Rotation ein, 2026-11-08).
 - Bei Gerätetests genau sagen, wann Kevin sperren, entsperren oder etwas tun soll.
   Simulationen danach zurücksetzen.

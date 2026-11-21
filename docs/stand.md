@@ -4,7 +4,10 @@ Stand: 2026-11-21. Bei jedem größeren Schritt aktualisieren. Erledigtes steht 
 anforderungen.md Kap. 10.1 und in den Review-Berichten (`.review/runs/`), nicht hier.
 
 ## Auf dem Gerät (S24)
-- **V1.4a** (`versionCode` 35) gebaut, noch nicht installiert: Watch-App für die Sitzung
+- **V1.4a** (`versionCode` 35), installiert am 2026-11-21 über V1.3c11 (Handy) und neu auf
+  der Galaxy Watch4 (SM-R870, Wear OS 6, API 36), beides über Debugging per WLAN. Enthält
+  V1.3c12–c14. Start ohne Fehler, Alarme neu geplant, Berechtigungen weiter erteilt; die Uhr
+  bekommt den Stand vom Handy (`watch nearby=true`). Watch-App für die Sitzung
   (Anf. 7.14, design.md 17), neues Modul `:wear`. Keine Migration. Am Handy ändert sich
   nur etwas, wenn die Watch-App auf der Uhr ist: Dann kommt die Sitzung nicht mehr
   zusätzlich als gespiegelte Benachrichtigung auf die Uhr. Erst die Handy-App installieren,
