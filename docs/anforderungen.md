@@ -1342,6 +1342,8 @@ Was vorher zu tun ist, in dieser Reihenfolge (Vorschlag, noch nicht entschieden)
   Reine Doku-PRs starten wegen `paths-ignore` keine CI und blieben sonst hängen.
   Probe-Läufe danach grün: App-Build auf `develop` (Backend ohne Deploy-Key), Backend-CI auf
   `develop`, Deploy von Hand aus `auvilo-backend`.
+  Alte Repos am selben Tag aufgeräumt: Deploy-Key und Secret `BACKEND_DEPLOY_KEY` gelöscht,
+  `avlreminder` und `avlreminder-backend` archiviert (privat, schreibgeschützt).
 - OV8 **Durchsehen (optional):** `CLAUDE.md`, `docs/` und `.review/` nennen durchgehend
   Kevin, sein Handy und seinen Benutzerpfad; heikle Lebensdetails stehen nicht drin. Mit dem
   Repo werden auch alte CI-Logs und Artefakte (Debug-APK, 14 Tage) und die PR-Texte
