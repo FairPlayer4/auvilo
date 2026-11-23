@@ -1291,8 +1291,11 @@ Was vorher zu tun ist, in dieser Reihenfolge (Vorschlag, noch nicht entschieden)
   Repo. Zugleich die Neuentscheidung zu A-2. **Obsolet 2026-11-14:** Das Backend wird
   ganz mit veröffentlicht; Deploy-Key und Secret danach löschen bleibt (OV6/OV7).
 - OV5 **Historie bereinigen statt verwerfen:** 45 Commits vom 18. bis 31.10. tragen Kevins
-  Arbeits-Adresse (`@arbeitgeber.example`); falls diese Anfänge auf dem Firmenrechner entstanden
-  sind, vorher klären, ob der Arbeitgeber Rechte daran haben könnte (§ 69b UrhG). Mit
+  Arbeits-Adresse; falls diese Anfänge auf dem Firmenrechner entstanden
+  sind, vorher klären, ob der Arbeitgeber Rechte daran haben könnte (§ 69b UrhG).
+  **Geklärt (Kevin, 2026-11-23):** rein privates Projekt, mit dem Arbeitgeber ist
+  abgesprochen, dass er keine Rechte daran hat; gewechselt wurde nur auf den privaten
+  Rechner (Admin, Docker). Mit
   `git filter-repo` die Autoren per `--mailmap` auf die GitHub-noreply-Adresse setzen und
   `testdata/real-*` aus allen Commits entfernen; Commits und Nachrichten bleiben. Das
   Ergebnis in ein **neues** GitHub-Repo pushen, nicht per Force-Push ins alte: GitHub hält
@@ -1304,6 +1307,20 @@ Was vorher zu tun ist, in dieser Reihenfolge (Vorschlag, noch nicht entschieden)
   echten Reminder-Titel und Benutzerpfaden). Das **Backend** braucht ihn nicht: nur die
   Gmail-Adresse und GitHub-Adressen, keine Testdaten, kein Rechnungskonto in der Historie.
   Die Mailmap setzt die Arbeits-Adresse auf die Gmail-Adresse (nicht noreply, siehe OV7).
+  **Neue Repos (Vorschlag 2026-11-23):** beide neu als `FairPlayer4/auvilo` und
+  `FairPlayer4/auvilo-backend`, erst privat; das Backend ohne Umschreiben. Umstellung,
+  OV6, OV7 und Veröffentlichen an einem Tag (sonst Nachtragen von Commits und wieder ein
+  Deploy-Key). Lokale Ordner, GCP-Projekt, Zweck-Labels und `applicationId` bleiben.
+  **Probelauf 2026-11-23** (Skript, Mailmap und Ersetzungen in `E:\src\umzug-auvilo`,
+  außerhalb der Repos): frischer Klon, Mailmap, `testdata/real-*` entfernt, Benutzerpfade
+  durch `%USERPROFILE%` und die Arbeits-Domain ersetzt, in Inhalten und Nachrichten.
+  Ergebnis: 288 Commits (vorher 289, der fehlende ist der Dependabot-Branch), nur noch
+  Gmail- und GitHub-Adressen, keine Treffer für Arbeits-Domain, Benutzerpfad und
+  `testdata/real-*` (Gegenprobe am alten Klon: 90, 27, 3); Spitzen von `main` und `develop`
+  gleich bis auf zwei Zeilen hier, die diese Werte nannten (seitdem umformuliert, damit
+  die Bäume identisch werden); gitleaks 8.30.1 ohne Funde (Gegenprobe mit einem
+  Test-Schlüssel schlägt an). Offen: Kevins eigene Ersetzung des echten Reminder-Titels
+  (Datei `PRIVAT=…`, Claude liest sie nicht), dann der Lauf am Umstellungstag.
 - OV6 **CI** (erst kurz vorher): wieder bei PRs bauen (für öffentliche Repos kostenlos, Kap. 9, 2026-11-13);
   „Require approval for fork PR workflows“ lassen.
 - OV7 **GitHub-Einstellungen** (erst kurz vorher): Secret Scanning mit Push Protection,
@@ -1312,7 +1329,7 @@ Was vorher zu tun ist, in dieser Reihenfolge (Vorschlag, noch nicht entschieden)
   und steht schon in fast allen Commits. „Keep my email addresses private“ bleibt aus,
   sonst blockt GitHub Pushes mit dieser Adresse.
 - OV8 **Durchsehen (optional):** `CLAUDE.md`, `docs/` und `.review/` nennen durchgehend
-  Kevin, sein Handy und `%USERPROFILE%`; heikle Lebensdetails stehen nicht drin. Mit dem
+  Kevin, sein Handy und seinen Benutzerpfad; heikle Lebensdetails stehen nicht drin. Mit dem
   Repo werden auch alte CI-Logs und Artefakte (Debug-APK, 14 Tage) und die PR-Texte
   öffentlich, beim neuen Repo aus OV5 nicht. **Bereinigt 2026-11-14:** Benutzerpfade
   durch `%USERPROFILE%` ersetzt, der echte Reminder-Titel in `stand.md` entfernt; Kevin,
@@ -1485,6 +1502,7 @@ Neueste zuerst. Kap. 7 enthält immer den gültigen Stand; diese Tabelle ist die
 
 | Datum | Entscheidung |
 |---|---|
+| 2026-11-23 | **OV5 vorbereitet** (7.34, Kevin: „rein privates Projekt und ich habe mit dem Arbeitgeber schon ausgemacht das kein Urheberrecht besteht“; „Ja, Probelauf“): Rechte des Arbeitgebers geklärt. Vorschlag: beide Repos neu als `auvilo` und `auvilo-backend`, erst privat, Umstellung und Veröffentlichen an einem Tag. Probelauf grün, mit Gegenprobe; offen ist Kevins Ersetzung des Reminder-Titels |
 | 2026-11-21 | **Logo ohne „AVL“: Glocke mit Haken** (Kevin: „Aus meiner Sicht passt das Logo weiterhin.“, dann nach vier Vorschlägen: „A übernehmen“): Glocke, Farben und Haken bleiben, nur „A“ und „L“ fallen weg; schon jetzt statt erst vor dem Store-Antrag, auf Handy und Uhr (7.28 PS11, playstore.md N1, `docs/logo-entwuerfe.html` Vorschlag A). Umgesetzt in V1.4a1 |
 | 2026-11-21 | **Fragen zum Entwurf V1.4a** (Kevin: „2. und 3. nach Vorschlag“; zu 1.: „Sollte das nicht über Bluetooth laufen? Es reicht wenn die App nur funktioniert wenn das Handy in der Nähe ist. Meine Uhr hat eh keine Mobilfunkverbindung. … Die Uhr App wäre ja eh optional.“; „Ja es ist Wear OS 6.0“): Die Watch-App spricht nur mit einem Handy in der Nähe, nur über Nachrichten an direkt verbundene Knoten, ohne DataItems, damit nichts über Googles Server geht (7.14 G9b). Kachel mit Sitzung, sonst nächstem Reminder mit Sitzung, sonst nächstem Reminder; bei einer Nachfrage vibriert die Uhr zusätzlich zum Alarm am Handy (design.md, Entwurf V1.4a) |
 | 2026-11-21 | **Watch-App V1.4a vor den Abläufen** (Kevin: „Sitzung funktioniert bisher gut, Abläufe wären eine natürliche Ergänzung. Die Watch App erleichtert die Steuerung weil man das Handy nicht immer direkt in Griffweite hat. Benachrichtigungen auf der Uhr funktionieren gut bei den allgemeinen Remindern. Aber für eine gute Sitzung braucht man eine Watch-App.“; „Schreib mal den Entwurf für V1.4a“). Reihenfolge: V1.4a Watch-App für die Sitzung ohne Schritte, dann V1.4b Abläufe mit Schritten auf Handy und Uhr (bisher als V1.3c geplant), dann Checklisten (7.13 C9). Uhr: Galaxy Watch 4, bald eine neue, geplant für ein aktuelles Wear OS (8.1, 7.14) |
