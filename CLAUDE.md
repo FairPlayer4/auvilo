@@ -106,17 +106,19 @@ Strenge und invasive Mechanismen sind gewollt. Kommunikation auf **Deutsch, mit 
   ```
 
 ## Git
-- Remote `origin`: GitHub `FairPlayer4/avlreminder` (privat). `develop` ist der
+- Remote `origin`: GitHub `FairPlayer4/auvilo` (öffentlich, seit 2026-11-23, Historie
+  bereinigt nach 7.34 OV5; das alte private Repo `FairPlayer4/avlreminder` ist das Archiv
+  mit den PRs und Commits davor, Zuordnung alt→neu in `E:\src\umzug-auvilo\commit-map.txt`).
+  Der lokale Ordner heißt weiter `avlreminder`. `develop` ist der
   Arbeitsbranch; dort nach eigenem Ermessen committen und pushen.
 - **Feature-Branches nur nach Kevins Bestätigung anlegen** (sonst kommt er durcheinander,
   2026-11-15); ohne Bestätigung direkt auf `develop` arbeiten.
 - `main` nur per Pull Request, nie direkt pushen. Nach einer abgeschlossenen Etappe
   einen PR anbieten (`gh pr create`, Basis `main`; ohne `gh` die Compare-URL
-  `https://github.com/FairPlayer4/avlreminder/compare/main...<branch>` nennen).
-- GitHub Actions baut und testet nur nach dem Merge auf `main` (`.github/workflows/build.yml`,
-  gleicher Befehl wie lokal; Debug-APK als Artefakt am Lauf), nicht bei PRs und nicht auf
-  `develop` (GitHub-Minuten, Kap. 9, 2026-11-13). Vor einem PR nach `main` deshalb lokal
+  `https://github.com/FairPlayer4/auvilo/compare/main...<branch>` nennen).
+- GitHub Actions baut und testet auf `main`, `develop` und bei PRs (`.github/workflows/build.yml`,
+  gleicher Befehl wie lokal; Debug-APK als Artefakt am Lauf; wieder seit dem öffentlichen
+  Repo, 2026-11-23, PRs aus Forks erst nach Freigabe). Vor einem PR nach `main` trotzdem lokal
   mit `-PbackendStreng=true` bauen, alles grün, und nach dem Merge den Lauf ansehen.
-  Andere Branches nur bei Bedarf von Hand (`gh workflow run build.yml --ref <branch>`).
   Wird das Repo öffentlich, wieder bei PRs bauen.
 - Commit-Nachrichten auf Deutsch, Präfix mit Version (z. B. `V1.2b: …`).

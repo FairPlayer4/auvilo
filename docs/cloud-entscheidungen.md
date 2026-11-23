@@ -25,7 +25,7 @@
 | # | Frage | Entscheidung | Warum |
 |---|---|---|---|
 | A-1 | Eigene App-Variante? | **Nein**, solange nur Kevin die App nutzt: normaler Build hinter dem Schalter aus PS8 (aus = keine Anmeldung, kein Netz). Variante bzw. interner Test-Track erst mit dem ersten Tester. | Eine Variante hätte eine eigene Datenbank; gesichert würden nicht Kevins echte Daten. |
-| A-2 | Einbindung von `client/` | **Composite Build** (`includeBuild("../avlreminder-backend/client")`), die App hängt von `verbindung` ab (bringt `protokoll` mit). Fester Commit in `gradle/backend-commit.txt`; die CI holt ihn mit einem **Deploy-Key** (nur lesen, nur Backend-Repo). Lokal warnt der Build bei anderem Commit oder uncommitteten Änderungen in `client/`/`proto/` („diese APK nicht installieren“), mit `-PbackendStreng=true` (CI) bricht er ab. | E-B2b-10. Ohne festen Commit baute die CI einen anderen Stand als lokal; ein Deploy-Key gilt nur für ein Repo und läuft nicht ab. Langfristig mit der Sicherheitsphase neu entscheiden (Monorepo oder veröffentlichte Versionen). |
+| A-2 | Einbindung von `client/` | **Composite Build** (`includeBuild("../avlreminder-backend/client")`), die App hängt von `verbindung` ab (bringt `protokoll` mit). Fester Commit in `gradle/backend-commit.txt`; die CI holt ihn aus dem öffentlichen Backend-Repo (bis 2026-11-23 mit einem **Deploy-Key**, nur lesen, nur Backend-Repo). Lokal warnt der Build bei anderem Commit oder uncommitteten Änderungen in `client/`/`proto/` („diese APK nicht installieren“), mit `-PbackendStreng=true` (CI) bricht er ab. | E-B2b-10. Ohne festen Commit baute die CI einen anderen Stand als lokal; ein Deploy-Key gilt nur für ein Repo und läuft nicht ab. Langfristig mit der Sicherheitsphase neu entscheiden (Monorepo oder veröffentlichte Versionen). |
 | A-3 | Netz | Berechtigung **`INTERNET`**. Anf. 8.4: Daten verlassen das Gerät nur Ende-zu-Ende verschlüsselt im Backup, und nur, wenn es eingeschaltet ist. | Die App hatte vorher gar kein Netz. |
 | A-4 | Anmeldung | **Credential Manager**, „Mit Google anmelden“ (`GetSignInWithGoogleOption`), `serverClientId` = Web-Client des Backend-Projekts, `nonce` = `Geraetenachrichten.nonce(Geräteschlüssel)`. Im GCP-Projekt ein Web- und ein Android-Client (unten). | Der Server prüft `aud` gegen `GOOGLE_CLIENT_IDS`, bei Android ist das der Web-Client. Die Nonce bindet das ID-Token an den Geräteschlüssel. |
 | A-5 | Geräteschlüssel | ECDSA P-256 im **Android Keystore**, nicht exportierbar, StrongBox wenn vorhanden, `SHA256withECDSA`. Verloren (App-Daten gelöscht) → neues Gerät. | Der private Schlüssel verlässt das Gerät nie, auch Claude sieht ihn nicht. |
@@ -87,11 +87,6 @@ macht Claude dort keine Bildschirmfotos und keine UI-Abzüge; geprüft wird übe
   `local.properties`. Ohne beide blendet die App das Cloud-Backup aus, stoppt die
   stündliche Sicherung und der Build warnt; so baut auch die CI. Nur einer der beiden
   Werte, eine Adresse ohne `https://` oder eine falsche Client-ID brechen den Build ab.
-- Deploy-Key der CI (in einem eigenen Terminal, der private Schlüssel gehört nicht in den
-  Gesprächsverlauf):
-  ```bash
-  ssh-keygen -t ed25519 -N "" -C "avlreminder-ci" -f avlreminder-ci
-  gh repo deploy-key add avlreminder-ci.pub -R FairPlayer4/avlreminder-backend -t "avlreminder-ci (App-CI, nur lesen)"
-  gh secret set BACKEND_DEPLOY_KEY -R FairPlayer4/avlreminder < avlreminder-ci
-  rm avlreminder-ci avlreminder-ci.pub
-  ```
+- Die CI holt das Backend ohne Schlüssel aus dem öffentlichen Repo
+  `FairPlayer4/auvilo-backend` (seit 2026-11-23; vorher Deploy-Key `BACKEND_DEPLOY_KEY`
+  für das private Repo).

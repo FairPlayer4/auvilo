@@ -1321,10 +1321,13 @@ Was vorher zu tun ist, in dieser Reihenfolge (Vorschlag, noch nicht entschieden)
   die Bäume identisch werden); gitleaks 8.30.1 ohne Funde (Gegenprobe mit einem
   Test-Schlüssel schlägt an). Der echte Reminder-Titel (einziger in der Historie, aus
   `stand.md`) wird über `privat.txt` im selben Ordner ersetzt (`PRIVAT=…`): vorher 9 Treffer,
-  danach 0. Offen: der Lauf am Umstellungstag, nachdem `main` den Stand von `develop`
-  hat (bis dahin weicht nur `main` in den zwei umformulierten Zeilen ab).
+  danach 0. **Umgestellt 2026-11-23:** derselbe Lauf auf dem Stand von GitHub, gitleaks ohne
+  Funde, gepusht nach `FairPlayer4/auvilo` (`main` weicht an der Spitze nur in den zwei
+  umformulierten Zeilen ab, `develop` ist gleich); der lokale Klon zeigt auf das neue
+  Repo, alte Objekte sind entfernt.
 - OV6 **CI** (erst kurz vorher): wieder bei PRs bauen (für öffentliche Repos kostenlos, Kap. 9, 2026-11-13);
-  „Require approval for fork PR workflows“ lassen.
+  „Require approval for fork PR workflows“ lassen. **Umgesetzt 2026-11-23** in beiden Repos
+  (`main`, `develop`, PRs; Backend ohne Deploy-Key).
 - OV7 **GitHub-Einstellungen** (erst kurz vorher): Secret Scanning mit Push Protection,
   Dependabot-Alerts, Branch-Schutz für `main`. **Keine noreply-Adresse** (Kevin,
   2026-11-14): `kevin.bartik@gmail.com` wird eine rein geschäftliche, öffentliche Adresse
@@ -1504,6 +1507,7 @@ Neueste zuerst. Kap. 7 enthält immer den gültigen Stand; diese Tabelle ist die
 
 | Datum | Entscheidung |
 |---|---|
+| 2026-11-23 | **Umzug nach `FairPlayer4/auvilo`** (7.34, Kevin: „Ja, Umstellung“): Historie bereinigt (OV5) und neu gepusht, Backend nach `FairPlayer4/auvilo-backend`; alte Repos bleiben privat als Archiv. CI wieder auf `develop` und bei PRs, Backend ohne Deploy-Key aus dem öffentlichen Repo (OV6, ersetzt „CI nur nach dem Merge auf `main`“ vom 2026-11-13). Lokale Ordner, `applicationId` und Paketname bleiben |
 | 2026-11-23 | **OV5 vorbereitet** (7.34, Kevin: „rein privates Projekt und ich habe mit dem Arbeitgeber schon ausgemacht das kein Urheberrecht besteht“; „Ja, Probelauf“): Rechte des Arbeitgebers geklärt. Vorschlag: beide Repos neu als `auvilo` und `auvilo-backend`, erst privat, Umstellung und Veröffentlichen an einem Tag. Probelauf grün, mit Gegenprobe, auch für den echten Reminder-Titel (Kevin: „Du darfst meine Reminder Titel sehen (da ist nix kritisches dabei)“; Ziel ist nur, dass er aus der Historie verschwindet) |
 | 2026-11-21 | **Logo ohne „AVL“: Glocke mit Haken** (Kevin: „Aus meiner Sicht passt das Logo weiterhin.“, dann nach vier Vorschlägen: „A übernehmen“): Glocke, Farben und Haken bleiben, nur „A“ und „L“ fallen weg; schon jetzt statt erst vor dem Store-Antrag, auf Handy und Uhr (7.28 PS11, playstore.md N1, `docs/logo-entwuerfe.html` Vorschlag A). Umgesetzt in V1.4a1 |
 | 2026-11-21 | **Fragen zum Entwurf V1.4a** (Kevin: „2. und 3. nach Vorschlag“; zu 1.: „Sollte das nicht über Bluetooth laufen? Es reicht wenn die App nur funktioniert wenn das Handy in der Nähe ist. Meine Uhr hat eh keine Mobilfunkverbindung. … Die Uhr App wäre ja eh optional.“; „Ja es ist Wear OS 6.0“): Die Watch-App spricht nur mit einem Handy in der Nähe, nur über Nachrichten an direkt verbundene Knoten, ohne DataItems, damit nichts über Googles Server geht (7.14 G9b). Kachel mit Sitzung, sonst nächstem Reminder mit Sitzung, sonst nächstem Reminder; bei einer Nachfrage vibriert die Uhr zusätzlich zum Alarm am Handy (design.md, Entwurf V1.4a) |

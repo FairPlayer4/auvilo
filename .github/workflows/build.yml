@@ -1,15 +1,20 @@
-# Build und Tests auf main (gleicher Befehl wie lokal, siehe CLAUDE.md).
+# Build und Tests (gleicher Befehl wie lokal, siehe CLAUDE.md).
 #
-# Nur nach dem Merge auf main, nicht bei PRs und nicht auf develop (Entscheidung
-# 2026-11-13, GitHub-Minuten sparen, solange das Repo privat ist). Vor einem PR
-# nach main lokal mit -PbackendStreng=true bauen. Von Hand für jeden Branch
-# startbar (Reiter "Actions"). Wird das Repo öffentlich, wieder bei PRs bauen.
+# Auf main, develop und bei PRs (wieder seit dem öffentlichen Repo, 2026-11-23;
+# vorher nur main, um GitHub-Minuten zu sparen). PRs aus Forks laufen erst nach
+# Freigabe ("Require approval for all external contributors") und ohne Secrets.
+# Vor einem PR nach main lokal mit -PbackendStreng=true bauen.
 name: Build
 
 on:
   push:
-    branches: [main]
-    # Reine Doku-Merges brauchen keinen Build.
+    branches: [main, develop]
+    # Reine Doku-Änderungen brauchen keinen Build.
+    paths-ignore:
+      - "docs/**"
+      - "**.md"
+  pull_request:
+    branches: [main, develop]
     paths-ignore:
       - "docs/**"
       - "**.md"
@@ -46,13 +51,12 @@ jobs:
         id: backend
         run: echo "commit=$(tr -d '[:space:]' < gradle/backend-commit.txt)" >> "$GITHUB_OUTPUT"
 
-      # Das Backend-Repo ist privat. Der Deploy-Key darf nur dieses Repo lesen
-      # (Secret BACKEND_DEPLOY_KEY, Anleitung in docs/cloud-entscheidungen.md).
+      # Das Backend-Repo ist öffentlich, ein Schlüssel ist nicht nötig. Der Ordner
+      # heißt weiter avlreminder-backend wie auf Kevins Rechner (settings.gradle.kts).
       - uses: actions/checkout@fbc6f3992d24b796d5a048ff273f7fcc4a7b6c09 # v5.1.0
         with:
-          repository: FairPlayer4/avlreminder-backend
+          repository: FairPlayer4/auvilo-backend
           ref: ${{ steps.backend.outputs.commit }}
-          ssh-key: ${{ secrets.BACKEND_DEPLOY_KEY }}
           path: avlreminder-backend
           persist-credentials: false
 
@@ -61,8 +65,8 @@ jobs:
           distribution: microsoft
           java-version: 21
 
-      # Gebaut wird nur noch auf main (Standard-Branch); dort schreibt setup-gradle
-      # den Cache von selbst.
+      # setup-gradle schreibt den Cache nur auf main (Standard-Branch); develop
+      # und PRs lesen ihn nur.
       - uses: gradle/actions/setup-gradle@0723195856401067f7a2779048b490ace7a47d7c # v5.0.2
         with:
           # Offener Cache auf Basis von actions/cache statt des proprietären
