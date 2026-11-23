@@ -1333,6 +1333,15 @@ Was vorher zu tun ist, in dieser Reihenfolge (Vorschlag, noch nicht entschieden)
   2026-11-14): `kevin.bartik@gmail.com` wird eine rein geschäftliche, öffentliche Adresse
   und steht schon in fast allen Commits. „Keep my email addresses private“ bleibt aus,
   sonst blockt GitHub Pushes mit dieser Adresse.
+  **Umgesetzt 2026-11-23** in beiden Repos (nach dem Umschalten auf öffentlich): Secret
+  Scanning mit Push Protection, Dependabot-Alerts, Actions nur mit auf Commit-SHA
+  festgelegten Actions (`sha_pinning_required`), Fork-PRs erst nach Freigabe für alle
+  Externen. Regeln: `main` nur per PR (0 Freigaben, kein Force-Push, nicht löschbar),
+  `develop` ohne Force-Push und nicht löschbar; keine Ausnahmen, auch nicht für Kevin.
+  Gegenprobe: ein direkter Push auf `main` wird abgelehnt (GH013). Keine Pflicht-Checks:
+  Reine Doku-PRs starten wegen `paths-ignore` keine CI und blieben sonst hängen.
+  Probe-Läufe danach grün: App-Build auf `develop` (Backend ohne Deploy-Key), Backend-CI auf
+  `develop`, Deploy von Hand aus `auvilo-backend`.
 - OV8 **Durchsehen (optional):** `CLAUDE.md`, `docs/` und `.review/` nennen durchgehend
   Kevin, sein Handy und seinen Benutzerpfad; heikle Lebensdetails stehen nicht drin. Mit dem
   Repo werden auch alte CI-Logs und Artefakte (Debug-APK, 14 Tage) und die PR-Texte
