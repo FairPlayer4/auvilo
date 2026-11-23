@@ -1319,8 +1319,10 @@ Was vorher zu tun ist, in dieser Reihenfolge (Vorschlag, noch nicht entschieden)
   `testdata/real-*` (Gegenprobe am alten Klon: 90, 27, 3); Spitzen von `main` und `develop`
   gleich bis auf zwei Zeilen hier, die diese Werte nannten (seitdem umformuliert, damit
   die Bäume identisch werden); gitleaks 8.30.1 ohne Funde (Gegenprobe mit einem
-  Test-Schlüssel schlägt an). Offen: Kevins eigene Ersetzung des echten Reminder-Titels
-  (Datei `PRIVAT=…`, Claude liest sie nicht), dann der Lauf am Umstellungstag.
+  Test-Schlüssel schlägt an). Der echte Reminder-Titel (einziger in der Historie, aus
+  `stand.md`) wird über `privat.txt` im selben Ordner ersetzt (`PRIVAT=…`): vorher 9 Treffer,
+  danach 0. Offen: der Lauf am Umstellungstag, nachdem `main` den Stand von `develop`
+  hat (bis dahin weicht nur `main` in den zwei umformulierten Zeilen ab).
 - OV6 **CI** (erst kurz vorher): wieder bei PRs bauen (für öffentliche Repos kostenlos, Kap. 9, 2026-11-13);
   „Require approval for fork PR workflows“ lassen.
 - OV7 **GitHub-Einstellungen** (erst kurz vorher): Secret Scanning mit Push Protection,
@@ -1502,7 +1504,7 @@ Neueste zuerst. Kap. 7 enthält immer den gültigen Stand; diese Tabelle ist die
 
 | Datum | Entscheidung |
 |---|---|
-| 2026-11-23 | **OV5 vorbereitet** (7.34, Kevin: „rein privates Projekt und ich habe mit dem Arbeitgeber schon ausgemacht das kein Urheberrecht besteht“; „Ja, Probelauf“): Rechte des Arbeitgebers geklärt. Vorschlag: beide Repos neu als `auvilo` und `auvilo-backend`, erst privat, Umstellung und Veröffentlichen an einem Tag. Probelauf grün, mit Gegenprobe; offen ist Kevins Ersetzung des Reminder-Titels |
+| 2026-11-23 | **OV5 vorbereitet** (7.34, Kevin: „rein privates Projekt und ich habe mit dem Arbeitgeber schon ausgemacht das kein Urheberrecht besteht“; „Ja, Probelauf“): Rechte des Arbeitgebers geklärt. Vorschlag: beide Repos neu als `auvilo` und `auvilo-backend`, erst privat, Umstellung und Veröffentlichen an einem Tag. Probelauf grün, mit Gegenprobe, auch für den echten Reminder-Titel (Kevin: „Du darfst meine Reminder Titel sehen (da ist nix kritisches dabei)“; Ziel ist nur, dass er aus der Historie verschwindet) |
 | 2026-11-21 | **Logo ohne „AVL“: Glocke mit Haken** (Kevin: „Aus meiner Sicht passt das Logo weiterhin.“, dann nach vier Vorschlägen: „A übernehmen“): Glocke, Farben und Haken bleiben, nur „A“ und „L“ fallen weg; schon jetzt statt erst vor dem Store-Antrag, auf Handy und Uhr (7.28 PS11, playstore.md N1, `docs/logo-entwuerfe.html` Vorschlag A). Umgesetzt in V1.4a1 |
 | 2026-11-21 | **Fragen zum Entwurf V1.4a** (Kevin: „2. und 3. nach Vorschlag“; zu 1.: „Sollte das nicht über Bluetooth laufen? Es reicht wenn die App nur funktioniert wenn das Handy in der Nähe ist. Meine Uhr hat eh keine Mobilfunkverbindung. … Die Uhr App wäre ja eh optional.“; „Ja es ist Wear OS 6.0“): Die Watch-App spricht nur mit einem Handy in der Nähe, nur über Nachrichten an direkt verbundene Knoten, ohne DataItems, damit nichts über Googles Server geht (7.14 G9b). Kachel mit Sitzung, sonst nächstem Reminder mit Sitzung, sonst nächstem Reminder; bei einer Nachfrage vibriert die Uhr zusätzlich zum Alarm am Handy (design.md, Entwurf V1.4a) |
 | 2026-11-21 | **Watch-App V1.4a vor den Abläufen** (Kevin: „Sitzung funktioniert bisher gut, Abläufe wären eine natürliche Ergänzung. Die Watch App erleichtert die Steuerung weil man das Handy nicht immer direkt in Griffweite hat. Benachrichtigungen auf der Uhr funktionieren gut bei den allgemeinen Remindern. Aber für eine gute Sitzung braucht man eine Watch-App.“; „Schreib mal den Entwurf für V1.4a“). Reihenfolge: V1.4a Watch-App für die Sitzung ohne Schritte, dann V1.4b Abläufe mit Schritten auf Handy und Uhr (bisher als V1.3c geplant), dann Checklisten (7.13 C9). Uhr: Galaxy Watch 4, bald eine neue, geplant für ein aktuelles Wear OS (8.1, 7.14) |
