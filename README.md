@@ -129,7 +129,8 @@ cd avlreminder
 - Die Mutations-Suite prüft, ob die Tests Fehler finden:
   `python -I -X utf8 tools/mutate.py` (etwa 20 Minuten).
 - Gearbeitet wird auf `develop`; nach `main` nur per Pull Request. Die CI
-  ([build.yml](.github/workflows/build.yml)) läuft auf beiden und bei Pull Requests.
+  ([build.yml](.github/workflows/build.yml)) läuft auf beiden und bei Pull Requests
+  und ist die maßgebliche Prüfung; gemergt wird nur mit grüner CI.
 
 ## Lizenz
 

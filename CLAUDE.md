@@ -44,9 +44,10 @@ Strenge und invasive Mechanismen sind gewollt. Kommunikation auf **Deutsch, mit 
 ./gradlew -q :core:check :core:koverLog :app:testDebugUnitTest :app:lintDebug :app:assembleDebug \
   :wear:testDebugUnitTest :wear:lintDebug :wear:assembleDebug
 ```
-- Vor einem PR nach `main` zusätzlich `-PbackendStreng=true` (wie die CI): bricht ab,
-  wenn der Backend-Stand nicht zu `gradle/backend-commit.txt` passt. Dazu die
-  Mutations-Suite `python -I -X utf8 tools/mutate.py` (etwa 20 min, im Hintergrund, Netz wie
+- Die CI baut mit `-PbackendStreng=true`: bricht ab, wenn der Backend-Stand nicht zu
+  `gradle/backend-commit.txt` passt. Lokal braucht man das nur, um einen roten Lauf
+  nachzustellen. Vor einem PR nach `main` die Mutations-Suite
+  `python -I -X utf8 tools/mutate.py` (etwa 20 min, im Hintergrund, Netz wie
   Gradle): Gegenprobe grün, alle Mutanten entdeckt; das Ergebnis in den PR-Text.
 - `JAVA_HOME` und `ANDROID_HOME` sind auf dem Rechner gesetzt, nichts exportieren
   (Pfade in entwicklungsumgebung.md).
@@ -118,7 +119,9 @@ Strenge und invasive Mechanismen sind gewollt. Kommunikation auf **Deutsch, mit 
   `https://github.com/FairPlayer4/auvilo/compare/main...<branch>` nennen).
 - GitHub Actions baut und testet auf `main`, `develop` und bei PRs (`.github/workflows/build.yml`,
   gleicher Befehl wie lokal; Debug-APK als Artefakt am Lauf; wieder seit dem öffentlichen
-  Repo, 2026-11-23, PRs aus Forks erst nach Freigabe). Vor einem PR nach `main` trotzdem lokal
-  mit `-PbackendStreng=true` bauen, alles grün, und nach dem Merge den Lauf ansehen.
+  Repo, 2026-11-23, PRs aus Forks erst nach Freigabe). **Die CI ist die maßgebliche
+  Prüfung** (Kevin, 2026-11-24): nach einem Push den Lauf abwarten, nach `main` nur mit
+  grüner PR-CI mergen, nach dem Merge den Lauf ansehen. Lokal gebaut wird trotzdem vor
+  jedem Push, weil daraus die APK fürs Handy entsteht.
   Wird das Repo öffentlich, wieder bei PRs bauen.
 - Commit-Nachrichten auf Deutsch, Präfix mit Version (z. B. `V1.2b: …`).
